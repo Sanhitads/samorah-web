@@ -1,0 +1,50 @@
+[
+  {
+    "id": "warm-spiced-gourmand",
+    "name": "Warm Spiced Gourmand",
+    "tagline": "Rich, creamy and delicately floral with a velvety tea undertone.",
+    "notes": {
+      "opening": ["Bergamot", "Black Tea", "Star Anise"],
+      "heart": ["Rose", "Cardamom", "Cinnamon"],
+      "base": ["Sweet Milk", "Vanilla", "Sandalwood"]
+    },
+    "inspiredBy": "Kashmiri Chai",
+    "gradClass": "grad-chai"
+  },
+  {
+    "id": "sweet-oriental",
+    "name": "Sweet Oriental",
+    "tagline": "Devotional sweetness wrapped in coconut milk and sacred sandalwood.",
+    "notes": {
+      "opening": ["Coconut", "Cardamom", "Rice Flour"],
+      "heart": ["Jasmine", "Saffron", "Jaggery"],
+      "base": ["Sandalwood", "White Musk", "Vanilla"]
+    },
+    "inspiredBy": "Modak",
+    "gradClass": "grad-modak"
+  },
+  {
+    "id": "smoky-woods",
+    "name": "Smoky Woods",
+    "tagline": "Ancient, commanding, and deeply resonant — a scent that crosses centuries.",
+    "notes": {
+      "opening": ["Black Pepper", "Dark Berries", "Clove"],
+      "heart": ["Oud", "Patchouli", "Cedar"],
+      "base": ["Dark Amber", "Vetiver", "Tobacco"]
+    },
+    "inspiredBy": "Crimson Velvet",
+    "gradClass": "grad-crimson"
+  },
+  {
+    "id": "fresh-earthy-green",
+    "name": "Fresh Earthy Green",
+    "tagline": "The clarity after rain — petrichor, iris, and living green.",
+    "notes": {
+      "opening": ["Violet Leaf", "Bergamot", "Blackcurrant"],
+      "heart": ["Iris", "Lavender", "Heliotrope"],
+      "base": ["Vetiver", "Cedarwood", "Ambergris"]
+    },
+    "inspiredBy": "Midnight Amethyst",
+    "gradClass": "grad-amethyst"
+  }
+]

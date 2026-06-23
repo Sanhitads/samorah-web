@@ -1,0 +1,54 @@
+[
+  {
+    "id": "vol-1",
+    "volume": "Vol. I",
+    "name": "Dessert Chapter",
+    "slug": "dessert-chapter",
+    "tagline": "Where memory tastes like warmth.",
+    "poeticLine": "Stories steeped in sugar, spice — and the slow alchemy of love.",
+    "description": "A collection born from the warmth of Indian kitchens. Each scent is a recipe — slow, intentional, and deeply comforting. Inspired by sweets that carry memory, by rituals that nourish before they delight.",
+    "gradClass": "grad-chai",
+    "heroCandle": "kashmiri-chai",
+    "products": ["kashmiri-chai", "modak", "gajar-halwa"],
+    "comingSoon": false
+  },
+  {
+    "id": "vol-2",
+    "volume": "Vol. II",
+    "name": "The Wild Within",
+    "slug": "the-wild-within",
+    "tagline": "What lives beneath the surface.",
+    "poeticLine": "For those who carry entire forests inside them.",
+    "description": "A collection for the untamed — bold botanicals, raw earth, and the electricity of things that grow without asking permission. These are scents for people who know themselves.",
+    "gradClass": "grad-wild",
+    "heroCandle": "samorah-blush",
+    "products": ["samorah-blush", "golden-citrine", "crimson-velvet"],
+    "comingSoon": false
+  },
+  {
+    "id": "vol-3",
+    "volume": "Vol. III",
+    "name": "Mood Library",
+    "slug": "mood-library",
+    "tagline": "A fragrance for every state of mind.",
+    "poeticLine": "Light one. Let it find you.",
+    "description": "Curated moods for every hour — from the electric clarity of morning to the velvet quiet of midnight. Each candle in this collection is a mood made visible.",
+    "gradClass": "grad-amethyst",
+    "heroCandle": "midnight-amethyst",
+    "products": ["midnight-amethyst"],
+    "comingSoon": false
+  },
+  {
+    "id": "vol-4",
+    "volume": "Vol. IV",
+    "name": "Nature Chapter",
+    "slug": "nature-chapter",
+    "tagline": "The outside, brought in.",
+    "poeticLine": "Rain on dry earth. Cedar in morning air. Petrichor, slowly.",
+    "description": "A love letter to the natural world — petrichor, forest floors, sun-warmed leaves, and the quiet dignity of things that grow slowly. Coming soon.",
+    "gradClass": "grad-nature",
+    "heroCandle": null,
+    "products": [],
+    "comingSoon": true
+  }
+]
