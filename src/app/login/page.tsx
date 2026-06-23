@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, type CSSProperties, type FormEvent } from "react";
+import {
+  Suspense,
+  useEffect,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+} from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserStore } from "@/store/useUserStore";
 
@@ -32,8 +39,11 @@ const btnGhost: CSSProperties = { ...btn, background: "transparent", color: "#22
 
 type Status = { type: "error" | "info"; message: string } | null;
 
-export default function LoginPage() {
+function LoginInner() {
   const auth = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const next = searchParams.get("next");
   const user = useUserStore((s) => s.user);
   const role = useUserStore((s) => s.role);
   const isLoggedIn = useUserStore((s) => s.isLoggedIn);
@@ -43,7 +53,18 @@ export default function LoginPage() {
   const [status, setStatus] = useState<Status>(null);
   const [busy, setBusy] = useState(false);
 
-  async function run(action: () => Promise<{ error: { message: string } | null }>, ok?: string) {
+  // Once authenticated, return to the path the middleware stashed in ?next=
+  // (relative paths only, to avoid open redirects).
+  useEffect(() => {
+    if (isLoggedIn && next && next.startsWith("/")) {
+      router.replace(next);
+    }
+  }, [isLoggedIn, next, router]);
+
+  async function run(
+    action: () => Promise<{ error: { message: string } | null }>,
+    ok?: string,
+  ) {
     setBusy(true);
     setStatus(null);
     const { error } = await action();
@@ -139,5 +160,13 @@ export default function LoginPage() {
         No account? <a href="/register">Register</a>
       </p>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginInner />
+    </Suspense>
   );
 }
