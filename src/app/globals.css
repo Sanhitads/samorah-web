@@ -19,8 +19,10 @@
   --gold-dark: #A8843C;
   --white: #FFFFFF;
 
-  --font-serif: 'Cormorant Garamond', Georgia, serif;
-  --font-sans: 'DM Sans', system-ui, sans-serif;
+  /* next/font (layout.tsx) exposes --font-cormorant / --font-dm-sans on <html>;
+     fall back to the literal family, then a system serif/sans. */
+  --font-serif: var(--font-cormorant), 'Cormorant Garamond', Georgia, serif;
+  --font-sans: var(--font-dm-sans), 'DM Sans', system-ui, sans-serif;
 
   --ease-luxury: cubic-bezier(0.25, 0.1, 0.25, 1);
   --ease-out: cubic-bezier(0.0, 0.0, 0.2, 1);
@@ -233,31 +235,31 @@ h1, h2, h3, h4 {
 .reveal-delay-2 { transition-delay: 0.2s; }
 .reveal-delay-3 { transition-delay: 0.35s; }
 
-/* ─── Announcement Bar ─── */
+/* ─── Announcement Bar ───
+   V2 override (SDD-VISUAL §1): a static, centred luxury signal — NO marquee.
+   Messages crossfade in place; overlapping copies are absolutely stacked so
+   the bar height never shifts. */
 .announcement-bar {
-  background: var(--deep-charcoal);
-  color: var(--ivory);
-  text-align: center;
-  padding: 10px 20px;
-  font-size: 11px;
-  letter-spacing: 0.12em;
   position: relative;
+  height: 38px;
+  background: var(--deep-charcoal);
   z-index: 200;
   overflow: hidden;
 }
 
-.announcement-bar__inner {
+.announcement-bar__message {
+  position: absolute;
+  inset: 0;
   display: flex;
-  gap: 40px;
-  animation: marquee 20s linear infinite;
-  width: max-content;
-}
-
-.announcement-bar__inner span { white-space: nowrap; }
-
-@keyframes marquee {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
+  align-items: center;
+  justify-content: center;
+  padding: 0 20px;
+  text-align: center;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 300;
+  letter-spacing: 0.1em;
+  color: rgba(250, 247, 242, 0.85);
 }
 
 /* ─── Header ─── */
@@ -3356,13 +3358,3 @@ h1, h2, h3, h4 {
 }
 
 .cart-drawer__continue:hover { color: var(--deep-charcoal); }
-
-@media (max-width: 480px) {
-  .cart-drawer { width: 100vw; }
-  .cart-item { padding: 16px 20px; }
-  .cart-drawer__header { padding: 24px 20px 20px; }
-  .cart-drawer__footer { padding: 16px 20px 24px; }
-}
-
-/* ── next/font wiring (overrides prototype literal font-family tokens) ── */
-:root { --font-serif: var(--font-cormorant), Georgia, serif; --font-sans: var(--font-dm-sans), system-ui, sans-serif; }
