@@ -2800,19 +2800,20 @@ h1, h2, h3, h4 {
   background: rgba(26, 26, 26, 0.6);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  animation: searchFadeIn 0.25s var(--ease-out);
-}
-
-@keyframes searchFadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  /* Motion is owned by Framer in SearchOverlay (Phase 6 · Component 4). */
 }
 
 .search-overlay__panel {
   background: var(--ivory);
   max-height: 80vh;
   overflow-y: auto;
-  animation: searchSlideDown 0.3s var(--ease-luxury);
+}
+
+/* Result-row body: stack the text lines (the row itself is a 3-col grid). */
+.search-result-item__body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 @keyframes searchSlideDown {

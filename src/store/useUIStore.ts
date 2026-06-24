@@ -5,22 +5,25 @@ import { create } from "zustand";
  * open. Kept separate from data stores so any component (Header now, an
  * add-to-cart button later) can open an overlay without prop-drilling.
  *
- * Phase 6 introduces the Mega Menu; Search (Component 4) and Cart (Component 5)
- * extend this same store with searchOpen / cartOpen. Opening one overlay closes
- * the others (only one fullscreen surface at a time).
- *
- * Not persisted — overlay state is ephemeral.
+ * Opening one overlay closes the others — only one fullscreen surface at a time.
+ * Cart (Component 5) extends this with cartOpen. Not persisted — ephemeral.
  */
 interface UIState {
   menuOpen: boolean;
+  searchOpen: boolean;
   openMenu: () => void;
   closeMenu: () => void;
   toggleMenu: () => void;
+  openSearch: () => void;
+  closeSearch: () => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
   menuOpen: false,
-  openMenu: () => set({ menuOpen: true }),
+  searchOpen: false,
+  openMenu: () => set({ menuOpen: true, searchOpen: false }),
   closeMenu: () => set({ menuOpen: false }),
-  toggleMenu: () => set((state) => ({ menuOpen: !state.menuOpen })),
+  toggleMenu: () => set((state) => ({ menuOpen: !state.menuOpen, searchOpen: false })),
+  openSearch: () => set({ searchOpen: true, menuOpen: false }),
+  closeSearch: () => set({ searchOpen: false }),
 }));

@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   DEFAULT_BRANCH_ID,
   MENU_BRANCHES,
   type MenuBranch,
 } from "@/config/navigation";
+import { useOverlay } from "@/hooks/useOverlay";
 
 /**
  * Fullscreen Editorial Mega Menu (Phase 6 · Component 3).
@@ -26,66 +27,22 @@ export interface MegaMenuProps {
   onClose: () => void;
 }
 
-const FOCUSABLE =
-  'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
 const EASE_LUXURY = [0.25, 0.1, 0.25, 1] as const;
 const EASE_OUT = [0, 0, 0.2, 1] as const;
 
 export function MegaMenu({ open, onClose }: MegaMenuProps) {
   const reduceMotion = useReducedMotion();
   const [activeId, setActiveId] = useState<MenuBranch["id"]>(DEFAULT_BRANCH_ID);
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const restoreRef = useRef<HTMLElement | null>(null);
+  // Shared overlay behaviour: scroll lock · focus trap · ESC · return focus.
+  const dialogRef = useOverlay(open, onClose);
 
   const active =
     MENU_BRANCHES.find((b) => b.id === activeId) ?? MENU_BRANCHES[0];
 
-  // Open-state side effects: scroll lock, focus capture + trap + restore, ESC.
+  // Open on SHOP — never an empty state.
   useEffect(() => {
-    if (!open) return;
-
-    setActiveId(DEFAULT_BRANCH_ID); // open on SHOP — never empty
-    restoreRef.current = document.activeElement as HTMLElement | null;
-
-    const { body } = document;
-    const prevOverflow = body.style.overflow;
-    body.style.overflow = "hidden";
-
-    const raf = requestAnimationFrame(() => {
-      dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
-    });
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onClose();
-        return;
-      }
-      if (e.key !== "Tab" || !dialogRef.current) return;
-      const items = Array.from(
-        dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE),
-      ).filter((n) => n.offsetParent !== null);
-      if (items.length === 0) return;
-      const first = items[0];
-      const last = items[items.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener("keydown", onKeyDown);
-
-    return () => {
-      cancelAnimationFrame(raf);
-      document.removeEventListener("keydown", onKeyDown);
-      body.style.overflow = prevOverflow;
-      restoreRef.current?.focus?.(); // return focus to the Menu trigger
-    };
-  }, [open, onClose]);
+    if (open) setActiveId(DEFAULT_BRANCH_ID);
+  }, [open]);
 
   // Close when the negative space (overlay root) is clicked — not the content.
   const onBackdrop = useCallback(
