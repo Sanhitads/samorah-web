@@ -3358,3 +3358,174 @@ h1, h2, h3, h4 {
 }
 
 .cart-drawer__continue:hover { color: var(--deep-charcoal); }
+
+/* ─── Site Header (Phase 6 · Component 2) ───
+   V2 chrome (SDD-VISUAL §2): single MENU trigger · centred SAMORAH wordmark ·
+   Search / Account / Cart. Two modes via [data-variant]:
+     solid    — sticky ivory; warms to glass + hairline shadow once scrolled
+     floating — fixed & transparent over a hero; settles to ivory glass on scroll
+   Supersedes the legacy prototype .header rules above. */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  width: 100%;
+  color: var(--deep-charcoal);
+  background: var(--ivory);
+  border-bottom: 1px solid rgba(26, 26, 26, 0.05);
+  box-shadow: 0 1px 0 rgba(26, 26, 26, 0); /* hairline shadow, off at top */
+  transition:
+    background 0.45s var(--ease-luxury),
+    color 0.45s var(--ease-luxury),
+    box-shadow 0.45s var(--ease-luxury),
+    border-color 0.45s var(--ease-luxury),
+    backdrop-filter 0.45s var(--ease-luxury);
+}
+
+/* Solid + scrolled → warm ivory glass, subtle blur, hairline shadow */
+.site-header[data-scrolled="true"] {
+  background: rgba(250, 247, 242, 0.82);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 1px 0 rgba(26, 26, 26, 0.06);
+}
+
+/* Floating: fixed & transparent over the hero (no border, no shadow).
+   Phase 7 finalises top-offset relative to the announcement bar. */
+.site-header[data-variant="floating"] {
+  position: fixed;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+.site-header[data-variant="floating"][data-tone="light"] { color: var(--ivory); }
+.site-header[data-variant="floating"][data-tone="dark"] { color: var(--deep-charcoal); }
+
+/* Floating + scrolled → settle into warm ivory glass with dark text */
+.site-header[data-variant="floating"][data-scrolled="true"] {
+  background: rgba(250, 247, 242, 0.82);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  color: var(--deep-charcoal);
+  border-color: rgba(26, 26, 26, 0.05);
+  box-shadow: 0 1px 0 rgba(26, 26, 26, 0.06);
+}
+
+.site-header__inner {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  height: var(--header-height);
+  padding-inline: 48px;
+  max-width: var(--container-wide);
+  margin-inline: auto;
+}
+
+/* LEFT — single Menu trigger (opens the Mega Menu, Component 3) */
+.site-header__menu {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 8px 4px;
+  transition: opacity 0.3s;
+}
+.site-header__menu:hover { opacity: 0.6; }
+
+.site-header__menu-glyph {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 18px;
+}
+.site-header__menu-glyph span {
+  display: block;
+  height: 1px;
+  width: 100%;
+  background: currentColor;
+}
+
+/* CENTER — the wordmark anchor */
+.site-header__wordmark {
+  justify-self: center;
+  font-family: var(--font-serif);
+  font-size: 26px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: inherit;
+  line-height: 1;
+  padding-left: 0.2em; /* optical balance against the tracking */
+}
+
+/* RIGHT — Search · Account · Cart */
+.site-header__actions {
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 28px;
+}
+.site-header__action {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 8px 2px;
+  transition: opacity 0.3s;
+}
+.site-header__action:hover { opacity: 0.6; }
+
+.site-header__action-icon { display: none; } /* desktop is typography-led */
+.site-header__count {
+  font-size: 10px;
+  letter-spacing: 0;
+  opacity: 0.7;
+}
+
+/* Keyboard focus — visible, on-brand */
+.site-header__menu:focus-visible,
+.site-header__wordmark:focus-visible,
+.site-header__action:focus-visible {
+  outline: 1px solid currentColor;
+  outline-offset: 4px;
+  opacity: 1;
+}
+
+/* ── Responsive prep (the mobile menu overlay is Component 7 — not built) ── */
+@media (max-width: 1024px) {
+  .site-header__inner { padding-inline: 32px; }
+  .site-header__actions { gap: 20px; }
+}
+@media (max-width: 768px) {
+  .site-header__inner { padding-inline: 20px; }
+  .site-header__wordmark { font-size: 22px; }
+  /* Collapse text labels → thin icons to fit small screens */
+  .site-header__menu-label,
+  .site-header__action-label { display: none; }
+  .site-header__action-icon { display: inline-flex; }
+  .site-header__menu-glyph { width: 20px; }
+  .site-header__actions { gap: 18px; }
+}
+
+/* Reduced motion — simplified, instant state changes */
+@media (prefers-reduced-motion: reduce) {
+  .site-header { transition: none; }
+}
