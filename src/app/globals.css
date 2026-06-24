@@ -3752,3 +3752,125 @@ h1, h2, h3, h4 {
 
 /* Empty-state understated action */
 .cart-drawer__empty-link { margin-top: 24px; }
+
+/* ─── Site Footer (Phase 6 · Component 6) ───
+   The quiet closing note (Trudon · Loewe · The Row): a dark charcoal surface so
+   the page closes with weight and settles into silence. Warm low-opacity type,
+   hairline dividers only, typography-led. No cards, shadows, boxes, or promo.
+   Rhythm: poetic line → hairline → five-column index → hairline → bottom line.
+   Fresh namespace — supersedes the legacy .footer rules above. */
+.site-footer {
+  background: var(--deep-charcoal);
+  color: var(--ivory);
+}
+
+.site-footer__inner {
+  max-width: var(--container-wide);
+  margin-inline: auto;
+  padding-inline: 48px;
+}
+
+/* Poetic line — its own centred section, divided from the index below */
+.site-footer__intro {
+  text-align: center;
+  padding-block: 80px 56px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.site-footer__poetic {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: clamp(18px, 2vw, 24px);
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  color: rgba(250, 247, 242, 0.55);
+  max-width: 40ch;
+  margin-inline: auto;
+}
+
+/* Five columns */
+.site-footer__columns {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 48px;
+  padding-block: 64px;
+}
+
+.site-footer__col-title {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(250, 247, 242, 0.4);
+  margin-bottom: 20px;
+}
+
+.site-footer__links {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.site-footer__link {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 300;
+  letter-spacing: 0.02em;
+  color: rgba(250, 247, 242, 0.65);
+  transition: color 0.3s var(--ease-luxury);
+}
+.site-footer__link:hover { color: var(--ivory); }
+.site-footer__link:focus-visible {
+  outline: 1px solid rgba(250, 247, 242, 0.6);
+  outline-offset: 3px;
+  color: var(--ivory);
+}
+
+/* Bottom — divided from the index, subtle */
+.site-footer__bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding-block: 28px 40px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.site-footer__copyright,
+.site-footer__made {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: rgba(250, 247, 242, 0.35);
+}
+
+/* Tablet — graceful reflow, hierarchy preserved */
+@media (max-width: 1024px) {
+  .site-footer__inner { padding-inline: 32px; }
+  .site-footer__intro { padding-block: 64px 48px; }
+  .site-footer__columns {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 40px 32px;
+    padding-block: 56px;
+  }
+}
+
+/* Mobile — two columns (compact, same IA, no accordion) */
+@media (max-width: 768px) {
+  .site-footer__inner { padding-inline: 20px; }
+  .site-footer__intro { padding-block: 48px 36px; }
+  .site-footer__columns {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 36px 24px;
+    padding-block: 44px;
+  }
+  .site-footer__bottom {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding-block: 24px 32px;
+  }
+}
+
+/* Reduced motion — subtle hover without transition timing */
+@media (prefers-reduced-motion: reduce) {
+  .site-footer__link { transition: none; }
+}

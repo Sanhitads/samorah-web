@@ -131,3 +131,71 @@ export const MENU_BRANCHES: MenuBranch[] = [
 ];
 
 export const DEFAULT_BRANCH_ID: MenuBranch["id"] = "shop";
+
+/* ── Footer ────────────────────────────────────────────────────────────────
+   The footer's own information architecture (SDD-VISUAL §31, as refined for
+   Component 6): Shop · Chapters · About · Help · Follow. Distinct from the Mega
+   Menu model above — the footer is a permanent index, not a campaign menu. */
+
+export interface FooterLink {
+  label: string;
+  href: string;
+  /** Off-site (social) link — opens in a new tab. */
+  external?: boolean;
+}
+
+export interface FooterSection {
+  title: string;
+  links: FooterLink[];
+}
+
+export const FOOTER_SECTIONS: FooterSection[] = [
+  {
+    title: "Shop",
+    links: [
+      { label: "All Products", href: "/shop" },
+      { label: "Scented Candles", href: "/shop/candles" },
+      { label: "Room & Linen Sprays", href: "/shop/room-linen-sprays" },
+      { label: "Ritual Bundles", href: "/bundles" },
+      { label: "New Arrivals", href: "/shop/new-arrivals" },
+    ],
+  },
+  {
+    title: "Chapters",
+    links: [
+      { label: "Vol. I — Dessert Chapter", href: "/chapters/dessert-chapter" },
+      { label: "Vol. II — The Wild Within", href: "/chapters/the-wild-within" },
+      { label: "Vol. III — Mood Library", href: "/chapters/mood-library" },
+      { label: "Vol. IV — Nature Chapter", href: "/chapters/nature-chapter" },
+    ],
+  },
+  {
+    title: "About",
+    links: [
+      { label: "Our Story", href: "/about/our-story" },
+      { label: "Craft & Ingredients", href: "/about/craft-ingredients" },
+      { label: "Meet The Makers", href: "/about/meet-the-makers" },
+      { label: "Product Care", href: "/product-care" },
+      { label: "Contact", href: "/contact" },
+    ],
+  },
+  {
+    title: "Help",
+    links: [
+      { label: "Shipping Policy", href: "/shipping" },
+      { label: "Returns & Exchanges", href: "/returns" },
+      { label: "Terms & Conditions", href: "/terms" },
+      { label: "Privacy Policy", href: "/privacy" },
+      { label: "FAQ", href: "/faq" },
+    ],
+  },
+  {
+    title: "Follow",
+    // Placeholder destinations until the real handles are confirmed.
+    links: [
+      { label: "Instagram", href: "https://www.instagram.com/", external: true },
+      { label: "Pinterest", href: "https://www.pinterest.com/", external: true },
+      { label: "Spotify", href: "https://open.spotify.com/", external: true },
+    ],
+  },
+];
