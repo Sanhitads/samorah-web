@@ -3529,3 +3529,221 @@ h1, h2, h3, h4 {
 @media (prefers-reduced-motion: reduce) {
   .site-header { transition: none; }
 }
+
+/* ─── Mega Menu (Phase 6 · Component 3) ───
+   Fullscreen editorial overlay — a table of contents, not a dropdown.
+   Opacity + translateY motion only (driven by Framer). No shadows, no cards,
+   no hover backgrounds; large negative space. */
+.mega {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: var(--ivory);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.mega__bar {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  height: var(--header-height);
+  padding-inline: 48px;
+}
+.mega__eyebrow {
+  justify-self: start;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.mega__wordmark {
+  justify-self: center;
+  font-family: var(--font-serif);
+  font-size: 26px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--deep-charcoal);
+  line-height: 1;
+  padding-left: 0.2em;
+}
+.mega__close {
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--deep-charcoal);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  transition: opacity 0.3s;
+}
+.mega__close:hover { opacity: 0.6; }
+
+.mega__inner {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(200px, 1fr) 2.6fr;
+  gap: 80px;
+  width: 100%;
+  max-width: var(--container-wide);
+  margin-inline: auto;
+  padding: 64px 48px 80px;
+  align-items: start;
+}
+
+/* LEFT — primary branches (large, typographic) */
+.mega__branches {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.mega__branch {
+  width: fit-content;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: clamp(28px, 3vw, 44px);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--muted);
+  padding: 2px 0;
+  transition: color 0.35s var(--ease-luxury);
+}
+.mega__branch:hover,
+.mega__branch[aria-current="true"] { color: var(--deep-charcoal); }
+.mega__branch:focus-visible {
+  outline: 1px solid var(--deep-charcoal);
+  outline-offset: 6px;
+  color: var(--deep-charcoal);
+}
+
+/* CENTER + RIGHT — the dynamic panel */
+.mega__panel {
+  display: grid;
+  grid-template-columns: 1fr 1.1fr;
+  gap: 56px;
+  align-items: start;
+}
+
+.mega__links {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 8px;
+}
+.mega__link {
+  width: fit-content;
+  font-family: var(--font-serif);
+  font-size: 18px;
+  color: var(--charcoal);
+  transition: opacity 0.3s, padding-left 0.3s var(--ease-luxury);
+}
+.mega__link:hover { opacity: 0.55; padding-left: 6px; }
+.mega__link:focus-visible {
+  outline: 1px solid var(--deep-charcoal);
+  outline-offset: 4px;
+}
+.mega__link--soon {
+  color: var(--muted);
+  cursor: default;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.mega__link--soon:hover { opacity: 1; padding-left: 0; }
+.mega__soon {
+  font-family: var(--font-sans);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  opacity: 0.7;
+}
+
+/* RIGHT — campaign panel (4:5), the whole panel is the link */
+.mega__campaign {
+  position: relative;
+  display: block;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  border-radius: 2px;
+}
+.mega__campaign-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.55) 0%, transparent 55%);
+  transition: background 0.4s var(--ease-luxury);
+}
+.mega__campaign:hover .mega__campaign-overlay {
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.65) 0%, transparent 60%);
+}
+.mega__campaign-content {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 28px;
+  color: var(--ivory);
+}
+.mega__campaign-eyebrow {
+  font-family: var(--font-sans);
+  font-size: 9px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.mega__campaign-title {
+  font-family: var(--font-serif);
+  font-size: 24px;
+  line-height: 1.15;
+}
+.mega__campaign-desc {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+/* Tablet */
+@media (max-width: 1024px) {
+  .mega__bar { padding-inline: 32px; }
+  .mega__inner {
+    grid-template-columns: 1fr 1.6fr;
+    gap: 48px;
+    padding: 48px 32px 64px;
+  }
+  .mega__panel { grid-template-columns: 1fr; gap: 40px; }
+  .mega__campaign { max-width: 420px; }
+}
+
+/* Small screens — graceful vertical stack (the real Mobile Menu is Component 7) */
+@media (max-width: 768px) {
+  .mega__bar { padding-inline: 20px; }
+  .mega__wordmark { font-size: 22px; }
+  .mega__close-label { display: none; }
+  .mega__inner {
+    grid-template-columns: 1fr;
+    gap: 36px;
+    padding: 32px 20px 56px;
+  }
+  .mega__branch { font-size: 30px; }
+}
