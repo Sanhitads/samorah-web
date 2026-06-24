@@ -3664,6 +3664,27 @@ h1, h2, h3, h4 {
   opacity: 0.7;
 }
 
+/* Collections branch — parent → children → quiet CTA hierarchy.
+   Hierarchy via size · colour · indent · space only (no cards/dividers/arrows).
+   Vertical rhythm (the .mega__links gap) is preserved. */
+.mega__link--parent {
+  font-size: 19px;
+  color: var(--deep-charcoal);
+}
+.mega__link--child {
+  padding-left: 18px;
+  font-size: 15px;
+  color: var(--smoke);
+}
+.mega__link--child:hover { padding-left: 18px; } /* keep indent stable on hover */
+.mega__link--child.mega__link--soon { color: var(--muted); }
+.mega__link--cta {
+  margin-top: 18px;
+  font-style: italic;
+  font-size: 15px;
+  color: var(--charcoal);
+}
+
 /* RIGHT — campaign panel (4:5), the whole panel is the link */
 .mega__campaign {
   position: relative;

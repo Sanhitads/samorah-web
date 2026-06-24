@@ -129,11 +129,12 @@ export function MegaMenu({ open, onClose }: MegaMenuProps) {
             {/* CENTER + RIGHT — crossfade together when the branch changes */}
             <motion.div key={active.id} className="mega__panel" {...panelMotion}>
               <nav className="mega__links" aria-label={`${active.label} links`}>
-                {active.items.map((item) =>
-                  item.isComingSoon ? (
+                {active.items.map((item) => {
+                  const tier = item.tier ? ` mega__link--${item.tier}` : "";
+                  return item.isComingSoon ? (
                     <span
                       key={item.label}
-                      className="mega__link mega__link--soon"
+                      className={`mega__link mega__link--soon${tier}`}
                       aria-disabled="true"
                     >
                       {item.label}
@@ -143,13 +144,13 @@ export function MegaMenu({ open, onClose }: MegaMenuProps) {
                     <Link
                       key={item.label}
                       href={item.href}
-                      className="mega__link"
+                      className={`mega__link${tier}`}
                       onClick={onClose}
                     >
                       {item.label}
                     </Link>
-                  ),
-                )}
+                  );
+                })}
               </nav>
 
               <Link

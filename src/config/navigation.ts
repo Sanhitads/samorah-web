@@ -13,6 +13,13 @@ export interface MenuItem {
   href: string;
   /** Render as a quiet, non-navigating "Coming Soon" label until ready. */
   isComingSoon?: boolean;
+  /**
+   * Visual hierarchy within a branch (used by Collections): a `parent` carries
+   * slightly more presence, `child` items are subordinate (indented, softer),
+   * and `cta` sits apart as a quiet editorial call-to-action. Untagged items
+   * render flat, unchanged.
+   */
+  tier?: "parent" | "child" | "cta";
 }
 
 export interface MenuCampaign {
@@ -80,14 +87,15 @@ export const MENU_BRANCHES: MenuBranch[] = [
     id: "collections",
     label: "Collections",
     items: [
-      { label: "The Hours Collection", href: "/collections/the-hours" },
-      { label: "Volume I — The Everyday", href: "/collections/the-everyday" },
+      { label: "The Hours Collection", href: "/collections/the-hours", tier: "parent" },
+      { label: "Volume I — The Everyday", href: "/collections/the-everyday", tier: "child" },
       {
         label: "Volume II — The Intimate",
         href: "/collections/the-intimate",
         isComingSoon: true,
+        tier: "child",
       },
-      { label: "Discover The Collection", href: "/collections" },
+      { label: "Discover The Collection", href: "/collections", tier: "cta" },
     ],
     campaign: {
       eyebrow: "The Air Chapters",
