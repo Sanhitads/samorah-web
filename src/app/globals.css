@@ -3074,12 +3074,7 @@ h1, h2, h3, h4 {
   background: rgba(26, 26, 26, 0.5);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
-  animation: cartFadeIn 0.2s ease;
-}
-
-@keyframes cartFadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  /* Motion owned by Framer in CartDrawer (Phase 6 · Component 5). */
 }
 
 .cart-drawer {
@@ -3092,13 +3087,7 @@ h1, h2, h3, h4 {
   background: var(--ivory);
   display: flex;
   flex-direction: column;
-  animation: cartSlideIn 0.3s var(--ease-luxury);
   overflow: hidden;
-}
-
-@keyframes cartSlideIn {
-  from { transform: translateX(32px); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
 }
 
 .cart-drawer__header {
@@ -3748,3 +3737,18 @@ h1, h2, h3, h4 {
   }
   .mega__branch { font-size: 30px; }
 }
+
+/* ─── Cart Drawer additions (Phase 6 · Component 5) ───
+   Reuses the ported .cart-* styles; these few rules cover the V2 specifics. */
+.cart-item__body { min-width: 0; }
+
+/* Primary action — the ported .atc-btn dark styling, as a full-width Link */
+.cart-drawer__checkout {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  margin-top: 16px;
+}
+
+/* Empty-state understated action */
+.cart-drawer__empty-link { margin-top: 24px; }

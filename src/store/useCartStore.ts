@@ -25,15 +25,12 @@ export interface CartItem {
   qty: number;
 }
 
-interface CartState {
+export interface CartState {
   items: CartItem[];
-  cartOpen: boolean;
   addItem: (product: CartProduct, vessel: string, size: string) => void;
   removeItem: (key: string) => void;
   updateQty: (key: string, qty: number) => void;
   clearCart: () => void;
-  openCart: () => void;
-  closeCart: () => void;
 }
 
 /**
@@ -45,10 +42,10 @@ export const useCartStore = create<CartState>()(
   persist(
     (set) => ({
       items: [],
-      cartOpen: false,
 
-      // ADD: increment qty if the key already exists, else append with qty 1 —
-      // then auto-open the mini-cart, exactly like CartContext.addItem.
+      // ADD: increment qty if the key already exists, else append with qty 1.
+      // (Overlay open-state lives in useUIStore now; the prototype's auto-open-
+      // on-add is re-wired at the add-to-cart call site in Phase 9 via openCart.)
       addItem: (product, vessel, size) =>
         set((state) => {
           const key = `${product.id}-${vessel}-${size}`;
@@ -72,7 +69,7 @@ export const useCartStore = create<CartState>()(
                   qty: 1,
                 },
               ];
-          return { items, cartOpen: true };
+          return { items };
         }),
 
       removeItem: (key) =>
@@ -87,12 +84,10 @@ export const useCartStore = create<CartState>()(
         })),
 
       clearCart: () => set({ items: [] }),
-      openCart: () => set({ cartOpen: true }),
-      closeCart: () => set({ cartOpen: false }),
     }),
     {
       name: "samorah_cart", // same localStorage key as the prototype
-      partialize: (state) => ({ items: state.items }), // persist only items (cartOpen resets)
+      partialize: (state) => ({ items: state.items }), // persist only items
     },
   ),
 );
