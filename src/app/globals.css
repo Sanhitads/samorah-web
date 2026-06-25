@@ -4252,3 +4252,104 @@ h1, h2, h3, h4 {
   .home-chapter:hover .home-chapter__title { transform: none; }
   .home-chapter--skeleton { animation: none; }
 }
+
+/* ─── Homepage · Brand Story (Phase 7 · Section 3) ───
+   The maker's quiet — an asymmetric editorial spread on soft-beige. No section
+   title is shown; photography leads, the type whispers. Orientation + tone are
+   data-driven so campaigns reshape it without a rebuild. Gentle reveal only. */
+.home-story {
+  background: var(--soft-beige);
+}
+.home-story[data-tone="warm-ivory"] { background: var(--warm-ivory); }
+.home-story[data-tone="ivory"] { background: var(--ivory); }
+
+.home-story__inner {
+  display: grid;
+  grid-template-columns: 58fr 42fr; /* image-weighted asymmetry */
+  grid-template-rows: minmax(660px, auto); /* the image fills this row; the text floats centred, so the image extends above and below it */
+  align-items: center;
+  max-width: var(--container-wide);
+  margin-inline: auto;
+}
+/* image-right → swap columns + order; the image stays the larger panel */
+.home-story[data-orientation="image-right"] .home-story__inner {
+  grid-template-columns: 42fr 58fr;
+}
+.home-story[data-orientation="image-right"] .home-story__media { order: 2; }
+.home-story[data-orientation="image-right"] .home-story__content { order: 1; }
+
+.home-story__media {
+  position: relative;
+  align-self: stretch; /* fills the full row — taller than the text, extends beyond it */
+  min-height: 560px;
+}
+.home-story__image {
+  position: absolute;
+  inset: 0;
+}
+.home-story__image--photo {
+  background-size: cover;
+  background-position: center;
+}
+
+.home-story__content {
+  display: flex;
+  flex-direction: column;
+  padding: 64px clamp(48px, 6vw, 96px);
+  max-width: 576px; /* ~7% narrower → a calmer paragraph line length (heading size unchanged) */
+}
+.home-story__eyebrow {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 22px;
+}
+.home-story__heading {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: clamp(32px, 3.4vw, 52px);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: var(--deep-charcoal);
+  margin-bottom: 28px;
+}
+.home-story__body {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  line-height: 1.8;
+  color: var(--smoke);
+  margin-bottom: 52px; /* let the CTA breathe */
+}
+/* Optional single editorial sentence (campaign alternative to the body) */
+.home-story__quote {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: clamp(22px, 2.4vw, 30px);
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  color: var(--charcoal);
+  margin-bottom: 52px;
+}
+
+@media (max-width: 1024px) {
+  .home-story__inner,
+  .home-story[data-orientation="image-right"] .home-story__inner {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+  }
+  /* image always leads on stacked layouts */
+  .home-story__media,
+  .home-story__content,
+  .home-story[data-orientation="image-right"] .home-story__media,
+  .home-story[data-orientation="image-right"] .home-story__content { order: 0; }
+  .home-story__media { min-height: 52vh; }
+  .home-story__content { padding: 64px 32px; max-width: 640px; }
+}
+@media (max-width: 768px) {
+  .home-story__media { min-height: 42vh; }
+  .home-story__content { padding: 48px 20px; }
+  .home-story__body { font-size: 16px; }
+}

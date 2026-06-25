@@ -11,7 +11,7 @@
 > name the conflict** before writing code. Never silently replace an approved
 > decision. If a document is missing or outdated, say exactly which one.
 >
-> **Last updated:** 2026-06-25 · Phase 7 §1–§2 (Hero + Signature Chapters); Campaign System + Editorial Chapter Rail recorded (§8).
+> **Last updated:** 2026-06-25 · Phase 7 §1–§3 (Hero + Signature Chapters + Brand Story); Decision 17 + homepage per-section cadence + future Brand-Story image controls (§8) recorded.
 
 ---
 
@@ -41,11 +41,18 @@ prototype as the **locked design + content source of truth**.
 
 - **In progress:** **Phase 7 — Homepage** (one editorial journey, built beat by
   beat). Done: **§1 Hero** (campaign-driven) · **§2 Signature Chapters** (reusable
-  Editorial Chapter Rail). Next beat: **§3 Brand Story**.
+  Editorial Chapter Rail) · **§3 Brand Story** (titleless editorial spread).
+  Next beat: **§4 Scent Experience** (the dark "drama" beat).
 - **Completed:** Phase 6 — Layout Chrome (all chrome + refinements).
 - **Working cadence (standing):** one area → one component → one file at a time;
   explain dependencies first; **stop after each subphase for approval**; commit
   only on the user's "proceed"/"commit". Avoid generic e-commerce UI.
+- **Homepage per-section cadence (standing):** before building each homepage
+  section, pause and explain six things — **emotional goal · layout · transition
+  in · transition out · CMS structure · design rationale** — then stop for
+  approval. Judge every section by: *"Does this make Samorah feel more like an
+  editorial publication or more like an e-commerce store?"* If e-commerce,
+  redesign it.
 
 ## 4. Phase log (completed)
 
@@ -79,6 +86,7 @@ prototype as the **locked design + content source of truth**.
 14. **Chrome architecture: `(store)` route group + `StoreChrome` client coordinator; isolated, prop-driven components; shared `useOverlay` hook (scroll-lock/focus-trap/ESC/return-focus).** · Decoupled, testable chrome. · 2026-06-25 · 6 · All chrome + future overlays (Mobile Menu).
 15. **Homepage Hero is a campaign-driven editorial component, not a static banner.** Layout/type/spacing/motion/photography *treatment* stay fixed; only campaign *content* changes (image, eyebrow, heading, copy, CTA, theme). Phase 7 already reads from a typed `HeroCampaign` (`config/campaigns.ts` + `getActiveCampaign()`); the full Campaign Manager + automatic date-scheduling is **Approved Future Architecture (§8)**, built in the Admin/CMS phase. · Timeless layout, seasonal content (Trudon/Dior/Loewe); no layout refactor and no deploy to switch campaigns later. · 2026-06-25 · 7 / future CMS · Homepage Hero + future admin.
 16. **Editorial Chapter Rail = the reusable Chapter navigation system** (Homepage now; Chapters landing / Related / Explore-More later). Data-driven (no fixed count), an editorial horizontal shelf — not a carousel (no autoplay/dots/loop; architectural arrows only on overflow). CMS-ready `HomeChapter` (`config/chapters.ts`). Campaign↔chapter is `chapterSlugs[]` (one/many/seasonal); emphasis is **editorial photography only** — equal hierarchy, no featured cards/badges/borders/opacity. · Build once, reuse everywhere; choose a story, not a product. · 2026-06-25 · 7 (§2) · All chapter navigation. See §8.
+17. **Homepage §3 "Brand Story" = a titleless, campaign-driven editorial spread** answering *why Samorah exists* — never an "About Us" block, and the words "Brand Story" never appear in the UI. Asymmetric ~58/42 layout where **photography is the dominant anchor and extends ~60px beyond the copy** (centred text floats inside a `minmax(660px,auto)` row); handcrafted (non-synchronised) reveal — image settles first, then eyebrow/heading/body(or `quote`)/CTA in a subtle stagger. CMS-ready `BrandStory` (`config/brandStory.ts`): `orientation` · `backgroundTone` · `photographyMood` · optional `quote`; photography shows **the making**, not the product. Copy is positive (never "what Samorah is *not*"); CTA "Enter the Studio". Future image controls (`imageCrop/imageFocus/imageMood/imageOverlay`) documented in §8, not built. · Editorial publication, not an e-commerce store. · 2026-06-25 · 7 (§3) · Homepage §3 + future CMS.
 
 ## 6. Pending / Deferred register (traced)
 
@@ -150,6 +158,10 @@ The Homepage Hero is a **campaign-driven editorial component**, not a static ban
 The **`ChapterRail`** (`src/components/chapters/`) is the **reusable Chapter navigation system** — built once, reused everywhere (Homepage now; Chapters landing · Related Chapters · Explore-More · editorial nav later). Data-driven (**never a fixed count**), an **editorial horizontal shelf, not a carousel** (no autoplay/dots/loop; architectural arrows appear only on overflow, native swipe on touch). Chapters are CMS-ready typed `HomeChapter` objects (`config/chapters.ts`): title · subtitle · editorial image · mood · description · CTA · display order · visibility.
 
 **Campaign ↔ chapters:** a campaign's `chapterSlugs[]` may feature **one, several, or seasonal** chapters; emphasis is expressed **only through editorial photography** (the active chapter receives current imagery) — **hierarchy stays equal**, never larger cards / badges / borders / opacity. *Rule: the visitor chooses which story to enter, never a product.*
+
+### Brand Story editorial image controls (future — not implemented)
+
+So every future campaign can use different photography with no CSS/component change, the Brand Story (§3) image will gain optional editorial controls: **`imageCrop` · `imageFocus` · `imageMood` · `imageOverlay`**. The model already carries `image`, `imageAlt`, `photographyMood`, `orientation` (+ optional `quote`); these four extend that set when the CMS lands.
 
 ---
 
