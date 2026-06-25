@@ -11,7 +11,7 @@
 > name the conflict** before writing code. Never silently replace an approved
 > decision. If a document is missing or outdated, say exactly which one.
 >
-> **Last updated:** 2026-06-25 · Phase 7 §1 (Hero, campaign-driven); Homepage Campaign System recorded (§8).
+> **Last updated:** 2026-06-25 · Phase 7 §1–§2 (Hero + Signature Chapters); Campaign System + Editorial Chapter Rail recorded (§8).
 
 ---
 
@@ -39,11 +39,10 @@ prototype as the **locked design + content source of truth**.
 
 ## 3. Current state
 
-- **Latest completed phase:** **Phase 6 — Layout Chrome** (Announcement Bar ·
-  Header · Mega Menu · Search Overlay · Cart Drawer · Footer), incl. the
-  Collections-hierarchy + dark-footer refinements. All committed.
-- **Next phase:** **Phase 7 — Homepage** (unblocked; SDD + SPD approved).
-  *Confirm before coding.*
+- **In progress:** **Phase 7 — Homepage** (one editorial journey, built beat by
+  beat). Done: **§1 Hero** (campaign-driven) · **§2 Signature Chapters** (reusable
+  Editorial Chapter Rail). Next beat: **§3 Brand Story**.
+- **Completed:** Phase 6 — Layout Chrome (all chrome + refinements).
 - **Working cadence (standing):** one area → one component → one file at a time;
   explain dependencies first; **stop after each subphase for approval**; commit
   only on the user's "proceed"/"commit". Avoid generic e-commerce UI.
@@ -79,6 +78,7 @@ prototype as the **locked design + content source of truth**.
 13. **Vessel sizes stay 100g / 200g / 350g for now** (mockups show 120/180/250 — deferred, not adopted). · Catalogue is seeded with these; size change = a reseed, not a layout change. · 2026-06-24 · 5.5A · Catalogue; see Pending P5.
 14. **Chrome architecture: `(store)` route group + `StoreChrome` client coordinator; isolated, prop-driven components; shared `useOverlay` hook (scroll-lock/focus-trap/ESC/return-focus).** · Decoupled, testable chrome. · 2026-06-25 · 6 · All chrome + future overlays (Mobile Menu).
 15. **Homepage Hero is a campaign-driven editorial component, not a static banner.** Layout/type/spacing/motion/photography *treatment* stay fixed; only campaign *content* changes (image, eyebrow, heading, copy, CTA, theme). Phase 7 already reads from a typed `HeroCampaign` (`config/campaigns.ts` + `getActiveCampaign()`); the full Campaign Manager + automatic date-scheduling is **Approved Future Architecture (§8)**, built in the Admin/CMS phase. · Timeless layout, seasonal content (Trudon/Dior/Loewe); no layout refactor and no deploy to switch campaigns later. · 2026-06-25 · 7 / future CMS · Homepage Hero + future admin.
+16. **Editorial Chapter Rail = the reusable Chapter navigation system** (Homepage now; Chapters landing / Related / Explore-More later). Data-driven (no fixed count), an editorial horizontal shelf — not a carousel (no autoplay/dots/loop; architectural arrows only on overflow). CMS-ready `HomeChapter` (`config/chapters.ts`). Campaign↔chapter is `chapterSlugs[]` (one/many/seasonal); emphasis is **editorial photography only** — equal hierarchy, no featured cards/badges/borders/opacity. · Build once, reuse everywhere; choose a story, not a product. · 2026-06-25 · 7 (§2) · All chapter navigation. See §8.
 
 ## 6. Pending / Deferred register (traced)
 
@@ -144,6 +144,12 @@ The Homepage Hero is a **campaign-driven editorial component**, not a static ban
 - **Future — Homepage Campaign Manager (Admin/CMS phase):** a `homepage_campaigns` table/CMS replaces the local config (no component/layout change). **Automatic date scheduling** — the homepage shows whichever campaign is active for the current date, *no deploy to switch.* (Enabling scheduling needs the homepage to be **ISR/dynamic** so the date re-evaluates; with one open-ended campaign today it stays static.)
 
 **Project rule:** treat the Homepage Hero — and campaign-aware sections — as campaign-driven; extend this architecture, don't replace it.
+
+### Editorial Chapter Rail (Decision 16 · 2026-06-25)
+
+The **`ChapterRail`** (`src/components/chapters/`) is the **reusable Chapter navigation system** — built once, reused everywhere (Homepage now; Chapters landing · Related Chapters · Explore-More · editorial nav later). Data-driven (**never a fixed count**), an **editorial horizontal shelf, not a carousel** (no autoplay/dots/loop; architectural arrows appear only on overflow, native swipe on touch). Chapters are CMS-ready typed `HomeChapter` objects (`config/chapters.ts`): title · subtitle · editorial image · mood · description · CTA · display order · visibility.
+
+**Campaign ↔ chapters:** a campaign's `chapterSlugs[]` may feature **one, several, or seasonal** chapters; emphasis is expressed **only through editorial photography** (the active chapter receives current imagery) — **hierarchy stays equal**, never larger cards / badges / borders / opacity. *Rule: the visitor chooses which story to enter, never a product.*
 
 ---
 

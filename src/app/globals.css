@@ -4011,3 +4011,246 @@ h1, h2, h3, h4 {
 @media (prefers-reduced-motion: reduce) {
   .home-hero__scroll-line { animation: none; }
 }
+
+/* ─── Homepage · Signature Chapters (Phase 7 · Section 2) ───
+   The editorial library. Cards live in a reusable Editorial Chapter Rail
+   (.chapter-rail) — horizontal browse, not a carousel. Hover lets a chapter
+   quietly come alive: slow zoom + brightness, the title lifts a touch, the
+   Discover underline draws in — symmetric on the way out. No lift/shadow/glow.
+   Hierarchy is equal; the active campaign's emphasis is editorial photography. */
+.home-chapters {
+  background: var(--ivory);
+  padding-block: 120px;
+}
+.home-chapters__intro {
+  max-width: 560px;
+  margin: 0 auto 44px; /* tighter → the rail reads as a continuation */
+  padding-inline: 48px;
+  text-align: center;
+}
+.home-chapters__label {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 9px;
+}
+.home-chapters__heading {
+  font-family: var(--font-serif);
+  font-size: clamp(34px, 4vw, 56px);
+  font-weight: 400;
+  line-height: 1.12;
+  color: var(--deep-charcoal);
+  margin-bottom: 16px;
+}
+.home-chapters__sub {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--smoke);
+}
+
+/* ── Editorial Chapter Rail (reusable) ── */
+.chapter-rail { position: relative; }
+.chapter-rail__track {
+  display: flex;
+  align-items: flex-start; /* lets each card carry its own stagger offset */
+  gap: 18px;
+  max-width: var(--container-wide);
+  margin-inline: auto;
+  padding-inline: 48px;
+  padding-block: 8px; /* room for the stagger + reveal lift */
+  overflow-x: auto;
+  scroll-snap-type: x proximity; /* gentle shelf snap, not a carousel */
+  -webkit-overflow-scrolling: touch; /* inertial momentum on touch */
+  scroll-padding-inline: 48px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.chapter-rail__track::-webkit-scrollbar { display: none; }
+.chapter-rail__item {
+  flex: 0 0 clamp(258px, 22vw, 312px);
+  scroll-snap-align: start;
+}
+/* Subtle editorial stagger — curated, not masonry (max 28px, cycles every 4) */
+.chapter-rail__item:nth-child(4n + 2) { margin-top: 24px; }
+.chapter-rail__item:nth-child(4n + 3) { margin-top: 10px; }
+.chapter-rail__item:nth-child(4n + 4) { margin-top: 28px; }
+
+/* Architectural nav — only on overflow, hidden on touch (native swipe) */
+.chapter-rail__nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--beige);
+  background: rgba(250, 247, 242, 0.92);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: var(--deep-charcoal);
+  cursor: pointer;
+  transition: background 0.3s var(--ease-luxury);
+}
+.chapter-rail__nav:hover { background: var(--ivory); }
+.chapter-rail__nav--prev { left: 14px; }
+.chapter-rail__nav--next { right: 14px; }
+.chapter-rail__nav:focus-visible {
+  outline: 1px solid var(--deep-charcoal);
+  outline-offset: 3px;
+}
+
+/* ── Chapter card (book cover) ── */
+.home-chapter {
+  position: relative;
+  display: block;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  border-radius: 2px;
+  color: var(--ivory);
+}
+.home-chapter__image {
+  position: absolute;
+  inset: 0;
+  transition: transform 1.1s var(--ease-luxury), filter 1.1s var(--ease-luxury);
+}
+.home-chapter__image--photo {
+  background-size: cover;
+  background-position: center;
+}
+.home-chapter:hover .home-chapter__image {
+  transform: scale(1.06);
+  filter: brightness(1.08);
+}
+
+.home-chapter__overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.12) 52%, transparent 78%);
+}
+
+.home-chapter__inner {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  /* extra bottom breathing room — the type rests within the image, not at its edge */
+  padding: 30px 26px 48px;
+}
+.home-chapter__volume {
+  font-family: var(--font-sans);
+  font-size: 9px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  opacity: 0.72;
+  margin-bottom: 8px;
+}
+.home-chapter__title {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: 26px;
+  line-height: 1.15;
+  margin-bottom: 10px;
+  transition: transform 0.9s var(--ease-luxury);
+}
+.home-chapter:hover .home-chapter__title { transform: translateY(-3px); }
+.home-chapter__tagline {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 13px;
+  line-height: 1.5;
+  opacity: 0.78;
+}
+.home-chapter__cta {
+  position: relative;
+  align-self: flex-start;
+  margin-top: 20px;
+  padding-bottom: 4px;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ivory);
+}
+.home-chapter__cta::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.45);
+  transform: scaleX(0.3);
+  transform-origin: left;
+  transition: transform 1s var(--ease-luxury), background-color 1s var(--ease-luxury);
+}
+.home-chapter:hover .home-chapter__cta::after {
+  transform: scaleX(1);
+  background: rgba(255, 255, 255, 0.78);
+}
+.home-chapter__soon {
+  margin-top: 20px;
+  font-family: var(--font-sans);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+.home-chapter--soon { opacity: 0.7; cursor: default; }
+
+.home-chapter:focus-visible {
+  outline: 1px solid var(--ivory);
+  outline-offset: -4px;
+}
+
+/* Loading — same proportions, a quiet designed pulse */
+.home-chapter--skeleton {
+  background: var(--soft-beige);
+  animation: chapterPulse 1.8s var(--ease-luxury) infinite;
+}
+@keyframes chapterPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+@media (max-width: 1024px) {
+  .home-chapters { padding-block: 80px; }
+  .home-chapters__intro { padding-inline: 32px; }
+  .chapter-rail__track { padding-inline: 32px; scroll-padding-inline: 32px; }
+  .chapter-rail__nav { display: none; } /* touch devices use native swipe */
+}
+@media (max-width: 768px) {
+  .home-chapters__intro { padding-inline: 20px; }
+  .chapter-rail__track {
+    gap: 14px;
+    padding-inline: 20px;
+    scroll-padding-inline: 20px;
+  }
+  .chapter-rail__item { flex-basis: 76vw; }
+  /* one card at a time — flatten the stagger */
+  .chapter-rail__item:nth-child(4n + 2),
+  .chapter-rail__item:nth-child(4n + 3),
+  .chapter-rail__item:nth-child(4n + 4) { margin-top: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-chapter__image,
+  .home-chapter__title,
+  .home-chapter__cta::after,
+  .chapter-rail__nav { transition: none; }
+  .home-chapter:hover .home-chapter__image { transform: none; filter: none; }
+  .home-chapter:hover .home-chapter__title { transform: none; }
+  .home-chapter--skeleton { animation: none; }
+}

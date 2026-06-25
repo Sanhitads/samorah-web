@@ -27,6 +27,11 @@ export interface HeroCampaign {
   ctaHref: string;
   /** Colour mood / editorial atmosphere (future: tints scrim/accents). */
   theme: string;
+  /** Chapter(s) this campaign features. A campaign may highlight one, several,
+   *  or seasonal chapters — emphasis is expressed later through editorial
+   *  photography (the active chapter receives current imagery), never through
+   *  larger cards, badges, borders or opacity. Hierarchy stays equal. */
+  chapterSlugs?: string[];
   isActive: boolean;
   /** ISO dates; null = open-ended. Drives automatic scheduling later. */
   startDate: string | null;
@@ -47,6 +52,7 @@ export const HERO_CAMPAIGNS: HeroCampaign[] = [
     ctaLabel: "Explore Chapters",
     ctaHref: "/chapters",
     theme: "warm-dark",
+    chapterSlugs: ["dessert-chapter"],
     isActive: true,
     startDate: null,
     endDate: null,
