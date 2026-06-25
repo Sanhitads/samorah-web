@@ -11,7 +11,7 @@
 > name the conflict** before writing code. Never silently replace an approved
 > decision. If a document is missing or outdated, say exactly which one.
 >
-> **Last updated:** 2026-06-25 · Phase 7 §1–§3 (Hero + Signature Chapters + Brand Story); Decision 17 + homepage per-section cadence + future Brand-Story image controls (§8) recorded.
+> **Last updated:** 2026-06-26 · Phase 7 §1–§4 built. §4 "The Atmosphere" shipped (Decision 18, refined): fragrance-led & product-agnostic, "Featured Atmosphere" heading, Scene·Memory·Atmosphere·Fragrance Journey, data-driven CTA + campaign-priority ordering, provisional Atmosphere Index (Pending P15). Next: §5 Air + Bundle.
 
 ---
 
@@ -41,8 +41,10 @@ prototype as the **locked design + content source of truth**.
 
 - **In progress:** **Phase 7 — Homepage** (one editorial journey, built beat by
   beat). Done: **§1 Hero** (campaign-driven) · **§2 Signature Chapters** (reusable
-  Editorial Chapter Rail) · **§3 Brand Story** (titleless editorial spread).
-  Next beat: **§4 Scent Experience** (the dark "drama" beat).
+  Editorial Chapter Rail) · **§3 Brand Story** (titleless editorial spread) ·
+  **§4 The Atmosphere** (the signature section — "Featured Atmosphere";
+  fragrance-led, product-agnostic, campaign-aware; Decision 18).
+  Next beat: **§5 — Air + Bundle**.
 - **Completed:** Phase 6 — Layout Chrome (all chrome + refinements).
 - **Working cadence (standing):** one area → one component → one file at a time;
   explain dependencies first; **stop after each subphase for approval**; commit
@@ -87,6 +89,7 @@ prototype as the **locked design + content source of truth**.
 15. **Homepage Hero is a campaign-driven editorial component, not a static banner.** Layout/type/spacing/motion/photography *treatment* stay fixed; only campaign *content* changes (image, eyebrow, heading, copy, CTA, theme). Phase 7 already reads from a typed `HeroCampaign` (`config/campaigns.ts` + `getActiveCampaign()`); the full Campaign Manager + automatic date-scheduling is **Approved Future Architecture (§8)**, built in the Admin/CMS phase. · Timeless layout, seasonal content (Trudon/Dior/Loewe); no layout refactor and no deploy to switch campaigns later. · 2026-06-25 · 7 / future CMS · Homepage Hero + future admin.
 16. **Editorial Chapter Rail = the reusable Chapter navigation system** (Homepage now; Chapters landing / Related / Explore-More later). Data-driven (no fixed count), an editorial horizontal shelf — not a carousel (no autoplay/dots/loop; architectural arrows only on overflow). CMS-ready `HomeChapter` (`config/chapters.ts`). Campaign↔chapter is `chapterSlugs[]` (one/many/seasonal); emphasis is **editorial photography only** — equal hierarchy, no featured cards/badges/borders/opacity. · Build once, reuse everywhere; choose a story, not a product. · 2026-06-25 · 7 (§2) · All chapter navigation. See §8.
 17. **Homepage §3 "Brand Story" = a titleless, campaign-driven editorial spread** answering *why Samorah exists* — never an "About Us" block, and the words "Brand Story" never appear in the UI. Asymmetric ~58/42 layout where **photography is the dominant anchor and extends ~60px beyond the copy** (centred text floats inside a `minmax(660px,auto)` row); handcrafted (non-synchronised) reveal — image settles first, then eyebrow/heading/body(or `quote`)/CTA in a subtle stagger. CMS-ready `BrandStory` (`config/brandStory.ts`): `orientation` · `backgroundTone` · `photographyMood` · optional `quote`; photography shows **the making**, not the product. Copy is positive (never "what Samorah is *not*"); CTA "Enter the Studio". Future image controls (`imageCrop/imageFocus/imageMood/imageOverlay`) documented in §8, not built. · Editorial publication, not an e-commerce store. · 2026-06-25 · 7 (§3) · Homepage §3 + future CMS.
+18. **Homepage §4 = "The Atmosphere" — inhabit one fragrance-world at a time, never a "Featured Product."** Full-bleed immersive room; the philosophy *is* the layout — **PLACE → FEELING → ATMOSPHERE → SCENT → CHAPTER** (emotion before composition). **Atmosphere Index** = curated emotional descriptors rendered as a **gold leader-rule index** (fine rules flush-right to a common margin, ragged-left — *an index, never a meter*; no bars/%/chips/icons; this becomes a Samorah typographic signature). **One signature sentence** lands as the crescendo *after* the Index; the **title stands alone** (no tagline). **SCENT** = First / Then / Finally (never Top/Heart/Base). Changing atmosphere makes the **whole environment breathe together** in one slow crossfade (~1.6s — *slower than the rest of the page*; reduced-motion → opacity only) — no carousel/slider/autoplay/parallax/sliding. Fully CMS-driven `config/experiences.ts` (`homepageFeatured · displayOrder · isVisible · backgroundTone · overlayStrength · campaignId · chapterSlug · place · feeling · atmosphereIndex[] · signatureLine · opening/unfolding/lingering · ctaLabel/Href · image · video?` …), campaign-aware; handles **1 / 3 / 5** identically (single → no selector; many → a quiet vertical name-index, not carousel dots). Seeded with **three fragrances** (Kashmiri Chai · Petrichor · Velvet Hour — fragrance names, **not** chapters: the title is *always* the fragrance; the chapter is secondary metadata and the product-medium label is shown separately, different treatment). **CTA is data-driven per product type** (verb fits the medium — "Discover/Experience/Explore the Ritual…") and leads to the fragrance's **product page**. **Permanent timeless heading "Featured Atmosphere"** — *this supersedes the earlier "no Featured wording / Today's Atmosphere" stance, reversed on the user's instruction (2026-06-26); it's one constant, swappable to "Experience".* Spine labels: **Scene · Memory · Atmosphere · Fragrance Journey**. CMS future-proofed for marketing: **Display Name · Sort Order · Visibility · Homepage Featured · Campaign Priority** (reorder/relabel via data, no code). Photography swaps in as the **full immersive background** with CMS overlay colour + opacity (gradient is only a placeholder). The Atmosphere Index leader-rule is a **provisional Phase 7** treatment — decorative auto-generated line lengths (never data); the whole "Atmosphere Language" is revisited after the full site + real photography (Pending P15). · The signature, most-remembered section; the page behaves the way scent-memory behaves. · 2026-06-25 (refined 2026-06-26) · 7 (§4) · Homepage §4 + future CMS. *(Built.)*
 
 ## 6. Pending / Deferred register (traced)
 
@@ -108,6 +111,7 @@ prototype as the **locked design + content source of truth**.
 | P12 | **SDD-VISUAL §31** footer listing diverges from as-built (Decision 10) | doc sync | User instructed not to change docs now; reconcile later |
 | P13 | **Gradient placeholders → real photography** per SPD | Phase 17 / upload | `gradient:<class>` rows become Cloudinary IDs; gradient stays as the blur placeholder |
 | P14 | **Narrative product fields** (story, flame_persona, cultural_reference, lifestyle_use, SEO) not seeded | Phase 9 / content | Seed left them null intentionally |
+| P15 | **Atmosphere Language (§4 Atmosphere Index) revisit** — leader-rule is a provisional Phase 7 treatment | post-site + real photography | Decorative auto-generated lengths now; redesign the whole descriptor language once photography is integrated (Decision 18) |
 
 ## 7. Document index & authority
 
