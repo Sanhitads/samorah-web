@@ -11,7 +11,7 @@
 > name the conflict** before writing code. Never silently replace an approved
 > decision. If a document is missing or outdated, say exactly which one.
 >
-> **Last updated:** 2026-06-25 · after Phase 6 (Layout Chrome); BRD + USD added to `/docs`.
+> **Last updated:** 2026-06-25 · Phase 7 §1 (Hero, campaign-driven); Homepage Campaign System recorded (§8).
 
 ---
 
@@ -78,6 +78,7 @@ prototype as the **locked design + content source of truth**.
 12. **Routing split: `/chapters/*` = candle Volumes; `/collections/*` = Air/Hours lines.** Plus `/shop/*`, `/bundles`, `/about/*`, `/archive`, `/contact`, `/product-care`, `/shipping|returns|terms|privacy|faq`, `/checkout`. · Resolves CHAPTERS vs COLLECTIONS. · 2026-06-25 · 6 · Nav + future page routes.
 13. **Vessel sizes stay 100g / 200g / 350g for now** (mockups show 120/180/250 — deferred, not adopted). · Catalogue is seeded with these; size change = a reseed, not a layout change. · 2026-06-24 · 5.5A · Catalogue; see Pending P5.
 14. **Chrome architecture: `(store)` route group + `StoreChrome` client coordinator; isolated, prop-driven components; shared `useOverlay` hook (scroll-lock/focus-trap/ESC/return-focus).** · Decoupled, testable chrome. · 2026-06-25 · 6 · All chrome + future overlays (Mobile Menu).
+15. **Homepage Hero is a campaign-driven editorial component, not a static banner.** Layout/type/spacing/motion/photography *treatment* stay fixed; only campaign *content* changes (image, eyebrow, heading, copy, CTA, theme). Phase 7 already reads from a typed `HeroCampaign` (`config/campaigns.ts` + `getActiveCampaign()`); the full Campaign Manager + automatic date-scheduling is **Approved Future Architecture (§8)**, built in the Admin/CMS phase. · Timeless layout, seasonal content (Trudon/Dior/Loewe); no layout refactor and no deploy to switch campaigns later. · 2026-06-25 · 7 / future CMS · Homepage Hero + future admin.
 
 ## 6. Pending / Deferred register (traced)
 
@@ -85,7 +86,7 @@ prototype as the **locked design + content source of truth**.
 
 | # | Item | Resolve in | Notes |
 |---|---|---|---|
-| P1 | **Header `floating` mode** is built but mounted *solid* | Phase 7 | Homepage hero passes `floating floatingTone="light"`; finalise top-offset vs the announcement bar |
+| P1 | ✅ **DONE (Phase 7 §1)** — Header `floating` activated on the homepage | — | Absolute under the announcement → fixed ivory glass on scroll; `StoreChrome` `usePathname`; interior pages unchanged |
 | P2 | **Cart auto-open-on-add** removed from `useCartStore` | Phase 9 | Re-wire at the add-to-cart call site via `useUIStore.openCart()` |
 | P3 | **`onAccountClick`** unwired on the Header | account phase | Wire to auth/account; respects "no auth coupling in chrome" |
 | P4 | **Search backend** = client-side JSON filter (`lib/search.ts`) | search phase (BRD P1) | Swap `searchProducts()` to server Postgres full-text behind the same signature |
@@ -129,7 +130,24 @@ and/or §6 in the same turn it's decided.
 - **SDD-VISUAL §31 footer columns** vs as-built (Decision 10 / Pending P12). Docs intentionally unchanged.
 - **SDD-VISUAL §12 footer** showed a large serif statement; as-built footer is restrained (a single centred poetic line). Minor; the restrained treatment is intended.
 
-## 8. Operational notes
+## 8. Approved Future Architecture
+
+> Approved direction, not yet fully built. Future phases **extend** these — never replace them.
+
+### Homepage Campaign System (Decision 15 · 2026-06-25)
+
+The Homepage Hero is a **campaign-driven editorial component**, not a static banner. The layout, typography, spacing, motion and photography *treatment* stay timeless; only the campaign *content* changes through the year (Trudon / Dior Maison / Loewe). **Not a carousel / slider / rotating banner — exactly one campaign is active at a time;** eventual transitions between campaigns are slow editorial crossfades in the Samorah motion language.
+
+**Each campaign carries:** name · hero image · eyebrow · heading · subheading · CTA label · CTA destination · theme (colour mood) · is_active · display order/priority · start date · end date. *Examples:* Kashmiri Chai · Rainforest Bloom · Whispered Flame · Air Chapters.
+
+- **Built now (Phase 7):** the Hero reads from a typed `HeroCampaign` (`src/config/campaigns.ts` + `getActiveCampaign()`) — nothing hardcoded; one open-ended campaign today.
+- **Future — Homepage Campaign Manager (Admin/CMS phase):** a `homepage_campaigns` table/CMS replaces the local config (no component/layout change). **Automatic date scheduling** — the homepage shows whichever campaign is active for the current date, *no deploy to switch.* (Enabling scheduling needs the homepage to be **ISR/dynamic** so the date re-evaluates; with one open-ended campaign today it stays static.)
+
+**Project rule:** treat the Homepage Hero — and campaign-aware sections — as campaign-driven; extend this architecture, don't replace it.
+
+---
+
+## 9. Operational notes
 
 - **Windows + `next dev`:** a running dev server locks `.next/trace` and makes `npm run build` hang/EPERM. Stop node processes before a clean build; restart `npm run dev` afterwards.
 - **`.env.local`** holds real secrets (Supabase project `fzrkjozezkncwewmhoru`) and is gitignored — keep it so. CRLF line endings (Windows).

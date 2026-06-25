@@ -36,8 +36,12 @@ export interface HeaderProps {
   onCartClick?: () => void;
 }
 
-// Just past the announcement bar — where the frame begins to settle.
-const SCROLL_THRESHOLD = 24;
+// Solid: a touch of scroll reveals the hairline shadow.
+const SOLID_SCROLL_OFFSET = 24;
+// Floating: the transparent header is absolute at the announcement's height and
+// scrolls away; at this offset it has reached the top, so it locks to fixed glass
+// seamlessly (matches `top: 38px` in the floating CSS).
+const FLOATING_SCROLL_OFFSET = 38;
 
 export function Header({
   floating = false,
@@ -52,11 +56,12 @@ export function Header({
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
+    const offset = floating ? FLOATING_SCROLL_OFFSET : SOLID_SCROLL_OFFSET;
     let raf = 0;
     const onScroll = () => {
       if (raf) return;
       raf = requestAnimationFrame(() => {
-        setScrolled(window.scrollY > SCROLL_THRESHOLD);
+        setScrolled(window.scrollY > offset);
         raf = 0;
       });
     };
@@ -66,7 +71,7 @@ export function Header({
       window.removeEventListener("scroll", onScroll);
       if (raf) cancelAnimationFrame(raf);
     };
-  }, []);
+  }, [floating]);
 
   return (
     <header

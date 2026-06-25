@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { Header } from "./Header";
 import { MegaMenu } from "./MegaMenu";
 import { SearchOverlay } from "./SearchOverlay";
@@ -32,9 +33,15 @@ export function StoreChrome() {
 
   const cartCount = useStore<CartState, number>(useCartStore, selectCartCount);
 
+  // The homepage hero is a dark cinematic ground → the Header floats transparent
+  // (light tone) over it and warms to ivory glass on scroll (Pending P1).
+  const isHome = usePathname() === "/";
+
   return (
     <>
       <Header
+        floating={isHome}
+        floatingTone="light"
         menuOpen={menuOpen}
         onMenuClick={openMenu}
         onSearchClick={openSearch}

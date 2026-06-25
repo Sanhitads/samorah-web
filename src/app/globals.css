@@ -3380,10 +3380,12 @@ h1, h2, h3, h4 {
   box-shadow: 0 1px 0 rgba(26, 26, 26, 0.06);
 }
 
-/* Floating: fixed & transparent over the hero (no border, no shadow).
-   Phase 7 finalises top-offset relative to the announcement bar. */
+/* Floating (Phase 7): transparent over the hero, sitting just under the
+   announcement bar and scrolling away with the page (absolute), then locking to
+   ivory glass at the top on scroll (below). No border, no shadow. */
 .site-header[data-variant="floating"] {
-  position: fixed;
+  position: absolute;
+  top: 38px; /* announcement bar height (.announcement-bar) */
   background: transparent;
   border-color: transparent;
   box-shadow: none;
@@ -3391,8 +3393,10 @@ h1, h2, h3, h4 {
 .site-header[data-variant="floating"][data-tone="light"] { color: var(--ivory); }
 .site-header[data-variant="floating"][data-tone="dark"] { color: var(--deep-charcoal); }
 
-/* Floating + scrolled → settle into warm ivory glass with dark text */
+/* Floating + scrolled → lock to the top and settle into warm ivory glass */
 .site-header[data-variant="floating"][data-scrolled="true"] {
+  position: fixed;
+  top: 0;
   background: rgba(250, 247, 242, 0.82);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
@@ -3894,4 +3898,116 @@ h1, h2, h3, h4 {
 /* Reduced motion — subtle hover without transition timing */
 @media (prefers-reduced-motion: reduce) {
   .site-footer__link { transition: none; }
+}
+
+/* ─── Homepage · Hero (Phase 7 · Section 1) ───
+   A cinematic candlelit ground (gradient placeholder; SPD photography later)
+   with editorial text over the left and a quiet scroll cue. The floating
+   transparent Header reads against this dark atmosphere. */
+.home-hero {
+  position: relative;
+  min-height: calc(100vh - 38px); /* fills the viewport below the announcement */
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  background: var(--deep-charcoal);
+}
+.home-hero__bg {
+  position: absolute;
+  inset: 0;
+  /* .grad-* paints the placeholder atmosphere; --photo carries a real image */
+}
+.home-hero__bg--photo {
+  background-size: cover;
+  background-position: center;
+}
+.home-hero__scrim {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to right, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.12) 55%, transparent 82%),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.32) 0%, transparent 22%);
+}
+.home-hero__inner {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: var(--container-wide);
+  margin-inline: auto;
+  padding-inline: 48px;
+  padding-block: 120px;
+}
+.home-hero__content { max-width: 640px; }
+
+.home-hero__eyebrow {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 28px;
+}
+.home-hero__heading {
+  font-family: var(--font-serif);
+  font-size: clamp(52px, 6vw, 88px);
+  font-weight: 300;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--ivory);
+  margin-bottom: 28px;
+}
+.home-hero__heading em { font-style: italic; }
+.home-hero__sub {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 300;
+  line-height: 1.8;
+  color: rgba(250, 247, 242, 0.72);
+  max-width: 420px;
+  margin-bottom: 44px;
+}
+.home-hero__cta-row { display: flex; }
+
+/* Quiet scroll cue */
+.home-hero__scroll {
+  position: absolute;
+  bottom: 36px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: rgba(250, 247, 242, 0.55);
+}
+.home-hero__scroll-label {
+  font-family: var(--font-sans);
+  font-size: 9px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+}
+.home-hero__scroll-line {
+  width: 1px;
+  height: 48px;
+  background: rgba(250, 247, 242, 0.4);
+  transform-origin: top;
+  animation: heroScroll 2.4s var(--ease-luxury) infinite;
+}
+@keyframes heroScroll {
+  0%, 100% { transform: scaleY(1); opacity: 0.5; }
+  50% { transform: scaleY(0.4); opacity: 0.9; }
+}
+
+@media (max-width: 1024px) {
+  .home-hero__inner { padding-inline: 32px; }
+}
+@media (max-width: 768px) {
+  .home-hero__inner { padding-inline: 20px; padding-block: 96px; }
+  .home-hero__content,
+  .home-hero__sub { max-width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-hero__scroll-line { animation: none; }
 }
