@@ -4075,10 +4075,10 @@ h1, h2, h3, h4 {
   flex: 0 0 clamp(258px, 22vw, 312px);
   scroll-snap-align: start;
 }
-/* Subtle editorial stagger — curated, not masonry (max 28px, cycles every 4) */
-.chapter-rail__item:nth-child(4n + 2) { margin-top: 24px; }
-.chapter-rail__item:nth-child(4n + 3) { margin-top: 10px; }
-.chapter-rail__item:nth-child(4n + 4) { margin-top: 28px; }
+/* Editorial two-row stagger — odd cards rest high, even cards drop by one
+   subtle step, so the shelf reads as two symmetric rows (Vol I = Vol III,
+   Vol II = Vol IV …) that hold their rhythm as more chapters are added. */
+.chapter-rail__item:nth-child(even) { margin-top: 28px; }
 
 /* Architectural nav — only on overflow, hidden on touch (native swipe) */
 .chapter-rail__nav {
@@ -4240,9 +4240,7 @@ h1, h2, h3, h4 {
   }
   .chapter-rail__item { flex-basis: 76vw; }
   /* one card at a time — flatten the stagger */
-  .chapter-rail__item:nth-child(4n + 2),
-  .chapter-rail__item:nth-child(4n + 3),
-  .chapter-rail__item:nth-child(4n + 4) { margin-top: 0; }
+  .chapter-rail__item:nth-child(even) { margin-top: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
