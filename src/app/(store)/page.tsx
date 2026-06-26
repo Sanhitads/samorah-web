@@ -4,12 +4,14 @@ import { BrandStory } from "@/components/home/BrandStory";
 import { Atmosphere } from "@/components/home/Atmosphere";
 import { Invitations } from "@/components/home/Invitations";
 import { Words } from "@/components/home/Words";
+import { EditorialWorld } from "@/components/home/EditorialWorld";
 import { getActiveCampaign } from "@/config/campaigns";
 import { getVisibleChapters } from "@/config/chapters";
 import { getBrandStory } from "@/config/brandStory";
 import { getFeaturedExperiences } from "@/config/experiences";
 import { getHomeInvitations } from "@/config/invitations";
 import { getEditorialVoice } from "@/config/voices";
+import { getEditorialWorld } from "@/config/editorialWorld";
 
 /**
  * Homepage (Phase 7) — one editorial journey, built one beat at a time.
@@ -20,7 +22,9 @@ import { getEditorialVoice } from "@/config/voices";
  *      at a time; product-agnostic, campaign-aware)
  *   5. Living with fragrance  ✓  (two ways of living as one editorial spread)
  *   6. Words  ✓  (the Editorial Voice — one literary sentence, titleless)
- *   The close, growing quieter: 7. Atmosphere Gallery · 8. Newsletter · Footer.
+ *   7. Editorial World  ✓  (the final magazine spread — the life Samorah belongs
+ *      in; campaign-driven, titleless)
+ *   The close, growing quieter: 8. Newsletter · Footer.
  *   (The old "Featured Product" is dropped — §4 fulfils that role editorially.)
  */
 export default function HomePage() {
@@ -30,6 +34,7 @@ export default function HomePage() {
   const experiences = getFeaturedExperiences(campaign.id);
   const invitations = getHomeInvitations(campaign.id);
   const voice = getEditorialVoice(campaign.id);
+  const world = getEditorialWorld(campaign.id);
 
   return (
     <main>
@@ -39,6 +44,7 @@ export default function HomePage() {
       <Atmosphere experiences={experiences} />
       <Invitations invitations={invitations} />
       <Words voice={voice} />
+      <EditorialWorld stories={world} />
     </main>
   );
 }

@@ -4817,3 +4817,142 @@ h1, h2, h3, h4 {
   .home-words__figure { padding-inline: 22px; }
   .home-words__author { text-align: center; }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Homepage §7 — the Editorial World (titleless; formerly Atmosphere Gallery)
+   One art-directed magazine spread, never "five images":
+     Large Story (left, dominant & tallest) → Supporting Moments (a centre of
+     intentionally varied crops — portrait · landscape · square · macro, never
+     equal tiles) → Closing Story (right, ~15% smaller & offset — the life lived
+     in this world, not another hero).
+   Gutters are deliberately a little unequal (18 / 22 / 15px …) so the eye reads
+   them as hand-set, not mathematical. One spread within one viewport.
+   ───────────────────────────────────────────────────────────────────────── */
+.home-editorial {
+  background: var(--warm-ivory);
+  padding-block: clamp(56px, 9vh, 108px);
+}
+.home-editorial__spread {
+  display: grid;
+  grid-template-columns: 1.28fr 1.78fr 1.02fr; /* Large Story · Supporting · Closing */
+  align-items: start;
+  gap: clamp(14px, 1.5vw, 22px);
+  height: clamp(500px, 62vh, 700px);
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-inline: clamp(20px, 4vw, 56px);
+}
+
+/* each plate is one clickable destination — no card, shadow, lift or overlay */
+.home-editorial__plate {
+  display: block;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+}
+/* the Large Story establishes the world — dominant but eased to 95% so the
+   spread balances (it stays widest, which keeps the hierarchy) */
+.home-editorial__plate[data-slot="hero"] { height: 95%; }
+/* the Closing Story — a little taller (the closing page of the magazine, not
+   another column), nudged down, and set farther from the centre to breathe */
+.home-editorial__plate[data-slot="closing"] {
+  height: calc(85% + 40px);
+  align-self: start;
+  margin-top: clamp(16px, 2.4vh, 28px);
+  margin-left: clamp(30px, 3.2vw, 42px);
+}
+
+/* Supporting Moments — varied crops, intentionally not a 2×2 grid */
+.home-editorial__center {
+  display: grid;
+  grid-template-columns: 0.88fr 2.12fr; /* the second portrait is clearly secondary */
+  gap: 18px;
+  height: 94%;
+  margin-top: 12px; /* a touch lower than the establishing Large Story */
+}
+.home-editorial__center-right {
+  display: grid;
+  grid-template-rows: 0.53fr 0.47fr; /* landscape eased ~5% so it isn't a 2nd hero */
+  gap: 22px; /* a slightly wider gutter than the others */
+  height: 100%;
+}
+.home-editorial__center-bottom {
+  display: grid;
+  grid-template-columns: 1.06fr 0.94fr; /* square a little larger than the macro */
+  align-items: start;
+  gap: 15px; /* a slightly tighter gutter */
+  height: 100%;
+}
+/* the lower pair is offset so neither top nor bottom edge lines up — hand-composed */
+.home-editorial__plate[data-slot="square"] { height: 96%; align-self: start; }
+.home-editorial__plate[data-slot="macro"] { height: 86%; align-self: end; }
+
+.home-editorial__frame {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+.home-editorial__reveal { position: absolute; inset: 0; }
+.home-editorial__image {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  transition: transform 0.9s var(--ease-luxury);
+}
+/* hover = opening a magazine page: a very slow 1.02 zoom + a tiny caption fade.
+   No overlay, no dark layer — just the image and a little editorial text. */
+.home-editorial__plate:hover .home-editorial__image { transform: scale(1.02); }
+.home-editorial__caption {
+  position: absolute;
+  left: clamp(12px, 1.4vw, 18px);
+  bottom: clamp(12px, 1.4vw, 18px);
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--ivory);
+  text-shadow: 0 1px 16px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  transition: opacity 0.6s var(--ease-luxury);
+  pointer-events: none;
+}
+.home-editorial__plate:hover .home-editorial__caption { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .home-editorial__plate:hover .home-editorial__image { transform: none; }
+}
+
+/* mobile: the spread flattens into one vertical editorial run */
+@media (max-width: 860px) {
+  .home-editorial__spread,
+  .home-editorial__center,
+  .home-editorial__center-right {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    gap: 10px;
+    margin-top: 0;
+  }
+  .home-editorial__center-bottom {
+    grid-template-columns: 1fr 1fr;
+    height: auto;
+    gap: 10px;
+  }
+  .home-editorial__plate,
+  .home-editorial__plate[data-slot="hero"],
+  .home-editorial__plate[data-slot="closing"],
+  .home-editorial__plate[data-slot="macro"] {
+    height: auto;
+    align-self: auto;
+    margin: 0;
+  }
+  .home-editorial__plate[data-slot="hero"] .home-editorial__frame,
+  .home-editorial__plate[data-slot="closing"] .home-editorial__frame,
+  .home-editorial__plate[data-slot="portrait"] .home-editorial__frame { aspect-ratio: 4 / 5; }
+  .home-editorial__plate[data-slot="landscape"] .home-editorial__frame { aspect-ratio: 3 / 2; }
+  .home-editorial__plate[data-slot="square"] .home-editorial__frame,
+  .home-editorial__plate[data-slot="macro"] .home-editorial__frame { aspect-ratio: 1 / 1; }
+}
