@@ -4765,3 +4765,55 @@ h1, h2, h3, h4 {
 @media (max-width: 600px) {
   .home-living__inner { padding-inline: 22px; }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Homepage §6 — the Editorial / Closing Voice (titleless)
+   One literary sentence in vast whitespace — the final paragraph of the story.
+   The quietest beat: no heading, no quote graphics, just a single subtle gold
+   hairline. The page begins to settle toward the newsletter and the footer.
+   ───────────────────────────────────────────────────────────────────────── */
+.home-words {
+  background: var(--soft-beige);
+  padding-block: clamp(140px, 24vh, 280px);
+}
+.home-words__figure {
+  /* narrower than a full measure — the typography feels intimate and editorial */
+  max-width: 720px;
+  margin: 0 auto;
+  padding-inline: clamp(24px, 6vw, 80px);
+  text-align: center;
+}
+/* the single permitted ornament — a subtle gold hairline */
+.home-words__rule {
+  display: block;
+  width: 40px;
+  height: 1px;
+  margin: 0 auto clamp(36px, 5vh, 64px);
+  background: var(--gold);
+  opacity: 0.5;
+}
+.home-words__quote {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-weight: 300;
+  font-size: clamp(28px, 3.6vw, 48px);
+  line-height: 1.32;
+  letter-spacing: 0.005em;
+  color: var(--charcoal);
+}
+/* attribution — very tiny, understated, sitting close to the quote so it reads
+   as connected, never competing with it */
+.home-words__author {
+  margin: clamp(16px, 2vh, 24px) 0 0;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: right;
+}
+
+@media (max-width: 600px) {
+  .home-words__figure { padding-inline: 22px; }
+  .home-words__author { text-align: center; }
+}
