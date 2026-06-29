@@ -25,9 +25,11 @@ export const EDITORIAL_CHAPTER_TEMPLATE: Template = {
     commerceEmphasis: "soft",
   },
   rules: {
-    requiredSlots: ["opening", "product", "atmosphere", "closing"],
-    requiredTypes: ["Hero", "FeaturedProduct", "Gallery"],
-    optionalTypes: ["ProductCollection", "Quote"],
+    // Story + Gallery are optional until real editorial-story content exists;
+    // a chapter proves the template with Hero → Featured → Collection → Quote → Rail.
+    requiredSlots: ["opening", "product", "closing"],
+    requiredTypes: ["Hero", "FeaturedProduct"],
+    optionalTypes: ["Story", "ProductCollection", "Quote", "Gallery"],
     maxOccurrences: { Hero: 1, Gallery: 2 },
   },
   sections: [
