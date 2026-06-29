@@ -5,6 +5,7 @@ import type {
   BlockInstance,
 } from "@/platform/section";
 import type { RenderContext } from "@/platform/render";
+import type { ValidationIssue } from "@/platform/primitives";
 
 /**
  * Section Registry (§16) — maps a section `type` to its component, with a rich
@@ -64,10 +65,7 @@ export interface SectionPermissions {
 }
 
 // — validation: flag incomplete sections before publishing —
-export interface ValidationIssue {
-  field?: string;
-  message: string;
-}
+// `ValidationIssue` is shared with template validation — defined in @/platform/primitives.
 export type SectionValidator = (
   settings: Record<string, unknown>,
 ) => ValidationIssue[];

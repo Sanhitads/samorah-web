@@ -75,3 +75,9 @@ export interface Schedule {
   startAt?: string | null;
   endAt?: string | null;
 }
+
+/** A validation problem — shared by section & template validation. */
+export interface ValidationIssue {
+  field?: string;
+  message: string;
+}

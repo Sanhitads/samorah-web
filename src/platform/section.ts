@@ -36,12 +36,24 @@ export type SectionType =
  *  e.g. Hero: classic | minimal | immersive | editorial | cinematic | campaign. */
 export type SectionVariant = string;
 
+/** A named narrative slot a section occupies in a template — structure over
+ *  position, so the section filling a slot can change without breaking the flow. */
+export type TemplateSlot =
+  | "opening"
+  | "narrative"
+  | "product"
+  | "atmosphere"
+  | "closing"
+  | (string & {});
+
 export interface SectionInstance {
   id: string;
   type: SectionType;
   variant: SectionVariant;
   order: number;
   visibility: boolean;
+  /** The narrative slot this section fills in its template (opening/product/…). */
+  slot?: TemplateSlot;
 
   // — lifecycle & conditional rendering (§18, §16) —
   /** Section-level lifecycle (beyond visibility): draft → published → archived;

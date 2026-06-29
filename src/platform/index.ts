@@ -20,6 +20,7 @@ export * from "./relationships";
 export * from "./relationshipTypes";
 export * from "./render";
 export * from "./section";
+export * from "./template";
 export * from "./page";
 export * from "./commerce";
 export * from "./observability";
