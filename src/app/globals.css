@@ -5110,3 +5110,43 @@ img.asset-image,
 video.asset-image {
   object-fit: cover;
 }
+
+/* Section engine (PAGE_ARCHITECTURE.md §16) — SectionShell envelope.
+   data-theme paints --surface/--ink (generated theme CSS); data-spacing sets the
+   rhythm; a background asset (if any) sits behind the content. */
+.section-shell {
+  position: relative;
+}
+.section-shell[data-spacing="sm"] { padding-block: clamp(48px, 8vh, 88px); }
+.section-shell[data-spacing="md"] { padding-block: clamp(72px, 11vh, 132px); }
+.section-shell[data-spacing="lg"] { padding-block: clamp(96px, 14vh, 184px); }
+.section-shell[data-spacing="xl"] { padding-block: clamp(120px, 19vh, 240px); }
+.section-shell__bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+.section-shell__inner {
+  position: relative;
+  z-index: 1;
+}
+
+/* Divider section — adopts the active theme's accent */
+.section-divider {
+  display: flex;
+  justify-content: center;
+}
+.section-divider__rule {
+  display: block;
+  width: 40px;
+  height: 1px;
+  background: var(--accent, var(--gold));
+  opacity: 0.5;
+}
+.section-divider__label {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--accent, var(--gold));
+}

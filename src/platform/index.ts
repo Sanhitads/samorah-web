@@ -18,6 +18,7 @@ export * from "./navigation";
 export * from "./content";
 export * from "./relationships";
 export * from "./relationshipTypes";
+export * from "./render";
 export * from "./section";
 export * from "./page";
 export * from "./commerce";

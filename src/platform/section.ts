@@ -10,8 +10,10 @@ import type {
   EditorialMood,
   Spacing,
   AnimationStyle,
+  LifecycleStatus,
 } from "./primitives";
 import type { AssetRef } from "./asset";
+import type { RenderCondition } from "./render";
 
 export type SectionType =
   | "Hero"
@@ -40,6 +42,19 @@ export interface SectionInstance {
   variant: SectionVariant;
   order: number;
   visibility: boolean;
+
+  // — lifecycle & conditional rendering (§18, §16) —
+  /** Section-level lifecycle (beyond visibility): draft → published → archived;
+   *  preview shows non-published. Default (undefined) = published. */
+  status?: LifecycleStatus;
+  /** Declarative "render if" (campaign · auth · country · device · date · flag). */
+  renderIf?: RenderCondition;
+  /** Ids of sections this one needs — it renders only if they render too. */
+  dependsOn?: string[];
+  /** Version, for history/rollback — managed by the CMS later [Future]. */
+  version?: number;
+  /** An editor's unpublished edits, merged over `settings` only in preview. */
+  previewSettings?: Record<string, unknown>;
 
   // — envelope (applied uniformly by SectionShell) —
   themeToken?: ThemeToken;
