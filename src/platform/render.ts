@@ -13,6 +13,15 @@ import type { PageNavigation } from "./navigation";
 
 export type DeviceKind = "mobile" | "tablet" | "desktop";
 
+/** A CMS preview session — today a boolean `preview` is enough; this is the
+ *  shape it grows into (who is previewing, which draft, until when). [Future] */
+export interface PreviewSession {
+  draftId?: string;
+  editor?: string;
+  expiresAt?: string;
+  reason?: string;
+}
+
 export interface RenderContext {
   pageId?: string;
   experienceId?: string;
@@ -23,6 +32,8 @@ export interface RenderContext {
   now?: Date;
   /** Show draft/preview/scheduled sections (CMS preview). */
   preview?: boolean;
+  /** The richer preview session this boolean grows into [Future]. */
+  previewSession?: PreviewSession;
   // — environment (populated where known) —
   device?: DeviceKind;
   country?: string;

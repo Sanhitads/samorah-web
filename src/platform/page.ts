@@ -16,6 +16,37 @@ import type { TaxonomyRef } from "./taxonomy";
 import type { SeoMeta } from "./content";
 import type { PageNavigation, BreadcrumbItem } from "./navigation";
 import type { SectionInstance } from "./section";
+import type { AssetRef } from "./asset";
+
+// — Cache strategy (§5): rendering strategy belongs to the PAGE, not the route,
+//   so it survives a change of framework. Resolve → Cache → Render. [seam] —
+export type PageCacheMode = "static" | "isr" | "dynamic" | "preview";
+export interface PageCachePolicy {
+  mode: PageCacheMode;
+  /** ISR revalidation window, seconds (mode === "isr"). */
+  revalidate?: number;
+  /** Cache tags for on-demand invalidation [Future]. */
+  tags?: string[];
+}
+
+// — Page analytics (§22): the lifecycle events a page declares it emits. The
+//   implementation is [Future]; the contract exists now, mirroring Sections. —
+export type PageEventType = "viewed" | "scrolled" | "completed" | "cta";
+export interface PageEvents {
+  emits?: PageEventType[];
+  /** Scroll-depth checkpoints (%) at which to fire "scrolled". */
+  scrollDepths?: number[];
+  trackingId?: string;
+}
+
+// — Page manifest (§5): CMS-facing identity, never rendered — mirrors the
+//   Template manifest so the future CMS manages pages consistently. —
+export interface PageManifest {
+  displayName?: string;
+  previewAsset?: AssetRef;
+  purpose?: string;
+  owner?: string;
+}
 
 // — Experience (§3): pages belong to one; product-agnostic. —
 export type ExperienceKind =
@@ -64,6 +95,9 @@ export interface Page {
   status: LifecycleStatus;
   visibility: boolean;
   schedule?: Schedule;
+  cachePolicy?: PageCachePolicy; // default: derived from status (draft → dynamic)
+  events?: PageEvents; // analytics seam [Future impl]
+  manifest?: PageManifest; // CMS identity, never rendered
 
   palette: ThemeToken;
   editorialMood?: EditorialMood;

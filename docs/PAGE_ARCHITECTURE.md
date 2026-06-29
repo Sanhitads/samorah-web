@@ -117,6 +117,35 @@ interface Page {
 ```
 **Navigation is resolved, not hardcoded** — `next` = "the next published page in this experience/journey by order," so new Volumes need no edits.
 
+### 5a. Page Engine — the resolution pipeline  **[P8]**
+
+`resolvePage(page, opts?, middleware?)` (framework-agnostic, `platform/pageResolver.ts`) turns a Page into `{ sections, context, cachePolicy }`. The **fixed order** of resolution — documented so contributors extend the right step:
+
+```
+Page
+  → Lifecycle          isPagePublished() — caller gates; preview widens it
+  → [before-resolve]   localization · auth · experiment · campaign   (seam)
+  → Template           resolveTemplate() — walk `extends`, merge defaults
+  → Sections           composeSections() — page overrides template by id
+  → Relationships      resolved lazily by sections via the relationship engine
+  → Navigation         carried on the page → RenderContext.navigation
+  → SEO                carried on the page → buildPageMetadata() (UI layer)
+  → Context            one RenderContext assembled here, passed to every section
+  → Cache              page.cachePolicy (or derived) → route strategy
+  → [after-resolve]    analytics · logging · personalization          (seam)
+  → Render             SectionRenderer (UI layer)
+```
+
+The UI layer (`components/page/`) is thin over this: **`PageView`** (resolve → JSON-LD → SectionRenderer) and **`buildPageMetadata`** (`seo` → Next `Metadata`).
+
+Six forward-looking contracts ship now (shape, not full implementation):
+
+- **Cache policy** — `cachePolicy: { mode: static|isr|dynamic|preview; revalidate?; tags? }`. Rendering strategy is part of the **page model**, not the route, so it survives a framework change. `resolveCachePolicy()` derives a default from lifecycle when unset (*Resolve → Cache → Render*).
+- **Page events** — `events: { emits: (viewed|scrolled|completed|cta)[]; scrollDepths?; trackingId? }`. The analytics seam, mirroring Section events; implementation [Future].
+- **Middleware seams** — `PageMiddleware { beforeResolve[]; afterResolve[] }`. Reserved extension points around resolution (localization/auth/experiment/campaign in; analytics/logging/personalization out). Loops exist; no hooks ship today.
+- **Preview session** — `preview: boolean` stays; `PreviewSession { draftId?; editor?; expiresAt?; reason? }` is the shape it grows into for the CMS. A session implies preview.
+- **Page manifest** — `manifest: { displayName?; previewAsset?; purpose?; owner? }`. CMS identity, never rendered — mirrors the Template manifest.
+
 ---
 
 ## 6. Sections — type **+ variant** + envelope  **[P8]**
