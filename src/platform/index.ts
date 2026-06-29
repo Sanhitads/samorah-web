@@ -11,6 +11,7 @@
  * See `docs/PAGE_ARCHITECTURE.md` and `docs/ARCHITECTURAL_PRINCIPLES.md`.
  */
 export * from "./primitives";
+export * from "./theme";
 export * from "./taxonomy";
 export * from "./asset";
 export * from "./navigation";

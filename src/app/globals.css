@@ -5087,3 +5087,13 @@ h1, h2, h3, h4 {
   line-height: 1.5;
   color: var(--charcoal);
 }
+
+/* ═════════════════════════════════════════════════════════════════════════
+   THEME TOKENS  (PAGE_ARCHITECTURE.md §9)
+   The `:root` + `[data-theme="…"]` custom-property blocks are GENERATED from the
+   design-system registry (`src/platform/theme.ts`) by the CSS generator
+   (`src/platform/themeStylesheet.ts → buildThemeStylesheet`) and mounted once in
+   the root layout — one source of truth. Do not hand-write theme values here;
+   edit the registry. Principle: One Source of Truth.
+   (The homepage predates this system and uses its own tones — unaffected.)
+   ═════════════════════════════════════════════════════════════════════════ */

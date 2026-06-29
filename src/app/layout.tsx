@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Cormorant_Garamond, DM_Sans } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/auth/AuthProvider";
+import { buildThemeStylesheet } from "@/platform/themeStylesheet";
 
 // Fonts from the prototype design system (BRD §4.3), loaded via next/font.
 const cormorant = Cormorant_Garamond({
@@ -36,6 +37,11 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${cormorant.variable} ${dmSans.variable}`}>
       <body>
+        {/* Design-system theme tokens, generated from src/platform/theme.ts.
+            React 19 hoists this <style> (precedence) into <head>. */}
+        <style href="samorah-themes" precedence="high">
+          {buildThemeStylesheet()}
+        </style>
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
