@@ -5097,3 +5097,16 @@ h1, h2, h3, h4 {
    edit the registry. Principle: One Source of Truth.
    (The homepage predates this system and uses its own tones — unaffected.)
    ═════════════════════════════════════════════════════════════════════════ */
+
+/* AssetImage atom (PAGE_ARCHITECTURE.md §8) — fills its container; the parent
+   (section / plate / frame) owns the size. Gradient placeholders use the
+   existing .grad-* classes; real images cover-fit, honouring objectPosition. */
+.asset-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+img.asset-image,
+video.asset-image {
+  object-fit: cover;
+}
