@@ -6,8 +6,9 @@
  */
 import type { SectionInstance } from "@/platform/section";
 import { composeSections } from "@/platform/template";
-import { CANDLE_PDP_TEMPLATE } from "@/platform/coreTemplates";
+import { CANDLE_PDP_TEMPLATE, AIR_PDP_TEMPLATE } from "@/platform/coreTemplates";
 import type { ProductPageView } from "@/lib/productPage";
+import type { AirVolume, HourEntry } from "@/config/theHours";
 import type { Artist } from "@/config/artist";
 import type { ProductCardModel } from "@/components/ui/ProductCard";
 import { imageMedia, type MediaContent } from "@/lib/presentation";
@@ -88,6 +89,23 @@ export interface LifestyleFeatureSettings {
   media?: MediaContent;
   rows: LifestyleRow[];
   align: EditorialAlign;
+}
+export interface NotesColumnSettings {
+  eyebrow: string;
+  heading?: string;
+  notes: string[];
+}
+export interface PoeticLinesSettings {
+  eyebrow: string;
+  lines: string[];
+}
+export interface PlacementItem {
+  label: string;
+}
+export interface PlacementGridSettings {
+  eyebrow: string;
+  heading?: string;
+  items: PlacementItem[];
 }
 
 // ── Inputs ───────────────────────────────────────────────────────────────────
@@ -264,4 +282,73 @@ export function buildCandleEditorial({ view, artist, related }: CandleEditorialI
   ];
 
   return composeSections(CANDLE_PDP_TEMPLATE.sections, overrides);
+}
+
+// ── Air PDP (Experience B; data from config/theHours until air products exist) ──
+
+export interface AirEditorialInput {
+  hour: HourEntry;
+  volume: AirVolume;
+  others: HourEntry[];
+}
+
+function toHourCard(h: HourEntry): ProductCardModel {
+  return {
+    slug: h.productSlug,
+    name: h.name,
+    tagline: h.feels[0] ?? h.scent.join(" · "),
+    media: imageMedia(h.gradient, h.name, "portrait"),
+    priceLabel: h.priceLabel,
+    commerce: { priceRange: { min: h.price, max: h.price, display: h.priceLabel } },
+  };
+}
+
+function airAccordion(): AccordionItem[] {
+  return [
+    {
+      title: "Product Details",
+      body: "A 100ml room & linen mist. Alcohol-free, skin-safe formula. Mist lightly into the air, or over linen and soft furnishings, and let it settle.",
+    },
+    {
+      title: "Shipping & Exchanges",
+      body: "Dispatched within 2–3 business days. Complimentary shipping on orders over ₹1,000. Returns accepted within 48 hours of delivery for damaged or incorrect items.",
+    },
+  ];
+}
+
+export function buildAirEditorial({ hour, volume, others }: AirEditorialInput): SectionInstance[] {
+  const overrides: SectionInstance[] = [
+    fill("the-hour", {
+      eyebrow: `Hour ${hour.time}`,
+      heading: hour.name,
+      body: [hour.story],
+      media: imageMedia(hour.gradient, hour.name, "landscape"),
+      align: "image-left",
+    } satisfies EditorialStatementSettings),
+    fill("smells-like", { eyebrow: "Smells Like", heading: "The notes", notes: hour.scent } satisfies NotesColumnSettings, {
+      visibility: hour.scent.length > 0,
+    }),
+    fill("feels-like", { eyebrow: "Feels Like", lines: hour.feels } satisfies PoeticLinesSettings, {
+      visibility: hour.feels.length > 0,
+    }),
+    fill("experience", { eyebrow: "The Experience", body: [hour.experience], align: "none" } satisfies EditorialStatementSettings, {
+      visibility: Boolean(hour.experience),
+    }),
+    fill("placement", {
+      eyebrow: "Placement",
+      heading: "Where it belongs",
+      items: hour.placement.map((label) => ({ label })),
+    } satisfies PlacementGridSettings, { visibility: hour.placement.length > 0 }),
+    fill("signature", { quote: hour.signature, variant: "handwritten" } satisfies EditorialQuoteSettings, {
+      visibility: Boolean(hour.signature),
+    }),
+    fill("details", { items: airAccordion() } satisfies EditorialAccordionSettings),
+    fill("related", {
+      eyebrow: "Continue",
+      heading: `Continue ${volume.title}`,
+      products: others.map(toHourCard),
+    } satisfies RelatedProductsSettings, { visibility: others.length > 0 }),
+  ];
+
+  return composeSections(AIR_PDP_TEMPLATE.sections, overrides);
 }

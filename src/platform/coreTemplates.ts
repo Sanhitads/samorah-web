@@ -117,6 +117,28 @@ export const CANDLE_PDP_TEMPLATE: Template = {
   ],
 };
 
+/** Air PDP editorial sequence (Phase 9) — a different storytelling order from the
+ *  candle PDP, reusing the same blocks (no artist/craft/wax; emotion-led). */
+export const AIR_PDP_TEMPLATE: Template = {
+  id: "air-pdp",
+  version: 1,
+  label: "Air — Editorial PDP",
+  description: "The Hour → Smells Like → Feels Like → Experience → Placement → Signature → Details → Continue.",
+  category: "commerce",
+  capabilities: { products: true, blocks: true },
+  intent: { editorialGoal: "An hour, not a product", commerceEmphasis: "soft" },
+  sections: [
+    { id: "the-hour", type: "EditorialStatement", variant: "statement", slot: "narrative", order: 1, visibility: true, spacing: "lg", animation: "fade", settings: {} },
+    { id: "smells-like", type: "NotesColumn", variant: "column", slot: "narrative", order: 2, visibility: true, spacing: "lg", animation: "fade", settings: {} },
+    { id: "feels-like", type: "PoeticLines", variant: "verse", slot: "narrative", order: 3, visibility: true, spacing: "lg", animation: "fade", settings: {} },
+    { id: "experience", type: "EditorialStatement", variant: "statement", slot: "narrative", order: 4, visibility: true, spacing: "lg", animation: "fade", settings: {} },
+    { id: "placement", type: "PlacementGrid", variant: "grid", slot: "narrative", order: 5, visibility: true, spacing: "lg", animation: "fade", settings: {} },
+    { id: "signature", type: "EditorialQuote", variant: "handwritten", slot: "narrative", order: 6, visibility: true, spacing: "lg", animation: "fade", settings: {} },
+    { id: "details", type: "EditorialAccordion", variant: "list", slot: "narrative", order: 7, visibility: true, spacing: "lg", animation: "fade", settings: {} },
+    { id: "related", type: "RelatedProducts", variant: "rail", slot: "closing", order: 8, visibility: true, spacing: "lg", animation: "fade", settings: {} },
+  ],
+};
+
 let registered = false;
 
 export function registerCoreTemplates(): void {
@@ -126,4 +148,5 @@ export function registerCoreTemplates(): void {
   registerTemplate(LIMITED_EDITION_CHAPTER_TEMPLATE);
   registerTemplate(AIR_HOURS_TEMPLATE);
   registerTemplate(CANDLE_PDP_TEMPLATE);
+  registerTemplate(AIR_PDP_TEMPLATE);
 }

@@ -8,8 +8,10 @@ import { chapterTheme } from "@/lib/chapterPage";
 import { getArtist } from "@/config/artist";
 import { AssetImage } from "@/components/ui/AssetImage";
 import { ProductPurchasePanel } from "@/components/product/ProductPurchasePanel";
+import { AirProductDetail } from "@/components/product/AirProductDetail";
 import { SectionRenderer } from "@/components/sections/SectionRenderer";
 import { bootstrapPlatform } from "@/components/page/bootstrap";
+import { getAirVolumes, getHourBySlug } from "@/config/theHours";
 
 /**
  * Product page (Phase 9) — `/shop/[slug]`. A focused commerce page (not the
@@ -21,11 +23,14 @@ export const revalidate = 300;
 export const dynamicParams = true;
 
 export async function generateStaticParams() {
+  const airSlugs = getAirVolumes().flatMap((v) =>
+    v.groups.flatMap((g) => g.hours.map((h) => ({ slug: h.productSlug }))),
+  );
   try {
     const products = await getProducts();
-    return products.map((p) => ({ slug: p.slug }));
+    return [...products.map((p) => ({ slug: p.slug })), ...airSlugs];
   } catch {
-    return [];
+    return airSlugs;
   }
 }
 
@@ -41,12 +46,22 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const p = await load(slug);
-  if (!p) return {};
-  return {
-    title: `${p.name} · Samorah`,
-    description: p.tagline ?? `${p.name} — a Samorah scented candle.`,
-    openGraph: { title: `${p.name} · Samorah`, description: p.tagline ?? "", type: "website" },
-  };
+  if (p) {
+    return {
+      title: `${p.name} · Samorah`,
+      description: p.tagline ?? `${p.name} — a Samorah scented candle.`,
+      openGraph: { title: `${p.name} · Samorah`, description: p.tagline ?? "", type: "website" },
+    };
+  }
+  const air = getHourBySlug(slug);
+  if (air) {
+    return {
+      title: `${air.hour.name} · The Hours · Samorah`,
+      description: air.hour.story,
+      openGraph: { title: `${air.hour.name} · Samorah`, description: air.hour.story, type: "website" },
+    };
+  }
+  return {};
 }
 
 export default async function ProductRoute({
@@ -56,7 +71,15 @@ export default async function ProductRoute({
 }) {
   const { slug } = await params;
   const product = await getProductBySlug(slug);
-  if (!product) notFound();
+  if (!product) {
+    // Air products live in config/theHours (no DB rows yet) — same UI + builder.
+    const air = getHourBySlug(slug);
+    if (!air) notFound();
+    const others = air.volume.groups
+      .flatMap((g) => g.hours)
+      .filter((h) => h.productSlug !== slug);
+    return <AirProductDetail hour={air.hour} group={air.group} volume={air.volume} others={others} />;
+  }
   const raw = product as unknown as ProductInput & {
     id: string;
     fragrance_family: string | null;

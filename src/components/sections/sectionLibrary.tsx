@@ -19,6 +19,9 @@ import { RelatedProducts } from "@/components/pdp/RelatedProducts";
 import { MoodGrid } from "@/components/pdp/MoodGrid";
 import { CraftDetails } from "@/components/pdp/CraftDetails";
 import { LifestyleFeature } from "@/components/pdp/LifestyleFeature";
+import { NotesColumn } from "@/components/pdp/NotesColumn";
+import { PoeticLines } from "@/components/pdp/PoeticLines";
+import { PlacementGrid } from "@/components/pdp/PlacementGrid";
 import type { BrandStory as StorySettings } from "@/config/brandStory";
 import type { EditorialVoice } from "@/config/voices";
 import type { EditorialStory } from "@/config/editorialWorld";
@@ -295,6 +298,39 @@ export function registerSectionLibrary(): void {
     renderCost: "medium",
     capabilities: { theme: true, assets: true, animation: true },
     component: LifestyleFeature,
+  });
+  registerSection({
+    type: "NotesColumn",
+    displayName: "Notes Column",
+    category: "narrative",
+    description: "Scent notes in large type — the 'Smells Like' beat.",
+    icon: "list",
+    variants: ["column"],
+    renderCost: "light",
+    capabilities: { theme: true, animation: true },
+    component: NotesColumn,
+  });
+  registerSection({
+    type: "PoeticLines",
+    displayName: "Poetic Lines",
+    category: "narrative",
+    description: "A few lines read like verse — the 'Feels Like' beat.",
+    icon: "feather",
+    variants: ["verse"],
+    renderCost: "light",
+    capabilities: { theme: true, animation: true },
+    component: PoeticLines,
+  });
+  registerSection({
+    type: "PlacementGrid",
+    displayName: "Placement Grid",
+    category: "narrative",
+    description: "Where the fragrance belongs — bedroom · living · workspace.",
+    icon: "grid",
+    variants: ["grid"],
+    renderCost: "light",
+    capabilities: { theme: true, animation: true },
+    component: PlacementGrid,
   });
   registerSection({
     type: "EditorialAccordion",

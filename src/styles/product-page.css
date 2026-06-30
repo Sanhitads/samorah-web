@@ -89,6 +89,15 @@
   color: var(--ink-muted, var(--muted));
   margin-top: 18px;
 }
+.pdp__air-hour {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--accent, var(--gold));
+  margin-top: 16px;
+  margin-bottom: 4px;
+}
 
 /* ── Purchase panel ── */
 .purchase { margin-top: clamp(28px, 4vw, 44px); }

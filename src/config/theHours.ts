@@ -19,8 +19,13 @@ export interface HourEntry {
   name: string;
   story: string; // the "feels like" line
   scent: string[]; // the "smells like" notes
+  feels: string[]; // the "feels like" poetic lines (PDP)
+  experience: string; // "The Experience" — how the room changes (PDP)
+  placement: string[]; // where it belongs — rooms (PDP)
+  signature: string; // the Signature Line — one sentence (PDP)
   productSlug: string; // → /shop/[slug] (the Room/Linen spray)
   priceLabel: string; // "From ₹599" until the commerce projection resolves it
+  price: number; // commerce price (placeholder until air products exist)
   gradient: string; // "gradient:grad-air"
   /** A short editorial line shown between this Hour and the next (turning a leaf). */
   interlude?: string;
@@ -73,8 +78,13 @@ export const AIR_VOLUMES: AirVolume[] = [
             name: "Open Window",
             story: "The room before the day begins — light arriving, quietly expectant.",
             scent: ["White Tea", "Fresh Air", "Soft Cotton"],
+            feels: ["Fresh sheets.", "Open windows.", "Morning sunlight."],
+            experience: "The room wakes slowly. Air moves where it couldn't before, and everything feels rinsed and beginning again — a quiet invitation to start.",
+            placement: ["Bedroom", "Kitchen", "Entryway"],
+            signature: "Stillness before the day begins.",
             productSlug: "open-window",
             priceLabel: "From ₹599",
+            price: 599,
             gradient: "gradient:grad-air",
             interlude: "The morning arrives quietly.",
           },
@@ -85,8 +95,13 @@ export const AIR_VOLUMES: AirVolume[] = [
             name: "Slow Evening",
             story: "The unhurried middle of an afternoon — soft linen, warm light through glass.",
             scent: ["Cotton", "Iris", "Warm Sandalwood"],
+            feels: ["Soft linen.", "Light through glass.", "Nowhere to be."],
+            experience: "The afternoon stretches. Warmth settles into the corners of the room and time loosens its grip. Nothing is urgent here.",
+            placement: ["Living room", "Reading nook", "Studio"],
+            signature: "The hour that asks for nothing.",
             productSlug: "slow-evening",
             priceLabel: "From ₹599",
+            price: 599,
             gradient: "gradient:grad-blush",
             interlude: "Afternoon forgets to hurry.",
           },
@@ -97,8 +112,13 @@ export const AIR_VOLUMES: AirVolume[] = [
             name: "After Dinner",
             story: "The comfortable haze after a meal — soft conversation, the warmth of something good.",
             scent: ["Tonka Bean", "Amber", "Soft Cedar"],
+            feels: ["Low light.", "Soft voices.", "Something good, remembered."],
+            experience: "Plates cleared, the room holds the warmth of the evening. Conversation slows to comfort, and the day folds itself away.",
+            placement: ["Dining room", "Living room", "Kitchen"],
+            signature: "The warmth that stays after the meal.",
             productSlug: "after-dinner",
             priceLabel: "From ₹599",
+            price: 599,
             gradient: "gradient:grad-chai",
           },
         ],
@@ -116,8 +136,13 @@ export const AIR_VOLUMES: AirVolume[] = [
             name: "Private Hours",
             story: "The most intimate hour of the day. The one that belongs only to you.",
             scent: ["Lavender", "Cashmere", "Dark Musk"],
+            feels: ["Cool cotton.", "A closed door.", "The day, finally quiet."],
+            experience: "The house exhales. The last light is low and kind. This hour belongs to no one else — it is entirely, finally, yours.",
+            placement: ["Bedroom", "Bathroom", "Dressing room"],
+            signature: "The hour that belongs only to you.",
             productSlug: "private-hours",
             priceLabel: "From ₹599",
+            price: 599,
             gradient: "gradient:grad-amethyst",
           },
         ],
@@ -141,3 +166,19 @@ export function getAirVolumes(): AirVolume[] {
 export function getAirVolume(slug: string): AirVolume | undefined {
   return AIR_VOLUMES.find((v) => v.slug === slug);
 }
+
+/** Resolve a single Hour (an air "product") by its productSlug, with its volume
+ *  and group — the temporary data source for the Air PDP until real air products
+ *  exist. The PDP UI + builder are identical, so the source can swap later. */
+export function getHourBySlug(
+  productSlug: string,
+): { hour: HourEntry; group: HourGroup; volume: AirVolume } | undefined {
+  for (const volume of AIR_VOLUMES) {
+    for (const group of volume.groups) {
+      const hour = group.hours.find((h) => h.productSlug === productSlug);
+      if (hour) return { hour, group, volume };
+    }
+  }
+  return undefined;
+}
+
