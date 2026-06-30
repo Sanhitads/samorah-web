@@ -4,7 +4,8 @@ import type { Metadata } from "next";
 import { getProductBySlug, getProducts, getRelatedProducts } from "@/services/productService";
 import { buildProductPage, type ProductInput } from "@/lib/productPage";
 import { buildCandleEditorial, type RelatedProductInput } from "@/lib/productEditorial";
-import { chapterTheme } from "@/lib/chapterPage";
+import { chapterTheme, editionLabel } from "@/lib/chapterPage";
+import { getCollectionBySlug } from "@/services/collectionService";
 import { getArtist } from "@/config/artist";
 import { AssetImage } from "@/components/ui/AssetImage";
 import { ProductPurchasePanel } from "@/components/product/ProductPurchasePanel";
@@ -88,6 +89,24 @@ export default async function ProductRoute({
   const p = buildProductPage(raw);
 
   bootstrapPlatform();
+
+  // Samorah numbering — the product's position in its chapter (hero = .1).
+  if (p.chapterSlug) {
+    const coll = (await getCollectionBySlug(p.chapterSlug)) as
+      | { volume: string | null; hero_product_id: string | null; products?: { id: string; slug: string; is_hero: boolean | null }[] }
+      | null;
+    const products = coll?.products ?? [];
+    if (products.length) {
+      const heroId = coll?.hero_product_id ?? products.find((x) => x.is_hero)?.id ?? products[0]?.id;
+      const ordered = [
+        ...products.filter((x) => x.id === heroId),
+        ...products.filter((x) => x.id !== heroId),
+      ];
+      const idx = ordered.findIndex((x) => x.slug === p.slug);
+      if (idx >= 0) p.edition = editionLabel(coll?.volume ?? null, idx + 1);
+    }
+  }
+
   const related = (await getRelatedProducts(
     { id: raw.id, fragrance_family: raw.fragrance_family, collection_id: raw.collection_id },
     4,
@@ -127,6 +146,7 @@ export default async function ProductRoute({
         </div>
 
         <div className="pdp__info">
+          {p.edition ? <p className="pdp__edition">{p.edition}</p> : null}
           {p.chapterName ? (
             p.chapterHref ? (
               <Link href={p.chapterHref} className="pdp__chapter">{p.chapterName}</Link>
@@ -136,7 +156,11 @@ export default async function ProductRoute({
           ) : null}
           <h1 className="pdp__name">{p.name}</h1>
           {p.tagline ? <p className="pdp__tagline">{p.tagline}</p> : null}
-          {p.scentGroup ? <p className="pdp__scent-group">{p.scentGroup}</p> : null}
+          <p className="pdp__meta">
+            {p.collectionType}
+            {p.scentGroup ? <span className="pdp__meta-sep"> · </span> : null}
+            {p.scentGroup ?? ""}
+          </p>
 
           <ProductPurchasePanel
             product={{

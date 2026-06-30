@@ -66,6 +66,11 @@ export function ProductPurchasePanel({ product }: { product: PurchaseProduct }) 
   return (
     <div className="purchase">
       <p className="purchase__price">{current ? current.priceLabel : product.priceLabel}</p>
+      {current?.burnTime ? (
+        <p className="purchase__burn">
+          <span className="purchase__burn-label">Burn time</span> {current.burnTime}
+        </p>
+      ) : null}
 
       {product.vessels.length > 0 ? (
         <div className="purchase__group">

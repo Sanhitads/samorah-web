@@ -33,6 +33,7 @@ export function AirProductDetail({
     size: "",
     price: hour.price,
     priceLabel: `₹${hour.price}`,
+    burnTime: "",
     inStock: true,
     stockNote: null,
   };

@@ -23,6 +23,7 @@ export interface ProductInput {
   tagline: string | null;
   scent_group: string | null;
   fragrance_family: string | null;
+  collection_type?: string | null; // "Core Collection" | "Limited Collection" (default Core)
   story: string | null;
   story_long: string | null;
   flame_persona: string | null;
@@ -50,6 +51,7 @@ export interface ProductVariantView {
   size: string;
   price: number;
   priceLabel: string; // "₹899"
+  burnTime: string; // "~45 hours" — varies by size
   inStock: boolean;
   stockNote: string | null; // "Low stock" | null
 }
@@ -81,6 +83,8 @@ export interface ProductPageView {
   chapterName: string | null;
   chapterSlug: string | null;
   chapterHref: string | null;
+  collectionType: string; // "Core Collection" | "Limited Collection"
+  edition: string; // "VOL. III.1" — set by the route from the collection position
   scentGroup: string | null;
   fragranceFamily: string | null;
   gallery: ProductGalleryImage[];
@@ -101,6 +105,14 @@ const NOTE_LAYERS: { key: string; label: string }[] = [
   { key: "heart", label: "Heart Notes" },
   { key: "base", label: "Base Notes" },
 ];
+/** Burn time scales with size — the panel updates as the size is chosen. */
+const BURN_BY_SIZE: Record<string, string> = {
+  "100g": "~25 hours",
+  "140g": "~32 hours",
+  "180g": "~40 hours",
+  "200g": "~45 hours",
+  "350g": "~80 hours",
+};
 
 function toGallery(p: ProductInput): ProductGalleryImage[] {
   const imgs = (p.product_images ?? []).filter((i) => i.url);
@@ -122,6 +134,7 @@ function toVariantViews(variants: ProductVariantInput[]): ProductVariantView[] {
         size: v.size_label as string,
         price: effectivePrice(v),
         priceLabel: formatPrice(v).current,
+        burnTime: BURN_BY_SIZE[v.size_label ?? ""] ?? "",
         inStock: status !== "out_of_stock",
         stockNote: status === "low_stock" ? "Low stock" : status === "out_of_stock" ? "Sold out" : null,
       };
@@ -140,8 +153,8 @@ function toNotes(p: ProductInput): NoteColumn[] {
 }
 
 function toDetails(p: ProductInput): DetailRow[] {
+  // Burn time is shown (and updated by size) in the purchase panel, not here.
   const rows: DetailRow[] = [];
-  if (p.burn_time) rows.push({ label: "Burn Time", value: p.burn_time });
   if (p.wax_blend) rows.push({ label: "Wax", value: p.wax_blend });
   if (p.wick) rows.push({ label: "Wick", value: p.wick });
   return rows;
@@ -164,6 +177,8 @@ export function buildProductPage(p: ProductInput): ProductPageView {
     chapterName,
     chapterSlug: p.collection?.slug ?? null,
     chapterHref: p.collection ? `/chapters/${p.collection.slug}` : null,
+    collectionType: p.collection_type ?? "Core Collection",
+    edition: "", // filled by the route from the collection position
     scentGroup: p.scent_group,
     fragranceFamily: p.fragrance_family,
     gallery: toGallery(p),

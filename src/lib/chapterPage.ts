@@ -286,7 +286,7 @@ export function toProjection(p: ChapterProductInput): ProductCommerceProjection 
 }
 
 /** Samorah chapter numbering — "Vol. I" + position → "VOL. I.1". */
-function editionLabel(volume: string | null, n: number): string {
+export function editionLabel(volume: string | null, n: number): string {
   return volume ? `${volume.toUpperCase()}.${n}` : `No. ${n}`;
 }
 
