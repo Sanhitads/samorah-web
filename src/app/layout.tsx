@@ -4,6 +4,7 @@ import "./globals.css";
 import "@/styles/motion.css";
 import "@/styles/product-card.css";
 import "@/styles/chapter-sections.css";
+import "@/styles/air-sections.css";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { buildThemeStylesheet } from "@/platform/themeStylesheet";
 

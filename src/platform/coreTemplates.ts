@@ -59,6 +59,38 @@ export const LIMITED_EDITION_CHAPTER_TEMPLATE: Template = {
   ],
 };
 
+/** Template B — Air Chapters / "The Hours". Hero → Shared Hours (Room) →
+ *  Divider → Private Hours (Linen) → Future Volume teaser. Same engines as the
+ *  Editorial Chapter; reuses Hero + Divider, adds HoursGroup + FutureVolume. */
+export const AIR_HOURS_TEMPLATE: Template = {
+  id: "air-hours",
+  version: 1,
+  experienceKind: "air-chapters",
+  label: "The Hours",
+  description: "Hero → Shared Hours (Room) → Private Hours (Linen) → Future Volume.",
+  category: "editorial",
+  capabilities: { products: true, campaigns: true, seo: true },
+  intent: {
+    audience: "Everyday ritual & gifting",
+    seoIntent: "Air / room & linen spray discovery",
+    editorialGoal: "A diary of the day's unnoticed moments",
+    commerceEmphasis: "soft",
+  },
+  rules: {
+    requiredSlots: ["opening", "closing"],
+    requiredTypes: ["Hero"],
+    optionalTypes: ["HoursGroup", "Divider", "FutureVolume"],
+    maxOccurrences: { Hero: 1, FutureVolume: 1 },
+  },
+  sections: [
+    { id: "hero", type: "Hero", variant: "cinematic", slot: "opening", order: 1, visibility: true, spacing: "xl", animation: "fade", settings: {} },
+    { id: "hours-room", type: "HoursGroup", variant: "room", slot: "narrative", order: 2, visibility: true, spacing: "lg", animation: "fade", settings: {} },
+    { id: "hours-divider", type: "Divider", variant: "labelled", slot: "narrative", order: 3, visibility: true, spacing: "md", animation: "fade", settings: {} },
+    { id: "hours-linen", type: "HoursGroup", variant: "linen", slot: "narrative", order: 4, visibility: true, spacing: "lg", animation: "fade", settings: {} },
+    { id: "future-volume", type: "FutureVolume", variant: "teaser", slot: "closing", order: 5, visibility: true, spacing: "lg", animation: "fade", settings: {} },
+  ],
+};
+
 let registered = false;
 
 export function registerCoreTemplates(): void {
@@ -66,4 +98,5 @@ export function registerCoreTemplates(): void {
   registered = true;
   registerTemplate(EDITORIAL_CHAPTER_TEMPLATE);
   registerTemplate(LIMITED_EDITION_CHAPTER_TEMPLATE);
+  registerTemplate(AIR_HOURS_TEMPLATE);
 }

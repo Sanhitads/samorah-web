@@ -1,0 +1,247 @@
+/* Air Chapters — "The Hours" (Experience B). Same typography, spacing and layout
+   system as Candle Chapters; its own atmosphere via the monsoon palette. The
+   page reads like another chapter of the same library, not another website. */
+
+.hours-group,
+.future-volume__inner {
+  width: min(var(--container), 100% - 48px);
+  margin-inline: auto;
+}
+
+/* ── Editorial rhythm (scoped to the Air experience) ── */
+main[data-experience="air-chapters"] .section-shell {
+  padding-block: clamp(72px, 9vw, 116px) 0;
+}
+main[data-experience="air-chapters"] #hero {
+  padding-block: 0;
+}
+main[data-experience="air-chapters"] #hours-divider {
+  /* turning the page — generous breathing room on both sides */
+  padding-block: clamp(72px, 11vw, 160px);
+}
+main[data-experience="air-chapters"] #future-volume {
+  padding-block: clamp(64px, 8vw, 110px) 0; /* the dark band carries its own padding */
+}
+/* subtle tonal shift between the two movements */
+main[data-experience="air-chapters"] #hours-linen {
+  background: color-mix(in srgb, var(--surface) 95%, var(--ink) 5%);
+}
+
+/* ── Group header — an experience, not a category ── */
+.hours-group__head {
+  text-align: center;
+  max-width: 640px;
+  margin-inline: auto;
+  margin-bottom: clamp(52px, 7vw, 96px);
+}
+.hours-group__label {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--accent, var(--gold));
+  margin-bottom: 16px;
+}
+.hours-group__title {
+  font-family: var(--font-serif);
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1.08;
+  color: var(--ink);
+}
+.hours-group__note {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: clamp(1.05rem, 2vw, 1.3rem);
+  color: var(--ink-soft, var(--smoke));
+  margin-top: 18px;
+}
+
+/* ── Hour Blocks — alternating editorial spreads ── */
+.hours-group__blocks {
+  display: grid;
+  gap: clamp(72px, 10vw, 140px);
+}
+
+.hour-block {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(32px, 5vw, 72px);
+  align-items: center;
+}
+.hour-block[data-align="image-right"] .hour-block__media {
+  order: 2; /* alternate: image on the right, text on the left */
+}
+
+.hour-block__media {
+  display: block;
+  aspect-ratio: 4 / 3;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--surface-alt, var(--soft-beige));
+}
+.hour-block__media .asset-image {
+  width: 100%;
+  height: 100%;
+  transition: transform var(--motion-hover-duration) var(--motion-ease);
+}
+.hour-block__media:hover .asset-image {
+  transform: scale(var(--motion-hover-scale));
+}
+
+.hour-block__hour {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--accent, var(--gold));
+  margin-bottom: 14px;
+}
+.hour-block__name {
+  font-family: var(--font-serif);
+  font-size: clamp(1.9rem, 3.6vw, 2.8rem);
+  line-height: 1.08;
+  color: var(--ink);
+}
+.hour-block__category {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-muted, var(--muted));
+  margin-top: 12px;
+}
+.hour-block__scent {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 20px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-soft, var(--smoke));
+}
+.hour-block__scent li:not(:last-child)::after {
+  content: "·";
+  margin: 0 10px;
+  opacity: 0.5;
+}
+.hour-block__story {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: clamp(1.1rem, 2vw, 1.35rem);
+  line-height: 1.5;
+  color: var(--ink-soft, var(--smoke));
+  margin-top: 20px;
+  max-width: 36ch;
+}
+.hour-block__price {
+  font-size: 15px;
+  color: var(--ink, var(--charcoal));
+  margin-top: 22px;
+}
+.hour-block__cta {
+  display: inline-block;
+  margin-top: 22px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink);
+  padding-bottom: 4px;
+  background-image: linear-gradient(var(--accent, var(--gold)), var(--accent, var(--gold)));
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 26% 1px;
+  transition: background-size var(--motion-hover-duration) var(--motion-ease);
+}
+.hour-block__cta::after { content: " \2192"; }
+.hour-block:hover .hour-block__cta { background-size: 100% 1px; }
+
+/* ── Interlude — a quiet line between Hours ── */
+.hours-interlude {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(18px, 3vw, 36px);
+}
+.hours-interlude__rule {
+  display: block;
+  width: clamp(40px, 8vw, 80px);
+  height: 1px;
+  background: var(--line, rgba(0, 0, 0, 0.12));
+}
+.hours-interlude__quote {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: clamp(1.05rem, 2vw, 1.3rem);
+  color: var(--ink-soft, var(--smoke));
+  text-align: center;
+}
+
+/* ── Future Volume — anticipation, a dark inverted close ── */
+.future-volume {
+  width: 100%;
+  padding: clamp(88px, 13vw, 168px) 24px;
+  text-align: center;
+  background: var(--ink, #1a1a1a);
+  color: var(--surface, #faf7f2);
+}
+.future-volume__eyebrow {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--accent, var(--gold));
+  margin-bottom: 22px;
+}
+.future-volume__volume {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  opacity: 0.7;
+  margin-bottom: 16px;
+}
+.future-volume__title {
+  font-family: var(--font-serif);
+  font-size: clamp(2.4rem, 5vw, 4rem);
+  line-height: 1.04;
+  color: inherit;
+}
+.future-volume__story {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: clamp(1.15rem, 2.2vw, 1.5rem);
+  line-height: 1.55;
+  opacity: 0.86;
+  margin-top: 26px;
+}
+.future-volume__line {
+  display: block;
+}
+.future-volume__closing {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  opacity: 0.55;
+  margin-top: 30px;
+}
+.future-volume__cta {
+  display: inline-block;
+  margin-top: 22px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--surface, #faf7f2);
+  border-bottom: 1px solid var(--accent, var(--gold));
+  padding-bottom: 5px;
+}
+
+@media (max-width: 760px) {
+  .hour-block { grid-template-columns: 1fr; }
+  .hour-block[data-align="image-right"] .hour-block__media { order: 0; }
+}

@@ -7,6 +7,8 @@ import { ChapterIntro } from "@/components/chapters/ChapterIntro";
 import { ChapterFeaturedProduct } from "@/components/chapters/ChapterFeaturedProduct";
 import { ChapterProductCollection } from "@/components/chapters/ChapterProductCollection";
 import { ChapterRailSection } from "@/components/chapters/ChapterRailSection";
+import { HoursGroup } from "@/components/air/HoursGroup";
+import { FutureVolumeTeaser } from "@/components/air/FutureVolumeTeaser";
 import type { BrandStory as StorySettings } from "@/config/brandStory";
 import type { EditorialVoice } from "@/config/voices";
 import type { EditorialStory } from "@/config/editorialWorld";
@@ -165,6 +167,34 @@ export function registerSectionLibrary(): void {
     permissions: { edit: ["administrator", "editor", "marketing"], publish: ["administrator", "editor"] },
     emits: ["chapter-click"],
     component: ChapterRailSection,
+  });
+
+  // — Air Chapters / The Hours (Template B; Experience B) —
+  registerSection({
+    type: "HoursGroup",
+    displayName: "Hours Group",
+    category: "narrative",
+    description: "A movement of the Air diary — alternating Hour Blocks with interludes.",
+    icon: "clock",
+    variants: ["room", "linen"],
+    renderCost: "medium",
+    capabilities: { variants: true, theme: true, assets: true, animation: true, relationships: true, analytics: true },
+    permissions: { edit: ["administrator", "editor", "marketing"], publish: ["administrator", "editor"] },
+    emits: ["product-click", "cta-click"],
+    component: HoursGroup,
+  });
+  registerSection({
+    type: "FutureVolume",
+    displayName: "Future Volume",
+    category: "narrative",
+    description: "The next volume, as anticipation — a dark editorial close.",
+    icon: "moon",
+    variants: ["teaser"],
+    renderCost: "light",
+    capabilities: { theme: true, animation: true },
+    permissions: { edit: ["administrator", "editor", "marketing"], publish: ["administrator", "editor"] },
+    emits: ["scroll-past"],
+    component: FutureVolumeTeaser,
   });
 
   registerSection({

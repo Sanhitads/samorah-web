@@ -101,7 +101,7 @@ export const HOME_INVITATIONS: HomeInvitation[] = [
     imageRatio: "4 / 5",
     backgroundTone: "warm-ivory",
     ctaLabel: "Explore Air Chapters",
-    ctaHref: "/collections/air",
+    ctaHref: "/collections/the-everyday",
     emphasis: "primary",
     homepageFeatured: true,
     displayOrder: 1,
