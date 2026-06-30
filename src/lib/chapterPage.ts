@@ -22,6 +22,7 @@ import {
   imageMedia,
   type A11yMeta,
   type CtaAction,
+  type HeroLayout,
   type MediaContent,
   type OverlayStyle,
   type ProductCardVariant,
@@ -136,7 +137,7 @@ export type ChapterSectionId =
   | "next-chapter";
 
 export interface ChapterPageConfig {
-  hero?: { strategy?: HeroStrategy; productSlug?: string };
+  hero?: { strategy?: HeroStrategy; productSlug?: string; layout?: HeroLayout };
   supporting?: SupportingRules;
   ordering?: ChapterOrdering;
   empty?: Partial<Record<ChapterSectionId, EmptyStrategy>>;
@@ -182,18 +183,33 @@ export interface ChapterHeroSettings {
   title: string;
   tagline: string | null;
   poeticLine: string | null;
+  /** A subtle "you are here" line, e.g. "The Fragrance Library". */
+  breadcrumb: string;
   media: MediaContent;
   overlay: OverlayStyle;
+  /** Hero height as data (compact|editorial|immersive|fullscreen) — CMS-driven. */
+  layout: HeroLayout;
   readingTime: number;
   identity: ChapterIdentity;
   a11y: A11yMeta;
   emptyStrategy: EmptyStrategy;
+}
+
+/** The opening "pause" — VOL · title · a poetic introduction, no product. */
+export interface ChapterIntroSettings {
+  volume: string | null;
+  title: string;
+  intro: string | null;
+  chapterContext: string;
+  a11y: A11yMeta;
 }
 export interface ChapterFeaturedSettings {
   eyebrow: string;
   /** "VOL. I — The Dessert Chapter" — keeps the reader inside the chapter. */
   chapterContext: string;
   product: ChapterProductView | null;
+  /** A longer editorial "inspired by" note for the signature (optional). */
+  note: string | null;
   cta: CtaAction;
   a11y: A11yMeta;
   emptyStrategy: EmptyStrategy;
@@ -444,12 +460,23 @@ export function buildChapterPage(
     title: chapter.name,
     tagline: chapter.tagline ?? null,
     poeticLine: chapter.poetic_line ?? null,
+    breadcrumb: "The Fragrance Library",
     media: imageMedia(cover, `${chapter.name} atmosphere`, "cinematic"),
     overlay: "gradient",
+    layout: config.hero?.layout ?? "immersive",
     readingTime: chapter.seo?.readingTime ?? readingTime(description),
     identity: chapter.identity ?? {},
     a11y: { headingLevel: 1, landmark: "region" },
     emptyStrategy: empty.hero,
+  };
+  // The opening pause — repurposes the template's order-2 narrative slot ("story")
+  // as a product-free chapter introduction (page-level override; template untouched).
+  const intro: ChapterIntroSettings = {
+    volume: chapter.volume,
+    title: chapter.name,
+    intro: chapter.poetic_line ?? chapter.tagline ?? null,
+    chapterContext,
+    a11y: { headingLevel: 2, landmark: "region" },
   };
   // Chapter numbering — hero is .1, supporting continue .2, .3, … (brand identity).
   const featuredProduct = heroProduct ? toProductView(heroProduct, editionLabel(chapter.volume, 1)) : null;
@@ -459,6 +486,7 @@ export function buildChapterPage(
     eyebrow: "The signature of this chapter",
     chapterContext,
     product: featuredProduct,
+    note: chapter.description ?? null, // the signature embodies the chapter
     cta: { label: "Discover", href: featuredProduct ? `/shop/${featuredProduct.slug}` : undefined },
     a11y: { headingLevel: 2 },
     emptyStrategy: empty.featured,
@@ -474,15 +502,15 @@ export function buildChapterPage(
     emptyStrategy: empty.supporting,
   };
   const quote: ChapterQuoteSettings = { voice, emptyStrategy: empty.quote };
-  const story: ChapterEditorialSettings = { contentId: chapter.storyContentId ?? null, emptyStrategy: empty.story };
   const gallery: ChapterEditorialSettings = { contentId: chapter.galleryContentId ?? null, emptyStrategy: empty.gallery };
-  const rail: ChapterRailSettings = { heading: "Continue reading", chapterContext, chapters: others.map(toChapterCard), layout: "editorial", a11y: { headingLevel: 2, landmark: "region" }, emptyStrategy: empty["next-chapter"] };
+  const rail: ChapterRailSettings = { heading: "Continue to the next chapter", chapterContext, chapters: others.map(toChapterCard), layout: "editorial", a11y: { headingLevel: 2, landmark: "region" }, emptyStrategy: empty["next-chapter"] };
 
   // Overrides keyed by the template's section ids (merged over the template).
   // Empty strategy + content presence decide visibility per section.
   const sections: SectionInstance[] = [
     fill("hero", heroSettings, { trackingId: "chapter:hero" }),
-    fill("story", story, { visibility: showsWhenEmpty(Boolean(story.contentId), empty.story) }),
+    // order-2 "story" slot → the opening introduction (type override, page-level)
+    fill("story", intro, { type: "ChapterIntro", visibility: Boolean(intro.intro) }),
     fill("featured", featured, {
       visibility: showsWhenEmpty(Boolean(featured.product), empty.featured),
       trackingId: "chapter:featured",

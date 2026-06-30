@@ -33,6 +33,10 @@ export type ComponentState =
 /** How a hero/media surface treats its overlay. */
 export type OverlayStyle = "gradient" | "blur" | "glass" | "solid" | "none";
 
+/** Hero presentation height — a property of the section, set by the CMS, never
+ *  a hardcoded vh in a component. compact → editorial → immersive → fullscreen. */
+export type HeroLayout = "compact" | "editorial" | "immersive" | "fullscreen";
+
 /** Rail presentation — one component, many layouts (like Section variants). */
 export type RailLayout = "editorial" | "magazine" | "timeline" | "cards" | "stack";
 

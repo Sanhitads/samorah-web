@@ -3,8 +3,9 @@
    instead of hardcoding hover/reveal/hero values, so motion is owned by the
    design system, not scattered through components. Global (not per-theme). */
 :root {
-  --motion-hover-scale: 1.04;
-  --motion-hover-duration: 0.6s;
+  /* Imperceptible movement — luxury brands avoid scale(1.05); media breathes. */
+  --motion-hover-scale: 1.015;
+  --motion-hover-duration: 0.9s;
   --motion-reveal-duration: 0.8s;
   --motion-hero-duration: 1.2s;
   --motion-ease: var(--ease-luxury, cubic-bezier(0.25, 0.1, 0.25, 1));

@@ -104,7 +104,8 @@
   color: var(--ink, var(--charcoal));
   margin-top: 12px;
 }
-/* Higher-contrast CTA (no new colours): ink label + accent underline + arrow. */
+/* Higher-contrast CTA (no new colours): ink label + an accent underline that
+   grows on hover — the only movement besides the imperceptible image breathe. */
 .product-card__cta {
   display: inline-block;
   margin-top: 14px;
@@ -114,7 +115,12 @@
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--ink);
-  border-bottom: 1px solid var(--accent, var(--gold));
   padding-bottom: 4px;
+  background-image: linear-gradient(var(--accent, var(--gold)), var(--accent, var(--gold)));
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 26% 1px;
+  transition: background-size var(--motion-hover-duration) var(--motion-ease);
 }
 .product-card__cta::after { content: " \2192"; }
+.product-card:hover .product-card__cta { background-size: 100% 1px; }

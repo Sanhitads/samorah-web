@@ -15,12 +15,13 @@ export function ChapterHero({ settings }: SectionComponentProps) {
   const Heading = `h${level}` as keyof JSX.IntrinsicElements;
 
   return (
-    <header className="chapter-hero" data-overlay={s.overlay} data-aspect={s.media.aspect ?? "cinematic"}>
+    <header className="chapter-hero" data-overlay={s.overlay} data-layout={s.layout ?? "immersive"}>
       <div className="chapter-hero__bg" aria-hidden="true">
         <AssetImage asset={s.media.src} as="background" alt="" role="hero" priority />
       </div>
       {s.overlay !== "none" ? <span className="chapter-hero__veil" aria-hidden="true" /> : null}
       <div className="chapter-hero__inner">
+        {s.breadcrumb ? <p className="chapter-hero__breadcrumb">{s.breadcrumb}</p> : null}
         {s.volume ? <p className="chapter-hero__volume">{s.volume}</p> : null}
         <Heading className="chapter-hero__title">{s.title}</Heading>
         {s.tagline ? <p className="chapter-hero__tagline">{s.tagline}</p> : null}

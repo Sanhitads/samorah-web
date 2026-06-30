@@ -3,6 +3,7 @@ import { Words } from "@/components/home/Words";
 import { EditorialWorld } from "@/components/home/EditorialWorld";
 import { TheLetters } from "@/components/home/TheLetters";
 import { ChapterHero } from "@/components/chapters/ChapterHero";
+import { ChapterIntro } from "@/components/chapters/ChapterIntro";
 import { ChapterFeaturedProduct } from "@/components/chapters/ChapterFeaturedProduct";
 import { ChapterProductCollection } from "@/components/chapters/ChapterProductCollection";
 import { ChapterRailSection } from "@/components/chapters/ChapterRailSection";
@@ -100,6 +101,19 @@ export function registerSectionLibrary(): void {
     ),
   });
   // — chapter sections (the Editorial Chapter template; step 9) —
+  registerSection({
+    type: "ChapterIntro",
+    displayName: "Chapter Introduction",
+    category: "narrative",
+    description: "The opening pause — volume, title and one poetic line, no product.",
+    icon: "feather",
+    variants: ["centered"],
+    renderCost: "light",
+    capabilities: { theme: true, animation: true },
+    permissions: { edit: ["administrator", "editor", "marketing"], publish: ["administrator", "editor"] },
+    emits: ["scroll-past"],
+    component: ChapterIntro,
+  });
   registerSection({
     type: "Hero",
     displayName: "Chapter Hero",

@@ -30,6 +30,7 @@ export function ChapterFeaturedProduct({ settings }: SectionComponentProps) {
         <Heading className="chapter-featured__name">{p.name}</Heading>
         <p className="chapter-featured__collection">{p.collectionType}</p>
         {p.tagline ? <p className="chapter-featured__tagline">{p.tagline}</p> : null}
+        {s.note ? <p className="chapter-featured__note">{s.note}</p> : null}
         <p className="chapter-featured__price">{p.priceLabel}</p>
         <Link href={href} className="chapter-featured__cta">
           {s.cta.label}

@@ -100,8 +100,8 @@ export function ProductCard({
         <span className="product-card__body">
           {edition ? <span className="product-card__edition">{edition}</span> : null}
           <Heading className="product-card__name">{name}</Heading>
-          {collectionType ? <span className="product-card__collection">{collectionType}</span> : null}
           {tagline ? <p className="product-card__tagline">{tagline}</p> : null}
+          {collectionType ? <span className="product-card__collection">{collectionType}</span> : null}
           {caps.price ? (
             <span className="product-card__price">{priceLabel ?? commerce.priceRange.display}</span>
           ) : null}
