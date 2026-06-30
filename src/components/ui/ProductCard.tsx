@@ -77,7 +77,9 @@ export function ProductCard({
 
   const inner = (
     <>
-      <span className="product-card__media">
+      {/* div (not span) — it holds the AssetImage <div>; a <div> in a <span>
+          is invalid DOM nesting (a React hydration warning). */}
+      <div className="product-card__media">
         {state === "loading" ? (
           <span className="product-card__skeleton" aria-hidden="true" />
         ) : (
@@ -94,10 +96,10 @@ export function ProductCard({
           <span className="product-card__badge">{BADGE_LABEL[commerce.badge]}</span>
         ) : null}
         {stateLabel ? <span className="product-card__state">{stateLabel}</span> : null}
-      </span>
+      </div>
 
       {state === "loading" ? null : (
-        <span className="product-card__body">
+        <div className="product-card__body">
           {edition ? <span className="product-card__edition">{edition}</span> : null}
           <Heading className="product-card__name">{name}</Heading>
           {tagline ? <p className="product-card__tagline">{tagline}</p> : null}
@@ -106,7 +108,7 @@ export function ProductCard({
             <span className="product-card__price">{priceLabel ?? commerce.priceRange.display}</span>
           ) : null}
           {cta?.label ? <span className="product-card__cta">{cta.label}</span> : null}
-        </span>
+        </div>
       )}
     </>
   );
