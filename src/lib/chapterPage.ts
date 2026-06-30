@@ -18,6 +18,15 @@ import type { EditorialVoice } from "@/config/voices";
 import { formatPrice, effectivePrice, type Priceable } from "@/lib/pricing";
 import { primaryImage, productBadge, type ImageLike } from "@/lib/product";
 import { chapterTitle } from "@/lib/collection";
+import {
+  imageMedia,
+  type A11yMeta,
+  type CtaAction,
+  type MediaContent,
+  type OverlayStyle,
+  type ProductCardVariant,
+  type RailLayout,
+} from "@/lib/presentation";
 
 const GRADIENT = (cls: string) => `gradient:${cls}`;
 
@@ -147,14 +156,14 @@ export interface ChapterProductView {
   slug: string;
   name: string;
   tagline: string | null;
-  image: string; // url or `gradient:*`
-  imageAlt: string;
+  media: MediaContent; // image today; video/3d reserved by the contract
   commerce: ProductCommerceProjection;
 }
 
 export interface ChapterCardView {
   slug: string;
-  title: string; // "Vol. II — The Wild Within"
+  volume: string | null; // "Vol. II"
+  name: string; // "The Wild Within"
   tagline: string | null;
   image: string;
   comingSoon: boolean;
@@ -165,20 +174,27 @@ export interface ChapterHeroSettings {
   title: string;
   tagline: string | null;
   poeticLine: string | null;
-  image: string;
+  media: MediaContent;
+  overlay: OverlayStyle;
   readingTime: number;
   identity: ChapterIdentity;
+  a11y: A11yMeta;
   emptyStrategy: EmptyStrategy;
 }
 export interface ChapterFeaturedSettings {
   eyebrow: string;
   product: ChapterProductView | null;
+  cta: CtaAction;
+  a11y: A11yMeta;
   emptyStrategy: EmptyStrategy;
 }
 export interface ChapterCollectionSettings {
   heading: string;
   products: ChapterProductView[];
   groupBy: SupportingRules["groupBy"];
+  cardVariant: ProductCardVariant;
+  cardCta: CtaAction;
+  a11y: A11yMeta;
   emptyStrategy: EmptyStrategy;
 }
 export interface ChapterQuoteSettings {
@@ -192,6 +208,8 @@ export interface ChapterEditorialSettings {
 export interface ChapterRailSettings {
   heading: string;
   chapters: ChapterCardView[];
+  layout: RailLayout;
+  a11y: A11yMeta;
   emptyStrategy: EmptyStrategy;
 }
 
@@ -227,11 +245,11 @@ export function toProjection(p: ChapterProductInput): ProductCommerceProjection 
 
 function toProductView(p: ChapterProductInput): ChapterProductView {
   const { url, alt } = imageOf(p);
-  return { slug: p.slug, name: p.name, tagline: p.tagline ?? null, image: url, imageAlt: alt, commerce: toProjection(p) };
+  return { slug: p.slug, name: p.name, tagline: p.tagline ?? null, media: imageMedia(url, alt, "portrait"), commerce: toProjection(p) };
 }
 
 function toChapterCard(c: ChapterSummary): ChapterCardView {
-  return { slug: c.slug, title: chapterTitle(c), tagline: c.tagline ?? null, image: c.cover_image_url ?? GRADIENT("grad-chai"), comingSoon: c.is_coming_soon };
+  return { slug: c.slug, volume: c.volume, name: c.name, tagline: c.tagline ?? null, image: c.cover_image_url ?? GRADIENT("grad-chai"), comingSoon: c.is_coming_soon };
 }
 
 function poeticVoice(chapter: ChapterInput): EditorialVoice | null {
@@ -392,31 +410,40 @@ export function buildChapterPage(
   const description = chapter.description ?? chapter.tagline ?? `${chapter.name} — a Samorah chapter.`;
   const voice = poeticVoice(chapter);
 
+  const cover = chapter.cover_image_url ?? GRADIENT("grad-chai");
   const heroSettings: ChapterHeroSettings = {
     volume: chapter.volume,
     title: chapter.name,
     tagline: chapter.tagline ?? null,
     poeticLine: chapter.poetic_line ?? null,
-    image: chapter.cover_image_url ?? GRADIENT("grad-chai"),
+    media: imageMedia(cover, `${chapter.name} atmosphere`, "cinematic"),
+    overlay: "gradient",
     readingTime: chapter.seo?.readingTime ?? readingTime(description),
     identity: chapter.identity ?? {},
+    a11y: { headingLevel: 1, landmark: "region" },
     emptyStrategy: empty.hero,
   };
+  const featuredProduct = heroProduct ? toProductView(heroProduct) : null;
   const featured: ChapterFeaturedSettings = {
     eyebrow: "The signature of this chapter",
-    product: heroProduct ? toProductView(heroProduct) : null,
+    product: featuredProduct,
+    cta: { label: "Discover the fragrance", href: featuredProduct ? `/shop/${featuredProduct.slug}` : undefined },
+    a11y: { headingLevel: 2 },
     emptyStrategy: empty.featured,
   };
   const collection: ChapterCollectionSettings = {
     heading: "The rest of the chapter",
     products: supporting.map(toProductView),
     groupBy: config.supporting?.groupBy ?? "none",
+    cardVariant: "editorial",
+    cardCta: { label: "Discover" },
+    a11y: { headingLevel: 2, landmark: "list" },
     emptyStrategy: empty.supporting,
   };
   const quote: ChapterQuoteSettings = { voice, emptyStrategy: empty.quote };
   const story: ChapterEditorialSettings = { contentId: chapter.storyContentId ?? null, emptyStrategy: empty.story };
   const gallery: ChapterEditorialSettings = { contentId: chapter.galleryContentId ?? null, emptyStrategy: empty.gallery };
-  const rail: ChapterRailSettings = { heading: "Continue reading", chapters: others.map(toChapterCard), emptyStrategy: empty["next-chapter"] };
+  const rail: ChapterRailSettings = { heading: "Continue reading", chapters: others.map(toChapterCard), layout: "editorial", a11y: { headingLevel: 2, landmark: "region" }, emptyStrategy: empty["next-chapter"] };
 
   // Overrides keyed by the template's section ids (merged over the template).
   // Empty strategy + content presence decide visibility per section.

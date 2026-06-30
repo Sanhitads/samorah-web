@@ -1,0 +1,21 @@
+/* Interaction motion tokens — the CSS-layer mirror of the Design System
+   MotionTokens (src/platform/theme.ts). Components reference these tokens
+   instead of hardcoding hover/reveal/hero values, so motion is owned by the
+   design system, not scattered through components. Global (not per-theme). */
+:root {
+  --motion-hover-scale: 1.04;
+  --motion-hover-duration: 0.6s;
+  --motion-reveal-duration: 0.8s;
+  --motion-hero-duration: 1.2s;
+  --motion-ease: var(--ease-luxury, cubic-bezier(0.25, 0.1, 0.25, 1));
+  --motion-ease-out: var(--ease-out, cubic-bezier(0, 0, 0.2, 1));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-hover-scale: 1;
+    --motion-hover-duration: 0.001s;
+    --motion-reveal-duration: 0.001s;
+    --motion-hero-duration: 0.001s;
+  }
+}

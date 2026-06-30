@@ -5150,3 +5150,7 @@ video.asset-image {
   text-transform: uppercase;
   color: var(--accent, var(--gold));
 }
+
+/* Component-specific styles live alongside their components, in the dedicated
+   src/styles/ layer (imported by the root layout) — not appended here. This
+   file holds global tokens, base/reset, typography and shared chrome. */

@@ -1,0 +1,172 @@
+/* Chapter page sections (step 9) — co-located styles. Each renders inside
+   SectionShell (full-width inner); a shared narrow column holds editorial
+   content. Colours come from the section's data-theme tokens; motion from the
+   motion tokens; aspect + overlay are data. */
+.chapter-hero,
+.chapter-featured,
+.chapter-collection,
+.chapter-next {
+  width: min(var(--container), 100% - 48px);
+  margin-inline: auto;
+}
+
+/* ── Hero — the chapter's book cover ── */
+.chapter-hero {
+  position: relative;
+  min-height: clamp(420px, 64vh, 680px);
+  display: flex;
+  align-items: flex-end;
+  border-radius: 4px;
+  overflow: hidden;
+  isolation: isolate;
+}
+.chapter-hero[data-aspect="landscape"] { min-height: clamp(360px, 52vh, 560px); }
+.chapter-hero[data-aspect="square"] { min-height: clamp(480px, 70vh, 760px); }
+
+.chapter-hero__bg,
+.chapter-hero__bg .asset-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -2;
+}
+.chapter-hero__veil {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
+/* overlay variants (#8) */
+.chapter-hero[data-overlay="gradient"] .chapter-hero__veil {
+  background: linear-gradient(180deg, rgba(20, 16, 12, 0.05) 0%, rgba(20, 16, 12, 0.55) 100%);
+}
+.chapter-hero[data-overlay="solid"] .chapter-hero__veil {
+  background: rgba(20, 16, 12, 0.42);
+}
+.chapter-hero[data-overlay="blur"] .chapter-hero__veil {
+  background: rgba(20, 16, 12, 0.18);
+  backdrop-filter: blur(6px);
+}
+.chapter-hero[data-overlay="glass"] .chapter-hero__veil {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px) saturate(120%);
+}
+
+.chapter-hero__inner {
+  padding: clamp(28px, 5vw, 64px);
+  color: var(--white);
+  max-width: 720px;
+}
+.chapter-hero__volume {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  opacity: 0.85;
+  margin-bottom: 14px;
+}
+.chapter-hero__title {
+  font-family: var(--font-serif);
+  font-size: clamp(2.6rem, 6vw, 4.4rem);
+  line-height: 1.04;
+  color: var(--white);
+}
+.chapter-hero__tagline {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: clamp(1.1rem, 2.4vw, 1.5rem);
+  margin-top: 16px;
+  opacity: 0.92;
+}
+.chapter-hero__poetic {
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  margin-top: 18px;
+  max-width: 48ch;
+  opacity: 0.8;
+}
+
+/* ── Featured fragrance — editorial spotlight ── */
+.chapter-featured {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(28px, 5vw, 72px);
+  align-items: center;
+}
+.chapter-featured__media {
+  display: block;
+  aspect-ratio: 4 / 5;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--surface-alt, var(--soft-beige));
+}
+.chapter-featured[data-aspect="square"] .chapter-featured__media { aspect-ratio: 1 / 1; }
+.chapter-featured[data-aspect="landscape"] .chapter-featured__media { aspect-ratio: 4 / 3; }
+.chapter-featured[data-aspect="cinematic"] .chapter-featured__media { aspect-ratio: 16 / 9; }
+.chapter-featured__media .asset-image {
+  width: 100%;
+  height: 100%;
+  transition: transform var(--motion-hover-duration) var(--motion-ease);
+}
+.chapter-featured__media:hover .asset-image { transform: scale(var(--motion-hover-scale)); }
+
+.chapter-featured__eyebrow {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--accent, var(--gold));
+  margin-bottom: 18px;
+}
+.chapter-featured__name {
+  font-family: var(--font-serif);
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1.08;
+  color: var(--ink);
+}
+.chapter-featured__tagline {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 1.2rem;
+  color: var(--ink-soft, var(--smoke));
+  margin-top: 14px;
+}
+.chapter-featured__price {
+  font-size: 15px;
+  color: var(--ink-soft, var(--smoke));
+  margin-top: 22px;
+}
+.chapter-featured__cta {
+  display: inline-block;
+  margin-top: 28px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink);
+  border-bottom: 1px solid var(--accent, var(--gold));
+  padding-bottom: 5px;
+  transition: opacity var(--motion-hover-duration) var(--motion-ease-out);
+}
+.chapter-featured__cta:hover { opacity: 0.6; }
+
+/* ── Chapter collection — grid of ProductCards ── */
+.chapter-collection__heading,
+.chapter-next__heading {
+  font-family: var(--font-serif);
+  font-size: clamp(1.6rem, 3vw, 2.2rem);
+  color: var(--ink);
+  text-align: center;
+  margin-bottom: clamp(32px, 5vw, 56px);
+}
+.chapter-collection__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: clamp(24px, 3vw, 44px);
+}
+
+.chapter-next { text-align: center; }
+
+@media (max-width: 760px) {
+  .chapter-featured { grid-template-columns: 1fr; }
+}

@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, DM_Sans } from "next/font/google";
 import "./globals.css";
+import "@/styles/motion.css";
+import "@/styles/product-card.css";
+import "@/styles/chapter-sections.css";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { buildThemeStylesheet } from "@/platform/themeStylesheet";
 

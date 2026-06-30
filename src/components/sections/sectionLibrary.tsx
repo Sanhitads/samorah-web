@@ -2,6 +2,10 @@ import { BrandStory } from "@/components/home/BrandStory";
 import { Words } from "@/components/home/Words";
 import { EditorialWorld } from "@/components/home/EditorialWorld";
 import { TheLetters } from "@/components/home/TheLetters";
+import { ChapterHero } from "@/components/chapters/ChapterHero";
+import { ChapterFeaturedProduct } from "@/components/chapters/ChapterFeaturedProduct";
+import { ChapterProductCollection } from "@/components/chapters/ChapterProductCollection";
+import { ChapterRailSection } from "@/components/chapters/ChapterRailSection";
 import type { BrandStory as StorySettings } from "@/config/brandStory";
 import type { EditorialVoice } from "@/config/voices";
 import type { EditorialStory } from "@/config/editorialWorld";
@@ -95,6 +99,60 @@ export function registerSectionLibrary(): void {
       <EditorialWorld stories={(settings.stories as EditorialStory[]) ?? []} />
     ),
   });
+  // — chapter sections (the Editorial Chapter template; step 9) —
+  registerSection({
+    type: "Hero",
+    displayName: "Chapter Hero",
+    category: "narrative",
+    description: "The chapter's opening book cover — volume, title, poetic line.",
+    icon: "image",
+    variants: ["cinematic", "immersive"],
+    renderCost: "medium",
+    capabilities: { variants: true, background: true, theme: true, assets: true, animation: true },
+    permissions: { edit: ["administrator", "editor", "marketing"], publish: ["administrator", "editor"] },
+    emits: ["scroll-past"],
+    component: ChapterHero,
+  });
+  registerSection({
+    type: "FeaturedProduct",
+    displayName: "Featured Fragrance",
+    category: "commerce",
+    description: "The chapter's signature candle as an editorial spotlight.",
+    icon: "sparkles",
+    variants: ["spotlight"],
+    renderCost: "light",
+    capabilities: { variants: true, theme: true, assets: true, animation: true, relationships: true, analytics: true },
+    permissions: { edit: ["administrator", "editor", "marketing"], publish: ["administrator", "editor"] },
+    emits: ["product-click", "cta-click"],
+    component: ChapterFeaturedProduct,
+  });
+  registerSection({
+    type: "ProductCollection",
+    displayName: "Chapter Collection",
+    category: "commerce",
+    description: "The rest of the chapter as a quiet product grid.",
+    icon: "grid",
+    variants: ["paired", "grid", "rail"],
+    renderCost: "medium",
+    capabilities: { variants: true, theme: true, assets: true, animation: true, relationships: true, analytics: true },
+    permissions: { edit: ["administrator", "editor", "marketing"], publish: ["administrator", "editor"] },
+    emits: ["product-click"],
+    component: ChapterProductCollection,
+  });
+  registerSection({
+    type: "ChapterRail",
+    displayName: "Continue Reading",
+    category: "navigation",
+    description: "The closing rail of other chapters (the shared ChapterRail).",
+    icon: "arrow-right",
+    variants: ["rail"],
+    renderCost: "medium",
+    capabilities: { theme: true, assets: true, relationships: true, analytics: true },
+    permissions: { edit: ["administrator", "editor", "marketing"], publish: ["administrator", "editor"] },
+    emits: ["chapter-click"],
+    component: ChapterRailSection,
+  });
+
   registerSection({
     type: "Newsletter",
     displayName: "The Letters",

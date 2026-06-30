@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { gradientClass, isGradientPlaceholder } from "@/lib/product";
 import type { HomeChapter } from "@/config/chapters";
+import type { RailLayout } from "@/lib/presentation";
 
 /**
  * Editorial Chapter Rail — the permanent Chapter navigation system (Homepage,
@@ -26,12 +27,16 @@ export interface ChapterRailProps {
   chapters: HomeChapter[];
   loading?: boolean;
   ariaLabel?: string;
+  /** Presentation layout — "editorial" (the horizontal browse) today; the
+   *  others are reserved so the rail evolves by config, not new components. */
+  layout?: RailLayout;
 }
 
 export function ChapterRail({
   chapters,
   loading = false,
   ariaLabel = "Chapters",
+  layout = "editorial",
 }: ChapterRailProps) {
   const reduceMotion = useReducedMotion();
   const trackRef = useRef<HTMLDivElement>(null);
@@ -73,7 +78,7 @@ export function ChapterRail({
   if (!loading && chapters.length === 0) return null;
 
   return (
-    <div className="chapter-rail">
+    <div className="chapter-rail" data-layout={layout}>
       <div
         className="chapter-rail__track"
         ref={trackRef}
