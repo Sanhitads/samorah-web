@@ -15,6 +15,7 @@ export type HourGroupKind = "room" | "linen";
 export interface HourEntry {
   id: string;
   time: string; // "07:00" — shown as "HOUR 07:00"
+  moment: string; // "Morning Begins" — a small poetic descriptor under the hour
   name: string;
   story: string; // the "feels like" line
   scent: string[]; // the "smells like" notes
@@ -68,6 +69,7 @@ export const AIR_VOLUMES: AirVolume[] = [
           {
             id: "open-window",
             time: "07:00",
+            moment: "Morning Begins",
             name: "Open Window",
             story: "The room before the day begins — light arriving, quietly expectant.",
             scent: ["White Tea", "Fresh Air", "Soft Cotton"],
@@ -79,6 +81,7 @@ export const AIR_VOLUMES: AirVolume[] = [
           {
             id: "slow-evening",
             time: "14:00",
+            moment: "Afternoon Lingers",
             name: "Slow Evening",
             story: "The unhurried middle of an afternoon — soft linen, warm light through glass.",
             scent: ["Cotton", "Iris", "Warm Sandalwood"],
@@ -90,6 +93,7 @@ export const AIR_VOLUMES: AirVolume[] = [
           {
             id: "after-dinner",
             time: "19:30",
+            moment: "Evening Settles",
             name: "After Dinner",
             story: "The comfortable haze after a meal — soft conversation, the warmth of something good.",
             scent: ["Tonka Bean", "Amber", "Soft Cedar"],
@@ -108,6 +112,7 @@ export const AIR_VOLUMES: AirVolume[] = [
           {
             id: "private-hours",
             time: "23:00",
+            moment: "Night Holds",
             name: "Private Hours",
             story: "The most intimate hour of the day. The one that belongs only to you.",
             scent: ["Lavender", "Cashmere", "Dark Musk"],
@@ -123,7 +128,7 @@ export const AIR_VOLUMES: AirVolume[] = [
       title: "The Intimate",
       story: "For evenings. For whispers. For the spaces closest to you.",
       closing: "Coming in the next volume.",
-      cta: "Discover Soon",
+      cta: "Available Soon",
     },
   },
 ];

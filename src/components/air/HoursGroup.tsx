@@ -1,6 +1,6 @@
 import { Fragment, type JSX } from "react";
 import Link from "next/link";
-import { AssetImage } from "@/components/ui/AssetImage";
+import { ParallaxMedia } from "@/components/ui/ParallaxMedia";
 import type { SectionComponentProps } from "@/components/sections/registry";
 import type { AirHoursGroupSettings, HourBlockView } from "@/lib/airPage";
 
@@ -49,10 +49,11 @@ function HourBlock({ hour, headingLevel }: { hour: HourBlockView; headingLevel: 
   return (
     <article className="hour-block" data-align={hour.align}>
       <Link href={hour.href} className="hour-block__media" aria-hidden="true" tabIndex={-1}>
-        <AssetImage asset={hour.media.src} alt={hour.media.alt ?? hour.name} role="lifestyle" className="hour-block__image" />
+        <ParallaxMedia src={hour.media.src} alt={hour.media.alt ?? hour.name} imageClassName="hour-block__image" />
       </Link>
       <div className="hour-block__body">
         <p className="hour-block__hour">{hour.hourLabel}</p>
+        {hour.moment ? <p className="hour-block__moment">{hour.moment}</p> : null}
         <H className="hour-block__name">{hour.name}</H>
         <p className="hour-block__category">{hour.category}</p>
         <ul className="hour-block__scent">

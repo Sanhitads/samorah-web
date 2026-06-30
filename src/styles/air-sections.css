@@ -22,9 +22,13 @@ main[data-experience="air-chapters"] #hours-divider {
 main[data-experience="air-chapters"] #future-volume {
   padding-block: clamp(64px, 8vw, 110px) 0; /* the dark band carries its own padding */
 }
-/* subtle tonal shift between the two movements */
+/* Almost-invisible tonal shifts between movements — the atmosphere changes as
+   the day does: airy Shared Hours, a slightly deeper Private Hours. */
+main[data-experience="air-chapters"] #hours-room {
+  background: color-mix(in srgb, var(--surface) 97%, #fff 3%);
+}
 main[data-experience="air-chapters"] #hours-linen {
-  background: color-mix(in srgb, var(--surface) 95%, var(--ink) 5%);
+  background: color-mix(in srgb, var(--surface) 93%, var(--ink) 7%);
 }
 
 /* ── Group header — an experience, not a category ── */
@@ -73,11 +77,24 @@ main[data-experience="air-chapters"] #hours-linen {
 }
 
 .hour-block__media {
+  position: relative; /* frames the parallax layer */
   display: block;
   aspect-ratio: 4 / 3;
   border-radius: 3px;
   overflow: hidden;
   background: var(--surface-alt, var(--soft-beige));
+}
+/* Subtle scroll parallax — the image drifts a few px slower than the page.
+   The inner layer is over-sized (top/bottom set inline) so it never gaps. */
+.parallax-media {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.parallax-media__inner {
+  position: absolute;
+  left: 0;
+  right: 0;
 }
 .hour-block__media .asset-image {
   width: 100%;
@@ -94,7 +111,14 @@ main[data-experience="air-chapters"] #hours-linen {
   letter-spacing: 0.3em;
   text-transform: uppercase;
   color: var(--accent, var(--gold));
-  margin-bottom: 14px;
+  margin-bottom: 8px;
+}
+.hour-block__moment {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 14px;
+  color: var(--ink-muted, var(--muted));
+  margin-bottom: 18px;
 }
 .hour-block__name {
   font-family: var(--font-serif);
@@ -155,8 +179,13 @@ main[data-experience="air-chapters"] #hours-linen {
   background-size: 26% 1px;
   transition: background-size var(--motion-hover-duration) var(--motion-ease);
 }
-.hour-block__cta::after { content: " \2192"; }
-.hour-block:hover .hour-block__cta { background-size: 100% 1px; }
+.hour-block__cta::after {
+  content: " \2192";
+  display: inline-block;
+  transition: transform var(--motion-hover-duration) var(--motion-ease);
+}
+.hour-block:hover .hour-block__cta { background-size: 100% 1px; opacity: 0.82; }
+.hour-block:hover .hour-block__cta::after { transform: translateX(5px); }
 
 /* ── Interlude — a quiet line between Hours ── */
 .hours-interlude {
@@ -228,17 +257,16 @@ main[data-experience="air-chapters"] #hours-linen {
   opacity: 0.55;
   margin-top: 30px;
 }
+/* A quiet status label — not a link (nothing to click yet). */
 .future-volume__cta {
   display: inline-block;
-  margin-top: 22px;
+  margin-top: 24px;
   font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.22em;
+  font-size: 11px;
+  letter-spacing: 0.28em;
   text-transform: uppercase;
-  color: var(--surface, #faf7f2);
-  border-bottom: 1px solid var(--accent, var(--gold));
-  padding-bottom: 5px;
+  color: var(--accent, var(--gold));
+  opacity: 0.85;
 }
 
 @media (max-width: 760px) {

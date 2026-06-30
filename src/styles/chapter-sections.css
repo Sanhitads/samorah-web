@@ -103,7 +103,7 @@ main[data-experience="candle-chapters"] #next-chapter {
 }
 .chapter-hero[data-layout="compact"] { min-height: clamp(360px, 48vh, 520px); }
 .chapter-hero[data-layout="editorial"] { min-height: clamp(460px, 64vh, 700px); }
-.chapter-hero[data-layout="immersive"] { min-height: clamp(560px, 82vh, 880px); }
+.chapter-hero[data-layout="immersive"] { min-height: clamp(680px, 90vh, 1000px); }
 .chapter-hero[data-layout="fullscreen"] { min-height: 100vh; }
 
 .chapter-hero__bg,

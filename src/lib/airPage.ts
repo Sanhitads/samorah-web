@@ -21,6 +21,7 @@ export type HourAlign = "image-left" | "image-right";
 
 export interface HourBlockView {
   hourLabel: string; // "HOUR 07:00"
+  moment: string; // "Morning Begins"
   name: string;
   category: string; // "Room Spray" · "Linen Spray"
   scent: string[]; // the "smells like" notes
@@ -57,6 +58,7 @@ const categoryOf = (kind: HourGroupKind) => (kind === "room" ? "Room Spray" : "L
 function toHourBlock(h: HourGroup["hours"][number], globalIndex: number, kind: HourGroupKind): HourBlockView {
   return {
     hourLabel: `HOUR ${h.time}`,
+    moment: h.moment,
     name: h.name,
     category: categoryOf(kind),
     scent: h.scent,
