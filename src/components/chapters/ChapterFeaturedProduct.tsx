@@ -20,7 +20,7 @@ export function ChapterFeaturedProduct({ settings }: SectionComponentProps) {
   const href = s.cta.href ?? `/shop/${p.slug}`;
 
   return (
-    <div className="chapter-featured" data-aspect={p.media.aspect ?? "portrait"}>
+    <div className="chapter-featured" data-aspect={p.media.aspect ?? "portrait"} data-solo={s.solo ? "true" : undefined}>
       <Link href={href} className="chapter-featured__media" aria-hidden="true" tabIndex={-1}>
         <AssetImage asset={p.media.src} alt={p.media.alt ?? p.name} role="portrait" className="chapter-featured__image" />
       </Link>

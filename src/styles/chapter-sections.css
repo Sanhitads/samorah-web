@@ -36,10 +36,13 @@
   font-family: var(--font-serif);
   font-style: italic;
   font-size: clamp(1.2rem, 2.4vw, 1.6rem);
-  line-height: 1.5;
+  line-height: 1.55;
   color: var(--ink-soft, var(--smoke));
-  margin-top: 22px;
+  margin-top: 24px;
 }
+/* each clause on its own measured line — two or three, like a stanza */
+.chapter-intro__clause { display: block; }
+.chapter-intro__clause + .chapter-intro__clause { margin-top: 6px; }
 
 /* ── Editorial rhythm ──
    Each section pads the TOP only (bottom 0), so gaps never double up. Scoped to
@@ -63,10 +66,21 @@ main[data-experience="candle-chapters"] #next-chapter {
   padding-block: clamp(64px, 9vw, 120px) clamp(80px, 11vw, 150px);
 }
 
+/* Almost-imperceptible texture shifts between sections — like turning leaves of
+   warm paper. Tints nudge the theme surface a few percent; never a hard edge. */
+main[data-experience="candle-chapters"] #story {
+  background: color-mix(in srgb, var(--surface) 96%, var(--accent) 4%);
+}
+main[data-experience="candle-chapters"] #quote {
+  background: color-mix(in srgb, var(--surface) 97%, var(--ink) 3%);
+}
+
 /* ── Hero — the opening page of a book. Height is a SETTING (data-layout),
       never hardcoded in the component. ── */
 .chapter-hero {
   position: relative;
+  /* breathe more than the body column — luxury layouts hold back from the edge */
+  width: min(1180px, 100% - 96px);
   display: flex;
   align-items: flex-end;
   border-radius: 4px;
@@ -153,6 +167,15 @@ main[data-experience="candle-chapters"] #next-chapter {
   gap: clamp(32px, 5vw, 80px);
   align-items: center;
 }
+/* Solo chapter — the only fragrance: expand the image ~6% and let the story
+   breathe, so it reads as a curated single-fragrance chapter. */
+.chapter-featured[data-solo="true"] {
+  grid-template-columns: 1.12fr 0.88fr;
+  gap: clamp(40px, 6vw, 96px);
+}
+.chapter-featured[data-solo="true"] .chapter-featured__body { padding-block: clamp(8px, 2vw, 28px); }
+.chapter-featured[data-solo="true"] .chapter-featured__tagline,
+.chapter-featured[data-solo="true"] .chapter-featured__note { margin-top: 24px; }
 .chapter-featured__media {
   display: block;
   aspect-ratio: 4 / 5;
@@ -240,7 +263,7 @@ main[data-experience="candle-chapters"] #next-chapter {
 .chapter-collection__head,
 .chapter-next__head {
   text-align: center;
-  margin-bottom: clamp(36px, 5vw, 60px);
+  margin-bottom: clamp(52px, 6vw, 84px); /* more air before the cards begin */
 }
 .chapter-collection__context,
 .chapter-next__context {
@@ -259,11 +282,14 @@ main[data-experience="candle-chapters"] #next-chapter {
   color: var(--ink);
 }
 
-/* ── Chapter collection grid ── */
+/* ── Chapter collection grid ──
+   Cards stay a refined width and CENTRE, so two products never leave a large
+   empty area on the right. More products simply add centred columns. */
 .chapter-collection__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: clamp(28px, 3.2vw, 48px);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 280px));
+  justify-content: center;
+  gap: clamp(28px, 3.2vw, 52px);
 }
 
 .chapter-next { text-align: center; }

@@ -8,16 +8,35 @@ import type { ChapterIntroSettings } from "@/lib/chapterPage";
  * anticipation before the signature fragrance. Reads ChapterIntroSettings;
  * themed by SectionShell. Server component.
  */
+/** Break one poetic line into its clauses (on em-dash / sentence) so the
+ *  introduction reads as two or three measured lines, not one long sentence. */
+function introLines(intro: string | null): string[] {
+  if (!intro) return [];
+  return intro
+    .split(/\s*[—–]\s*|(?<=[.!?])\s+/)
+    .map((t) => t.trim())
+    .filter(Boolean);
+}
+
 export function ChapterIntro({ settings }: SectionComponentProps) {
   const s = settings as unknown as ChapterIntroSettings;
   const level = s.a11y?.headingLevel ?? 2;
   const Heading = `h${level}` as keyof JSX.IntrinsicElements;
+  const lines = introLines(s.intro);
 
   return (
     <div className="chapter-intro">
       {s.volume ? <p className="chapter-intro__volume">{s.volume.toUpperCase()}</p> : null}
       <Heading className="chapter-intro__title">{s.title}</Heading>
-      {s.intro ? <p className="chapter-intro__line">{s.intro}</p> : null}
+      {lines.length > 0 ? (
+        <p className="chapter-intro__line">
+          {lines.map((line, i) => (
+            <span key={i} className="chapter-intro__clause">
+              {line}
+            </span>
+          ))}
+        </p>
+      ) : null}
     </div>
   );
 }

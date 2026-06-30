@@ -210,6 +210,9 @@ export interface ChapterFeaturedSettings {
   product: ChapterProductView | null;
   /** A longer editorial "inspired by" note for the signature (optional). */
   note: string | null;
+  /** True when this is the chapter's only fragrance — the signature expands to
+   *  read as a curated single-fragrance chapter, not one "missing products". */
+  solo: boolean;
   cta: CtaAction;
   a11y: A11yMeta;
   emptyStrategy: EmptyStrategy;
@@ -487,6 +490,7 @@ export function buildChapterPage(
     chapterContext,
     product: featuredProduct,
     note: chapter.description ?? null, // the signature embodies the chapter
+    solo: supportingViews.length === 0, // the only fragrance → expand it
     cta: { label: "Discover", href: featuredProduct ? `/shop/${featuredProduct.slug}` : undefined },
     a11y: { headingLevel: 2 },
     emptyStrategy: empty.featured,
