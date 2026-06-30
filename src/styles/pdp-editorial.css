@@ -18,7 +18,10 @@
 .artist,
 .equote,
 .eaccordion,
-.related-products {
+.related-products,
+.mood-grid,
+.craft,
+.lifestyle {
   width: min(var(--container), 100% - 48px);
   margin-inline: auto;
 }
@@ -264,9 +267,142 @@
   gap: clamp(28px, 3vw, 48px);
 }
 
+/* ── MoodGrid ── */
+.mood-grid__head { text-align: center; margin-bottom: clamp(36px, 5vw, 60px); }
+.mood-grid__eyebrow {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--accent, var(--gold));
+  margin-bottom: 16px;
+}
+.mood-grid__heading {
+  font-family: var(--font-serif);
+  font-size: clamp(1.7rem, 3.2vw, 2.4rem);
+  color: var(--ink);
+}
+.mood-grid__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: clamp(16px, 2.4vw, 28px);
+  max-width: 880px;
+  margin-inline: auto;
+}
+.mood-card {
+  border: 1px solid var(--line, var(--beige));
+  border-radius: 3px;
+  padding: clamp(24px, 3vw, 36px);
+  text-align: center;
+}
+.mood-card__label {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-muted, var(--muted));
+  margin-bottom: 14px;
+}
+.mood-card__value {
+  font-family: var(--font-serif);
+  font-size: clamp(1.2rem, 2.2vw, 1.5rem);
+  line-height: 1.3;
+  color: var(--ink);
+}
+
+/* ── CraftDetails ── */
+.craft__head { text-align: center; margin-bottom: clamp(36px, 5vw, 60px); }
+.craft__eyebrow {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--accent, var(--gold));
+  margin-bottom: 16px;
+}
+.craft__heading {
+  font-family: var(--font-serif);
+  font-size: clamp(1.7rem, 3.2vw, 2.4rem);
+  color: var(--ink);
+}
+.craft__items {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: clamp(24px, 3vw, 44px);
+  max-width: 900px;
+  margin-inline: auto;
+  text-align: center;
+}
+.craft__label {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent, var(--gold));
+  margin-bottom: 12px;
+}
+.craft__value {
+  font-family: var(--font-serif);
+  font-size: clamp(1rem, 1.8vw, 1.2rem);
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+/* ── LifestyleFeature ── */
+.lifestyle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(32px, 5vw, 80px);
+  align-items: center;
+}
+.lifestyle[data-align="image-right"] .lifestyle__media { order: 2; }
+.lifestyle__media {
+  aspect-ratio: 4 / 3;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--surface-alt, var(--soft-beige));
+}
+.lifestyle__image { width: 100%; height: 100%; }
+.lifestyle__eyebrow {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--accent, var(--gold));
+  margin-bottom: 16px;
+}
+.lifestyle__heading {
+  font-family: var(--font-serif);
+  font-size: clamp(1.7rem, 3.2vw, 2.4rem);
+  color: var(--ink);
+  margin-bottom: 24px;
+}
+.lifestyle__row {
+  display: flex;
+  gap: 20px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line, var(--beige));
+}
+.lifestyle__row-label {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-muted, var(--muted));
+  min-width: 130px;
+  padding-top: 3px;
+}
+.lifestyle__row-value {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--ink-soft, var(--smoke));
+}
+
 @media (max-width: 760px) {
   .estatement,
-  .artist { grid-template-columns: 1fr; }
+  .artist,
+  .lifestyle { grid-template-columns: 1fr; }
   .estatement[data-align="image-right"] .estatement__media,
-  .artist[data-align="image-right"] .artist__media { order: 0; }
+  .artist[data-align="image-right"] .artist__media,
+  .lifestyle[data-align="image-right"] .lifestyle__media { order: 0; }
 }

@@ -60,6 +60,35 @@ export interface RelatedProductsSettings {
   heading: string;
   products: ProductCardModel[];
 }
+export interface MoodCard {
+  label: string;
+  value: string;
+}
+export interface MoodGridSettings {
+  eyebrow: string;
+  heading?: string;
+  cards: MoodCard[];
+}
+export interface CraftItem {
+  label: string;
+  value: string;
+}
+export interface CraftDetailsSettings {
+  eyebrow: string;
+  heading?: string;
+  items: CraftItem[];
+}
+export interface LifestyleRow {
+  label: string;
+  value: string;
+}
+export interface LifestyleFeatureSettings {
+  eyebrow: string;
+  heading?: string;
+  media?: MediaContent;
+  rows: LifestyleRow[];
+  align: EditorialAlign;
+}
 
 // ── Inputs ───────────────────────────────────────────────────────────────────
 
@@ -130,6 +159,20 @@ export function buildCandleEditorial({ view, artist, related }: CandleEditorialI
   const storyBody = splitParagraphs(view.mood.story);
   const storyImage = view.gallery[1]?.src ?? view.gallery[0]?.src;
 
+  const moodCards: MoodCard[] = [];
+  if (view.mood.tags.length) moodCards.push({ label: "Mood", value: view.mood.tags.join(" · ") });
+  if (view.mood.persona) moodCards.push({ label: "Flame Persona", value: view.mood.persona });
+  if (view.scentGroup) moodCards.push({ label: "Scent Group", value: view.scentGroup });
+  if (view.chapterName) moodCards.push({ label: "Theme", value: stripVolume(view.chapterName) });
+
+  const craftItems: CraftItem[] = [{ label: "Hand Poured", value: "In small batches" }, ...view.details];
+  if (view.vessels.length) craftItems.push({ label: "Vessel", value: `${view.vessels.join(" · ")} — reusable` });
+
+  const lifestyleRows: LifestyleRow[] = splitParagraphs(view.mood.lifestyle).map((line, i) => ({
+    label: ["Where it belongs", "When to light it", "Pairs with"][i] ?? "Note",
+    value: line,
+  }));
+
   const overrides: SectionInstance[] = [
     fill(
       "story",
@@ -181,6 +224,32 @@ export function buildCandleEditorial({ view, artist, related }: CandleEditorialI
         ? ({ quote: artist.quote, attribution: artist.signature, variant: "handwritten" } satisfies EditorialQuoteSettings)
         : {},
       { visibility: Boolean(artist?.quote) },
+    ),
+    fill(
+      "mood",
+      { eyebrow: "Scent Mood", heading: "The feeling it leaves", cards: moodCards } satisfies MoodGridSettings,
+      { visibility: moodCards.length > 0 },
+    ),
+    fill(
+      "craft",
+      { eyebrow: "Craft & Composition", heading: "Made by hand", items: craftItems } satisfies CraftDetailsSettings,
+      { visibility: craftItems.length > 1 },
+    ),
+    fill(
+      "lifestyle",
+      {
+        eyebrow: "Lifestyle",
+        heading: "Living with it",
+        media: storyImage ? imageMedia(storyImage, view.name, "landscape") : undefined,
+        rows: lifestyleRows,
+        align: "image-left",
+      } satisfies LifestyleFeatureSettings,
+      { visibility: lifestyleRows.length > 0 },
+    ),
+    fill(
+      "cultural",
+      { quote: view.mood.cultural ?? "", variant: "hairline" } satisfies EditorialQuoteSettings,
+      { visibility: Boolean(view.mood.cultural) },
     ),
     fill("details", { items: candleAccordion() } satisfies EditorialAccordionSettings),
     fill(

@@ -16,6 +16,9 @@ import { ArtworkFeature } from "@/components/pdp/ArtworkFeature";
 import { EditorialQuote } from "@/components/pdp/EditorialQuote";
 import { EditorialAccordion } from "@/components/pdp/EditorialAccordion";
 import { RelatedProducts } from "@/components/pdp/RelatedProducts";
+import { MoodGrid } from "@/components/pdp/MoodGrid";
+import { CraftDetails } from "@/components/pdp/CraftDetails";
+import { LifestyleFeature } from "@/components/pdp/LifestyleFeature";
 import type { BrandStory as StorySettings } from "@/config/brandStory";
 import type { EditorialVoice } from "@/config/voices";
 import type { EditorialStory } from "@/config/editorialWorld";
@@ -259,6 +262,39 @@ export function registerSectionLibrary(): void {
     renderCost: "light",
     capabilities: { variants: true, theme: true, animation: true },
     component: EditorialQuote,
+  });
+  registerSection({
+    type: "MoodGrid",
+    displayName: "Mood Grid",
+    category: "narrative",
+    description: "The scent's character as editorial cards (mood · persona · theme).",
+    icon: "grid",
+    variants: ["cards"],
+    renderCost: "light",
+    capabilities: { theme: true, animation: true },
+    component: MoodGrid,
+  });
+  registerSection({
+    type: "CraftDetails",
+    displayName: "Craft Details",
+    category: "narrative",
+    description: "How it's made — hand-poured · wax · wick · burn · vessel.",
+    icon: "tool",
+    variants: ["list"],
+    renderCost: "light",
+    capabilities: { theme: true, animation: true },
+    component: CraftDetails,
+  });
+  registerSection({
+    type: "LifestyleFeature",
+    displayName: "Lifestyle Feature",
+    category: "narrative",
+    description: "Image + where / when / pairs-with rows.",
+    icon: "home",
+    variants: ["feature"],
+    renderCost: "medium",
+    capabilities: { theme: true, assets: true, animation: true },
+    component: LifestyleFeature,
   });
   registerSection({
     type: "EditorialAccordion",
