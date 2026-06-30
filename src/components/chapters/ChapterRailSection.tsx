@@ -35,7 +35,10 @@ export function ChapterRailSection({ settings }: SectionComponentProps) {
 
   return (
     <div className="chapter-next">
-      {s.heading ? <Heading className="chapter-next__heading">{s.heading}</Heading> : null}
+      <div className="chapter-next__head">
+        {s.chapterContext ? <p className="chapter-next__context">{s.chapterContext}</p> : null}
+        {s.heading ? <Heading className="chapter-next__heading">{s.heading}</Heading> : null}
+      </div>
       <ChapterRail chapters={chapters} ariaLabel="Other chapters" layout={s.layout} />
     </div>
   );

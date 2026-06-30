@@ -26,9 +26,11 @@ export function ChapterFeaturedProduct({ settings }: SectionComponentProps) {
       </Link>
       <div className="chapter-featured__body">
         {s.eyebrow ? <p className="chapter-featured__eyebrow">{s.eyebrow}</p> : null}
+        <p className="chapter-featured__edition">{p.edition}</p>
         <Heading className="chapter-featured__name">{p.name}</Heading>
+        <p className="chapter-featured__collection">{p.collectionType}</p>
         {p.tagline ? <p className="chapter-featured__tagline">{p.tagline}</p> : null}
-        <p className="chapter-featured__price">{p.commerce.priceRange.display}</p>
+        <p className="chapter-featured__price">{p.priceLabel}</p>
         <Link href={href} className="chapter-featured__cta">
           {s.cta.label}
         </Link>

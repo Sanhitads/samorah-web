@@ -1,7 +1,8 @@
-/* Chapter page sections (step 9) — co-located styles. Each renders inside
-   SectionShell (full-width inner); a shared narrow column holds editorial
-   content. Colours come from the section's data-theme tokens; motion from the
-   motion tokens; aspect + overlay are data. */
+/* Chapter page sections (step 9) — co-located styles. The page reads as ONE
+   continuous editorial chapter: a single, intentional rhythm (not doubled
+   section padding), a tall opening, and the Samorah numbering throughout.
+   Colours come from the section's data-theme tokens; motion from motion tokens. */
+
 .chapter-hero,
 .chapter-featured,
 .chapter-collection,
@@ -10,18 +11,37 @@
   margin-inline: auto;
 }
 
-/* ── Hero — the chapter's book cover ── */
+/* ── Editorial rhythm ──
+   Each section pads the TOP only (bottom 0), so gaps never double up. Scoped to
+   the chapter experience so the global spacing scale is untouched elsewhere. */
+main[data-experience="candle-chapters"] .section-shell {
+  padding-block: clamp(64px, 8vw, 104px) 0;
+}
+main[data-experience="candle-chapters"] #hero {
+  padding-block: 0; /* the hero block owns its own height — flush opening */
+}
+main[data-experience="candle-chapters"] #featured {
+  padding-block: clamp(48px, 6vw, 80px) 0; /* hero flows straight into the signature */
+}
+main[data-experience="candle-chapters"] #quote {
+  padding-block: clamp(80px, 11vw, 150px) 0; /* a longer breath before the pause */
+}
+main[data-experience="candle-chapters"] #next-chapter {
+  padding-block: clamp(64px, 9vw, 120px) clamp(72px, 10vw, 140px);
+}
+
+/* ── Hero — the opening page of a book ── */
 .chapter-hero {
   position: relative;
-  min-height: clamp(420px, 64vh, 680px);
+  min-height: clamp(560px, 82vh, 880px);
   display: flex;
   align-items: flex-end;
   border-radius: 4px;
   overflow: hidden;
   isolation: isolate;
 }
-.chapter-hero[data-aspect="landscape"] { min-height: clamp(360px, 52vh, 560px); }
-.chapter-hero[data-aspect="square"] { min-height: clamp(480px, 70vh, 760px); }
+.chapter-hero[data-aspect="landscape"] { min-height: clamp(440px, 62vh, 640px); }
+.chapter-hero[data-aspect="square"] { min-height: clamp(600px, 88vh, 920px); }
 
 .chapter-hero__bg,
 .chapter-hero__bg .asset-image {
@@ -36,13 +56,10 @@
   inset: 0;
   z-index: -1;
 }
-/* overlay variants (#8) */
 .chapter-hero[data-overlay="gradient"] .chapter-hero__veil {
-  background: linear-gradient(180deg, rgba(20, 16, 12, 0.05) 0%, rgba(20, 16, 12, 0.55) 100%);
+  background: linear-gradient(180deg, rgba(20, 16, 12, 0.05) 0%, rgba(20, 16, 12, 0.6) 100%);
 }
-.chapter-hero[data-overlay="solid"] .chapter-hero__veil {
-  background: rgba(20, 16, 12, 0.42);
-}
+.chapter-hero[data-overlay="solid"] .chapter-hero__veil { background: rgba(20, 16, 12, 0.42); }
 .chapter-hero[data-overlay="blur"] .chapter-hero__veil {
   background: rgba(20, 16, 12, 0.18);
   backdrop-filter: blur(6px);
@@ -53,44 +70,44 @@
 }
 
 .chapter-hero__inner {
-  padding: clamp(28px, 5vw, 64px);
+  padding: clamp(32px, 5vw, 72px);
   color: var(--white);
-  max-width: 720px;
+  max-width: 760px;
 }
 .chapter-hero__volume {
   font-family: var(--font-sans);
   font-size: 12px;
-  letter-spacing: 0.32em;
+  letter-spacing: 0.34em;
   text-transform: uppercase;
-  opacity: 0.85;
-  margin-bottom: 14px;
+  opacity: 0.9;
+  margin-bottom: 16px;
 }
 .chapter-hero__title {
   font-family: var(--font-serif);
-  font-size: clamp(2.6rem, 6vw, 4.4rem);
-  line-height: 1.04;
+  font-size: clamp(2.8rem, 6.4vw, 4.8rem);
+  line-height: 1.02;
   color: var(--white);
 }
 .chapter-hero__tagline {
   font-family: var(--font-serif);
   font-style: italic;
-  font-size: clamp(1.1rem, 2.4vw, 1.5rem);
-  margin-top: 16px;
-  opacity: 0.92;
+  font-size: clamp(1.15rem, 2.4vw, 1.6rem);
+  margin-top: 18px;
+  opacity: 0.94;
 }
 .chapter-hero__poetic {
   font-size: 14px;
   letter-spacing: 0.02em;
   margin-top: 18px;
   max-width: 48ch;
-  opacity: 0.8;
+  opacity: 0.82;
 }
 
-/* ── Featured fragrance — editorial spotlight ── */
+/* ── Featured fragrance — the signature, with full chapter identity ── */
 .chapter-featured {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: clamp(28px, 5vw, 72px);
+  gap: clamp(32px, 5vw, 80px);
   align-items: center;
 }
 .chapter-featured__media {
@@ -113,34 +130,52 @@
 .chapter-featured__eyebrow {
   font-family: var(--font-sans);
   font-size: 11px;
-  letter-spacing: 0.28em;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ink-muted, var(--muted));
+  margin-bottom: 18px;
+}
+.chapter-featured__edition {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  letter-spacing: 0.3em;
   text-transform: uppercase;
   color: var(--accent, var(--gold));
-  margin-bottom: 18px;
+  margin-bottom: 14px;
 }
 .chapter-featured__name {
   font-family: var(--font-serif);
-  font-size: clamp(2rem, 4vw, 3rem);
-  line-height: 1.08;
+  font-size: clamp(2.2rem, 4.4vw, 3.2rem);
+  line-height: 1.06;
   color: var(--ink);
+}
+.chapter-featured__collection {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-muted, var(--muted));
+  margin-top: 12px;
 }
 .chapter-featured__tagline {
   font-family: var(--font-serif);
   font-style: italic;
-  font-size: 1.2rem;
+  font-size: 1.25rem;
   color: var(--ink-soft, var(--smoke));
-  margin-top: 14px;
+  margin-top: 18px;
+  max-width: 34ch;
 }
 .chapter-featured__price {
   font-size: 15px;
-  color: var(--ink-soft, var(--smoke));
+  color: var(--ink, var(--charcoal));
   margin-top: 22px;
 }
 .chapter-featured__cta {
   display: inline-block;
-  margin-top: 28px;
+  margin-top: 26px;
   font-family: var(--font-sans);
   font-size: 12px;
+  font-weight: 500;
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--ink);
@@ -148,21 +183,37 @@
   padding-bottom: 5px;
   transition: opacity var(--motion-hover-duration) var(--motion-ease-out);
 }
-.chapter-featured__cta:hover { opacity: 0.6; }
+.chapter-featured__cta::after { content: " \2192"; }
+.chapter-featured__cta:hover { opacity: 0.62; }
 
-/* ── Chapter collection — grid of ProductCards ── */
+/* ── Section heads — keep the reader inside the chapter ── */
+.chapter-collection__head,
+.chapter-next__head {
+  text-align: center;
+  margin-bottom: clamp(36px, 5vw, 60px);
+}
+.chapter-collection__context,
+.chapter-next__context {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--accent, var(--gold));
+  margin-bottom: 14px;
+}
 .chapter-collection__heading,
 .chapter-next__heading {
   font-family: var(--font-serif);
-  font-size: clamp(1.6rem, 3vw, 2.2rem);
+  font-size: clamp(2rem, 3.6vw, 2.8rem);
+  line-height: 1.1;
   color: var(--ink);
-  text-align: center;
-  margin-bottom: clamp(32px, 5vw, 56px);
 }
+
+/* ── Chapter collection grid ── */
 .chapter-collection__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: clamp(24px, 3vw, 44px);
+  gap: clamp(28px, 3.2vw, 48px);
 }
 
 .chapter-next { text-align: center; }

@@ -65,31 +65,56 @@
 }
 
 .product-card__body {
-  padding-top: 16px;
+  padding-top: 18px;
   text-align: center;
+}
+.product-card__edition {
+  display: block;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--accent, var(--gold));
+  margin-bottom: 8px;
 }
 .product-card__name {
   font-family: var(--font-serif);
-  font-size: 1.25rem;
+  font-size: 1.3rem;
   color: var(--ink);
 }
-.product-card__tagline {
-  font-size: 13px;
+.product-card__collection {
+  display: block;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
   color: var(--ink-muted, var(--muted));
-  margin-top: 4px;
+  margin-top: 8px;
+}
+.product-card__tagline {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 14px;
+  color: var(--ink-soft, var(--smoke));
+  margin-top: 8px;
 }
 .product-card__price {
   display: block;
   font-size: 14px;
-  color: var(--ink-soft, var(--smoke));
-  margin-top: 10px;
+  color: var(--ink, var(--charcoal));
+  margin-top: 12px;
 }
+/* Higher-contrast CTA (no new colours): ink label + accent underline + arrow. */
 .product-card__cta {
   display: inline-block;
-  margin-top: 12px;
+  margin-top: 14px;
   font-family: var(--font-sans);
   font-size: 11px;
+  font-weight: 500;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--accent, var(--gold));
+  color: var(--ink);
+  border-bottom: 1px solid var(--accent, var(--gold));
+  padding-bottom: 4px;
 }
+.product-card__cta::after { content: " \2192"; }

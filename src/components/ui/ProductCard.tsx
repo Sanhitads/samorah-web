@@ -26,6 +26,12 @@ export interface ProductCardModel {
   tagline?: string | null;
   media: MediaContent;
   commerce: Pick<ProductCommerceProjection, "priceRange" | "badge">;
+  /** Chapter numbering — "VOL. I.2" — shown above the name (editorial variant). */
+  edition?: string;
+  /** "Core Collection" | "Limited Collection" | … shown under the name. */
+  collectionType?: string;
+  /** Editorial price label ("From ₹899"); falls back to the projection display. */
+  priceLabel?: string;
   /** The action label/target — from settings, not hardcoded. */
   cta?: CtaAction;
   /** Optional editorial story link (capability `story`). */
@@ -58,7 +64,7 @@ export function ProductCard({
   if (state === "hidden") return null;
 
   const caps = { ...DEFAULT_CARD_CAPABILITIES, ...capabilities };
-  const { slug, name, tagline, media, commerce, cta } = product;
+  const { slug, name, tagline, media, commerce, cta, edition, collectionType, priceLabel } = product;
   const aspect = media.aspect ?? "portrait";
   const level = a11y?.headingLevel ?? 3;
   const Heading = `h${level}` as keyof JSX.IntrinsicElements;
@@ -92,9 +98,13 @@ export function ProductCard({
 
       {state === "loading" ? null : (
         <span className="product-card__body">
+          {edition ? <span className="product-card__edition">{edition}</span> : null}
           <Heading className="product-card__name">{name}</Heading>
+          {collectionType ? <span className="product-card__collection">{collectionType}</span> : null}
           {tagline ? <p className="product-card__tagline">{tagline}</p> : null}
-          {caps.price ? <span className="product-card__price">{commerce.priceRange.display}</span> : null}
+          {caps.price ? (
+            <span className="product-card__price">{priceLabel ?? commerce.priceRange.display}</span>
+          ) : null}
           {cta?.label ? <span className="product-card__cta">{cta.label}</span> : null}
         </span>
       )}

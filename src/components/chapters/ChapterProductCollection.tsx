@@ -19,7 +19,10 @@ export function ChapterProductCollection({ settings }: SectionComponentProps) {
 
   return (
     <div className="chapter-collection">
-      {s.heading ? <Heading className="chapter-collection__heading">{s.heading}</Heading> : null}
+      <div className="chapter-collection__head">
+        {s.chapterContext ? <p className="chapter-collection__context">{s.chapterContext}</p> : null}
+        {s.heading ? <Heading className="chapter-collection__heading">{s.heading}</Heading> : null}
+      </div>
       <div className="chapter-collection__grid" data-group={s.groupBy}>
         {s.products.map((p) => (
           <ProductCard
@@ -30,6 +33,9 @@ export function ChapterProductCollection({ settings }: SectionComponentProps) {
               slug: p.slug,
               name: p.name,
               tagline: p.tagline,
+              edition: p.edition,
+              collectionType: p.collectionType,
+              priceLabel: p.priceLabel,
               media: p.media,
               commerce: p.commerce,
               cta: { label: s.cardCta.label, href: s.cardCta.href ?? `/shop/${p.slug}` },

@@ -40,6 +40,8 @@ export interface ChapterProductInput extends Priceable {
   is_hero?: boolean | null;
   is_featured?: boolean | null;
   created_at?: string | null;
+  /** "Core Collection" | "Limited Collection" | "Seasonal" | … (defaults to Core). */
+  collection_type?: string | null;
   product_images?: ImageLike[] | null;
 }
 
@@ -156,6 +158,12 @@ export interface ChapterProductView {
   slug: string;
   name: string;
   tagline: string | null;
+  /** Samorah chapter numbering — "VOL. I.1" — part of the brand identity. */
+  edition: string;
+  /** "Core Collection" | "Limited Collection" | … */
+  collectionType: string;
+  /** Editorial price label, e.g. "From ₹899". */
+  priceLabel: string;
   media: MediaContent; // image today; video/3d reserved by the contract
   commerce: ProductCommerceProjection;
 }
@@ -183,6 +191,8 @@ export interface ChapterHeroSettings {
 }
 export interface ChapterFeaturedSettings {
   eyebrow: string;
+  /** "VOL. I — The Dessert Chapter" — keeps the reader inside the chapter. */
+  chapterContext: string;
   product: ChapterProductView | null;
   cta: CtaAction;
   a11y: A11yMeta;
@@ -190,6 +200,7 @@ export interface ChapterFeaturedSettings {
 }
 export interface ChapterCollectionSettings {
   heading: string;
+  chapterContext: string;
   products: ChapterProductView[];
   groupBy: SupportingRules["groupBy"];
   cardVariant: ProductCardVariant;
@@ -207,6 +218,7 @@ export interface ChapterEditorialSettings {
 }
 export interface ChapterRailSettings {
   heading: string;
+  chapterContext: string;
   chapters: ChapterCardView[];
   layout: RailLayout;
   a11y: A11yMeta;
@@ -243,9 +255,23 @@ export function toProjection(p: ChapterProductInput): ProductCommerceProjection 
   };
 }
 
-function toProductView(p: ChapterProductInput): ChapterProductView {
+/** Samorah chapter numbering — "Vol. I" + position → "VOL. I.1". */
+function editionLabel(volume: string | null, n: number): string {
+  return volume ? `${volume.toUpperCase()}.${n}` : `No. ${n}`;
+}
+
+function toProductView(p: ChapterProductInput, edition: string): ChapterProductView {
   const { url, alt } = imageOf(p);
-  return { slug: p.slug, name: p.name, tagline: p.tagline ?? null, media: imageMedia(url, alt, "portrait"), commerce: toProjection(p) };
+  return {
+    slug: p.slug,
+    name: p.name,
+    tagline: p.tagline ?? null,
+    edition,
+    collectionType: p.collection_type ?? "Core Collection",
+    priceLabel: `From ${formatPrice(p).current}`,
+    media: imageMedia(url, alt, "portrait"),
+    commerce: toProjection(p),
+  };
 }
 
 function toChapterCard(c: ChapterSummary): ChapterCardView {
@@ -409,6 +435,8 @@ export function buildChapterPage(
   const title = chapterTitle(chapter);
   const description = chapter.description ?? chapter.tagline ?? `${chapter.name} — a Samorah chapter.`;
   const voice = poeticVoice(chapter);
+  // "VOL. I — The Dessert Chapter": the reminder carried through every section.
+  const chapterContext = chapter.volume ? `${chapter.volume.toUpperCase()} — ${chapter.name}` : chapter.name;
 
   const cover = chapter.cover_image_url ?? GRADIENT("grad-chai");
   const heroSettings: ChapterHeroSettings = {
@@ -423,17 +451,22 @@ export function buildChapterPage(
     a11y: { headingLevel: 1, landmark: "region" },
     emptyStrategy: empty.hero,
   };
-  const featuredProduct = heroProduct ? toProductView(heroProduct) : null;
+  // Chapter numbering — hero is .1, supporting continue .2, .3, … (brand identity).
+  const featuredProduct = heroProduct ? toProductView(heroProduct, editionLabel(chapter.volume, 1)) : null;
+  const supportingViews = supporting.map((p, i) => toProductView(p, editionLabel(chapter.volume, i + 2)));
+
   const featured: ChapterFeaturedSettings = {
     eyebrow: "The signature of this chapter",
+    chapterContext,
     product: featuredProduct,
-    cta: { label: "Discover the fragrance", href: featuredProduct ? `/shop/${featuredProduct.slug}` : undefined },
+    cta: { label: "Discover", href: featuredProduct ? `/shop/${featuredProduct.slug}` : undefined },
     a11y: { headingLevel: 2 },
     emptyStrategy: empty.featured,
   };
   const collection: ChapterCollectionSettings = {
     heading: "The rest of the chapter",
-    products: supporting.map(toProductView),
+    chapterContext,
+    products: supportingViews,
     groupBy: config.supporting?.groupBy ?? "none",
     cardVariant: "editorial",
     cardCta: { label: "Discover" },
@@ -443,7 +476,7 @@ export function buildChapterPage(
   const quote: ChapterQuoteSettings = { voice, emptyStrategy: empty.quote };
   const story: ChapterEditorialSettings = { contentId: chapter.storyContentId ?? null, emptyStrategy: empty.story };
   const gallery: ChapterEditorialSettings = { contentId: chapter.galleryContentId ?? null, emptyStrategy: empty.gallery };
-  const rail: ChapterRailSettings = { heading: "Continue reading", chapters: others.map(toChapterCard), layout: "editorial", a11y: { headingLevel: 2, landmark: "region" }, emptyStrategy: empty["next-chapter"] };
+  const rail: ChapterRailSettings = { heading: "Continue reading", chapterContext, chapters: others.map(toChapterCard), layout: "editorial", a11y: { headingLevel: 2, landmark: "region" }, emptyStrategy: empty["next-chapter"] };
 
   // Overrides keyed by the template's section ids (merged over the template).
   // Empty strategy + content presence decide visibility per section.
