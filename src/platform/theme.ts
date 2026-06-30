@@ -191,7 +191,7 @@ export const THEMES: Theme[] = [
   {
     token: "dark-library",
     label: "Dark Library",
-    description: "Aubergine dark — the Mood Library.",
+    description: "Aubergine / deep plum — the Mood Library. Lavender-grey accent.",
     category: "core",
     version: 1,
     scheme: "dark",
@@ -203,6 +203,26 @@ export const THEMES: Theme[] = [
         inkSoft: "rgba(250, 247, 242, 0.72)",
         inkMuted: "rgba(250, 247, 242, 0.5)",
         line: "rgba(250, 247, 242, 0.16)",
+        accent: "#b6aec6", // lavender grey — not gold
+      },
+    },
+  },
+  {
+    token: "sage",
+    label: "Sage",
+    description: "Sage & moss — the Nature chapters. Soft-olive accent.",
+    category: "core",
+    version: 1,
+    scheme: "dark",
+    extends: "forest",
+    tokens: {
+      color: {
+        surface: "#2c3528", // deep moss
+        ink: "#f1f3ea",
+        inkSoft: "rgba(241, 243, 234, 0.72)",
+        inkMuted: "rgba(241, 243, 234, 0.5)",
+        line: "rgba(241, 243, 234, 0.16)",
+        accent: "#aeb98f", // soft olive
       },
     },
   },

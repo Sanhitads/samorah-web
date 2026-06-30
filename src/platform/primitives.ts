@@ -35,6 +35,7 @@ export type ThemeToken = Open<
   | "warm-ivory"
   | "dark-library"
   | "forest"
+  | "sage"
   | "clay"
   | "sand"
   | "monsoon"

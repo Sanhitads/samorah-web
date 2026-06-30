@@ -66,13 +66,27 @@ main[data-experience="candle-chapters"] #next-chapter {
   padding-block: clamp(64px, 9vw, 120px) clamp(80px, 11vw, 150px);
 }
 
-/* Almost-imperceptible texture shifts between sections — like turning leaves of
-   warm paper. Tints nudge the theme surface a few percent; never a hard edge. */
+/* Subtle tonal variation between sections — a 4–10% lightness shift so the page
+   feels layered, never one flat block. Tints are relative to the theme surface
+   (mixing toward --ink lifts; toward #000 deepens), so the rhythm holds in every
+   chapter palette — deep at the hero & the quote, lifted through the middle. */
+main[data-experience="candle-chapters"] #hero {
+  background: color-mix(in srgb, var(--surface) 92%, #000 8%);
+}
 main[data-experience="candle-chapters"] #story {
-  background: color-mix(in srgb, var(--surface) 96%, var(--accent) 4%);
+  background: color-mix(in srgb, var(--surface) 97%, var(--ink) 3%);
+}
+main[data-experience="candle-chapters"] #featured {
+  background: var(--surface);
+}
+main[data-experience="candle-chapters"] #supporting {
+  background: color-mix(in srgb, var(--surface) 94%, var(--ink) 6%);
 }
 main[data-experience="candle-chapters"] #quote {
-  background: color-mix(in srgb, var(--surface) 97%, var(--ink) 3%);
+  background: color-mix(in srgb, var(--surface) 90%, #000 10%);
+}
+main[data-experience="candle-chapters"] #next-chapter {
+  background: color-mix(in srgb, var(--surface) 95%, var(--ink) 5%);
 }
 
 /* ── Hero — the opening page of a book. Height is a SETTING (data-layout),

@@ -246,11 +246,16 @@ export interface ChapterRailSettings {
 
 // ── Mapping ──────────────────────────────────────────────────────────────────
 
+// The fixed chapter colour system (per the Samorah chapter palette):
+//   I  Dessert — warm beige/brown · honey gold   → clay
+//   II Wild Within — deep green · antique gold    → forest
+//   III Mood Library — aubergine · lavender grey  → dark-library
+//   IV Nature — sage/moss · soft olive            → sage
 const CHAPTER_THEME: Record<string, ThemeToken> = {
   "dessert-chapter": "clay",
   "the-wild-within": "forest",
   "mood-library": "dark-library",
-  "nature-chapter": "forest",
+  "nature-chapter": "sage",
 };
 
 function imageOf(p: ChapterProductInput): { url: string; alt: string } {

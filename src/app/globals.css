@@ -1403,82 +1403,8 @@ h1, h2, h3, h4 {
   .footer__bottom { flex-direction: column; gap: 16px; text-align: center; padding-inline: 20px; }
 }
 
-/* ─── Product Card ─── */
-.product-card {
-  display: flex;
-  flex-direction: column;
-  cursor: pointer;
-}
-
-.product-card__image {
-  aspect-ratio: 3/4;
-  overflow: hidden;
-  margin-bottom: 20px;
-  position: relative;
-}
-
-.product-card__image .img-fill {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform 0.7s var(--ease-luxury);
-}
-
-.product-card:hover .img-fill { transform: scale(1.04); }
-
-.product-card__badge {
-  position: absolute;
-  top: 16px;
-  left: 16px;
-  background: var(--gold);
-  color: var(--ivory);
-  font-size: 9px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  padding: 4px 10px;
-  z-index: 2;
-}
-
-.product-card__chapter {
-  font-size: 10px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 6px;
-}
-
-.product-card__name {
-  font-family: var(--font-serif);
-  font-size: 22px;
-  color: var(--deep-charcoal);
-  margin-bottom: 4px;
-  line-height: 1.2;
-  transition: opacity 0.3s;
-}
-
-.product-card:hover .product-card__name { opacity: 0.7; }
-
-.product-card__tagline {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 13px;
-  color: var(--smoke);
-  margin-bottom: 12px;
-  line-height: 1.5;
-}
-
-.product-card__price {
-  font-family: var(--font-serif);
-  font-size: 17px;
-  color: var(--charcoal);
-}
-
-.product-card__notes {
-  font-size: 11px;
-  color: var(--muted);
-  margin-top: 4px;
-  letter-spacing: 0.05em;
-}
+/* Legacy prototype `.product-card` CSS removed — the platform ProductCard now
+   owns these class names (src/styles/product-card.css). */
 
 /* ─── Product Grid ─── */
 .product-grid {
@@ -1617,82 +1543,10 @@ h1, h2, h3, h4 {
   .collection-entry { min-height: 360px; padding: 32px 20px; }
 }
 
-/* ─── Chapter Listing ─── */
-.chapter-listing-hero {
-  min-height: 70vh;
-  display: flex;
-  align-items: flex-end;
-  padding: 80px 48px;
-  position: relative;
-  overflow: hidden;
-}
-
-.chapter-hero-content {
-  position: relative;
-  z-index: 2;
-  color: var(--ivory);
-  max-width: 560px;
-}
-
-.chapter-hero__overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to right, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.1) 100%);
-  z-index: 1;
-}
-
-.chapter-featured {
-  display: grid;
-  grid-template-columns: 1.1fr 0.9fr;
-  gap: 0;
-  background: var(--warm-ivory);
-  padding-block: 80px;
-  padding-inline: 48px;
-  gap: 64px;
-  align-items: center;
-}
-
-.chapter-featured__image {
-  aspect-ratio: 3/4;
-  overflow: hidden;
-  border-radius: 1px;
-}
-
-.chapter-support-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px;
-  padding: 4px;
-}
-
-.chapter-support-item {
-  aspect-ratio: 3/4;
-  position: relative;
-  overflow: hidden;
-  cursor: pointer;
-  display: flex;
-  align-items: flex-end;
-  padding: 28px;
-}
-
-.chapter-support-item__overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to top, rgba(0,0,0,0.5), transparent 60%);
-  z-index: 1;
-}
-
-.chapter-support-item__content {
-  position: relative;
-  z-index: 2;
-  color: var(--ivory);
-}
-
-@media (max-width: 768px) {
-  .chapter-featured { grid-template-columns: 1fr; padding-inline: 20px; gap: 36px; }
-  .chapter-listing-hero { padding: 60px 20px; }
-  .chapter-support-grid { grid-template-columns: 1fr 1fr; }
-}
+/* Legacy prototype "Chapter Listing" CSS removed — the new chapter pages own
+   `.chapter-hero` / `.chapter-featured` (src/styles/chapter-sections.css). The
+   old `.chapter-featured { background: var(--warm-ivory) }` was painting cream
+   over the themed (dark) chapter surface. */
 
 /* ─── Product Detail ─── */
 .product-detail {
@@ -4127,14 +3981,19 @@ h1, h2, h3, h4 {
   background-position: center;
 }
 .home-chapter:hover .home-chapter__image {
-  transform: scale(1.06);
-  filter: brightness(1.08);
+  transform: scale(1.03);
+  filter: brightness(1.04);
 }
 
+/* Depth, not a flat block: a soft top-left light, an edge vignette, and the
+   bottom legibility gradient — layered so each card reads like atmosphere. */
 .home-chapter__overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.12) 52%, transparent 78%);
+  background:
+    radial-gradient(85% 55% at 28% 12%, rgba(255, 255, 255, 0.1) 0%, transparent 55%),
+    radial-gradient(130% 130% at 50% 28%, transparent 44%, rgba(0, 0, 0, 0.42) 100%),
+    linear-gradient(to top, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.12) 52%, transparent 78%);
 }
 
 .home-chapter__inner {
