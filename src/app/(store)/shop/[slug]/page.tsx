@@ -1,10 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getProductBySlug, getProducts } from "@/services/productService";
+import { getProductBySlug, getProducts, getRelatedProducts } from "@/services/productService";
 import { buildProductPage, type ProductInput } from "@/lib/productPage";
+import { buildCandleEditorial, type RelatedProductInput } from "@/lib/productEditorial";
+import { chapterTheme } from "@/lib/chapterPage";
+import { getArtist } from "@/config/artist";
 import { AssetImage } from "@/components/ui/AssetImage";
 import { ProductPurchasePanel } from "@/components/product/ProductPurchasePanel";
+import { SectionRenderer } from "@/components/sections/SectionRenderer";
+import { bootstrapPlatform } from "@/components/page/bootstrap";
 
 /**
  * Product page (Phase 9) — `/shop/[slug]`. A focused commerce page (not the
@@ -50,8 +55,22 @@ export default async function ProductRoute({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const p = await load(slug);
-  if (!p) notFound();
+  const product = await getProductBySlug(slug);
+  if (!product) notFound();
+  const raw = product as unknown as ProductInput & {
+    id: string;
+    fragrance_family: string | null;
+    collection_id: string | null;
+  };
+  const p = buildProductPage(raw);
+
+  bootstrapPlatform();
+  const related = (await getRelatedProducts(
+    { id: raw.id, fragrance_family: raw.fragrance_family, collection_id: raw.collection_id },
+    4,
+  )) as unknown as RelatedProductInput[];
+  const editorial = buildCandleEditorial({ view: p, artist: getArtist(null), related });
+  const palette = chapterTheme(p.chapterSlug);
 
   return (
     <main className="pdp" data-theme="warm-ivory">
@@ -121,6 +140,13 @@ export default async function ProductRoute({
             </dl>
           ) : null}
         </div>
+      </div>
+
+      <div className="pdp__editorial">
+        <SectionRenderer
+          sections={editorial}
+          context={{ pageId: p.slug, themeToken: palette, preview: false, data: { productSlug: p.slug } }}
+        />
       </div>
     </main>
   );

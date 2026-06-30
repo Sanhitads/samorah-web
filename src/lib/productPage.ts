@@ -79,6 +79,7 @@ export interface ProductPageView {
   name: string;
   tagline: string | null;
   chapterName: string | null;
+  chapterSlug: string | null;
   chapterHref: string | null;
   scentGroup: string | null;
   fragranceFamily: string | null;
@@ -161,6 +162,7 @@ export function buildProductPage(p: ProductInput): ProductPageView {
     name: p.name,
     tagline: p.tagline,
     chapterName,
+    chapterSlug: p.collection?.slug ?? null,
     chapterHref: p.collection ? `/chapters/${p.collection.slug}` : null,
     scentGroup: p.scent_group,
     fragranceFamily: p.fragrance_family,

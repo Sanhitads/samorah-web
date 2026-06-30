@@ -258,6 +258,12 @@ const CHAPTER_THEME: Record<string, ThemeToken> = {
   "nature-chapter": "sage",
 };
 
+/** The theme token for a chapter slug — used to theme a chapter's PDP editorial
+ *  blocks for continuity (falls back to the house warm-ivory). */
+export function chapterTheme(slug: string | null | undefined): ThemeToken {
+  return (slug && CHAPTER_THEME[slug]) || "warm-ivory";
+}
+
 function imageOf(p: ChapterProductInput): { url: string; alt: string } {
   const img = primaryImage(p.product_images);
   return { url: img?.url ?? GRADIENT("grad-chai"), alt: img?.alt_text ?? p.name };

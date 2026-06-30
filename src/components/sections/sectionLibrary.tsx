@@ -9,6 +9,13 @@ import { ChapterProductCollection } from "@/components/chapters/ChapterProductCo
 import { ChapterRailSection } from "@/components/chapters/ChapterRailSection";
 import { HoursGroup } from "@/components/air/HoursGroup";
 import { FutureVolumeTeaser } from "@/components/air/FutureVolumeTeaser";
+import { EditorialStatement } from "@/components/pdp/EditorialStatement";
+import { FragrancePyramid } from "@/components/pdp/FragrancePyramid";
+import { ArtistFeature } from "@/components/pdp/ArtistFeature";
+import { ArtworkFeature } from "@/components/pdp/ArtworkFeature";
+import { EditorialQuote } from "@/components/pdp/EditorialQuote";
+import { EditorialAccordion } from "@/components/pdp/EditorialAccordion";
+import { RelatedProducts } from "@/components/pdp/RelatedProducts";
 import type { BrandStory as StorySettings } from "@/config/brandStory";
 import type { EditorialVoice } from "@/config/voices";
 import type { EditorialStory } from "@/config/editorialWorld";
@@ -195,6 +202,86 @@ export function registerSectionLibrary(): void {
     permissions: { edit: ["administrator", "editor", "marketing"], publish: ["administrator", "editor"] },
     emits: ["scroll-past"],
     component: FutureVolumeTeaser,
+  });
+
+  // — Editorial PDP blocks (Phase 9; product-agnostic, reusable) —
+  registerSection({
+    type: "EditorialStatement",
+    displayName: "Editorial Statement",
+    category: "narrative",
+    description: "A large editorial paragraph beside one image (or full-width text).",
+    icon: "align-left",
+    variants: ["statement"],
+    renderCost: "medium",
+    capabilities: { theme: true, assets: true, animation: true },
+    component: EditorialStatement,
+  });
+  registerSection({
+    type: "FragrancePyramid",
+    displayName: "Fragrance Pyramid",
+    category: "narrative",
+    description: "Top / Heart / Base composition as an editorial pyramid.",
+    icon: "triangle",
+    variants: ["pyramid"],
+    renderCost: "light",
+    capabilities: { theme: true, animation: true },
+    component: FragrancePyramid,
+  });
+  registerSection({
+    type: "ArtistFeature",
+    displayName: "Artist Feature",
+    category: "narrative",
+    description: "Layout A — process image + the artist's story.",
+    icon: "user",
+    variants: ["feature"],
+    renderCost: "medium",
+    capabilities: { theme: true, assets: true, animation: true },
+    component: ArtistFeature,
+  });
+  registerSection({
+    type: "ArtworkFeature",
+    displayName: "Artwork Feature",
+    category: "media",
+    description: "Layout B — a full-width artwork, edge to edge, no UI.",
+    icon: "image",
+    variants: ["full"],
+    renderCost: "medium",
+    capabilities: { theme: true, assets: true, animation: true },
+    component: ArtworkFeature,
+  });
+  registerSection({
+    type: "EditorialQuote",
+    displayName: "Editorial Quote",
+    category: "narrative",
+    description: "One centred sentence in generous whitespace (hairline · handwritten).",
+    icon: "quote",
+    variants: ["hairline", "handwritten"],
+    renderCost: "light",
+    capabilities: { variants: true, theme: true, animation: true },
+    component: EditorialQuote,
+  });
+  registerSection({
+    type: "EditorialAccordion",
+    displayName: "Editorial Accordion",
+    category: "structure",
+    description: "Collapsed details — care, shipping, ingredients.",
+    icon: "chevron-down",
+    variants: ["list"],
+    renderCost: "light",
+    capabilities: { theme: true },
+    component: EditorialAccordion,
+  });
+  registerSection({
+    type: "RelatedProducts",
+    displayName: "Related Products",
+    category: "commerce",
+    description: "Continue the Chapter / Hours — reuses ProductCard.",
+    icon: "grid",
+    variants: ["rail"],
+    renderCost: "medium",
+    capabilities: { theme: true, assets: true, relationships: true, analytics: true },
+    emits: ["product-click"],
+    component: RelatedProducts,
   });
 
   registerSection({

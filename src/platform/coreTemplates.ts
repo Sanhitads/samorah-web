@@ -91,6 +91,28 @@ export const AIR_HOURS_TEMPLATE: Template = {
   ],
 };
 
+/** Candle PDP editorial sequence (Phase 9) — the reusable Editorial Blocks
+ *  below the commerce header, composed as a fragrance journal. Same engine as
+ *  the chapters; the builder fills each block's settings from the product. */
+export const CANDLE_PDP_TEMPLATE: Template = {
+  id: "candle-pdp",
+  version: 1,
+  label: "Candle — Editorial PDP",
+  description: "Story → Journey → Artist → Artwork → Quote → Details → Continue.",
+  category: "commerce",
+  capabilities: { products: true, blocks: true },
+  intent: { editorialGoal: "A candle as an editorial book", commerceEmphasis: "soft" },
+  sections: [
+    { id: "story", type: "EditorialStatement", variant: "statement", slot: "narrative", order: 1, visibility: true, spacing: "lg", animation: "fade", settings: {} },
+    { id: "journey", type: "FragrancePyramid", variant: "pyramid", slot: "narrative", order: 2, visibility: true, spacing: "lg", animation: "fade", settings: {} },
+    { id: "artist", type: "ArtistFeature", variant: "feature", slot: "narrative", order: 3, visibility: true, spacing: "lg", animation: "fade", settings: {} },
+    { id: "artwork", type: "ArtworkFeature", variant: "full", slot: "atmosphere", order: 4, visibility: true, spacing: "md", animation: "fade", settings: {} },
+    { id: "artist-quote", type: "EditorialQuote", variant: "handwritten", slot: "narrative", order: 5, visibility: true, spacing: "lg", animation: "fade", settings: {} },
+    { id: "details", type: "EditorialAccordion", variant: "list", slot: "narrative", order: 6, visibility: true, spacing: "lg", animation: "fade", settings: {} },
+    { id: "related", type: "RelatedProducts", variant: "rail", slot: "closing", order: 7, visibility: true, spacing: "lg", animation: "fade", settings: {} },
+  ],
+};
+
 let registered = false;
 
 export function registerCoreTemplates(): void {
@@ -99,4 +121,5 @@ export function registerCoreTemplates(): void {
   registerTemplate(EDITORIAL_CHAPTER_TEMPLATE);
   registerTemplate(LIMITED_EDITION_CHAPTER_TEMPLATE);
   registerTemplate(AIR_HOURS_TEMPLATE);
+  registerTemplate(CANDLE_PDP_TEMPLATE);
 }

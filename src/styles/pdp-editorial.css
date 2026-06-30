@@ -1,0 +1,272 @@
+/* Editorial PDP blocks (Phase 9) — reusable, product-agnostic. Rendered below
+   the commerce header by the Section Engine; themed by the product's chapter
+   palette. Varying visual density: statement → pyramid → artist → full-bleed
+   artwork → huge quote → accordion → continue. Each page turn feels different. */
+
+.pdp__editorial { margin-top: clamp(56px, 8vw, 104px); }
+
+/* rhythm — top-pad only (single gaps); the artwork & quote breathe wider */
+.pdp__editorial .section-shell { padding-block: clamp(64px, 9vw, 116px) 0; }
+.pdp__editorial #artwork { padding-block: clamp(40px, 6vw, 80px) 0; }
+.pdp__editorial #artist-quote { padding-block: clamp(88px, 12vw, 168px) 0; }
+.pdp__editorial #related {
+  padding-block: clamp(72px, 10vw, 130px) clamp(48px, 7vw, 96px);
+}
+
+.estatement,
+.pyramid,
+.artist,
+.equote,
+.eaccordion,
+.related-products {
+  width: min(var(--container), 100% - 48px);
+  margin-inline: auto;
+}
+
+/* ── EditorialStatement ── */
+.estatement {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(32px, 5vw, 80px);
+  align-items: center;
+}
+.estatement[data-align="none"] {
+  grid-template-columns: 1fr;
+  max-width: 720px;
+  text-align: center;
+}
+.estatement[data-align="image-right"] .estatement__media { order: 2; }
+.estatement__media {
+  aspect-ratio: 4 / 3;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--surface-alt, var(--soft-beige));
+}
+.estatement__image { width: 100%; height: 100%; }
+.estatement__eyebrow,
+.pyramid__eyebrow,
+.artist__eyebrow,
+.related-products__eyebrow {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--accent, var(--gold));
+  margin-bottom: 18px;
+}
+.estatement__heading {
+  font-family: var(--font-serif);
+  font-size: clamp(1.8rem, 3.4vw, 2.6rem);
+  line-height: 1.1;
+  color: var(--ink);
+  margin-bottom: 20px;
+}
+.estatement__para {
+  font-size: 15px;
+  line-height: 1.85;
+  color: var(--ink-soft, var(--smoke));
+}
+.estatement__para + .estatement__para { margin-top: 16px; }
+
+/* ── FragrancePyramid ── */
+.pyramid__head {
+  text-align: center;
+  max-width: 600px;
+  margin-inline: auto;
+  margin-bottom: clamp(40px, 5vw, 72px);
+}
+.pyramid__heading {
+  font-family: var(--font-serif);
+  font-size: clamp(1.8rem, 3.4vw, 2.6rem);
+  color: var(--ink);
+}
+.pyramid__intro {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: clamp(1.05rem, 2vw, 1.3rem);
+  color: var(--ink-soft, var(--smoke));
+  margin-top: 16px;
+}
+.pyramid__layers {
+  display: grid;
+  gap: clamp(28px, 4vw, 48px);
+  max-width: 560px;
+  margin-inline: auto;
+  text-align: center;
+}
+.pyramid__layer-label {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--accent, var(--gold));
+  margin-bottom: 12px;
+}
+.pyramid__notes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  font-family: var(--font-serif);
+  font-size: clamp(1.2rem, 2.4vw, 1.6rem);
+  color: var(--ink);
+}
+.pyramid__note:not(:last-child)::after {
+  content: "·";
+  margin: 0 14px;
+  color: var(--ink-muted, var(--muted));
+}
+
+/* ── ArtistFeature (Layout A) ── */
+.artist {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(32px, 5vw, 80px);
+  align-items: center;
+}
+.artist[data-align="image-right"] .artist__media { order: 2; }
+.artist__media {
+  aspect-ratio: 4 / 5;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--surface-alt, var(--soft-beige));
+}
+.artist__image { width: 100%; height: 100%; }
+.artist__name {
+  font-family: var(--font-serif);
+  font-size: clamp(2rem, 3.8vw, 2.8rem);
+  line-height: 1.06;
+  color: var(--ink);
+}
+.artist__role {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-muted, var(--muted));
+  margin-top: 10px;
+  margin-bottom: 22px;
+}
+.artist__para {
+  font-size: 15px;
+  line-height: 1.85;
+  color: var(--ink-soft, var(--smoke));
+}
+.artist__para + .artist__para { margin-top: 14px; }
+
+/* ── ArtworkFeature (Layout B — full bleed) ── */
+.artwork { width: 100%; }
+.artwork__frame {
+  width: min(var(--container-wide, 1440px), 100% - 32px);
+  margin-inline: auto;
+  aspect-ratio: 16 / 9;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--surface-alt, var(--soft-beige));
+}
+.artwork__image { width: 100%; height: 100%; }
+.artwork__caption {
+  text-align: center;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-muted, var(--muted));
+  margin-top: 20px;
+}
+
+/* ── EditorialQuote ── */
+.equote {
+  text-align: center;
+  max-width: 800px;
+}
+.equote__rule {
+  display: block;
+  width: 48px;
+  height: 1px;
+  background: var(--accent, var(--gold));
+  margin: 0 auto 30px;
+}
+.equote__quote {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: clamp(1.7rem, 4vw, 2.8rem);
+  line-height: 1.3;
+  color: var(--ink);
+}
+.equote[data-variant="handwritten"] .equote__quote { font-weight: 400; }
+.equote__attr {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ink-muted, var(--muted));
+  margin-top: 24px;
+}
+
+/* ── EditorialAccordion ── */
+.eaccordion { max-width: 760px; }
+.eaccordion__item { border-bottom: 1px solid var(--line, var(--beige)); }
+.eaccordion__item:first-child { border-top: 1px solid var(--line, var(--beige)); }
+.eaccordion__header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 24px 0;
+  font-family: var(--font-serif);
+  font-size: clamp(1.05rem, 2vw, 1.25rem);
+  color: var(--ink);
+  text-align: left;
+  background: transparent;
+}
+.eaccordion__icon { position: relative; width: 13px; height: 13px; flex: none; }
+.eaccordion__icon::before,
+.eaccordion__icon::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 13px;
+  height: 1px;
+  background: var(--ink);
+}
+.eaccordion__icon::after { transform: rotate(90deg); transition: opacity 0.3s var(--motion-ease); }
+.eaccordion__item[data-open="true"] .eaccordion__icon::after { opacity: 0; }
+.eaccordion__panel {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.45s var(--motion-ease);
+}
+.eaccordion__item[data-open="true"] .eaccordion__panel { max-height: 360px; }
+.eaccordion__text {
+  padding-bottom: 24px;
+  font-size: 14px;
+  line-height: 1.85;
+  color: var(--ink-soft, var(--smoke));
+  max-width: 56ch;
+}
+
+/* ── RelatedProducts ── */
+.related-products__head {
+  text-align: center;
+  margin-bottom: clamp(40px, 5vw, 64px);
+}
+.related-products__heading {
+  font-family: var(--font-serif);
+  font-size: clamp(1.8rem, 3.4vw, 2.6rem);
+  color: var(--ink);
+}
+.related-products__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 280px));
+  justify-content: center;
+  gap: clamp(28px, 3vw, 48px);
+}
+
+@media (max-width: 760px) {
+  .estatement,
+  .artist { grid-template-columns: 1fr; }
+  .estatement[data-align="image-right"] .estatement__media,
+  .artist[data-align="image-right"] .artist__media { order: 0; }
+}
