@@ -7,8 +7,8 @@ import { buildCandleEditorial, type RelatedProductInput } from "@/lib/productEdi
 import { chapterTheme, editionLabel } from "@/lib/chapterPage";
 import { getCollectionBySlug } from "@/services/collectionService";
 import { getArtist } from "@/config/artist";
-import { AssetImage } from "@/components/ui/AssetImage";
 import { ProductPurchasePanel } from "@/components/product/ProductPurchasePanel";
+import { ProductGallery } from "@/components/product/ProductGallery";
 import { AirProductDetail } from "@/components/product/AirProductDetail";
 import { SectionRenderer } from "@/components/sections/SectionRenderer";
 import { bootstrapPlatform } from "@/components/page/bootstrap";
@@ -132,20 +132,7 @@ export default async function ProductRoute({
       </nav>
 
       <div className="pdp__layout">
-        <div className="pdp__gallery">
-          <div className="pdp__image">
-            <AssetImage asset={p.gallery[0]?.src} alt={p.gallery[0]?.alt ?? p.name} role="detail" priority className="pdp__image-fill" />
-          </div>
-          {p.gallery.length > 1 ? (
-            <div className="pdp__thumbs">
-              {p.gallery.map((g, i) => (
-                <div key={i} className="pdp__thumb" data-active={i === 0}>
-                  <AssetImage asset={g.src} alt={g.alt} role="detail" className="pdp__thumb-fill" />
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </div>
+        <ProductGallery images={p.gallery} name={p.name} />
 
         <div className="pdp__info">
           {p.edition ? <p className="pdp__edition">{p.edition}</p> : null}

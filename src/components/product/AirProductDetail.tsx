@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { AssetImage } from "@/components/ui/AssetImage";
 import { ProductPurchasePanel } from "@/components/product/ProductPurchasePanel";
+import { ProductGallery } from "@/components/product/ProductGallery";
 import { SectionRenderer } from "@/components/sections/SectionRenderer";
 import { bootstrapPlatform } from "@/components/page/bootstrap";
 import { buildAirEditorial } from "@/lib/productEditorial";
@@ -49,11 +49,7 @@ export function AirProductDetail({
       </nav>
 
       <div className="pdp__layout">
-        <div className="pdp__gallery">
-          <div className="pdp__image">
-            <AssetImage asset={hour.gradient} alt={hour.name} role="detail" priority className="pdp__image-fill" />
-          </div>
-        </div>
+        <ProductGallery images={[{ src: hour.gradient, alt: hour.name }]} name={hour.name} />
 
         <div className="pdp__info">
           <Link href={`/collections/${volume.slug}`} className="pdp__chapter">
