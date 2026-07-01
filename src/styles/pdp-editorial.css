@@ -188,25 +188,42 @@
 }
 
 /* ── Air PDP — lighter, atmospheric emphasis (Hours Collection) ── */
-.pdp--air #the-hour .estatement__eyebrow { margin-bottom: 22px; }
+/* 40–60px more air after the hero, before The Hour, and space around 07:00 */
+.pdp--air #the-hour {
+  padding-block: clamp(104px, 13vw, 176px) clamp(20px, 4vw, 52px);
+}
+.pdp--air #the-hour .estatement__eyebrow { margin-bottom: 26px; }
 .pdp--air #the-hour .estatement__heading {
   font-family: var(--font-serif);
-  font-size: clamp(3rem, 8vw, 5.5rem);
+  font-size: clamp(3.3rem, 9vw, 6rem); /* ~10% larger — the collection's signature */
   line-height: 1;
   letter-spacing: 0.02em;
-  margin-bottom: 24px;
+  margin-bottom: 28px;
 }
 .pdp--air #the-hour .estatement__para {
   font-family: var(--font-serif);
   font-style: italic;
-  font-size: clamp(1.15rem, 2.2vw, 1.5rem);
+  font-size: clamp(1.2rem, 2.4vw, 1.6rem);
   color: var(--ink-soft, var(--smoke));
 }
+
 .pdp--air .poetic__line {
   font-size: clamp(1.8rem, 4.4vw, 3rem);
   line-height: 1.5;
 }
 .pdp--air .poetic__lines { gap: clamp(18px, 3vw, 34px); }
+
+/* The Experience — larger, so it doesn't disappear between sections */
+.pdp--air #experience { padding-top: clamp(96px, 12vw, 152px); }
+.pdp--air #experience .estatement__body { max-width: 640px; margin-inline: auto; }
+.pdp--air #experience .estatement__para {
+  font-family: var(--font-serif);
+  font-size: clamp(1.35rem, 3vw, 2rem);
+  line-height: 1.6;
+  color: var(--ink);
+}
+.pdp--air #experience .estatement__para + .estatement__para { margin-top: 20px; }
+
 .pdp--air #signature .equote__quote {
   font-size: clamp(2rem, 5vw, 3.4rem);
 }

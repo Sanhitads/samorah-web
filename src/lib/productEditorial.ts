@@ -412,10 +412,11 @@ export function buildAirEditorial({ hour, volume, others }: AirEditorialInput): 
       body: [hour.hourReason],
       align: "none",
     } satisfies EditorialStatementSettings, { visibility: Boolean(hour.hourReason) }),
-    // Smells Like — a refined Opening / Heart / Lingering structure (lighter).
+    // Fragrance Journey — Opening / Heart / Lingering (the brand's perfumery
+    // language; lighter under the air palette).
     fill("smells-like", {
-      eyebrow: "Smells Like",
-      heading: "The structure",
+      eyebrow: "Fragrance Journey",
+      heading: "",
       layers: airScentLayers(hour.scent),
     } satisfies FragrancePyramidSettings, { visibility: hour.scent.length > 0 }),
     // Feels Like — large editorial typography, one evocative line per row.
