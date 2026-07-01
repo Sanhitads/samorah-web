@@ -1,4 +1,4 @@
-import { AssetImage } from "@/components/ui/AssetImage";
+import { ParallaxMedia } from "@/components/ui/ParallaxMedia";
 import type { SectionComponentProps } from "@/components/sections/registry";
 import type { LifestyleFeatureSettings } from "@/lib/productEditorial";
 
@@ -14,7 +14,7 @@ export function LifestyleFeature({ settings }: SectionComponentProps) {
     <div className="lifestyle" data-align={s.align}>
       {s.media?.src ? (
         <div className="lifestyle__media">
-          <AssetImage asset={s.media.src} alt={s.media.alt ?? ""} role="lifestyle" className="lifestyle__image" />
+          <ParallaxMedia src={s.media.src} alt={s.media.alt ?? ""} role="lifestyle" imageClassName="lifestyle__image" range={22} />
         </div>
       ) : null}
       <div className="lifestyle__body">

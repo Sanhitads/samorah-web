@@ -1,4 +1,4 @@
-import { AssetImage } from "@/components/ui/AssetImage";
+import { ParallaxMedia } from "@/components/ui/ParallaxMedia";
 import type { SectionComponentProps } from "@/components/sections/registry";
 import type { ArtistFeatureSettings } from "@/lib/productEditorial";
 
@@ -14,7 +14,7 @@ export function ArtistFeature({ settings }: SectionComponentProps) {
   return (
     <div className="artist" data-align={s.align}>
       <div className="artist__media">
-        <AssetImage asset={s.media.src} alt={s.media.alt ?? s.name} role="portrait" className="artist__image" />
+        <ParallaxMedia src={s.media.src} alt={s.media.alt ?? s.name} role="portrait" imageClassName="artist__image" range={22} />
       </div>
       <div className="artist__body">
         {s.eyebrow ? <p className="artist__eyebrow">{s.eyebrow}</p> : null}

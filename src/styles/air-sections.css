@@ -96,6 +96,7 @@ main[data-experience="air-chapters"] #hours-linen {
   left: 0;
   right: 0;
 }
+.parallax-media .asset-image { width: 100%; height: 100%; }
 .hour-block__media .asset-image {
   width: 100%;
   height: 100%;

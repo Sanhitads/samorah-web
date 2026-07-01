@@ -5,6 +5,12 @@
 
 .pdp__editorial { margin-top: clamp(56px, 8vw, 104px); }
 
+/* feature-image frames are positioned parents for the ParallaxMedia layer */
+.estatement__media,
+.artist__media,
+.lifestyle__media,
+.artwork__frame { position: relative; }
+
 /* rhythm — top-pad only (single gaps); the artwork & quote breathe wider */
 .pdp__editorial .section-shell { padding-block: clamp(64px, 9vw, 116px) 0; }
 .pdp__editorial #artwork { padding-block: clamp(40px, 6vw, 80px) 0; }

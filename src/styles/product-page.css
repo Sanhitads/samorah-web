@@ -151,6 +151,15 @@
 
 /* ── Purchase panel ── */
 .purchase { margin-top: clamp(28px, 4vw, 44px); }
+/* gentle fade when the selected variant changes */
+@keyframes priceSwap {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: none; }
+}
+.purchase__pricing { animation: priceSwap 0.45s var(--motion-ease); }
+@media (prefers-reduced-motion: reduce) {
+  .purchase__pricing { animation: none; }
+}
 .purchase__price {
   font-family: var(--font-serif);
   font-size: clamp(1.6rem, 3vw, 2.1rem);

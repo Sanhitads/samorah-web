@@ -1,4 +1,4 @@
-import { AssetImage } from "@/components/ui/AssetImage";
+import { ParallaxMedia } from "@/components/ui/ParallaxMedia";
 import type { SectionComponentProps } from "@/components/sections/registry";
 import type { EditorialStatementSettings } from "@/lib/productEditorial";
 
@@ -16,7 +16,7 @@ export function EditorialStatement({ settings }: SectionComponentProps) {
     <div className="estatement" data-align={withMedia ? s.align : "none"}>
       {withMedia ? (
         <div className="estatement__media">
-          <AssetImage asset={s.media!.src} alt={s.media!.alt ?? ""} role="lifestyle" className="estatement__image" />
+          <ParallaxMedia src={s.media!.src} alt={s.media!.alt ?? ""} role="lifestyle" imageClassName="estatement__image" range={22} />
         </div>
       ) : null}
       <div className="estatement__body">

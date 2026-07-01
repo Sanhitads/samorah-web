@@ -65,12 +65,15 @@ export function ProductPurchasePanel({ product }: { product: PurchaseProduct }) 
 
   return (
     <div className="purchase">
-      <p className="purchase__price">{current ? current.priceLabel : product.priceLabel}</p>
-      {current?.burnTime ? (
-        <p className="purchase__burn">
-          <span className="purchase__burn-label">Burn time</span> {current.burnTime}
-        </p>
-      ) : null}
+      {/* keyed so the price + burn gently fade when the variant changes */}
+      <div className="purchase__pricing" key={current?.id ?? "base"}>
+        <p className="purchase__price">{current ? current.priceLabel : product.priceLabel}</p>
+        {current?.burnTime ? (
+          <p className="purchase__burn">
+            <span className="purchase__burn-label">Burn time</span> {current.burnTime}
+          </p>
+        ) : null}
+      </div>
 
       {product.vessels.length > 0 ? (
         <div className="purchase__group">
