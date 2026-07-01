@@ -116,6 +116,7 @@ export interface PoeticLinesSettings {
 }
 export interface PlacementItem {
   label: string;
+  note?: string;
 }
 export interface PlacementGridSettings {
   eyebrow: string;
@@ -380,8 +381,8 @@ function toHourCard(h: HourEntry): ProductCardModel {
 function airAccordion(): AccordionItem[] {
   return [
     {
-      title: "Product Details",
-      body: "A 100ml room & linen mist. Alcohol-free, skin-safe formula. Mist lightly into the air, or over linen and soft furnishings, and let it settle.",
+      title: "Composition",
+      body: "A 100ml room & linen mist. Alcohol-free, skin-safe formula, made with premium fragrance and essential oils. Mist lightly into the air, or over linen and soft furnishings, and let it settle.",
     },
     {
       title: "Shipping & Exchanges",
@@ -390,28 +391,47 @@ function airAccordion(): AccordionItem[] {
   ];
 }
 
+/** Air scent as an Opening / Heart / Lingering structure (the brand's perfumery
+ *  language) from the three notes; extra notes fold into Lingering. */
+function airScentLayers(scent: string[]): { label: string; notes: string[] }[] {
+  const labels = ["Opening", "Heart", "Lingering"];
+  return labels
+    .map((label, i) => ({
+      label,
+      notes: i < 2 ? (scent[i] ? [scent[i]] : []) : scent.slice(2),
+    }))
+    .filter((l) => l.notes.length > 0);
+}
+
 export function buildAirEditorial({ hour, volume, others }: AirEditorialInput): SectionInstance[] {
   const overrides: SectionInstance[] = [
+    // The Hour — the signature time, prominent, with why it inspired the scent.
     fill("the-hour", {
-      eyebrow: `Hour ${hour.time}`,
-      heading: hour.name,
-      body: [hour.story],
-      media: imageMedia(hour.gradient, hour.name, "landscape"),
-      align: "image-left",
-    } satisfies EditorialStatementSettings),
-    fill("smells-like", { eyebrow: "Smells Like", heading: "The notes", notes: hour.scent } satisfies NotesColumnSettings, {
-      visibility: hour.scent.length > 0,
-    }),
+      eyebrow: "The Hour",
+      heading: hour.time,
+      body: [hour.hourReason],
+      align: "none",
+    } satisfies EditorialStatementSettings, { visibility: Boolean(hour.hourReason) }),
+    // Smells Like — a refined Opening / Heart / Lingering structure (lighter).
+    fill("smells-like", {
+      eyebrow: "Smells Like",
+      heading: "The structure",
+      layers: airScentLayers(hour.scent),
+    } satisfies FragrancePyramidSettings, { visibility: hour.scent.length > 0 }),
+    // Feels Like — large editorial typography, one evocative line per row.
     fill("feels-like", { eyebrow: "Feels Like", lines: hour.feels } satisfies PoeticLinesSettings, {
       visibility: hour.feels.length > 0,
     }),
-    fill("experience", { eyebrow: "The Experience", body: [hour.experience], align: "none" } satisfies EditorialStatementSettings, {
-      visibility: Boolean(hour.experience),
-    }),
+    // The Experience — the atmosphere of the room, sentence per line.
+    fill("experience", {
+      eyebrow: "The Experience",
+      body: hour.experience.split(/(?<=[.!?])\s+/).map((t) => t.trim()).filter(Boolean),
+      align: "none",
+    } satisfies EditorialStatementSettings, { visibility: Boolean(hour.experience) }),
     fill("placement", {
       eyebrow: "Placement",
-      heading: "Where it belongs",
-      items: hour.placement.map((label) => ({ label })),
+      heading: "Best enjoyed",
+      items: hour.placement,
     } satisfies PlacementGridSettings, { visibility: hour.placement.length > 0 }),
     fill("signature", { quote: hour.signature, variant: "handwritten" } satisfies EditorialQuoteSettings, {
       visibility: Boolean(hour.signature),

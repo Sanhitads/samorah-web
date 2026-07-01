@@ -20,6 +20,7 @@ export function PlacementGrid({ settings }: SectionComponentProps) {
           <div key={item.label} className="placement__item">
             <span className="placement__rule" aria-hidden="true" />
             <p className="placement__label">{item.label}</p>
+            {item.note ? <p className="placement__note">{item.note}</p> : null}
           </div>
         ))}
       </div>

@@ -132,7 +132,7 @@ export const AIR_PDP_TEMPLATE: Template = {
   intent: { editorialGoal: "An hour, not a product", commerceEmphasis: "soft" },
   sections: [
     { id: "the-hour", type: "EditorialStatement", variant: "statement", slot: "narrative", order: 1, visibility: true, spacing: "lg", animation: "fade", settings: {} },
-    { id: "smells-like", type: "NotesColumn", variant: "column", slot: "narrative", order: 2, visibility: true, spacing: "lg", animation: "fade", settings: {} },
+    { id: "smells-like", type: "FragrancePyramid", variant: "pyramid", slot: "narrative", order: 2, visibility: true, spacing: "lg", animation: "fade", settings: {} },
     { id: "feels-like", type: "PoeticLines", variant: "verse", slot: "narrative", order: 3, visibility: true, spacing: "lg", animation: "fade", settings: {} },
     { id: "experience", type: "EditorialStatement", variant: "statement", slot: "narrative", order: 4, visibility: true, spacing: "lg", animation: "fade", settings: {} },
     { id: "placement", type: "PlacementGrid", variant: "grid", slot: "narrative", order: 5, visibility: true, spacing: "lg", animation: "fade", settings: {} },

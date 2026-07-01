@@ -18,10 +18,11 @@ export interface HourEntry {
   moment: string; // "Morning Begins" — a small poetic descriptor under the hour
   name: string;
   story: string; // the "feels like" line
-  scent: string[]; // the "smells like" notes
+  hourReason: string; // "The Hour" — why this hour inspired the fragrance (PDP)
+  scent: string[]; // the "smells like" notes (opening · heart · lingering)
   feels: string[]; // the "feels like" poetic lines (PDP)
   experience: string; // "The Experience" — how the room changes (PDP)
-  placement: string[]; // where it belongs — rooms (PDP)
+  placement: { label: string; note: string }[]; // where it belongs + a moment (PDP)
   signature: string; // the Signature Line — one sentence (PDP)
   productSlug: string; // → /shop/[slug] (the Room/Linen spray)
   priceLabel: string; // "From ₹599" until the commerce projection resolves it
@@ -77,10 +78,15 @@ export const AIR_VOLUMES: AirVolume[] = [
             moment: "Morning Begins",
             name: "Open Window",
             story: "The room before the day begins — light arriving, quietly expectant.",
-            scent: ["White Tea", "Fresh Air", "Soft Cotton"],
-            feels: ["Fresh sheets.", "Open windows.", "Morning sunlight."],
-            experience: "The room wakes slowly. Air moves where it couldn't before, and everything feels rinsed and beginning again — a quiet invitation to start.",
-            placement: ["Bedroom", "Kitchen", "Entryway"],
+            hourReason: "When the windows open and the day begins.",
+            scent: ["Fresh Air", "White Tea", "Soft Cotton"],
+            feels: ["Fresh sheets.", "Curtains moving.", "The first coffee."],
+            experience: "Morning begins quietly. Curtains move where they couldn't before. Fresh air enters, and the room resets — everything rinsed and beginning again.",
+            placement: [
+              { label: "Bedroom", note: "For slow mornings." },
+              { label: "Kitchen", note: "For fresh beginnings." },
+              { label: "Entryway", note: "The first impression." },
+            ],
             signature: "Stillness before the day begins.",
             productSlug: "open-window",
             priceLabel: "From ₹599",
@@ -94,10 +100,15 @@ export const AIR_VOLUMES: AirVolume[] = [
             moment: "Afternoon Lingers",
             name: "Slow Evening",
             story: "The unhurried middle of an afternoon — soft linen, warm light through glass.",
-            scent: ["Cotton", "Iris", "Warm Sandalwood"],
+            hourReason: "The hour the afternoon forgets to hurry.",
+            scent: ["Iris", "Cotton", "Warm Sandalwood"],
             feels: ["Soft linen.", "Light through glass.", "Nowhere to be."],
-            experience: "The afternoon stretches. Warmth settles into the corners of the room and time loosens its grip. Nothing is urgent here.",
-            placement: ["Living room", "Reading nook", "Studio"],
+            experience: "The afternoon stretches. Warmth settles into the corners of the room, and time loosens its grip. Nothing here is urgent.",
+            placement: [
+              { label: "Living room", note: "For unhurried afternoons." },
+              { label: "Reading nook", note: "For a chapter or two." },
+              { label: "Studio", note: "For quiet work." },
+            ],
             signature: "The hour that asks for nothing.",
             productSlug: "slow-evening",
             priceLabel: "From ₹599",
@@ -111,10 +122,15 @@ export const AIR_VOLUMES: AirVolume[] = [
             moment: "Evening Settles",
             name: "After Dinner",
             story: "The comfortable haze after a meal — soft conversation, the warmth of something good.",
-            scent: ["Tonka Bean", "Amber", "Soft Cedar"],
+            hourReason: "When the table clears and the evening softens.",
+            scent: ["Amber", "Tonka Bean", "Soft Cedar"],
             feels: ["Low light.", "Soft voices.", "Something good, remembered."],
             experience: "Plates cleared, the room holds the warmth of the evening. Conversation slows to comfort, and the day folds itself away.",
-            placement: ["Dining room", "Living room", "Kitchen"],
+            placement: [
+              { label: "Dining room", note: "For lingering meals." },
+              { label: "Living room", note: "For soft conversation." },
+              { label: "Kitchen", note: "For the warmth after." },
+            ],
             signature: "The warmth that stays after the meal.",
             productSlug: "after-dinner",
             priceLabel: "From ₹599",
@@ -135,10 +151,15 @@ export const AIR_VOLUMES: AirVolume[] = [
             moment: "Night Holds",
             name: "Private Hours",
             story: "The most intimate hour of the day. The one that belongs only to you.",
+            hourReason: "The last hour, kept only for you.",
             scent: ["Lavender", "Cashmere", "Dark Musk"],
             feels: ["Cool cotton.", "A closed door.", "The day, finally quiet."],
             experience: "The house exhales. The last light is low and kind. This hour belongs to no one else — it is entirely, finally, yours.",
-            placement: ["Bedroom", "Bathroom", "Dressing room"],
+            placement: [
+              { label: "Bedroom", note: "For winding down." },
+              { label: "Bathroom", note: "For a long soak." },
+              { label: "Dressing room", note: "For the quiet ritual." },
+            ],
             signature: "The hour that belongs only to you.",
             productSlug: "private-hours",
             priceLabel: "From ₹599",

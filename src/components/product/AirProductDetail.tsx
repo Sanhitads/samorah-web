@@ -27,6 +27,11 @@ export function AirProductDetail({
   const editorial = buildAirEditorial({ hour, volume, others });
   const category = group.kind === "room" ? "Room Spray" : "Linen Spray";
 
+  // Volume numbering — the hour's position across the whole volume (VOL. I.1 …).
+  const allHours = volume.groups.flatMap((g) => g.hours);
+  const idx = allHours.findIndex((h) => h.productSlug === hour.productSlug);
+  const edition = `${volume.volume.replace(/volume/i, "Vol.").toUpperCase()}.${idx + 1}`;
+
   const variant = {
     id: hour.id,
     vessel: "",
@@ -39,7 +44,7 @@ export function AirProductDetail({
   };
 
   return (
-    <main className="pdp" data-theme="warm-ivory">
+    <main className="pdp pdp--air" data-theme="warm-ivory">
       <div className="pdp__head">
         <nav className="pdp__breadcrumb" aria-label="Breadcrumb">
           <Link href="/" className="pdp__crumb">Home</Link>
@@ -53,13 +58,14 @@ export function AirProductDetail({
           <ProductGallery images={[{ src: hour.gradient, alt: hour.name }]} name={hour.name} />
 
         <div className="pdp__info">
+          <p className="pdp__edition">{edition}</p>
           <Link href={`/collections/${volume.slug}`} className="pdp__chapter">
-            The Hours Collection
+            The Hours · {volume.title}
           </Link>
-          <p className="pdp__air-hour">HOUR {hour.time} · {hour.moment}</p>
           <h1 className="pdp__name">{hour.name}</h1>
+          <p className="pdp__air-hour">Hour {hour.time} · {hour.moment}</p>
           <p className="pdp__tagline">{hour.story}</p>
-          <p className="pdp__scent-group">{category} · {hour.scent.join(" · ")}</p>
+          <p className="pdp__meta">{category} · {hour.scent.join(" · ")}</p>
 
           <ProductPurchasePanel
             product={{

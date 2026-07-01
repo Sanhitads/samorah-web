@@ -179,6 +179,37 @@
   font-size: clamp(1.1rem, 2vw, 1.4rem);
   color: var(--ink);
 }
+.placement__note {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--ink-muted, var(--muted));
+  margin-top: 10px;
+}
+
+/* ── Air PDP — lighter, atmospheric emphasis (Hours Collection) ── */
+.pdp--air #the-hour .estatement__eyebrow { margin-bottom: 22px; }
+.pdp--air #the-hour .estatement__heading {
+  font-family: var(--font-serif);
+  font-size: clamp(3rem, 8vw, 5.5rem);
+  line-height: 1;
+  letter-spacing: 0.02em;
+  margin-bottom: 24px;
+}
+.pdp--air #the-hour .estatement__para {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: clamp(1.15rem, 2.2vw, 1.5rem);
+  color: var(--ink-soft, var(--smoke));
+}
+.pdp--air .poetic__line {
+  font-size: clamp(1.8rem, 4.4vw, 3rem);
+  line-height: 1.5;
+}
+.pdp--air .poetic__lines { gap: clamp(18px, 3vw, 34px); }
+.pdp--air #signature .equote__quote {
+  font-size: clamp(2rem, 5vw, 3.4rem);
+}
 
 /* ── EditorialStatement ── */
 .estatement {
