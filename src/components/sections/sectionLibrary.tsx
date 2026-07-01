@@ -23,6 +23,7 @@ import { NotesColumn } from "@/components/pdp/NotesColumn";
 import { PoeticLines } from "@/components/pdp/PoeticLines";
 import { PlacementGrid } from "@/components/pdp/PlacementGrid";
 import { EditorialDivider } from "@/components/pdp/EditorialDivider";
+import { Testimonials } from "@/components/pdp/Testimonials";
 import type { BrandStory as StorySettings } from "@/config/brandStory";
 import type { EditorialVoice } from "@/config/voices";
 import type { EditorialStory } from "@/config/editorialWorld";
@@ -354,6 +355,17 @@ export function registerSectionLibrary(): void {
     renderCost: "light",
     capabilities: { theme: true },
     component: EditorialAccordion,
+  });
+  registerSection({
+    type: "Testimonials",
+    displayName: "From Our Homes",
+    category: "narrative",
+    description: "Curated editorial voices — no stars, counts or avatars.",
+    icon: "quote",
+    variants: ["voices"],
+    renderCost: "light",
+    capabilities: { theme: true, animation: true },
+    component: Testimonials,
   });
   registerSection({
     type: "RelatedProducts",

@@ -40,16 +40,17 @@ export function AirProductDetail({
 
   return (
     <main className="pdp" data-theme="warm-ivory">
-      <nav className="pdp__breadcrumb" aria-label="Breadcrumb">
-        <Link href="/" className="pdp__crumb">Home</Link>
-        <span className="pdp__crumb-sep" aria-hidden="true">·</span>
-        <Link href={`/collections/${volume.slug}`} className="pdp__crumb">The Hours · {volume.title}</Link>
-        <span className="pdp__crumb-sep" aria-hidden="true">·</span>
-        <span className="pdp__crumb pdp__crumb--current">{hour.name}</span>
-      </nav>
+      <div className="pdp__head">
+        <nav className="pdp__breadcrumb" aria-label="Breadcrumb">
+          <Link href="/" className="pdp__crumb">Home</Link>
+          <span className="pdp__crumb-sep" aria-hidden="true">·</span>
+          <Link href={`/collections/${volume.slug}`} className="pdp__crumb">The Hours · {volume.title}</Link>
+          <span className="pdp__crumb-sep" aria-hidden="true">·</span>
+          <span className="pdp__crumb pdp__crumb--current">{hour.name}</span>
+        </nav>
 
-      <div className="pdp__layout">
-        <ProductGallery images={[{ src: hour.gradient, alt: hour.name }]} name={hour.name} />
+        <div className="pdp__layout">
+          <ProductGallery images={[{ src: hour.gradient, alt: hour.name }]} name={hour.name} />
 
         <div className="pdp__info">
           <Link href={`/collections/${volume.slug}`} className="pdp__chapter">
@@ -73,6 +74,7 @@ export function AirProductDetail({
               priceLabel: hour.priceLabel,
             }}
           />
+        </div>
         </div>
       </div>
 

@@ -229,7 +229,7 @@ Samorah avoids traditional ecommerce discovery patterns; the PDP stays editorial
 **Future phases (deferred — build later, not now):**
 
 - **Explore Another World** — a single editorial block *below the footer divider*, presenting **collections** (Vol II · The Wild Within → Explore →), never individual products. Brand storytelling, not recommendations.
-- **From Our Homes / Letters From Our Community** — curated editorial testimonials (quotes only; no stars, counts, avatars or "verified buyer").
+- **From Our Homes** — curated editorial testimonials (quotes only; no stars, counts, avatars or "verified buyer"). **Shipped** on the candle PDP (`config/testimonials.ts` + the `Testimonials` block); a studio-curated set, not user-generated reviews. Conventional star reviews remain excluded.
 - **Complete the Ritual** — pairs complementary products (candle + room spray + linen mist) by **fragrance family**, presented editorially — not generic upsell.
 - **EditorialDivider** (shipping in Beat 3) is the reusable hairline + short-line block that separates chapters · products · artist · lifestyle site-wide, so the whole site reads as one publication.
 

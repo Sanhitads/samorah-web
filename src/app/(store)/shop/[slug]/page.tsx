@@ -118,21 +118,22 @@ export default async function ProductRoute({
 
   return (
     <main className="pdp" data-theme="warm-ivory">
-      <nav className="pdp__breadcrumb" aria-label="Breadcrumb">
-        {p.breadcrumb.map((c, i) => (
-          <span key={c.href}>
-            {i > 0 ? <span className="pdp__crumb-sep" aria-hidden="true">·</span> : null}
-            {i < p.breadcrumb.length - 1 ? (
-              <Link href={c.href} className="pdp__crumb">{c.label}</Link>
-            ) : (
-              <span className="pdp__crumb pdp__crumb--current">{c.label}</span>
-            )}
-          </span>
-        ))}
-      </nav>
+      <div className="pdp__head">
+        <nav className="pdp__breadcrumb" aria-label="Breadcrumb">
+          {p.breadcrumb.map((c, i) => (
+            <span key={c.href}>
+              {i > 0 ? <span className="pdp__crumb-sep" aria-hidden="true">·</span> : null}
+              {i < p.breadcrumb.length - 1 ? (
+                <Link href={c.href} className="pdp__crumb">{c.label}</Link>
+              ) : (
+                <span className="pdp__crumb pdp__crumb--current">{c.label}</span>
+              )}
+            </span>
+          ))}
+        </nav>
 
-      <div className="pdp__layout">
-        <ProductGallery images={p.gallery} name={p.name} />
+        <div className="pdp__layout">
+          <ProductGallery images={p.gallery} name={p.name} />
 
         <div className="pdp__info">
           {p.edition ? <p className="pdp__edition">{p.edition}</p> : null}
@@ -175,6 +176,7 @@ export default async function ProductRoute({
               ))}
             </dl>
           ) : null}
+        </div>
         </div>
       </div>
 

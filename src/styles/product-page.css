@@ -1,9 +1,14 @@
 /* Product page (PDP, Phase 9) — a focused commerce page in editorial dress.
    Themed via data-theme tokens; reuses the type, spacing and motion system. */
-.pdp {
-  width: min(var(--container-wide, 1440px), 100% - 64px);
+/* .pdp is full-width so the editorial sections below can run edge-to-edge
+   (full-bleed artwork, themed bands). Only the commerce header is constrained
+   and given comfortable side padding so content never touches the viewport. */
+.pdp { width: 100%; }
+.pdp__head {
+  width: 100%;
+  max-width: var(--container-wide, 1440px);
   margin-inline: auto;
-  padding-block: clamp(20px, 3vw, 36px) clamp(72px, 10vw, 140px);
+  padding: clamp(20px, 3vw, 36px) clamp(24px, 5vw, 80px) 0;
 }
 
 .pdp__breadcrumb {

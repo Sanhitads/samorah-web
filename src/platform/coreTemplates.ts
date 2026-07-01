@@ -113,9 +113,10 @@ export const CANDLE_PDP_TEMPLATE: Template = {
     { id: "artist-quote", type: "EditorialQuote", variant: "handwritten", slot: "narrative", order: 8, visibility: true, spacing: "lg", animation: "fade", settings: {} },
     { id: "lifestyle", type: "LifestyleFeature", variant: "feature", slot: "narrative", order: 9, visibility: true, spacing: "lg", animation: "fade", settings: {} },
     { id: "cultural", type: "EditorialQuote", variant: "hairline", slot: "narrative", order: 10, visibility: true, spacing: "lg", animation: "fade", settings: {} },
-    { id: "divider-close", type: "EditorialDivider", variant: "rule", slot: "narrative", order: 11, visibility: true, spacing: "md", animation: "fade", settings: {} },
-    { id: "details", type: "EditorialAccordion", variant: "list", slot: "narrative", order: 12, visibility: true, spacing: "lg", animation: "fade", settings: {} },
-    { id: "related", type: "RelatedProducts", variant: "rail", slot: "closing", order: 13, visibility: true, spacing: "lg", animation: "fade", settings: {} },
+    { id: "testimonials", type: "Testimonials", variant: "voices", slot: "narrative", order: 11, visibility: true, spacing: "lg", animation: "fade", settings: {} },
+    { id: "divider-close", type: "EditorialDivider", variant: "rule", slot: "narrative", order: 12, visibility: true, spacing: "md", animation: "fade", settings: {} },
+    { id: "details", type: "EditorialAccordion", variant: "list", slot: "narrative", order: 13, visibility: true, spacing: "lg", animation: "fade", settings: {} },
+    { id: "related", type: "RelatedProducts", variant: "rail", slot: "closing", order: 14, visibility: true, spacing: "lg", animation: "fade", settings: {} },
   ],
 };
 

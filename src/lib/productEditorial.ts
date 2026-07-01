@@ -10,6 +10,7 @@ import { CANDLE_PDP_TEMPLATE, AIR_PDP_TEMPLATE } from "@/platform/coreTemplates"
 import type { ProductPageView } from "@/lib/productPage";
 import type { AirVolume, HourEntry } from "@/config/theHours";
 import type { Artist } from "@/config/artist";
+import { getTestimonials } from "@/config/testimonials";
 import type { ProductCardModel } from "@/components/ui/ProductCard";
 import { imageMedia, type MediaContent } from "@/lib/presentation";
 import { effectivePrice, formatINR, type Priceable } from "@/lib/pricing";
@@ -63,6 +64,15 @@ export interface RelatedProductsSettings {
   eyebrow: string;
   heading: string;
   products: ProductCardModel[];
+}
+export interface TestimonialQuote {
+  quote: string;
+  attribution?: string;
+}
+export interface TestimonialsSettings {
+  eyebrow: string;
+  heading: string;
+  quotes: TestimonialQuote[];
 }
 export interface MoodCard {
   label: string;
@@ -323,6 +333,15 @@ export function buildCandleEditorial({ view, artist, related }: CandleEditorialI
       "divider-memory",
       { line: "Every fragrance begins with a memory." } satisfies EditorialDividerSettings,
       { visibility: storyBody.length > 0 || view.notes.length > 0 },
+    ),
+    fill(
+      "testimonials",
+      {
+        eyebrow: "From Our Homes",
+        heading: "In their words",
+        quotes: getTestimonials(view.chapterSlug).map((t) => ({ quote: t.quote, attribution: t.attribution })),
+      } satisfies TestimonialsSettings,
+      { visibility: getTestimonials(view.chapterSlug).length > 0 },
     ),
     fill("divider-close", {} satisfies EditorialDividerSettings),
     fill("details", { items: candleAccordion(view) } satisfies EditorialAccordionSettings),
