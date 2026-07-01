@@ -22,6 +22,7 @@ import { LifestyleFeature } from "@/components/pdp/LifestyleFeature";
 import { NotesColumn } from "@/components/pdp/NotesColumn";
 import { PoeticLines } from "@/components/pdp/PoeticLines";
 import { PlacementGrid } from "@/components/pdp/PlacementGrid";
+import { EditorialDivider } from "@/components/pdp/EditorialDivider";
 import type { BrandStory as StorySettings } from "@/config/brandStory";
 import type { EditorialVoice } from "@/config/voices";
 import type { EditorialStory } from "@/config/editorialWorld";
@@ -331,6 +332,17 @@ export function registerSectionLibrary(): void {
     renderCost: "light",
     capabilities: { theme: true, animation: true },
     component: PlacementGrid,
+  });
+  registerSection({
+    type: "EditorialDivider",
+    displayName: "Editorial Divider",
+    category: "structure",
+    description: "A hairline with an optional short line — a breathing beat.",
+    icon: "minus",
+    variants: ["rule", "line"],
+    renderCost: "light",
+    capabilities: { theme: true, animation: true },
+    component: EditorialDivider,
   });
   registerSection({
     type: "EditorialAccordion",

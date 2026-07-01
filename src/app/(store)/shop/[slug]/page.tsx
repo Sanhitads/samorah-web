@@ -107,8 +107,10 @@ export default async function ProductRoute({
     }
   }
 
+  // "Continue the Chapter" — SAME chapter only (Decision 25), excluding this
+  // product; forcing fragrance_family null makes the rule match by collection.
   const related = (await getRelatedProducts(
-    { id: raw.id, fragrance_family: raw.fragrance_family, collection_id: raw.collection_id },
+    { id: raw.id, fragrance_family: null, collection_id: raw.collection_id },
     4,
   )) as unknown as RelatedProductInput[];
   const editorial = buildCandleEditorial({ view: p, artist: getArtist(null), related });

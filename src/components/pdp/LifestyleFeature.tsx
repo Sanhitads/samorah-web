@@ -8,7 +8,7 @@ import type { LifestyleFeatureSettings } from "@/lib/productEditorial";
  */
 export function LifestyleFeature({ settings }: SectionComponentProps) {
   const s = settings as unknown as LifestyleFeatureSettings;
-  if (!s.rows?.length) return null;
+  if (!s.rows?.length && !s.moments?.length) return null;
 
   return (
     <div className="lifestyle" data-align={s.align}>
@@ -28,6 +28,13 @@ export function LifestyleFeature({ settings }: SectionComponentProps) {
             </div>
           ))}
         </dl>
+        {s.moments?.length ? (
+          <ul className="lifestyle__moments" aria-label="Ideal moments">
+            {s.moments.map((m) => (
+              <li key={m} className="lifestyle__moment">{m}</li>
+            ))}
+          </ul>
+        ) : null}
       </div>
     </div>
   );

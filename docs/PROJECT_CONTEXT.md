@@ -218,6 +218,23 @@ Phase 8 build steps 7–8 complete the engine layer; **architecture is now froze
 
 ---
 
+### Discovery, reviews & ritual selling — editorial, not ecommerce (Decision 25 · 2026-07-01)
+
+Samorah avoids traditional ecommerce discovery patterns; the PDP stays editorial and curated. **Launch rules (enforced now):**
+
+- **Continue the Chapter** — the *only* related-products module. Renders **only** when the same chapter has ≥1 other product (excluding the current one); otherwise the whole section **self-hides** with no empty spacing or placeholders. Never cross-chapter.
+- **No** "You May Also Like" / "Recommended" / "People Also Bought" / "Trending" / upsell / cross-sell modules.
+- **No** conventional reviews — no star ratings, review counts, or "Write a Review". Perception should stay craft/story/experience, like Trudon · Diptyque · Byredo · Loewe.
+
+**Future phases (deferred — build later, not now):**
+
+- **Explore Another World** — a single editorial block *below the footer divider*, presenting **collections** (Vol II · The Wild Within → Explore →), never individual products. Brand storytelling, not recommendations.
+- **From Our Homes / Letters From Our Community** — curated editorial testimonials (quotes only; no stars, counts, avatars or "verified buyer").
+- **Complete the Ritual** — pairs complementary products (candle + room spray + linen mist) by **fragrance family**, presented editorially — not generic upsell.
+- **EditorialDivider** (shipping in Beat 3) is the reusable hairline + short-line block that separates chapters · products · artist · lifestyle site-wide, so the whole site reads as one publication.
+
+---
+
 ## 9. Operational notes
 
 - **Windows + `next dev`:** a running dev server locks `.next/trace` and makes `npm run build` hang/EPERM. Stop node processes before a clean build; restart `npm run dev` afterwards.

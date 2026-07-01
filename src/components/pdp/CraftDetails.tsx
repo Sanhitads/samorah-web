@@ -20,6 +20,7 @@ export function CraftDetails({ settings }: SectionComponentProps) {
           <li key={item.label} className="craft__item">
             <p className="craft__label">{item.label}</p>
             <p className="craft__value">{item.value}</p>
+            {item.note ? <p className="craft__note">{item.note}</p> : null}
           </li>
         ))}
       </ul>

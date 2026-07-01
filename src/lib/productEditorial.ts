@@ -49,6 +49,9 @@ export interface ArtworkFeatureSettings {
   media: MediaContent;
   caption?: string;
 }
+export interface EditorialDividerSettings {
+  line?: string; // an optional short editorial line between the hairlines
+}
 export interface AccordionItem {
   title: string;
   body: string;
@@ -73,6 +76,7 @@ export interface MoodGridSettings {
 export interface CraftItem {
   label: string;
   value: string;
+  note?: string; // a short line of storytelling beneath the value
 }
 export interface CraftDetailsSettings {
   eyebrow: string;
@@ -88,6 +92,7 @@ export interface LifestyleFeatureSettings {
   heading?: string;
   media?: MediaContent;
   rows: LifestyleRow[];
+  moments: string[]; // "Mornings · Reading · Gatherings" — ideal moments
   align: EditorialAlign;
 }
 export interface NotesColumnSettings {
@@ -151,19 +156,49 @@ function toCard(p: RelatedProductInput): ProductCardModel {
   };
 }
 
-function candleAccordion(): AccordionItem[] {
+const MOMENT_KEYWORDS: [RegExp, string][] = [
+  [/morning/i, "Mornings"],
+  [/evening|dinner|night|dusk/i, "Evenings"],
+  [/read/i, "Reading"],
+  [/meditat|calm|quiet|wind|slow|unwind/i, "Quiet moments"],
+  [/festi|gather|celebrat|guest|welcome/i, "Gatherings"],
+  [/gift/i, "Gifting"],
+];
+function deriveMoments(text: string | null): string[] {
+  if (!text) return [];
+  const found: string[] = [];
+  for (const [re, label] of MOMENT_KEYWORDS) {
+    if (re.test(text) && !found.includes(label)) found.push(label);
+  }
+  return found;
+}
+
+/** Care · Wax & Wick · Ingredients · Shipping · Sustainability — filled from the
+ *  product where structured data exists; otherwise from house policy copy. */
+function candleAccordion(view: ProductPageView): AccordionItem[] {
+  const wax = view.details.find((d) => d.label === "Wax")?.value;
+  const wick = view.details.find((d) => d.label === "Wick")?.value;
+  const vessel = view.vessels.length ? view.vessels.join(" · ") : "ceramic or glass";
   return [
     {
       title: "Candle Care & Safety",
-      body: "Trim the wick to 5mm before each lighting. Never leave a burning candle unattended. Keep away from drafts and flammable materials. Burn no longer than four hours at a time, and discontinue use when 10mm of wax remains.",
+      body: "Always burn within sight, and extinguish before leaving the room or sleeping. Trim the wick to ¼ inch before each use for a clean, even burn. Keep at least two feet from anything flammable, and away from drafts, fans, or open windows. Place on a stable, heat-resistant surface. Limit each session to four hours, and stop burning when ½ inch of wax remains. Never move a burning candle.",
     },
     {
-      title: "Shipping & Exchanges",
-      body: "Dispatched within 2–3 business days. Complimentary shipping on orders over ₹1,000. Returns accepted within 48 hours of delivery for damaged or incorrect items.",
+      title: "Wax & Wick Details",
+      body: `${wax ?? "A creamy coconut wax blend"} for a slow, clean, even burn. ${wick ?? "A lead-free cotton wick"}, trimmed for a steady, low-soot flame. Burn time scales with size — a longer, slower burn in the larger vessels.`,
     },
     {
       title: "Ingredients & Materials",
-      body: "Premium soy-coconut wax blend. 100% cotton, lead-free wick. Phthalate-free, IFRA-compliant fragrance compounds. Reusable ceramic or glass vessel.",
+      body: `Hand-poured with a premium coconut wax blend and a 100% natural, lead-free cotton wick. Premium-grade, phthalate-free fragrance and essential oils, IFRA-compliant. Free from parabens and sulfates, and never tested on animals. Poured into a reusable ${vessel} vessel.`,
+    },
+    {
+      title: "Shipping & Exchanges",
+      body: "Carefully packed and dispatched within 1–3 business days (a little longer during festive periods). Free standard shipping within India on orders over ₹5,000; most orders arrive in 3–7 business days. Worldwide shipping via trusted couriers (duties/taxes at checkout). Due to the handcrafted nature of our candles we do not accept returns, but if your order arrives damaged or incorrect, write to us within 48 hours and we will make it right.",
+    },
+    {
+      title: "Sustainability & Reusability",
+      body: "Cured for 10–14 days before shipping for a stronger, truer scent throw. Once the last of the wax is gone, the vessel can be cleaned and upcycled — a keepsake for flowers, brushes or small things. Made slowly, meant to last beyond the flame.",
     },
   ];
 }
@@ -183,13 +218,27 @@ export function buildCandleEditorial({ view, artist, related }: CandleEditorialI
   if (view.scentGroup) moodCards.push({ label: "Scent Group", value: view.scentGroup });
   if (view.chapterName) moodCards.push({ label: "Theme", value: stripVolume(view.chapterName) });
 
-  const craftItems: CraftItem[] = [{ label: "Hand Poured", value: "In small batches" }, ...view.details];
-  if (view.vessels.length) craftItems.push({ label: "Vessel", value: `${view.vessels.join(" · ")} — reusable` });
+  const CRAFT_NOTES: Record<string, string> = {
+    Wax: "A creamy coconut blend for a clean, slow, even burn.",
+    Wick: "Lead-free cotton, trimmed for a steady, low-soot flame.",
+  };
+  const craftItems: CraftItem[] = [
+    { label: "Hand Poured", value: "In small batches", note: "Every candle is poured slowly, by hand — never mass-produced." },
+    ...view.details.map((d) => ({ ...d, note: CRAFT_NOTES[d.label] })),
+  ];
+  if (view.vessels.length) {
+    craftItems.push({
+      label: "Vessel",
+      value: view.vessels.join(" · "),
+      note: "Reusable once the last of the wax is gone — a keepsake, not waste.",
+    });
+  }
 
   const lifestyleRows: LifestyleRow[] = splitParagraphs(view.mood.lifestyle).map((line, i) => ({
-    label: ["Where it belongs", "When to light it", "Pairs with"][i] ?? "Note",
+    label: ["Where it belongs", "When to light it", "Pairs with"][i] ?? "And",
     value: line,
   }));
+  const lifestyleMoments = deriveMoments(view.mood.lifestyle);
 
   const overrides: SectionInstance[] = [
     fill(
@@ -260,16 +309,23 @@ export function buildCandleEditorial({ view, artist, related }: CandleEditorialI
         heading: "Living with it",
         media: storyImage ? imageMedia(storyImage, view.name, "landscape") : undefined,
         rows: lifestyleRows,
+        moments: lifestyleMoments,
         align: "image-left",
       } satisfies LifestyleFeatureSettings,
-      { visibility: lifestyleRows.length > 0 },
+      { visibility: lifestyleRows.length > 0 || lifestyleMoments.length > 0 },
     ),
     fill(
       "cultural",
       { quote: view.mood.cultural ?? "", variant: "hairline" } satisfies EditorialQuoteSettings,
       { visibility: Boolean(view.mood.cultural) },
     ),
-    fill("details", { items: candleAccordion() } satisfies EditorialAccordionSettings),
+    fill(
+      "divider-memory",
+      { line: "Every fragrance begins with a memory." } satisfies EditorialDividerSettings,
+      { visibility: storyBody.length > 0 || view.notes.length > 0 },
+    ),
+    fill("divider-close", {} satisfies EditorialDividerSettings),
+    fill("details", { items: candleAccordion(view) } satisfies EditorialAccordionSettings),
     fill(
       "related",
       {
