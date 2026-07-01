@@ -46,8 +46,23 @@
   font-size: clamp(1.7rem, 3.2vw, 2.4rem);
   color: var(--ink);
 }
-.testimonials__list { display: grid; gap: clamp(36px, 5vw, 60px); }
-.testimonial { display: grid; justify-items: center; gap: clamp(28px, 4vw, 48px); }
+/* auto-advancing crossfade slider — quotes stack in one grid cell and fade */
+.testimonials__slider { display: grid; }
+.testimonials__slider .testimonial {
+  grid-area: 1 / 1;
+  display: grid;
+  justify-items: center;
+  gap: clamp(20px, 3vw, 32px);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 1.1s var(--motion-ease), transform 1.1s var(--motion-ease);
+  pointer-events: none;
+}
+.testimonials__slider .testimonial[data-active="true"] {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
 .testimonial__quote {
   font-family: var(--font-serif);
   font-style: italic;
@@ -63,6 +78,30 @@
   text-transform: uppercase;
   color: var(--ink-muted, var(--muted));
 }
+.testimonials__dots {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: clamp(32px, 4vw, 52px);
+}
+.testimonials__dot {
+  width: 6px;
+  height: 6px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--ink-muted, var(--muted));
+  background: transparent;
+  transition: background 0.4s var(--motion-ease), border-color 0.4s var(--motion-ease);
+  cursor: pointer;
+}
+.testimonials__dot[data-active="true"] {
+  background: var(--accent, var(--gold));
+  border-color: var(--accent, var(--gold));
+}
+
+/* reduced-motion static list */
+.testimonials__list { display: grid; gap: clamp(36px, 5vw, 60px); }
+.testimonial--static { display: grid; justify-items: center; gap: clamp(28px, 4vw, 48px); }
 .testimonial__sep {
   display: block;
   width: 28px;
