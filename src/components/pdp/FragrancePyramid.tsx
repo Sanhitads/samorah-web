@@ -23,10 +23,6 @@ export function FragrancePyramid({ settings }: SectionComponentProps) {
     hidden: { opacity: 0, y: reduce ? 0 : 18 },
     show: { opacity: 1, y: 0, transition: { duration: 0.9, ease: [0.25, 0.1, 0.25, 1] } },
   };
-  const line: Variants = {
-    hidden: { scaleY: reduce ? 1 : 0 },
-    show: { scaleY: 1, transition: { duration: reduce ? 0 : 1.4, ease: [0.25, 0.1, 0.25, 1] } },
-  };
 
   return (
     <div className="pyramid">
@@ -42,7 +38,6 @@ export function FragrancePyramid({ settings }: SectionComponentProps) {
         whileInView="show"
         viewport={{ once: true, margin: "0px 0px -100px 0px" }}
       >
-        <motion.span className="pyramid__line" aria-hidden="true" variants={line} />
         {s.layers.map((l) => (
           <motion.div key={l.label} className="pyramid__layer" variants={layer}>
             <p className="pyramid__layer-label">{l.label}</p>

@@ -245,27 +245,12 @@
   margin-top: 16px;
 }
 .pyramid__layers {
-  position: relative;
   display: grid;
   gap: clamp(28px, 4vw, 48px);
   max-width: 560px;
   margin-inline: auto;
   text-align: center;
 }
-/* the drawn connecting line — descends behind the layers as they reveal */
-.pyramid__line {
-  position: absolute;
-  top: 6px;
-  bottom: 6px;
-  left: 50%;
-  width: 1px;
-  transform: translateX(-50%);
-  transform-origin: top;
-  background: linear-gradient(var(--accent, var(--gold)), transparent);
-  opacity: 0.5;
-  z-index: 0;
-}
-.pyramid__layer { position: relative; z-index: 1; }
 .pyramid__layer-label {
   font-family: var(--font-sans);
   font-size: 11px;
