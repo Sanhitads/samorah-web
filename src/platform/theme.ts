@@ -226,6 +226,84 @@ export const THEMES: Theme[] = [
       },
     },
   },
+
+  // — Air / The Hours: one atmosphere per hour (light, except Private Hours) —
+  {
+    token: "morning-blue",
+    label: "Pale Morning Blue",
+    description: "Open Window — first light.",
+    category: "seasonal",
+    version: 1,
+    scheme: "light",
+    extends: "warm-ivory",
+    tokens: {
+      color: {
+        surface: "#dee4ea",
+        ink: "#2a3138",
+        inkSoft: "rgba(42, 49, 56, 0.72)",
+        inkMuted: "rgba(42, 49, 56, 0.5)",
+        line: "rgba(42, 49, 56, 0.12)",
+        accent: "#8f9dae",
+      },
+    },
+  },
+  {
+    token: "dusty-rose",
+    label: "Dusty Rose",
+    description: "Slow Evening — soft afternoon warmth.",
+    category: "seasonal",
+    version: 1,
+    scheme: "light",
+    extends: "warm-ivory",
+    tokens: {
+      color: {
+        surface: "#e7dad7",
+        ink: "#3a2e2d",
+        inkSoft: "rgba(58, 46, 45, 0.72)",
+        inkMuted: "rgba(58, 46, 45, 0.5)",
+        line: "rgba(58, 46, 45, 0.12)",
+        accent: "#b58f8b",
+      },
+    },
+  },
+  {
+    token: "amber-hour",
+    label: "Amber Hour",
+    description: "After Dinner — the warmth that stays.",
+    category: "seasonal",
+    version: 1,
+    scheme: "light",
+    extends: "warm-ivory",
+    tokens: {
+      color: {
+        surface: "#e9dfcb",
+        ink: "#3a3121",
+        inkSoft: "rgba(58, 49, 33, 0.72)",
+        inkMuted: "rgba(58, 49, 33, 0.5)",
+        line: "rgba(58, 49, 33, 0.12)",
+        accent: "#b89a68",
+      },
+    },
+  },
+  {
+    token: "deep-indigo",
+    label: "Deep Indigo",
+    description: "Private Hours — the last, quiet light.",
+    category: "seasonal",
+    version: 1,
+    scheme: "dark",
+    extends: "forest",
+    tokens: {
+      color: {
+        surface: "#1b1f2e",
+        ink: "#edeef4",
+        inkSoft: "rgba(237, 238, 244, 0.72)",
+        inkMuted: "rgba(237, 238, 244, 0.5)",
+        line: "rgba(237, 238, 244, 0.16)",
+        accent: "#9aa3c2",
+      },
+    },
+  },
 ];
 
 /** Indexed once for O(1) lookup (the exported API is unchanged). */

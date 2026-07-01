@@ -27,6 +27,7 @@ export interface HourEntry {
   productSlug: string; // → /shop/[slug] (the Room/Linen spray)
   priceLabel: string; // "From ₹599" until the commerce projection resolves it
   price: number; // commerce price (placeholder until air products exist)
+  palette: string; // per-hour atmosphere theme token (the PDP editorial palette)
   gradient: string; // "gradient:grad-air"
   /** A short editorial line shown between this Hour and the next (turning a leaf). */
   interlude?: string;
@@ -91,6 +92,7 @@ export const AIR_VOLUMES: AirVolume[] = [
             productSlug: "open-window",
             priceLabel: "From ₹599",
             price: 599,
+            palette: "morning-blue",
             gradient: "gradient:grad-air",
             interlude: "The morning arrives quietly.",
           },
@@ -113,6 +115,7 @@ export const AIR_VOLUMES: AirVolume[] = [
             productSlug: "slow-evening",
             priceLabel: "From ₹599",
             price: 599,
+            palette: "dusty-rose",
             gradient: "gradient:grad-blush",
             interlude: "Afternoon forgets to hurry.",
           },
@@ -135,6 +138,7 @@ export const AIR_VOLUMES: AirVolume[] = [
             productSlug: "after-dinner",
             priceLabel: "From ₹599",
             price: 599,
+            palette: "amber-hour",
             gradient: "gradient:grad-chai",
           },
         ],
@@ -164,6 +168,7 @@ export const AIR_VOLUMES: AirVolume[] = [
             productSlug: "private-hours",
             priceLabel: "From ₹599",
             price: 599,
+            palette: "deep-indigo",
             gradient: "gradient:grad-amethyst",
           },
         ],

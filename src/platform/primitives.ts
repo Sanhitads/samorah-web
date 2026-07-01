@@ -40,6 +40,10 @@ export type ThemeToken = Open<
   | "sand"
   | "monsoon"
   | "winter"
+  | "morning-blue"
+  | "dusty-rose"
+  | "amber-hour"
+  | "deep-indigo"
 >; // + "campaign-*" via Open
 
 // — Editorial mood (§9): a feeling, carried for filtering & adaptation. —

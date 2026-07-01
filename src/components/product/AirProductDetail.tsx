@@ -87,7 +87,7 @@ export function AirProductDetail({
       <div className="pdp__editorial">
         <SectionRenderer
           sections={editorial}
-          context={{ pageId: hour.productSlug, themeToken: "monsoon", preview: false, data: { productSlug: hour.productSlug } }}
+          context={{ pageId: hour.productSlug, themeToken: hour.palette || "monsoon", preview: false, data: { productSlug: hour.productSlug } }}
         />
       </div>
     </main>
