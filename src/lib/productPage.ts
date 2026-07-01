@@ -21,6 +21,7 @@ export interface ProductInput {
   slug: string;
   name: string;
   tagline: string | null;
+  price?: number | null; // base price — fallback when a product has no variants
   scent_group: string | null;
   fragrance_family: string | null;
   collection_type?: string | null; // "Core Collection" | "Limited Collection" (default Core)
@@ -169,6 +170,27 @@ export function buildProductPage(p: ProductInput): ProductPageView {
       : p.collection.name
     : null;
 
+  // Variant matrix, with a base-price fallback so a product that has a price but
+  // no variants is still buyable (a single "Standard" line) rather than showing
+  // an empty price + "Unavailable".
+  let variantViews = toVariantViews(variants);
+  let vessels = availableVessels(variants);
+  let sizes = availableSizes(variants);
+  let defaultVariantId = def?.id ?? null;
+  let priceLabel = "";
+  if (variants.length > 0) {
+    const r = priceRange(variants as Priceable[]);
+    priceLabel = r.min === r.max ? formatINR(r.min) : `From ${formatINR(r.min)}`;
+  } else if (p.price != null) {
+    variantViews = [
+      { id: p.id, vessel: "", size: "", price: p.price, priceLabel: formatINR(p.price), burnTime: "", inStock: true, stockNote: null },
+    ];
+    defaultVariantId = p.id;
+    vessels = [];
+    sizes = [];
+    priceLabel = formatINR(p.price);
+  }
+
   return {
     id: p.id,
     slug: p.slug,
@@ -182,17 +204,11 @@ export function buildProductPage(p: ProductInput): ProductPageView {
     scentGroup: p.scent_group,
     fragranceFamily: p.fragrance_family,
     gallery: toGallery(p),
-    vessels: availableVessels(variants),
-    sizes: availableSizes(variants),
-    variants: toVariantViews(variants),
-    defaultVariantId: def?.id ?? null,
-    priceLabel:
-      variants.length > 0
-        ? (() => {
-            const r = priceRange(variants as Priceable[]);
-            return r.min === r.max ? formatINR(r.min) : `From ${formatINR(r.min)}`;
-          })()
-        : "",
+    vessels,
+    sizes,
+    variants: variantViews,
+    defaultVariantId,
+    priceLabel,
     details: toDetails(p),
     notes: toNotes(p),
     mood: {
