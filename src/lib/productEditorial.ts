@@ -228,19 +228,18 @@ export function buildCandleEditorial({ view, artist, related }: CandleEditorialI
   if (view.scentGroup) moodCards.push({ label: "Scent Group", value: view.scentGroup });
   if (view.chapterName) moodCards.push({ label: "Theme", value: stripVolume(view.chapterName) });
 
-  const CRAFT_NOTES: Record<string, string> = {
-    Wax: "A creamy coconut blend for a clean, slow, even burn.",
-    Wick: "Lead-free cotton, trimmed for a steady, low-soot flame.",
-  };
+  const waxValue = view.details.find((d) => d.label === "Wax")?.value ?? "Natural coconut & soy blend";
+  const wickValue = view.details.find((d) => d.label === "Wick")?.value ?? "Lead-free cotton";
   const craftItems: CraftItem[] = [
-    { label: "Hand Poured", value: "In small batches", note: "Every candle is poured slowly, by hand — never mass-produced." },
-    ...view.details.map((d) => ({ ...d, note: CRAFT_NOTES[d.label] })),
+    { label: "Hand Poured", value: "In small batches", note: "Poured slowly, by hand — never mass-produced." },
+    { label: "Wax Blend", value: waxValue, note: "Crafted for a slow, clean, even burn." },
+    { label: "Cotton Wick", value: wickValue, note: "Trimmed for a steady, low-soot flame." },
   ];
   if (view.vessels.length) {
     craftItems.push({
-      label: "Vessel",
+      label: "The Vessel",
       value: view.vessels.join(" · "),
-      note: "Reusable once the last of the wax is gone — a keepsake, not waste.",
+      note: "Reusable once the wax is gone — a keepsake, not waste.",
     });
   }
 
@@ -337,7 +336,7 @@ export function buildCandleEditorial({ view, artist, related }: CandleEditorialI
     fill(
       "testimonials",
       {
-        eyebrow: "From Our Homes",
+        eyebrow: "Letters From Our Community",
         heading: "In their words",
         quotes: getTestimonials(view.chapterSlug).map((t) => ({ quote: t.quote, attribution: t.attribution })),
       } satisfies TestimonialsSettings,

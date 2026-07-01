@@ -166,16 +166,6 @@ export default async function ProductRoute({
             }}
           />
 
-          {p.details.length > 0 ? (
-            <dl className="pdp__details">
-              {p.details.map((d) => (
-                <div key={d.label} className="pdp__detail">
-                  <dt className="pdp__detail-label">{d.label}</dt>
-                  <dd className="pdp__detail-value">{d.value}</dd>
-                </div>
-              ))}
-            </dl>
-          ) : null}
         </div>
         </div>
       </div>
