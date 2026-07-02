@@ -8,6 +8,7 @@ import { chapterTheme, editionLabel } from "@/lib/chapterPage";
 import { getCollectionBySlug } from "@/services/collectionService";
 import { getArtist } from "@/config/artist";
 import { ProductPurchasePanel } from "@/components/product/ProductPurchasePanel";
+import { AddToComposition } from "@/components/product/AddToComposition";
 import { ProductGallery } from "@/components/product/ProductGallery";
 import { AirProductDetail } from "@/components/product/AirProductDetail";
 import { SectionRenderer } from "@/components/sections/SectionRenderer";
@@ -164,6 +165,17 @@ export default async function ProductRoute({
               defaultVariantId: p.defaultVariantId,
               priceLabel: p.priceLabel,
             }}
+          />
+
+          <AddToComposition
+            product={{
+              id: p.id,
+              slug: p.slug,
+              name: p.name,
+              chapterName: p.chapterName,
+              image: p.gallery[0]?.src ?? "",
+            }}
+            variants={p.variants.map((v) => ({ vessel: v.vessel, size: v.size, price: v.price }))}
           />
 
         </div>

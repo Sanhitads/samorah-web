@@ -151,6 +151,38 @@ export function composeBundle(selections: BundleSelection[]): BundleComposition 
   };
 }
 
+export interface CompositionPreview {
+  count: number;
+  complete: boolean;
+  regular: number;
+  total: number;
+  saving: number;
+  savingPct: number;
+  regularLabel: string;
+  totalLabel: string;
+  savingLabel: string;
+}
+
+/** Running composition totals from a set of full prices (the shared store's
+ *  items). The 15% is applied per line via bundleUnitPrice, so the preview and
+ *  the cart-level promotion always agree to the rupee. */
+export function composeComposition(prices: number[]): CompositionPreview {
+  const regular = prices.reduce((sum, p) => sum + p, 0);
+  const total = prices.reduce((sum, p) => sum + bundleUnitPrice(p), 0);
+  const saving = regular - total;
+  return {
+    count: prices.length,
+    complete: prices.length === BUNDLE_SIZE,
+    regular,
+    total,
+    saving,
+    savingPct: regular > 0 ? Math.round((saving / regular) * 100) : 0,
+    regularLabel: formatINR(regular),
+    totalLabel: formatINR(total),
+    savingLabel: formatINR(saving),
+  };
+}
+
 /** The composition panel's progress line. */
 export function bundleProgress(count: number): string {
   if (count >= BUNDLE_SIZE) return "Composition Complete";

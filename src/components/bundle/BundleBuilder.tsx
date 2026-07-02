@@ -5,41 +5,45 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { AssetImage } from "@/components/ui/AssetImage";
 import { useCartStore } from "@/store/useCartStore";
 import { useUIStore } from "@/store/useUIStore";
+import { useCompositionStore } from "@/store/useCompositionStore";
 import { isGradientPlaceholder, gradientClass } from "@/lib/product";
 import {
   BUNDLE_SIZE,
   BUNDLE_VESSELS,
-  composeBundle,
+  composeComposition,
   optionFor,
   vesselLabel,
   type BundleCandle,
-  type BundleSelection,
 } from "@/lib/bundle";
 
 /**
- * BundleBuilder (client) — the Discovery Composition. The customer chooses a
- * vessel first (single-vessel compositions), then composes exactly three 100g
- * candles from that vessel — filterable by chapter, no duplicate fragrances. A
- * sticky panel tracks the vessel, progress, and the automatic 15% discount, then
- * adds the set to the real cart. The only interactive island on the page.
+ * BundleBuilder (client) — the Discovery Composition. Choose a vessel (single-
+ * vessel compositions), then compose exactly three 100g candles — filterable by
+ * chapter, no duplicate fragrances. Backed by the shared composition store, so
+ * the in-progress set persists across a refresh and is shared with the PDP's
+ * "Add to Composition" action. A sticky panel tracks the vessel, progress, and
+ * the automatic 15% discount, then adds the set to the cart.
  */
 export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
-  const [vessel, setVessel] = useState<string | null>(null);
+  const vessel = useCompositionStore((s) => s.vessel);
+  const items = useCompositionStore((s) => s.items);
+  const setVessel = useCompositionStore((s) => s.setVessel);
+  const addCandle = useCompositionStore((s) => s.addCandle);
+  const removeCandle = useCompositionStore((s) => s.removeCandle);
+  const clearComposition = useCompositionStore((s) => s.clear);
+
   const [chapter, setChapter] = useState("All");
-  const [selected, setSelected] = useState<BundleSelection[]>([]);
   const [added, setAdded] = useState(false);
 
   const addItem = useCartStore((s) => s.addItem);
   const openCart = useUIStore((s) => s.openCart);
   const reduce = useReducedMotion();
 
-  // Only candles offered in the chosen vessel (100g).
   const vesselCandles = useMemo(
     () => (vessel ? candles.filter((c) => optionFor(c, vessel)) : []),
     [candles, vessel],
   );
 
-  // Chapters present for this vessel, in volume order → the filter row.
   const chapters = useMemo(() => {
     const map = new Map<string, { key: string; short: string; order: number }>();
     for (const c of vesselCandles) {
@@ -53,14 +57,14 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
     [vesselCandles, chapter],
   );
 
-  const composition = composeBundle(selected);
-  const isFull = selected.length >= BUNDLE_SIZE;
+  const selectedIds = useMemo(() => new Set(items.map((i) => i.id)), [items]);
+  const composition = composeComposition(items.map((i) => i.price));
+  const isFull = items.length >= BUNDLE_SIZE;
 
   const chooseVessel = (key: string) => {
     if (key === vessel) return;
-    setVessel(key);
+    setVessel(key); // store clears items on a vessel switch (no mixing)
     setChapter("All");
-    setSelected([]); // no mixing vessels within a composition
     setAdded(false);
   };
 
@@ -69,11 +73,20 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
     const option = optionFor(candle, vessel);
     if (!option) return;
     setAdded(false);
-    setSelected((prev) => {
-      if (prev.some((s) => s.candle.id === candle.id)) return prev.filter((s) => s.candle.id !== candle.id);
-      if (prev.length >= BUNDLE_SIZE) return prev; // set is full
-      return [...prev, { candle, option }]; // duplicates impossible — keyed by candle
-    });
+    if (selectedIds.has(candle.id)) {
+      removeCandle(candle.id);
+    } else {
+      addCandle({
+        id: candle.id,
+        slug: candle.slug,
+        name: candle.name,
+        chapterName: candle.chapter?.name,
+        image: candle.image.url,
+        vessel,
+        size: option.size,
+        price: option.price,
+      });
+    }
   };
 
   const addComposition = () => {
@@ -82,26 +95,24 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
     // Tag the three lines as one composition — the 15% is a cart-level promotion,
     // recomputed from the full prices (never baked into the stored line price).
     const compositionId = `comp-${vessel}-${Date.now()}`;
-    for (const { selection } of composition.lines) {
+    for (const it of items) {
       addItem(
         {
-          id: selection.candle.id,
-          slug: selection.candle.slug,
-          name: selection.candle.name,
-          price: selection.option.price, // full price — discount applied in the cart
-          gradClass: isGradientPlaceholder(selection.candle.image.url)
-            ? gradientClass(selection.candle.image.url) ?? undefined
-            : undefined,
-          chapterName: selection.candle.chapter?.name,
+          id: it.id,
+          slug: it.slug,
+          name: it.name,
+          price: it.price, // full price — discount applied in the cart
+          gradClass: isGradientPlaceholder(it.image) ? gradientClass(it.image) ?? undefined : undefined,
+          chapterName: it.chapterName,
           compositionId,
         },
         material,
-        selection.option.size,
+        it.size,
       );
     }
     openCart();
     setAdded(true);
-    setSelected([]);
+    clearComposition();
     setTimeout(() => setAdded(false), 2500);
   };
 
@@ -190,7 +201,7 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
                 transition={{ duration: reduce ? 0 : 0.3, ease: "easeOut" }}
               >
                 {visible.map((candle) => {
-                  const chosen = selected.some((s) => s.candle.id === candle.id);
+                  const chosen = selectedIds.has(candle.id);
                   const disabled = isFull && !chosen;
                   return (
                     <button
@@ -242,7 +253,7 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
 
               <div className="composition__progress" aria-hidden="true">
                 {Array.from({ length: BUNDLE_SIZE }).map((_, i) => (
-                  <span key={i} className="composition__dot" data-on={i < selected.length} />
+                  <span key={i} className="composition__dot" data-on={i < items.length} />
                 ))}
               </div>
 
@@ -253,36 +264,36 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
                 </div>
               ) : (
                 <p className="composition__status">
-                  {selected.length} of {BUNDLE_SIZE} Selected
+                  {items.length} of {BUNDLE_SIZE} Selected
                 </p>
               )}
 
-              {selected.length === 0 ? (
+              {items.length === 0 ? (
                 <p className="composition__empty">Choose your first candle to begin.</p>
               ) : (
                 <ul className="composition__items">
-                  {selected.map((s) => (
-                    <li key={s.candle.id} className="composition__item">
+                  {items.map((it) => (
+                    <li key={it.id} className="composition__item">
                       <span className="composition__thumb">
                         <AssetImage
-                          asset={s.candle.image.url}
-                          alt={s.candle.image.alt}
+                          asset={it.image}
+                          alt={it.name}
                           role="lifestyle"
                           sizes="72px"
                           className="composition__thumb-img"
                         />
                       </span>
                       <span className="composition__item-body">
-                        <span className="composition__item-name">{s.candle.name}</span>
-                        {s.candle.chapter ? (
-                          <span className="composition__item-chapter">{s.candle.chapter.name}</span>
+                        <span className="composition__item-name">{it.name}</span>
+                        {it.chapterName ? (
+                          <span className="composition__item-chapter">{it.chapterName}</span>
                         ) : null}
                       </span>
                       <button
                         type="button"
                         className="composition__remove"
-                        onClick={() => toggle(s.candle)}
-                        aria-label={`Remove ${s.candle.name}`}
+                        onClick={() => removeCandle(it.id)}
+                        aria-label={`Remove ${it.name}`}
                       >
                         Remove
                       </button>
@@ -291,7 +302,7 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
                 </ul>
               )}
 
-              {selected.length > 0 ? (
+              {items.length > 0 ? (
                 <div className="composition__totals">
                   <div className="composition__row">
                     <span>Regular Value</span>
@@ -319,7 +330,7 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
                   ? "✓ Composition added to bag"
                   : composition.complete
                     ? "Add Composition to Bag"
-                    : `Choose ${BUNDLE_SIZE - selected.length} more`}
+                    : `Choose ${BUNDLE_SIZE - items.length} more`}
               </button>
 
               <p className="composition__note">Any three 100g candles · 15% composition discount.</p>
