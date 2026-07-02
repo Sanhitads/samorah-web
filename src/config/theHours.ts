@@ -2,7 +2,7 @@
  * The Hours — Air Chapters content (Experience B). A "volume" is a diary of the
  * day's unnoticed moments; each **Hour** is an entry (time · name · story ·
  * scent) tied to a Room or Linen spray. Two groups per volume — Shared Hours
- * (the spaces we share) and Private Hours (closer to you).
+ * (Room) and Private Hours (Linen).
  *
  * CMS-ready & config-driven (no air products in the DB yet): the Air page reads
  * these typed objects, exactly like the homepage sections. Experiences, never
@@ -17,7 +17,7 @@ export interface HourEntry {
   time: string; // "07:00" — shown as "HOUR 07:00"
   moment: string; // "Morning Begins" — a small poetic descriptor under the hour
   name: string;
-  story: string; // the "feels like" line
+  story: string; // the hero line
   hourReason: string; // "The Hour" — why this hour inspired the fragrance (PDP)
   hourStory?: string; // long-form "The Hour" narrative (overrides hourReason on the PDP)
   scentEffect?: string; // "The Effect" — a line shown with the Fragrance Journey
@@ -57,7 +57,7 @@ export interface AirVolume {
     title: string;
     story: string; // "For evenings. For whispers. For the spaces closest to you."
     closing: string; // "Coming in the next volume."
-    cta: string; // "Discover Soon"
+    cta: string; // "Available Soon"
   };
 }
 
@@ -73,134 +73,11 @@ export const AIR_VOLUMES: AirVolume[] = [
       {
         kind: "room",
         label: "Shared Hours",
-        title: "Spaces We Share",
-        note: "Light, air, and the rooms a day moves through.",
+        title: "The Room",
+        note: "The atmosphere a room makes for itself.",
         hours: [
           {
             id: "open-window",
-            time: "07:00",
-            moment: "Morning Begins",
-            name: "Open Window",
-            story: "The room before the day begins — light arriving, quietly expectant.",
-            hourReason: "When the windows open and the day begins.",
-            scent: ["Fresh Air", "White Tea", "Soft Cotton"],
-            feels: ["Fresh sheets.", "Curtains moving.", "The first coffee."],
-            experience: "Morning begins quietly. Curtains move where they couldn't before. Fresh air enters, and the room resets — everything rinsed and beginning again.",
-            placement: [
-              { label: "Bedroom", note: "For slow mornings." },
-              { label: "Kitchen", note: "For fresh beginnings." },
-              { label: "Entryway", note: "The first impression." },
-            ],
-            signature: "Stillness before the day begins.",
-            productSlug: "open-window",
-            priceLabel: "From ₹599",
-            price: 599,
-            palette: "morning-blue",
-            gradient: "gradient:grad-air",
-            interlude: "The morning arrives quietly.",
-          },
-          {
-            id: "slow-evening",
-            time: "14:00",
-            moment: "Afternoon Lingers",
-            name: "Slow Evening",
-            story: "The unhurried middle of an afternoon — soft linen, warm light through glass.",
-            hourReason: "The hour the afternoon forgets to hurry.",
-            scent: ["Iris", "Cotton", "Warm Sandalwood"],
-            feels: ["Soft linen.", "Light through glass.", "Nowhere to be."],
-            experience: "The afternoon stretches. Warmth settles into the corners of the room, and time loosens its grip. Nothing here is urgent.",
-            placement: [
-              { label: "Living room", note: "For unhurried afternoons." },
-              { label: "Reading nook", note: "For a chapter or two." },
-              { label: "Studio", note: "For quiet work." },
-            ],
-            signature: "The hour that asks for nothing.",
-            productSlug: "slow-evening",
-            priceLabel: "From ₹599",
-            price: 599,
-            palette: "dusty-rose",
-            gradient: "gradient:grad-blush",
-            interlude: "Afternoon forgets to hurry.",
-          },
-          {
-            id: "after-dinner",
-            time: "19:30",
-            moment: "Evening Settles",
-            name: "After Dinner",
-            story: "The comfortable haze after a meal — soft conversation, the warmth of something good.",
-            hourReason: "When the table clears and the evening softens.",
-            scent: ["Amber", "Tonka Bean", "Soft Cedar"],
-            feels: ["Low light.", "Soft voices.", "Something good, remembered."],
-            experience: "Plates cleared, the room holds the warmth of the evening. Conversation slows to comfort, and the day folds itself away.",
-            placement: [
-              { label: "Dining room", note: "For lingering meals." },
-              { label: "Living room", note: "For soft conversation." },
-              { label: "Kitchen", note: "For the warmth after." },
-            ],
-            signature: "The warmth that stays after the meal.",
-            productSlug: "after-dinner",
-            priceLabel: "From ₹599",
-            price: 599,
-            palette: "amber-hour",
-            gradient: "gradient:grad-chai",
-          },
-        ],
-      },
-      {
-        kind: "linen",
-        label: "Private Hours",
-        title: "Closer to You",
-        note: "For linen, for fabric, for the hours that ask for nothing.",
-        hours: [
-          {
-            id: "private-hours",
-            time: "23:00",
-            moment: "Night Holds",
-            name: "Private Hours",
-            story: "The most intimate hour of the day. The one that belongs only to you.",
-            hourReason: "The last hour, kept only for you.",
-            scent: ["Lavender", "Cashmere", "Dark Musk"],
-            feels: ["Cool cotton.", "A closed door.", "The day, finally quiet."],
-            experience: "The house exhales. The last light is low and kind. This hour belongs to no one else — it is entirely, finally, yours.",
-            placement: [
-              { label: "Bedroom", note: "For winding down." },
-              { label: "Bathroom", note: "For a long soak." },
-              { label: "Dressing room", note: "For the quiet ritual." },
-            ],
-            signature: "The hour that belongs only to you.",
-            productSlug: "private-hours",
-            priceLabel: "From ₹599",
-            price: 599,
-            palette: "deep-indigo",
-            gradient: "gradient:grad-amethyst",
-          },
-        ],
-      },
-    ],
-    nextVolume: {
-      volume: "Volume II",
-      title: "First Light",
-      story: "The mornings you didn't plan. The air a room makes before you wake.",
-      closing: "Continue to the next volume.",
-      cta: "Explore Volume II",
-    },
-  },
-  {
-    slug: "first-light",
-    volume: "Volume II",
-    title: "First Light",
-    tagline: "The mornings you didn't plan.",
-    cover: "gradient:grad-air",
-    isComingSoon: false,
-    groups: [
-      {
-        kind: "room",
-        label: "Shared Hours",
-        title: "The Unplanned Mornings",
-        note: "The air a room makes for itself, before the day is yours.",
-        hours: [
-          {
-            id: "morning-open-window",
             time: "09:20",
             moment: "Air After First Light",
             name: "Open Window",
@@ -219,15 +96,111 @@ export const AIR_VOLUMES: AirVolume[] = [
               { label: "Rooms that need a reset", note: "" },
             ],
             signature: "Best experienced at 09:20.",
-            productSlug: "morning-open-window",
+            productSlug: "open-window",
             priceLabel: "From ₹599",
             price: 599,
             palette: "morning-blue",
             gradient: "gradient:grad-air",
+            interlude: "The morning arrives quietly.",
+          },
+          {
+            id: "slow-evening",
+            time: "18:40",
+            moment: "The Day Loosens",
+            name: "Slow Evening",
+            story: "The day loosens its grip. Nothing urgent remains.",
+            hourReason: "The hour the day finally forgets to hurry.",
+            hourStory:
+              "You said you'll just sit for 5 minutes. That was a while ago.\n\nThe lights are still off. Not intentionally. You just didn't feel like turning them on.\n\nYour phone is somewhere. You're not ignoring it. You just don't care enough to check.\n\nThere's something you were supposed to finish today. You remember it. You also decide it can wait.\n\nThe room feels softer now. Like everything sharp about the day has worn off.\n\nEven time feels slower. Or maybe you finally are.",
+            scentEffect: "Soft. Comforting. Slightly indulgent — like sitting down for five minutes and losing track of time.",
+            productDetails: "A room mist spray. A fine fragrance blend. Size: 100 ml. Made in India.",
+            scent: ["Ripe Fig Flesh", "Brown Sugar Warmth", "Soft Amber & Sandalwood"],
+            feels: ["Sitting down for five minutes and not getting up for forty."],
+            experience: "A fine mist designed to settle into the room slowly. Soft sweetness meets warm woods, creating a scent that stays close and lingers without heaviness. It doesn't fill the space instantly — it builds, softens, and becomes part of it.",
+            placement: [
+              { label: "Evenings with no plans", note: "" },
+              { label: "Post-work silence", note: "" },
+              { label: "The chair you always end up in", note: "" },
+              { label: "Moments when nothing feels urgent", note: "" },
+            ],
+            signature: "Best experienced when you stop trying to be productive.",
+            productSlug: "slow-evening",
+            priceLabel: "From ₹599",
+            price: 599,
+            palette: "amber-hour",
+            gradient: "gradient:grad-chai",
+          },
+        ],
+      },
+      {
+        kind: "linen",
+        label: "Private Hours",
+        title: "The Linen",
+        note: "For linen, for fabric, for the hours that ask for nothing.",
+        hours: [
+          {
+            id: "fresh-fold",
+            time: "07:10",
+            moment: "Before the Day Begins",
+            name: "Fresh Fold",
+            story: "Stillness before the day begins.",
+            hourReason: "The clean quiet of fresh linen, before the day starts.",
+            hourStory:
+              "You don't rush this part.\n\nThe sheets are still slightly warm. Not hot — just enough to notice.\n\nYou shake them once, maybe twice. More than needed, less than intentional.\n\nThere's that clean smell. Not sharp. Not soapy. Just… right.\n\nFor a moment, you don't put them away.\n\nYou just stand there holding them, like you're not in a hurry to start the day yet.",
+            scentEffect: "Clean. Quiet. Settled — like fresh linen that makes you slow down for no reason.",
+            productDetails: "A linen mist. A fine fragrance blend. Size: 100 ml. Fabric-safe formulation. Made in India.",
+            scent: ["White Tea Air", "Creamy Sandalwood", "Soft Amber Warmth"],
+            feels: ["Pulling freshly dried sheets and holding them for a second longer."],
+            experience: "A fine mist designed for fabric and close spaces. Soft musks and woods blend into the fibers, creating a scent that feels part of the linen — not on top of it. Light, airy, and gently lingering.",
+            placement: [
+              { label: "Freshly made beds", note: "" },
+              { label: "Wardrobes and folded stacks", note: "" },
+              { label: "Slow mornings before the day begins", note: "" },
+            ],
+            signature: "Best experienced just before the day starts.",
+            productSlug: "fresh-fold",
+            priceLabel: "From ₹599",
+            price: 599,
+            palette: "sand",
+            gradient: "gradient:grad-air",
+            interlude: "Linen holds the quiet.",
+          },
+          {
+            id: "after-lights",
+            time: "23:30",
+            moment: "When Everything Quiets",
+            name: "After Lights",
+            story: "When everything finally quiets down.",
+            hourReason: "The hour the day asks nothing more from you.",
+            hourStory:
+              "The lights are off. Not because you're sleepy — just because the day is done.\n\nThere's no more scrolling. No more 'one last thing.'\n\nYou lie down, not thinking about tomorrow yet.\n\nThe room feels different in the dark. Quieter. Softer. Less demanding.\n\nFor once, nothing is waiting for you.\n\nAnd you don't rush to fill the silence.",
+            scentEffect: "Warm. Close. Unrushed — like the moment after everything finally goes quiet.",
+            productDetails: "A linen mist. A fine fragrance blend. Size: 100 ml. Fabric-safe formulation. Made in India.",
+            scent: ["Tonka Warmth", "Soft Sandalwood", "Smooth Woody Musks"],
+            feels: ["The moment after the lights go off and nothing else is expected."],
+            experience: "A soft, intimate mist that settles into fabric and stays close. Warm woods and musks create a cocoon-like scent that lingers gently through the night. Designed to be felt, not announced.",
+            placement: [
+              { label: "Bed linens and pillows", note: "" },
+              { label: "Night routines", note: "" },
+              { label: "The last moment before sleep", note: "" },
+            ],
+            signature: "Best experienced when the day asks nothing more from you.",
+            productSlug: "after-lights",
+            priceLabel: "From ₹599",
+            price: 599,
+            palette: "deep-indigo",
+            gradient: "gradient:grad-amethyst",
           },
         ],
       },
     ],
+    nextVolume: {
+      volume: "Volume II",
+      title: "The Intimate",
+      story: "For evenings. For whispers. For the spaces closest to you.",
+      closing: "Coming in the next volume.",
+      cta: "Available Soon",
+    },
   },
 ];
 
@@ -254,4 +227,3 @@ export function getHourBySlug(
   }
   return undefined;
 }
-
