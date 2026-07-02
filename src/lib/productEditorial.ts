@@ -378,11 +378,13 @@ function toHourCard(h: HourEntry): ProductCardModel {
   };
 }
 
-function airAccordion(): AccordionItem[] {
+function airAccordion(composition?: string): AccordionItem[] {
   return [
     {
       title: "Composition",
-      body: "A 100ml room & linen mist. Alcohol-free, skin-safe formula, made with premium fragrance and essential oils. Mist lightly into the air, or over linen and soft furnishings, and let it settle.",
+      body:
+        composition ??
+        "A 100ml room & linen mist. Alcohol-free, skin-safe formula, made with premium fragrance and essential oils. Mist lightly into the air, or over linen and soft furnishings, and let it settle.",
     },
     {
       title: "Shipping & Exchanges",
@@ -405,18 +407,22 @@ function airScentLayers(scent: string[]): { label: string; notes: string[] }[] {
 
 export function buildAirEditorial({ hour, volume, others }: AirEditorialInput): SectionInstance[] {
   const overrides: SectionInstance[] = [
-    // The Hour — the signature time, prominent, with why it inspired the scent.
+    // The Hour — the signature time, prominent, with the hour's story (or, when
+    // there's no long story, the one-line reason it inspired the scent).
     fill("the-hour", {
       eyebrow: "The Hour",
       heading: hour.time,
-      body: [hour.hourReason],
+      body: hour.hourStory
+        ? hour.hourStory.split(/\n{2,}/).map((t) => t.trim()).filter(Boolean)
+        : [hour.hourReason],
       align: "none",
-    } satisfies EditorialStatementSettings, { visibility: Boolean(hour.hourReason) }),
+    } satisfies EditorialStatementSettings, { visibility: Boolean(hour.hourStory || hour.hourReason) }),
     // Fragrance Journey — Opening / Heart / Lingering (the brand's perfumery
-    // language; lighter under the air palette).
+    // language; lighter under the air palette). "The Effect" as the lead line.
     fill("smells-like", {
       eyebrow: "Fragrance Journey",
       heading: "",
+      intro: hour.scentEffect,
       layers: airScentLayers(hour.scent),
     } satisfies FragrancePyramidSettings, { visibility: hour.scent.length > 0 }),
     // Feels Like — large editorial typography, one evocative line per row.
@@ -437,7 +443,7 @@ export function buildAirEditorial({ hour, volume, others }: AirEditorialInput): 
     fill("signature", { quote: hour.signature, variant: "handwritten" } satisfies EditorialQuoteSettings, {
       visibility: Boolean(hour.signature),
     }),
-    fill("details", { items: airAccordion() } satisfies EditorialAccordionSettings),
+    fill("details", { items: airAccordion(hour.productDetails) } satisfies EditorialAccordionSettings),
     fill("related", {
       eyebrow: "Continue",
       heading: `Continue ${volume.title}`,

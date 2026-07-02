@@ -19,6 +19,9 @@ export interface HourEntry {
   name: string;
   story: string; // the "feels like" line
   hourReason: string; // "The Hour" — why this hour inspired the fragrance (PDP)
+  hourStory?: string; // long-form "The Hour" narrative (overrides hourReason on the PDP)
+  scentEffect?: string; // "The Effect" — a line shown with the Fragrance Journey
+  productDetails?: string; // custom "Composition" accordion body
   scent: string[]; // the "smells like" notes (opening · heart · lingering)
   feels: string[]; // the "feels like" poetic lines (PDP)
   experience: string; // "The Experience" — how the room changes (PDP)
@@ -176,11 +179,55 @@ export const AIR_VOLUMES: AirVolume[] = [
     ],
     nextVolume: {
       volume: "Volume II",
-      title: "The Intimate",
-      story: "For evenings. For whispers. For the spaces closest to you.",
-      closing: "Coming in the next volume.",
-      cta: "Available Soon",
+      title: "First Light",
+      story: "The mornings you didn't plan. The air a room makes before you wake.",
+      closing: "Continue to the next volume.",
+      cta: "Explore Volume II",
     },
+  },
+  {
+    slug: "first-light",
+    volume: "Volume II",
+    title: "First Light",
+    tagline: "The mornings you didn't plan.",
+    cover: "gradient:grad-air",
+    isComingSoon: false,
+    groups: [
+      {
+        kind: "room",
+        label: "Shared Hours",
+        title: "The Unplanned Mornings",
+        note: "The air a room makes for itself, before the day is yours.",
+        hours: [
+          {
+            id: "morning-open-window",
+            time: "09:20",
+            moment: "Air After First Light",
+            name: "Open Window",
+            story: "Air after the first light.",
+            hourReason: "The air a room makes for itself, before you wake.",
+            hourStory:
+              "You didn't wake up early on purpose. Something else did.\n\nMaybe the light. Maybe the sound of a bike starting. Maybe someone in the building already living their best life at 6 AM.\n\nYou sit up, slightly confused. The room feels different. The window is open. You don't remember opening it.\n\nFor a second, it feels like the air doesn't belong to you anymore. It's fresher. Slightly unfamiliar. Slightly addictive.\n\nYou don't question it. You just stay there longer than usual.",
+            scentEffect: "Warm. Slightly addictive. Familiar — like the room reset itself before you woke up.",
+            productDetails: "A room mist spray. A fine fragrance blend. Size: 100 ml. Made in India.",
+            scent: ["Green Paan Leaf", "Tonka Warmth", "Dry Amber Woods"],
+            feels: ["A room that aired itself before you woke up."],
+            experience: "A fine mist that diffuses gently. Built to linger without overwhelming. Designed for air, not surfaces.",
+            placement: [
+              { label: "Near open windows", note: "" },
+              { label: "Morning routines you didn't plan", note: "" },
+              { label: "Rooms that need a reset", note: "" },
+            ],
+            signature: "Best experienced at 09:20.",
+            productSlug: "morning-open-window",
+            priceLabel: "From ₹599",
+            price: 599,
+            palette: "morning-blue",
+            gradient: "gradient:grad-air",
+          },
+        ],
+      },
+    ],
   },
 ];
 
