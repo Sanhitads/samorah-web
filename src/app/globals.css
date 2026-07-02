@@ -2853,6 +2853,15 @@ h1, h2, h3, h4 {
   color: var(--charcoal);
 }
 
+.cart-item__tag {
+  font-family: var(--font-sans);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 8px;
+}
+
 .cart-item__controls {
   display: flex;
   flex-direction: column;
@@ -2931,6 +2940,16 @@ h1, h2, h3, h4 {
   color: var(--gold);
   letter-spacing: 0.08em;
 }
+
+.cart-drawer__line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 13px;
+  color: var(--smoke);
+  margin-bottom: 8px;
+}
+.cart-drawer__line--discount { color: var(--gold); }
 
 .cart-drawer__subtotal {
   display: flex;

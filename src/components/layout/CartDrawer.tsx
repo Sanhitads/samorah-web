@@ -5,8 +5,11 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Minus, Plus, X } from "lucide-react";
 import { useOverlay } from "@/hooks/useOverlay";
 import {
+  COMPOSITION_DISCOUNT_PCT,
   selectCartCount,
   selectCartSubtotal,
+  selectCartTotal,
+  selectCompositionDiscount,
   useCartStore,
 } from "@/store/useCartStore";
 
@@ -38,6 +41,8 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
   const items = useCartStore((s) => s.items);
   const count = useCartStore(selectCartCount);
   const subtotal = useCartStore(selectCartSubtotal);
+  const compositionDiscount = useCartStore(selectCompositionDiscount);
+  const total = useCartStore(selectCartTotal);
   const updateQty = useCartStore((s) => s.updateQty);
   const removeItem = useCartStore((s) => s.removeItem);
 
@@ -126,6 +131,9 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                         <p className="cart-item__meta">
                           {item.vessel} · {item.size}
                         </p>
+                        {item.compositionId && (
+                          <p className="cart-item__tag">Discovery Composition</p>
+                        )}
                         <p className="cart-item__price">{inr(item.price * item.qty)}</p>
                       </div>
                       <div className="cart-item__controls">
@@ -162,10 +170,27 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                 </div>
 
                 <div className="cart-drawer__footer">
-                  <div className="cart-drawer__subtotal">
-                    <span>Subtotal</span>
-                    <span>{inr(subtotal)}</span>
-                  </div>
+                  {compositionDiscount > 0 ? (
+                    <>
+                      <div className="cart-drawer__line">
+                        <span>Subtotal</span>
+                        <span>{inr(subtotal)}</span>
+                      </div>
+                      <div className="cart-drawer__line cart-drawer__line--discount">
+                        <span>Composition discount ({COMPOSITION_DISCOUNT_PCT}%)</span>
+                        <span>−{inr(compositionDiscount)}</span>
+                      </div>
+                      <div className="cart-drawer__subtotal">
+                        <span>Total</span>
+                        <span>{inr(total)}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="cart-drawer__subtotal">
+                      <span>Subtotal</span>
+                      <span>{inr(subtotal)}</span>
+                    </div>
+                  )}
                   <Link
                     href="/checkout"
                     className="atc-btn cart-drawer__checkout"

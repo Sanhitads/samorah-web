@@ -79,17 +79,21 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
   const addComposition = () => {
     if (!composition.complete || !vessel) return;
     const material = vesselLabel(vessel);
-    for (const { selection, unit } of composition.lines) {
+    // Tag the three lines as one composition — the 15% is a cart-level promotion,
+    // recomputed from the full prices (never baked into the stored line price).
+    const compositionId = `comp-${vessel}-${Date.now()}`;
+    for (const { selection } of composition.lines) {
       addItem(
         {
           id: selection.candle.id,
           slug: selection.candle.slug,
           name: selection.candle.name,
-          price: unit,
+          price: selection.option.price, // full price — discount applied in the cart
           gradClass: isGradientPlaceholder(selection.candle.image.url)
             ? gradientClass(selection.candle.image.url) ?? undefined
             : undefined,
           chapterName: selection.candle.chapter?.name,
+          compositionId,
         },
         material,
         selection.option.size,

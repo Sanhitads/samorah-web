@@ -20,7 +20,7 @@ export const metadata: Metadata = {
 export default async function ShopRoute({
   searchParams,
 }: {
-  searchParams: Promise<{ chapter?: string; sort?: string }>;
+  searchParams: Promise<{ chapter?: string; vessel?: string; sort?: string }>;
 }) {
   const params = await searchParams;
   let products: ShopProductInput[] = [];
@@ -36,21 +36,40 @@ export default async function ShopRoute({
       <header className="plp__head">
         <p className="plp__eyebrow">The Shop</p>
         <h1 className="plp__title">All Products</h1>
-        <p className="plp__count">
-          {view.shown} {view.shown === 1 ? "fragrance" : "fragrances"}
-          {view.activeChapter !== "all" ? " in this chapter" : ""}
-        </p>
+        <p className="plp__count">{view.shown} Signature Fragrances</p>
       </header>
 
       <div className="plp__controls">
-        <nav className="plp__filters" aria-label="Filter by chapter">
-          {view.chapters.map((c) => (
-            <Link key={c.key} href={c.href} className="plp__filter" data-active={c.active} scroll={false}>
-              {c.label}
-              <span className="plp__filter-count">{c.count}</span>
-            </Link>
-          ))}
-        </nav>
+        <div className="plp__facets">
+          <div className="plp__facet">
+            <span className="plp__facet-label">Chapter</span>
+            <nav className="plp__filters" aria-label="Filter by chapter">
+              {view.chapters.map((c) => (
+                <Link key={c.key} href={c.href} className="plp__filter" data-active={c.active} scroll={false}>
+                  {c.volume ? <span className="plp__filter-vol">{c.volume}</span> : null}
+                  <span className="plp__filter-name">
+                    {c.label}
+                    <span className="plp__filter-count"> ({c.count})</span>
+                  </span>
+                </Link>
+              ))}
+            </nav>
+          </div>
+
+          <div className="plp__facet">
+            <span className="plp__facet-label">Vessel</span>
+            <nav className="plp__filters" aria-label="Filter by vessel">
+              {view.vessels.map((v) => (
+                <Link key={v.key} href={v.href} className="plp__filter plp__filter--vessel" data-active={v.active} scroll={false}>
+                  <span className="plp__filter-name">
+                    {v.label}
+                    <span className="plp__filter-count"> ({v.count})</span>
+                  </span>
+                </Link>
+              ))}
+            </nav>
+          </div>
+        </div>
 
         <div className="plp__sort">
           <span className="plp__sort-label">Sort</span>
@@ -73,7 +92,13 @@ export default async function ShopRoute({
           ))}
         </ul>
       ) : (
-        <p className="plp__empty">No fragrances here yet — please explore another chapter.</p>
+        <div className="plp__empty">
+          <p className="plp__empty-title">No fragrances match this selection.</p>
+          <p className="plp__empty-sub">Explore another chapter, or return to the full collection.</p>
+          <Link href="/shop" className="plp__empty-link">
+            View the full collection
+          </Link>
+        </div>
       )}
     </main>
   );
