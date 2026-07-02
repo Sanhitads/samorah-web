@@ -186,6 +186,15 @@
   font-size: clamp(1.6rem, 3vw, 2.3rem);
   color: var(--ink);
 }
+.compose-status {
+  margin-top: 12px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--smoke, #6b6259);
+}
+.compose-status__sep { color: var(--bundle-gold); }
 
 /* ── Chapter filter ── */
 .bundle-filters {
@@ -269,8 +278,8 @@
   transition: background 0.4s ease, color 0.4s ease, transform 0.4s ease;
 }
 
-/* Selected feedback — soft gold border, gentle elevation, ~1% scale. */
-.bundle-card[data-chosen="true"] { transform: translateY(-4px) scale(1.01); }
+/* Selected feedback — soft gold border, gentle elevation, subtle scale. */
+.bundle-card[data-chosen="true"] { transform: translateY(-4px) scale(1.02); }
 .bundle-card[data-chosen="true"] .bundle-card__media {
   box-shadow: 0 18px 36px -20px rgba(31, 26, 22, 0.42);
 }
@@ -356,14 +365,39 @@
   border-color: var(--bundle-gold);
 }
 .composition__status {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 0.95rem;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
   color: var(--smoke, #6b6259);
   margin-bottom: 22px;
-  min-height: 22px;
+  min-height: 20px;
 }
-.composition__status[data-complete="true"] { color: var(--ink, #1f1a16); font-style: normal; }
+
+/* Completion — a soft, satisfying confirmation when all three are chosen. */
+.composition__complete {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 22px;
+  animation: compositionComplete 0.6s ease both;
+}
+.composition__complete-title {
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  color: var(--ink, #1f1a16);
+}
+.composition__complete-sub {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--bundle-gold);
+}
+@keyframes compositionComplete {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
 
 .composition__empty {
   font-family: var(--font-serif);
@@ -491,8 +525,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bundle-split { animation: none; }
-  .bundle-card,
+  .bundle-split,
+  .composition__complete { animation: none; }
+  .bundle-card { transform: none; }
   .bundle-card[data-chosen="true"] { transform: none; }
   .bundle-card__image,
   .bundle-card:hover .bundle-card__image { transition: none; transform: none; }

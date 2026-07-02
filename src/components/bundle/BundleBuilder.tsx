@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { AssetImage } from "@/components/ui/AssetImage";
 import { useCartStore } from "@/store/useCartStore";
 import { useUIStore } from "@/store/useUIStore";
@@ -8,7 +9,6 @@ import { isGradientPlaceholder, gradientClass } from "@/lib/product";
 import {
   BUNDLE_SIZE,
   BUNDLE_VESSELS,
-  bundleProgress,
   composeBundle,
   optionFor,
   vesselLabel,
@@ -31,6 +31,7 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
 
   const addItem = useCartStore((s) => s.addItem);
   const openCart = useUIStore((s) => s.openCart);
+  const reduce = useReducedMotion();
 
   // Only candles offered in the chosen vessel (100g).
   const vesselCandles = useMemo(
@@ -135,11 +136,16 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
 
       {/* ── Step 2 · Compose (revealed once a vessel is chosen) ── */}
       {vessel ? (
-        <div className="bundle-split" key={vessel}>
+        <div className="bundle-split">
           <div className="bundle-left">
             <div className="compose-head">
               <p className="compose-head__eyebrow">{selectedVessel?.material} Collection</p>
               <h2 className="compose-head__title">Choose Any Three</h2>
+              <p className="compose-status">
+                100g Signature Candles
+                <span className="compose-status__sep" aria-hidden="true"> · </span>
+                {vesselCandles.length} Available
+              </p>
             </div>
 
             {chapters.length > 1 ? (
@@ -170,47 +176,56 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
               </div>
             ) : null}
 
-            <div className="bundle-grid">
-              {visible.map((candle) => {
-                const chosen = selected.some((s) => s.candle.id === candle.id);
-                const disabled = isFull && !chosen;
-                return (
-                  <button
-                    key={candle.id}
-                    type="button"
-                    className="bundle-card"
-                    data-chosen={chosen}
-                    data-disabled={disabled}
-                    aria-pressed={chosen}
-                    disabled={disabled}
-                    onClick={() => toggle(candle)}
-                  >
-                    <span className="bundle-card__media">
-                      <AssetImage
-                        asset={candle.image.url}
-                        alt={candle.image.alt}
-                        role="lifestyle"
-                        sizes="(max-width: 640px) 45vw, 220px"
-                        className="bundle-card__image"
-                      />
-                      <span className="bundle-card__mark" aria-hidden="true">
-                        {chosen ? "✓" : "+"}
+            <AnimatePresence mode="wait">
+              <motion.div
+                className="bundle-grid"
+                key={`${vessel}-${chapter}`}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: reduce ? 0 : 0.3, ease: "easeOut" }}
+              >
+                {visible.map((candle) => {
+                  const chosen = selected.some((s) => s.candle.id === candle.id);
+                  const disabled = isFull && !chosen;
+                  return (
+                    <button
+                      key={candle.id}
+                      type="button"
+                      className="bundle-card"
+                      data-chosen={chosen}
+                      data-disabled={disabled}
+                      aria-pressed={chosen}
+                      disabled={disabled}
+                      onClick={() => toggle(candle)}
+                    >
+                      <span className="bundle-card__media">
+                        <AssetImage
+                          asset={candle.image.url}
+                          alt={candle.image.alt}
+                          role="lifestyle"
+                          sizes="(max-width: 640px) 45vw, 220px"
+                          className="bundle-card__image"
+                        />
+                        <span className="bundle-card__mark" aria-hidden="true">
+                          {chosen ? "✓" : "+"}
+                        </span>
                       </span>
-                    </span>
-                    <span className="bundle-card__body">
-                      {candle.chapter?.volume ? (
-                        <span className="bundle-card__edition">{candle.chapter.volume.toUpperCase()}</span>
-                      ) : null}
-                      <span className="bundle-card__name">{candle.name}</span>
-                      {candle.chapter ? (
-                        <span className="bundle-card__chapter">{candle.chapter.name}</span>
-                      ) : null}
-                      {candle.tagline ? <span className="bundle-card__notes">{candle.tagline}</span> : null}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+                      <span className="bundle-card__body">
+                        {candle.chapter?.volume ? (
+                          <span className="bundle-card__edition">{candle.chapter.volume.toUpperCase()}</span>
+                        ) : null}
+                        <span className="bundle-card__name">{candle.name}</span>
+                        {candle.chapter ? (
+                          <span className="bundle-card__chapter">{candle.chapter.name}</span>
+                        ) : null}
+                        {candle.tagline ? <span className="bundle-card__notes">{candle.tagline}</span> : null}
+                      </span>
+                    </button>
+                  );
+                })}
+              </motion.div>
+            </AnimatePresence>
           </div>
 
           {/* ── Sticky composition ── */}
@@ -226,11 +241,21 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
                   <span key={i} className="composition__dot" data-on={i < selected.length} />
                 ))}
               </div>
-              <p className="composition__status" data-complete={composition.complete}>
-                {bundleProgress(selected.length)}
-              </p>
 
-              {selected.length > 0 ? (
+              {composition.complete ? (
+                <div className="composition__complete" role="status">
+                  <span className="composition__complete-title">✓ Composition Complete</span>
+                  <span className="composition__complete-sub">15% Applied</span>
+                </div>
+              ) : (
+                <p className="composition__status">
+                  {selected.length} of {BUNDLE_SIZE} Selected
+                </p>
+              )}
+
+              {selected.length === 0 ? (
+                <p className="composition__empty">Choose your first candle to begin.</p>
+              ) : (
                 <ul className="composition__items">
                   {selected.map((s) => (
                     <li key={s.candle.id} className="composition__item">
@@ -260,8 +285,6 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
                     </li>
                   ))}
                 </ul>
-              ) : (
-                <p className="composition__empty">Choose three candles to compose your set.</p>
               )}
 
               {selected.length > 0 ? (
