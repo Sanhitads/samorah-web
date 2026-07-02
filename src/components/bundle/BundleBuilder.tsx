@@ -34,10 +34,19 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
 
   const [chapter, setChapter] = useState("All");
   const [added, setAdded] = useState(false);
+  // Was a vessel chosen on THIS page? A direct visit always starts at the vessel
+  // chooser; only an already-active composition (candles added, e.g. from a PDP)
+  // reveals the grid automatically.
+  const [started, setStarted] = useState(false);
 
   const addItem = useCartStore((s) => s.addItem);
   const openCart = useUIStore((s) => s.openCart);
   const reduce = useReducedMotion();
+
+  const composing = items.length > 0 || started;
+  // Ignore a stale persisted vessel (kept for continuity) until the composition
+  // is actually being built, so the chooser shows nothing pre-selected.
+  const activeVessel = composing ? vessel : null;
 
   const vesselCandles = useMemo(
     () => (vessel ? candles.filter((c) => optionFor(c, vessel)) : []),
@@ -62,10 +71,12 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
   const isFull = items.length >= BUNDLE_SIZE;
 
   const chooseVessel = (key: string) => {
-    if (key === vessel) return;
-    setVessel(key); // store clears items on a vessel switch (no mixing)
-    setChapter("All");
+    setStarted(true); // reveal the grid (also handles re-selecting a stale vessel)
     setAdded(false);
+    if (key !== vessel) {
+      setVessel(key); // store clears items on a vessel switch (no mixing)
+      setChapter("All");
+    }
   };
 
   const toggle = (candle: BundleCandle) => {
@@ -126,7 +137,7 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
         <h2 className="vessel-choose__title">Choose Your Vessel</h2>
         <div className="vessel-grid" role="radiogroup" aria-label="Vessel">
           {BUNDLE_VESSELS.map((v) => {
-            const active = v.key === vessel;
+            const active = v.key === activeVessel;
             return (
               <button
                 key={v.key}
@@ -149,8 +160,9 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
         </div>
       </section>
 
-      {/* ── Step 2 · Compose (revealed once a vessel is chosen) ── */}
-      {vessel ? (
+      {/* ── Step 2 · Compose (revealed once a vessel is chosen here, or when a
+          composition is already in progress — e.g. started from a PDP) ── */}
+      {composing && vessel ? (
         <div className="bundle-split">
           <div className="bundle-left">
             <div className="compose-head">
