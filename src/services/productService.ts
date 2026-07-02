@@ -27,6 +27,23 @@ export async function getProducts(filter: ProductFilter = {}) {
   return data ?? [];
 }
 
+// Card fields + collection (chapter) + created_at — everything the Shop PLP
+// needs to show, filter (by chapter), and sort (newest / price / featured).
+const SHOP_FIELDS =
+  "id, slug, name, tagline, scent_group, fragrance_family, price, sale_price, is_featured, is_hero, created_at, mood_tags, collection:collections!products_collection_id_fkey(slug, name, volume), product_images(url, alt_text, is_primary, sort_order)";
+
+/** Active products for the Shop PLP, with their chapter — filtered/sorted in the
+ *  page builder (pure) so the query stays a simple "all active products" read. */
+export async function getShopProducts() {
+  const db = createPublicClient();
+  const { data, error } = await db
+    .from("products")
+    .select(SHOP_FIELDS)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
 /** Full product detail: collection + variants + images + fragrance notes. */
 export async function getProductBySlug(slug: string) {
   const db = createPublicClient();

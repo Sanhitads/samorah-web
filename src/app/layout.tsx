@@ -8,6 +8,7 @@ import "@/styles/air-sections.css";
 import "@/styles/product-page.css";
 import "@/styles/pdp-editorial.css";
 import "@/styles/bundle.css";
+import "@/styles/shop.css";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { buildThemeStylesheet } from "@/platform/themeStylesheet";
 

@@ -1,0 +1,128 @@
+/* Shop PLP (Template C) — the functional browse grid. Editorial, calm,
+   link-based filters + sort. The cards themselves live in product-card.css. */
+
+.plp {
+  --plp-hairline: rgba(31, 26, 22, 0.14);
+  --plp-gold: var(--accent, var(--gold, #c9a96e));
+  max-width: var(--container-wide, 1280px);
+  margin-inline: auto;
+  padding: clamp(40px, 6vw, 88px) clamp(24px, 5vw, 80px) clamp(64px, 9vw, 128px);
+}
+
+/* ── Head ── */
+.plp__head {
+  text-align: center;
+  margin-bottom: clamp(28px, 4vw, 48px);
+}
+.plp__eyebrow {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--plp-gold);
+  margin-bottom: 14px;
+}
+.plp__title {
+  font-family: var(--font-serif);
+  font-size: clamp(2.2rem, 5vw, 3.4rem);
+  line-height: 1.05;
+  color: var(--ink, #1f1a16);
+}
+.plp__count {
+  margin-top: 12px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--smoke, #6b6259);
+}
+
+/* ── Controls ── */
+.plp__controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding-bottom: clamp(20px, 2.5vw, 32px);
+  margin-bottom: clamp(28px, 4vw, 48px);
+  border-bottom: 1px solid var(--plp-hairline);
+}
+
+.plp__filters { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.plp__filter {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 9px 18px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--smoke, #6b6259);
+  border: 1px solid transparent;
+  border-radius: 2px;
+  text-decoration: none;
+  transition: color 0.3s ease, border-color 0.3s ease, background 0.3s ease;
+}
+.plp__filter:hover { color: var(--ink, #1f1a16); }
+.plp__filter[data-active="true"] {
+  color: var(--ivory, #faf7f2);
+  background: var(--ink, #1f1a16);
+}
+.plp__filter-count {
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  opacity: 0.6;
+}
+
+.plp__sort { display: inline-flex; align-items: center; gap: 14px; }
+.plp__sort-label {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--smoke, #6b6259);
+}
+.plp__sort-opts { display: inline-flex; flex-wrap: wrap; gap: 16px; }
+.plp__sort-opt {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--smoke, #6b6259);
+  text-decoration: none;
+  padding-bottom: 3px;
+  border-bottom: 1px solid transparent;
+  transition: color 0.3s ease, border-color 0.3s ease;
+}
+.plp__sort-opt:hover { color: var(--ink, #1f1a16); }
+.plp__sort-opt[data-active="true"] {
+  color: var(--ink, #1f1a16);
+  border-bottom-color: var(--plp-gold);
+}
+
+/* ── Grid ── */
+.plp__grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: clamp(24px, 3vw, 48px) clamp(18px, 2.4vw, 32px);
+}
+.plp__cell { display: flex; }
+.plp__cell > * { width: 100%; }
+
+.plp__empty {
+  padding: clamp(56px, 9vw, 120px) 0;
+  text-align: center;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 1.15rem;
+  color: var(--smoke, #6b6259);
+}
+
+@media (max-width: 720px) {
+  .plp__controls { flex-direction: column; align-items: flex-start; }
+  .plp__grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+}
