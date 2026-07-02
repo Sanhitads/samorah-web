@@ -1,40 +1,108 @@
 /**
- * Bundle domain (Phase 10) — the "Build Your Collection" composition rules, as
- * pure functions over lean candle view-models. No I/O, no formatting opinions in
- * the UI. The rule: compose exactly BUNDLE_SIZE candles and save BUNDLE_DISCOUNT
- * off the set. Real per-variant prices flow in via `basePrice`.
+ * Discovery Composition domain (Phase 10) — the "Compose Any Three" rules, as
+ * pure functions over lean candle view-models. Single-vessel: the customer
+ * picks a vessel first, then composes three 100g Signature Candles from that
+ * vessel. Exactly three, no duplicate fragrances, 15% off the set. Real
+ * per-variant prices flow in via each candle's per-vessel option.
  */
 import { formatINR } from "@/lib/pricing";
 
-/** A candle eligible for the bundle — the lean shape the builder + cart need. */
+/** The one selectable size — the Discovery Collection is 100g candles only. */
+export const BUNDLE_SIZE_LABEL = "100g";
+/** Compose exactly this many candles. */
+export const BUNDLE_SIZE = 3;
+/** Automatic composition discount. */
+export const BUNDLE_DISCOUNT = 0.15; // 15%
+
+/** A vessel offered at launch (glass, ceramic) plus the future terracotta. */
+export interface BundleVesselDef {
+  key: string; // enum value — "glass" | "ceramic" | "terracotta"
+  name: string; // "Glass Edition"
+  material: string; // "Glass" — used in the panel ("Glass Composition")
+  blurb: string;
+  comingSoon: boolean;
+}
+
+/** Vessel editions, in display order. Terracotta is future-proofed (disabled). */
+export const BUNDLE_VESSELS: BundleVesselDef[] = [
+  {
+    key: "glass",
+    name: "Glass Edition",
+    material: "Glass",
+    blurb: "Clear, timeless elegance. Signature transparent vessels.",
+    comingSoon: false,
+  },
+  {
+    key: "ceramic",
+    name: "Ceramic Edition",
+    material: "Ceramic",
+    blurb: "Soft matte finish. A contemporary, handcrafted feel.",
+    comingSoon: false,
+  },
+  {
+    key: "terracotta",
+    name: "Terracotta Edition",
+    material: "Terracotta",
+    blurb: "Natural, earth-fired warmth.",
+    comingSoon: true,
+  },
+];
+
+/** The chapter a candle belongs to — its Samorah story, for display + filter. */
+export interface BundleChapter {
+  slug: string; // "dessert-chapter"
+  key: string; // filter key — "dessert"
+  short: string; // "Dessert"
+  volume: string | null; // "Vol. I"
+  name: string; // "Dessert Chapter"
+  order: number; // volume order, for filter arrangement
+}
+
+/** Canonical chapter identities (volume comes from the collection row). */
+export const CHAPTER_META: Record<string, { key: string; short: string; order: number }> = {
+  "dessert-chapter": { key: "dessert", short: "Dessert", order: 1 },
+  "the-wild-within": { key: "wild", short: "Wild", order: 2 },
+  "mood-library": { key: "mood", short: "Mood", order: 3 },
+  "nature-chapter": { key: "nature", short: "Nature", order: 4 },
+};
+
+/** A candle's 100g variant for one vessel — the sellable option. */
+export interface BundleVesselOption {
+  vessel: string; // "glass"
+  variantId: string;
+  size: string; // "100g"
+  price: number; // effective price
+  inStock: boolean;
+}
+
+/** A candle eligible for the composition — the lean shape the builder needs. */
 export interface BundleCandle {
   id: string;
   slug: string;
   name: string;
-  tagline: string | null; // a small editorial descriptor under the name
-  family: string | null; // fragrance_family — the filter facet
+  tagline: string | null;
+  chapter: BundleChapter | null;
   image: { url: string; alt: string };
-  basePrice: number; // effective price of the default in-stock variant
-  vessel: string; // default variant vessel (carried onto the cart line)
-  size: string; // default variant size
-  inStock: boolean;
+  /** 100g options keyed by vessel — a candle appears for a vessel it offers. */
+  vessels: BundleVesselOption[];
 }
 
-/** Bundle rule: pick exactly BUNDLE_SIZE candles, BUNDLE_DISCOUNT off the set. */
-export const BUNDLE_SIZE = 3;
-export const BUNDLE_DISCOUNT = 0.15; // 15%
+/** A chosen candle + the vessel option it resolves to (for pricing + cart). */
+export interface BundleSelection {
+  candle: BundleCandle;
+  option: BundleVesselOption;
+}
 
 export interface BundleLine {
-  candle: BundleCandle;
-  /** Discounted unit price for this candle (rounded to the rupee). */
-  unit: number;
+  selection: BundleSelection;
+  unit: number; // discounted unit price (rounded to the rupee)
 }
 
 export interface BundleComposition {
   count: number;
   complete: boolean;
   lines: BundleLine[];
-  regular: number; // Σ base prices
+  regular: number; // Σ option prices
   total: number; // Σ discounted units (what the cart charges)
   saving: number; // regular − total
   savingPct: number; // whole %
@@ -43,24 +111,35 @@ export interface BundleComposition {
   savingLabel: string;
 }
 
-/** Per-candle bundle price — the discount is applied per line so the cart
+/** Per-candle composition price — the discount is applied per line so the cart
  *  subtotal matches the composition total exactly (no rounding drift). */
-export function bundleUnitPrice(basePrice: number): number {
-  return Math.round(basePrice * (1 - BUNDLE_DISCOUNT));
+export function bundleUnitPrice(price: number): number {
+  return Math.round(price * (1 - BUNDLE_DISCOUNT));
+}
+
+/** The capitalised vessel material for display ("glass" → "Glass"). */
+export function vesselLabel(key: string): string {
+  const def = BUNDLE_VESSELS.find((v) => v.key === key);
+  return def ? def.material : key.charAt(0).toUpperCase() + key.slice(1);
+}
+
+/** Resolve a candle's option for a vessel (undefined when not offered there). */
+export function optionFor(candle: BundleCandle, vessel: string): BundleVesselOption | undefined {
+  return candle.vessels.find((v) => v.vessel === vessel);
 }
 
 /** Compute the running composition from the current selection. */
-export function composeBundle(selected: BundleCandle[]): BundleComposition {
-  const lines: BundleLine[] = selected.map((candle) => ({
-    candle,
-    unit: bundleUnitPrice(candle.basePrice),
+export function composeBundle(selections: BundleSelection[]): BundleComposition {
+  const lines: BundleLine[] = selections.map((selection) => ({
+    selection,
+    unit: bundleUnitPrice(selection.option.price),
   }));
-  const regular = selected.reduce((sum, c) => sum + c.basePrice, 0);
+  const regular = selections.reduce((sum, s) => sum + s.option.price, 0);
   const total = lines.reduce((sum, l) => sum + l.unit, 0);
   const saving = regular - total;
   return {
-    count: selected.length,
-    complete: selected.length === BUNDLE_SIZE,
+    count: selections.length,
+    complete: selections.length === BUNDLE_SIZE,
     lines,
     regular,
     total,
@@ -72,12 +151,8 @@ export function composeBundle(selected: BundleCandle[]): BundleComposition {
   };
 }
 
-/** The composition panel's status line, driven by how many are chosen. */
-export function bundleStatus(count: number): string {
-  if (count === 0) return "Select three candles to compose your set";
-  if (count < BUNDLE_SIZE) {
-    const left = BUNDLE_SIZE - count;
-    return `${left} more ${left === 1 ? "candle" : "candles"} to complete your set`;
-  }
-  return "Your set is ready";
+/** The composition panel's progress line. */
+export function bundleProgress(count: number): string {
+  if (count >= BUNDLE_SIZE) return "Composition Complete";
+  return `${count} of ${BUNDLE_SIZE}`;
 }

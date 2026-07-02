@@ -7,61 +7,91 @@ import { useUIStore } from "@/store/useUIStore";
 import { isGradientPlaceholder, gradientClass } from "@/lib/product";
 import {
   BUNDLE_SIZE,
-  bundleStatus,
+  BUNDLE_VESSELS,
+  bundleProgress,
   composeBundle,
+  optionFor,
+  vesselLabel,
   type BundleCandle,
+  type BundleSelection,
 } from "@/lib/bundle";
 
 /**
- * BundleBuilder (client) — "Build Your Collection". Pick exactly three candles;
- * a sticky composition panel shows the tray, the running total, and the 15%
- * bundle saving, then adds each candle to the real cart at its bundle price
- * (using its default in-stock variant). The only interactive island on the page.
+ * BundleBuilder (client) — the Discovery Composition. The customer chooses a
+ * vessel first (single-vessel compositions), then composes exactly three 100g
+ * candles from that vessel — filterable by chapter, no duplicate fragrances. A
+ * sticky panel tracks the vessel, progress, and the automatic 15% discount, then
+ * adds the set to the real cart. The only interactive island on the page.
  */
 export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
-  const [selected, setSelected] = useState<BundleCandle[]>([]);
-  const [family, setFamily] = useState("All");
+  const [vessel, setVessel] = useState<string | null>(null);
+  const [chapter, setChapter] = useState("All");
+  const [selected, setSelected] = useState<BundleSelection[]>([]);
   const [added, setAdded] = useState(false);
 
   const addItem = useCartStore((s) => s.addItem);
   const openCart = useUIStore((s) => s.openCart);
 
-  const families = useMemo(
-    () => ["All", ...Array.from(new Set(candles.map((c) => c.family).filter((f): f is string => !!f)))],
-    [candles],
+  // Only candles offered in the chosen vessel (100g).
+  const vesselCandles = useMemo(
+    () => (vessel ? candles.filter((c) => optionFor(c, vessel)) : []),
+    [candles, vessel],
   );
+
+  // Chapters present for this vessel, in volume order → the filter row.
+  const chapters = useMemo(() => {
+    const map = new Map<string, { key: string; short: string; order: number }>();
+    for (const c of vesselCandles) {
+      if (c.chapter) map.set(c.chapter.key, { key: c.chapter.key, short: c.chapter.short, order: c.chapter.order });
+    }
+    return [...map.values()].sort((a, b) => a.order - b.order);
+  }, [vesselCandles]);
+
   const visible = useMemo(
-    () => (family === "All" ? candles : candles.filter((c) => c.family === family)),
-    [candles, family],
+    () => (chapter === "All" ? vesselCandles : vesselCandles.filter((c) => c.chapter?.key === chapter)),
+    [vesselCandles, chapter],
   );
 
   const composition = composeBundle(selected);
   const isFull = selected.length >= BUNDLE_SIZE;
 
+  const chooseVessel = (key: string) => {
+    if (key === vessel) return;
+    setVessel(key);
+    setChapter("All");
+    setSelected([]); // no mixing vessels within a composition
+    setAdded(false);
+  };
+
   const toggle = (candle: BundleCandle) => {
+    if (!vessel) return;
+    const option = optionFor(candle, vessel);
+    if (!option) return;
     setAdded(false);
     setSelected((prev) => {
-      if (prev.some((c) => c.id === candle.id)) return prev.filter((c) => c.id !== candle.id);
+      if (prev.some((s) => s.candle.id === candle.id)) return prev.filter((s) => s.candle.id !== candle.id);
       if (prev.length >= BUNDLE_SIZE) return prev; // set is full
-      return [...prev, candle];
+      return [...prev, { candle, option }]; // duplicates impossible — keyed by candle
     });
   };
 
-  const addBundle = () => {
-    if (!composition.complete) return;
-    for (const { candle, unit } of composition.lines) {
+  const addComposition = () => {
+    if (!composition.complete || !vessel) return;
+    const material = vesselLabel(vessel);
+    for (const { selection, unit } of composition.lines) {
       addItem(
         {
-          id: candle.id,
-          slug: candle.slug,
-          name: candle.name,
+          id: selection.candle.id,
+          slug: selection.candle.slug,
+          name: selection.candle.name,
           price: unit,
-          gradClass: isGradientPlaceholder(candle.image.url)
-            ? gradientClass(candle.image.url) ?? undefined
+          gradClass: isGradientPlaceholder(selection.candle.image.url)
+            ? gradientClass(selection.candle.image.url) ?? undefined
             : undefined,
+          chapterName: selection.candle.chapter?.name,
         },
-        candle.vessel,
-        candle.size,
+        material,
+        selection.option.size,
       );
     }
     openCart();
@@ -70,152 +100,206 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
     setTimeout(() => setAdded(false), 2500);
   };
 
-  return (
-    <div className="bundle-split">
-      {/* ── The candles ── */}
-      <div className="bundle-left">
-        {families.length > 1 ? (
-          <div className="bundle-filters" role="tablist" aria-label="Filter by fragrance family">
-            {families.map((f) => (
-              <button
-                key={f}
-                type="button"
-                role="tab"
-                aria-selected={family === f}
-                className="bundle-filter"
-                data-active={family === f}
-                onClick={() => setFamily(f)}
-              >
-                {f}
-              </button>
-            ))}
-          </div>
-        ) : null}
+  const selectedVessel = vessel ? BUNDLE_VESSELS.find((v) => v.key === vessel) : null;
 
-        <div className="bundle-grid">
-          {visible.map((candle) => {
-            const chosen = selected.some((c) => c.id === candle.id);
-            const disabled = isFull && !chosen;
+  return (
+    <div className="composer">
+      {/* ── Step 1 · Choose your vessel ── */}
+      <section className="vessel-choose" aria-label="Choose your vessel">
+        <p className="vessel-choose__eyebrow">Step One</p>
+        <h2 className="vessel-choose__title">Choose Your Vessel</h2>
+        <div className="vessel-grid" role="radiogroup" aria-label="Vessel">
+          {BUNDLE_VESSELS.map((v) => {
+            const active = v.key === vessel;
             return (
               <button
-                key={candle.id}
+                key={v.key}
                 type="button"
-                className="bundle-card"
-                data-chosen={chosen}
-                data-disabled={disabled}
-                aria-pressed={chosen}
-                disabled={disabled}
-                onClick={() => toggle(candle)}
+                role="radio"
+                aria-checked={active}
+                className="vessel-card"
+                data-active={active}
+                data-coming={v.comingSoon}
+                disabled={v.comingSoon}
+                onClick={() => chooseVessel(v.key)}
               >
-                <span className="bundle-card__media">
-                  <AssetImage
-                    asset={candle.image.url}
-                    alt={candle.image.alt}
-                    role="lifestyle"
-                    sizes="(max-width: 640px) 45vw, 220px"
-                    className="bundle-card__image"
-                  />
-                  <span className="bundle-card__mark" aria-hidden="true">
-                    {chosen ? "✓" : "+"}
-                  </span>
-                </span>
-                <span className="bundle-card__body">
-                  <span className="bundle-card__name">{candle.name}</span>
-                  {candle.tagline ? (
-                    <span className="bundle-card__notes">{candle.tagline}</span>
-                  ) : null}
-                </span>
+                <span className="vessel-card__mark" aria-hidden="true" />
+                <span className="vessel-card__name">{v.name}</span>
+                <span className="vessel-card__blurb">{v.blurb}</span>
+                {v.comingSoon ? <span className="vessel-card__coming">Coming Soon</span> : null}
               </button>
             );
           })}
         </div>
-      </div>
+      </section>
 
-      {/* ── The composition ── */}
-      <aside className="bundle-right">
-        <div className="composition">
-          <p className="composition__eyebrow">Your composition</p>
-          <p className="composition__count">
-            {selected.length} <span>/ {BUNDLE_SIZE}</span>
-          </p>
-          <p className="composition__status" data-complete={composition.complete}>
-            {bundleStatus(selected.length)}
-          </p>
+      {/* ── Step 2 · Compose (revealed once a vessel is chosen) ── */}
+      {vessel ? (
+        <div className="bundle-split" key={vessel}>
+          <div className="bundle-left">
+            <div className="compose-head">
+              <p className="compose-head__eyebrow">{selectedVessel?.material} Collection</p>
+              <h2 className="compose-head__title">Choose Any Three</h2>
+            </div>
 
-          <div className="composition__tray">
-            {Array.from({ length: BUNDLE_SIZE }).map((_, i) => {
-              const c = selected[i];
-              return (
-                <div key={i} className="tray-slot" data-filled={!!c}>
-                  {c ? (
-                    <AssetImage
-                      asset={c.image.url}
-                      alt={c.image.alt}
-                      role="lifestyle"
-                      sizes="80px"
-                      className="tray-slot__image"
-                    />
-                  ) : (
-                    <span className="tray-slot__mark" aria-hidden="true">+</span>
-                  )}
-                </div>
-              );
-            })}
+            {chapters.length > 1 ? (
+              <div className="bundle-filters" role="tablist" aria-label="Filter by chapter">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={chapter === "All"}
+                  className="bundle-filter"
+                  data-active={chapter === "All"}
+                  onClick={() => setChapter("All")}
+                >
+                  All
+                </button>
+                {chapters.map((c) => (
+                  <button
+                    key={c.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={chapter === c.key}
+                    className="bundle-filter"
+                    data-active={chapter === c.key}
+                    onClick={() => setChapter(c.key)}
+                  >
+                    {c.short}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            <div className="bundle-grid">
+              {visible.map((candle) => {
+                const chosen = selected.some((s) => s.candle.id === candle.id);
+                const disabled = isFull && !chosen;
+                return (
+                  <button
+                    key={candle.id}
+                    type="button"
+                    className="bundle-card"
+                    data-chosen={chosen}
+                    data-disabled={disabled}
+                    aria-pressed={chosen}
+                    disabled={disabled}
+                    onClick={() => toggle(candle)}
+                  >
+                    <span className="bundle-card__media">
+                      <AssetImage
+                        asset={candle.image.url}
+                        alt={candle.image.alt}
+                        role="lifestyle"
+                        sizes="(max-width: 640px) 45vw, 220px"
+                        className="bundle-card__image"
+                      />
+                      <span className="bundle-card__mark" aria-hidden="true">
+                        {chosen ? "✓" : "+"}
+                      </span>
+                    </span>
+                    <span className="bundle-card__body">
+                      {candle.chapter?.volume ? (
+                        <span className="bundle-card__edition">{candle.chapter.volume.toUpperCase()}</span>
+                      ) : null}
+                      <span className="bundle-card__name">{candle.name}</span>
+                      {candle.chapter ? (
+                        <span className="bundle-card__chapter">{candle.chapter.name}</span>
+                      ) : null}
+                      {candle.tagline ? <span className="bundle-card__notes">{candle.tagline}</span> : null}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          {selected.length > 0 ? (
-            <ul className="composition__items">
-              {selected.map((c) => (
-                <li key={c.id} className="composition__item">
-                  <span>{c.name}</span>
-                  <button
-                    type="button"
-                    className="composition__remove"
-                    onClick={() => toggle(c)}
-                    aria-label={`Remove ${c.name}`}
-                  >
-                    Remove
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-
-          {selected.length > 0 ? (
-            <div className="composition__totals">
-              <div className="composition__row">
-                <span>Regular value</span>
-                <span>{composition.regularLabel}</span>
-              </div>
-              <div className="composition__row composition__row--main">
-                <span>Composition total</span>
-                <span>{composition.totalLabel}</span>
-              </div>
-              {composition.saving > 0 ? (
-                <p className="composition__saving">
-                  You save {composition.savingLabel} ({composition.savingPct}%)
-                </p>
+          {/* ── Sticky composition ── */}
+          <aside className="bundle-right">
+            <div className="composition">
+              <p className="composition__eyebrow">Your Composition</p>
+              {selectedVessel ? (
+                <p className="composition__vessel">{selectedVessel.material} Composition</p>
               ) : null}
+
+              <div className="composition__progress" aria-hidden="true">
+                {Array.from({ length: BUNDLE_SIZE }).map((_, i) => (
+                  <span key={i} className="composition__dot" data-on={i < selected.length} />
+                ))}
+              </div>
+              <p className="composition__status" data-complete={composition.complete}>
+                {bundleProgress(selected.length)}
+              </p>
+
+              {selected.length > 0 ? (
+                <ul className="composition__items">
+                  {selected.map((s) => (
+                    <li key={s.candle.id} className="composition__item">
+                      <span className="composition__thumb">
+                        <AssetImage
+                          asset={s.candle.image.url}
+                          alt={s.candle.image.alt}
+                          role="lifestyle"
+                          sizes="72px"
+                          className="composition__thumb-img"
+                        />
+                      </span>
+                      <span className="composition__item-body">
+                        <span className="composition__item-name">{s.candle.name}</span>
+                        {s.candle.chapter ? (
+                          <span className="composition__item-chapter">{s.candle.chapter.name}</span>
+                        ) : null}
+                      </span>
+                      <button
+                        type="button"
+                        className="composition__remove"
+                        onClick={() => toggle(s.candle)}
+                        aria-label={`Remove ${s.candle.name}`}
+                      >
+                        Remove
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="composition__empty">Choose three candles to compose your set.</p>
+              )}
+
+              {selected.length > 0 ? (
+                <div className="composition__totals">
+                  <div className="composition__row">
+                    <span>Regular Value</span>
+                    <span>{composition.regularLabel}</span>
+                  </div>
+                  <div className="composition__row">
+                    <span>Composition Discount ({composition.savingPct || 15}%)</span>
+                    <span>−{composition.savingLabel}</span>
+                  </div>
+                  <div className="composition__row composition__row--main">
+                    <span>Composition Total</span>
+                    <span>{composition.totalLabel}</span>
+                  </div>
+                </div>
+              ) : null}
+
+              <button
+                type="button"
+                className="composition__atc"
+                disabled={!composition.complete}
+                data-added={added}
+                onClick={addComposition}
+              >
+                {added
+                  ? "✓ Composition added to bag"
+                  : composition.complete
+                    ? "Add Composition to Bag"
+                    : `Choose ${BUNDLE_SIZE - selected.length} more`}
+              </button>
+
+              <p className="composition__note">Any three 100g candles · 15% composition discount.</p>
             </div>
-          ) : null}
-
-          <button
-            type="button"
-            className="composition__atc"
-            disabled={!composition.complete}
-            data-added={added}
-            onClick={addBundle}
-          >
-            {added
-              ? "✓ Bundle added to bag"
-              : composition.complete
-                ? "Add Bundle to Bag"
-                : `Select ${BUNDLE_SIZE - selected.length} more`}
-          </button>
-
-          <p className="composition__note">Any three candles · save 15% on the set.</p>
+          </aside>
         </div>
-      </aside>
+      ) : null}
     </div>
   );
 }

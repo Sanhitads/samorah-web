@@ -35,17 +35,25 @@ export default async function BundleRoute() {
         <div className="bundle-hero__art img-fill grad-bundle" aria-hidden="true" />
         <div className="bundle-hero__scrim" aria-hidden="true" />
         <div className="bundle-hero__inner">
-          <p className="bundle-hero__eyebrow">Curated Atmospheres</p>
+          <p className="bundle-hero__eyebrow">Discovery Collection</p>
           <h1 className="bundle-hero__title">
-            Build Your
+            Compose Your
             <br />
-            Collection
+            Three
           </h1>
           <p className="bundle-hero__lede">
-            Choose any three candles and save 15%. A composition as personal as the rooms you live in.
+            A single vessel, three signature scents, one considered set — 15% when the composition is complete.
           </p>
         </div>
       </header>
+
+      <p className="bundle-discovery">
+        <span>Discovery Collection</span>
+        <span className="bundle-discovery__sep" aria-hidden="true">·</span>
+        <span>100g Signature Candles</span>
+        <span className="bundle-discovery__sep" aria-hidden="true">·</span>
+        <span>Compose Any Three</span>
+      </p>
 
       {candles.length >= 3 ? (
         <BundleBuilder candles={candles} />
