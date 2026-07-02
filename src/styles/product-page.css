@@ -299,49 +299,107 @@
   text-align: center;
 }
 
-/* ── Add to Composition (PDP accelerator for an active composition) ── */
+/* ── Composition panel (PDP) — a quiet editorial block, not a second button ── */
 .pdp-composition {
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid var(--line, rgba(31, 26, 22, 0.14));
+  margin-top: 32px;
+  padding-top: 26px;
+  border-top: 1px solid rgba(31, 26, 22, 0.08);
+}
+.pdp-composition__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
 }
 .pdp-composition__label {
   font-family: var(--font-sans);
   font-size: 10px;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--accent, var(--gold));
+}
+.pdp-composition__change {
+  font-family: var(--font-sans);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-muted, var(--smoke, var(--muted)));
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 0.3s ease;
+}
+.pdp-composition__change:hover { color: var(--ink, var(--charcoal)); }
+
+.pdp-composition__dots {
+  display: flex;
+  gap: 9px;
+  margin: 16px 0 14px;
+}
+.pdp-composition__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid var(--ink-muted, var(--smoke, #9a9089));
+  transition: background 0.4s ease, border-color 0.4s ease;
+}
+.pdp-composition__dot[data-on="true"] {
+  background: var(--accent, var(--gold));
+  border-color: var(--accent, var(--gold));
+}
+
+.pdp-composition__count {
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-muted, var(--smoke, var(--muted)));
+  margin-bottom: 10px;
+}
+.pdp-composition__benefit {
+  font-family: var(--font-serif);
+  font-size: 0.98rem;
+  line-height: 1.55;
+  color: var(--ink, var(--charcoal));
+  margin-bottom: 16px;
+}
+.pdp-composition__status {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  color: var(--ink, var(--charcoal));
   margin-bottom: 12px;
 }
-.pdp-composition__count { color: var(--ink-muted, var(--smoke, var(--muted))); }
+.pdp-composition__status--done { letter-spacing: 0.01em; }
+.pdp-composition__added {
+  font-family: var(--font-serif);
+  font-size: 0.98rem;
+  color: var(--ink, var(--charcoal));
+  margin-bottom: 8px;
+}
+
+/* Secondary, outline — deliberately lighter than the solid "Add to bag". */
 .pdp-composition__add {
   width: 100%;
-  padding: 15px 24px;
+  padding: 13px 24px;
   font-family: var(--font-sans);
   font-size: 11px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--ink, var(--charcoal));
   background: transparent;
-  border: 1px solid var(--ink, var(--charcoal));
+  border: 1px solid rgba(31, 26, 22, 0.32);
   cursor: pointer;
-  transition: background 0.35s ease, color 0.35s ease;
+  transition: border-color 0.35s ease, background 0.35s ease, color 0.35s ease;
 }
-.pdp-composition__add:hover { background: var(--ink, var(--charcoal)); color: var(--ivory, #faf7f2); }
-.pdp-composition__state {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+.pdp-composition__add:hover {
+  border-color: var(--ink, var(--charcoal));
+  background: var(--ink, var(--charcoal));
+  color: var(--ivory, #faf7f2);
 }
-.pdp-composition__in {
-  font-family: var(--font-serif);
-  font-size: 1rem;
-  color: var(--ink, var(--charcoal));
-}
+
 .pdp-composition__remove,
-.pdp-composition__link,
-.pdp-composition__browse {
+.pdp-composition__review {
+  display: inline-block;
   font-family: var(--font-sans);
   font-size: 10px;
   letter-spacing: 0.16em;
@@ -354,19 +412,42 @@
   transition: color 0.3s ease;
 }
 .pdp-composition__remove:hover,
-.pdp-composition__link:hover,
-.pdp-composition__browse:hover { color: var(--ink, var(--charcoal)); }
-.pdp-composition__link { color: var(--accent, var(--gold)); }
-.pdp-composition__full {
+.pdp-composition__review:hover { color: var(--ink, var(--charcoal)); }
+.pdp-composition__review { margin-top: 14px; color: var(--accent, var(--gold)); }
+.pdp-composition__remove { margin-bottom: 2px; }
+
+/* Change-vessel confirmation — quiet, safe. */
+.pdp-composition__confirm { margin-top: 14px; }
+.pdp-composition__confirm-text {
   font-family: var(--font-serif);
   font-size: 0.95rem;
-  color: var(--ink, var(--charcoal));
   line-height: 1.5;
+  color: var(--ink, var(--charcoal));
+  margin-bottom: 14px;
 }
-.pdp-composition__browse {
-  display: inline-block;
-  margin-top: 12px;
+.pdp-composition__confirm-actions { display: flex; gap: 12px; }
+.pdp-composition__cancel,
+.pdp-composition__switch {
+  padding: 10px 22px;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
+.pdp-composition__cancel {
+  background: transparent;
+  border: 1px solid rgba(31, 26, 22, 0.24);
+  color: var(--ink-muted, var(--smoke, var(--muted)));
+}
+.pdp-composition__cancel:hover { color: var(--ink, var(--charcoal)); border-color: var(--ink, var(--charcoal)); }
+.pdp-composition__switch {
+  background: var(--ink, var(--charcoal));
+  border: 1px solid var(--ink, var(--charcoal));
+  color: var(--ivory, #faf7f2);
+}
+.pdp-composition__switch:hover { opacity: 0.86; }
 
 /* ── Details ── */
 .pdp__details {

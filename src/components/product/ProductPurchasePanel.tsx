@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useCartStore } from "@/store/useCartStore";
 import { useUIStore } from "@/store/useUIStore";
+import { AddToComposition } from "@/components/product/AddToComposition";
 import type { ProductVariantView } from "@/lib/productPage";
 
 /**
@@ -20,6 +21,8 @@ export interface PurchaseProduct {
   variants: ProductVariantView[];
   defaultVariantId: string | null;
   priceLabel: string;
+  /** Primary image — passed to the composition panel for its thumbnail. */
+  image?: string;
 }
 
 export function ProductPurchasePanel({ product }: { product: PurchaseProduct }) {
@@ -126,6 +129,18 @@ export function ProductPurchasePanel({ product }: { product: PurchaseProduct }) 
       {current?.stockNote && current.inStock ? (
         <p className="purchase__stock">{current.stockNote} — only a few left.</p>
       ) : null}
+
+      <AddToComposition
+        product={{
+          id: product.id,
+          slug: product.slug,
+          name: product.name,
+          chapterName: product.chapterName,
+          image: product.image ?? "",
+        }}
+        variants={product.variants.map((v) => ({ vessel: v.vessel, size: v.size, price: v.price }))}
+        selectedVessel={vessel}
+      />
     </div>
   );
 }

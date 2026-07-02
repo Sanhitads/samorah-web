@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { getShopProducts } from "@/services/productService";
-import { buildShopPage, type ShopProductInput } from "@/lib/shopPage";
+import { buildShopPage, canonicalShopUrl, type ShopProductInput } from "@/lib/shopPage";
 import { ProductCard } from "@/components/ui/ProductCard";
 
 /**
@@ -11,11 +11,21 @@ import { ProductCard } from "@/components/ui/ProductCard";
  */
 export const revalidate = 300;
 
-export const metadata: Metadata = {
-  title: "Shop",
-  description: "Every Samorah fragrance — hand-poured scented candles across our chapters. Filter by chapter, sort to taste.",
-  openGraph: { title: "Shop · Samorah", description: "Every Samorah fragrance, across our chapters.", type: "website" },
-};
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ chapter?: string; vessel?: string; sort?: string }>;
+}): Promise<Metadata> {
+  const params = await searchParams;
+  return {
+    title: "Shop",
+    description:
+      "Every Samorah fragrance — hand-poured scented candles across our chapters. Filter by chapter, sort to taste.",
+    // Friendly aliases resolve to the canonical slug URL for SEO.
+    alternates: { canonical: canonicalShopUrl(params) },
+    openGraph: { title: "Shop · Samorah", description: "Every Samorah fragrance, across our chapters.", type: "website" },
+  };
+}
 
 export default async function ShopRoute({
   searchParams,

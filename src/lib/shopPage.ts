@@ -75,6 +75,17 @@ const CHAPTER_SHORT: Record<string, { order: number }> = {
   "nature-chapter": { order: 4 },
 };
 
+// Friendly chapter aliases → canonical collection slugs. Shareable/typed URLs
+// like /shop?chapter=dessert resolve here; the filter links + canonical URL keep
+// the slug form for SEO.
+const CHAPTER_ALIAS: Record<string, string> = {
+  dessert: "dessert-chapter",
+  wild: "the-wild-within",
+  mood: "mood-library",
+  nature: "nature-chapter",
+};
+const resolveChapter = (v?: string): string => (v ? CHAPTER_ALIAS[v] ?? v : "all");
+
 // Vessels available at launch (terracotta is future — not surfaced yet).
 const LAUNCH_VESSELS: { key: string; label: string }[] = [
   { key: "glass", label: "Glass" },
@@ -90,6 +101,12 @@ const SORT_LABEL: Record<ShopSort, string> = {
 
 const isSort = (v: string | undefined): v is ShopSort =>
   v === "featured" || v === "newest" || v === "price-asc" || v === "price-desc";
+
+/** Canonical `/shop` URL for a set of (possibly aliased) params — for rel=canonical. */
+export function canonicalShopUrl(params: { chapter?: string; vessel?: string; sort?: string }): string {
+  const sort: ShopSort = isSort(params.sort) ? params.sort : "featured";
+  return href(resolveChapter(params.chapter), params.vessel ?? "all", sort);
+}
 
 /** Build a `/shop` query string, dropping defaults (chapter=all, vessel=all, sort=featured). */
 function href(chapter: string, vessel: string, sort: ShopSort): string {
@@ -152,7 +169,7 @@ export function buildShopPage(
   params: { chapter?: string; vessel?: string; sort?: string; type?: string } = {},
 ): ShopView {
   const activeSort: ShopSort = isSort(params.sort) ? params.sort : "featured";
-  const activeChapter = params.chapter ?? "all";
+  const activeChapter = resolveChapter(params.chapter); // aliases → canonical slug
   const activeVessel = params.vessel ?? "all";
 
   // Product-type is reserved: filter only when explicitly asked, treating a
