@@ -140,6 +140,7 @@ export function ProductPurchasePanel({ product }: { product: PurchaseProduct }) 
         }}
         variants={product.variants.map((v) => ({ vessel: v.vessel, size: v.size, price: v.price }))}
         selectedVessel={vessel}
+        selectedSize={size}
       />
     </div>
   );

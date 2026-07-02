@@ -331,10 +331,32 @@
 }
 .pdp-composition__change:hover { color: var(--ink, var(--charcoal)); }
 
+.pdp-composition__subtitle {
+  font-family: var(--font-sans);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-muted, var(--smoke, var(--muted)));
+  margin-top: 6px;
+}
+
+/* 200g / 350g → composition unavailable (100g-only), stated quietly. */
+.pdp-composition__note {
+  margin-top: 16px;
+  font-family: var(--font-serif);
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--ink, var(--charcoal));
+}
+.pdp-composition__note-cue {
+  margin-top: 6px;
+  color: var(--ink-muted, var(--smoke, var(--muted)));
+}
+
 .pdp-composition__dots {
   display: flex;
   gap: 9px;
-  margin: 16px 0 14px;
+  margin: 18px 0 12px;
 }
 .pdp-composition__dot {
   width: 8px;
@@ -407,14 +429,24 @@
   color: var(--ink-muted, var(--smoke, var(--muted)));
   background: none;
   border: none;
+  padding: 0;
   cursor: pointer;
   text-decoration: none;
   transition: color 0.3s ease;
 }
 .pdp-composition__remove:hover,
 .pdp-composition__review:hover { color: var(--ink, var(--charcoal)); }
-.pdp-composition__review { margin-top: 14px; color: var(--accent, var(--gold)); }
-.pdp-composition__remove { margin-bottom: 2px; }
+.pdp-composition__review { display: block; margin-top: 14px; color: var(--accent, var(--gold)); }
+
+/* Remove + View Composition read as two distinct actions, comfortably spaced. */
+.pdp-composition__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  margin-top: 4px;
+}
+.pdp-composition__actions .pdp-composition__review { margin-top: 0; }
 
 /* Change-vessel confirmation — quiet, safe. */
 .pdp-composition__confirm { margin-top: 14px; }
