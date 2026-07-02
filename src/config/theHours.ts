@@ -84,7 +84,7 @@ export const AIR_VOLUMES: AirVolume[] = [
             story: "Air after the first light.",
             hourReason: "The air a room makes for itself, before you wake.",
             hourStory:
-              "You didn't wake up early on purpose. Something else did.\n\nMaybe the light. Maybe the sound of a bike starting. Maybe someone in the building already living their best life at 6 AM.\n\nYou sit up, slightly confused. The room feels different. The window is open. You don't remember opening it.\n\nFor a second, it feels like the air doesn't belong to you anymore. It's fresher. Slightly unfamiliar. Slightly addictive.\n\nYou don't question it. You just stay there longer than usual.",
+              "You didn't wake up early on purpose.\n\nMaybe the light.\nMaybe the distant bicycle.\nMaybe someone already living the day before you.\n\nThe room feels different.\n\nThe window is open.\n\nFor a moment,\nthe air doesn't belong to yesterday anymore.",
             scentEffect: "Warm. Slightly addictive. Familiar — like the room reset itself before you woke up.",
             productDetails: "A room mist spray. A fine fragrance blend. Size: 100 ml. Made in India.",
             scent: ["Green Paan Leaf", "Tonka Warmth", "Dry Amber Woods"],

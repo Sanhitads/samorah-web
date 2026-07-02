@@ -221,13 +221,27 @@
 .pdp--air #experience .estatement__para {
   font-family: var(--font-serif);
   font-size: clamp(1.35rem, 3vw, 2rem);
-  line-height: 1.6;
+  line-height: 1.75;
   color: var(--ink);
 }
 .pdp--air #experience .estatement__para + .estatement__para { margin-top: 20px; }
 
 .pdp--air #signature .equote__quote {
   font-size: clamp(2rem, 5vw, 3.4rem);
+}
+
+/* Hero name — a touch more presence (~5%) */
+.pdp--air .pdp__name {
+  font-size: clamp(2.5rem, 4.7vw, 3.6rem);
+}
+
+/* The Effect — larger, italic; an editorial bridge into the Fragrance Journey */
+.pdp--air .pyramid__intro {
+  font-size: clamp(1.3rem, 2.6vw, 1.8rem);
+  line-height: 1.6;
+  max-width: 620px;
+  margin-inline: auto;
+  margin-top: 22px;
 }
 
 /* ── EditorialStatement ── */

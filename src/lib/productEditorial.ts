@@ -437,7 +437,7 @@ export function buildAirEditorial({ hour, volume, others }: AirEditorialInput): 
     } satisfies EditorialStatementSettings, { visibility: Boolean(hour.experience) }),
     fill("placement", {
       eyebrow: "Placement",
-      heading: "Best enjoyed",
+      heading: "Where it belongs",
       items: hour.placement,
     } satisfies PlacementGridSettings, { visibility: hour.placement.length > 0 }),
     fill("signature", { quote: hour.signature, variant: "handwritten" } satisfies EditorialQuoteSettings, {
