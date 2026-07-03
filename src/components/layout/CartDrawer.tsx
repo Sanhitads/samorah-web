@@ -192,11 +192,11 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                     </div>
                   )}
                   <Link
-                    href="/checkout"
+                    href="/cart"
                     className="atc-btn cart-drawer__checkout"
                     onClick={onClose}
                   >
-                    Proceed to Checkout
+                    View Bag
                   </Link>
                   <button
                     type="button"
