@@ -160,14 +160,7 @@
 
 /* ── Info ── */
 .pdp__info { position: sticky; top: 96px; }
-.pdp__edition {
-  font-family: var(--font-sans);
-  font-size: 12px;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  color: var(--accent, var(--gold));
-  margin-bottom: 12px;
-}
+/* Chapter (muted) sits above the number, which sits above the name. */
 .pdp__chapter {
   display: inline-block;
   font-family: var(--font-sans);
@@ -175,7 +168,15 @@
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--ink-muted, var(--muted));
-  margin-bottom: 18px;
+  margin-bottom: 8px;
+}
+.pdp__edition {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--accent, var(--gold));
+  margin-bottom: 16px;
 }
 .pdp__meta {
   font-family: var(--font-sans);

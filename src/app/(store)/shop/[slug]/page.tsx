@@ -124,7 +124,6 @@ export default async function ProductRoute({
           <ProductGallery images={p.gallery} name={p.name} />
 
         <div className="pdp__info">
-          {p.edition ? <p className="pdp__edition">{p.edition}</p> : null}
           {p.chapterName ? (
             p.chapterHref ? (
               <Link href={p.chapterHref} className="pdp__chapter">{p.chapterName}</Link>
@@ -132,6 +131,7 @@ export default async function ProductRoute({
               <p className="pdp__chapter">{p.chapterName}</p>
             )
           ) : null}
+          {p.edition ? <p className="pdp__edition">{p.edition}</p> : null}
           <h1 className="pdp__name">{p.name}</h1>
           {p.tagline ? <p className="pdp__tagline">{p.tagline}</p> : null}
           <p className="pdp__meta">

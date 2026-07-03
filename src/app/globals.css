@@ -2821,11 +2821,21 @@ h1, h2, h3, h4 {
 .cart-item__img:hover { opacity: 0.85; }
 
 .cart-item__chapter {
+  font-family: var(--font-sans);
   font-size: 9px;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 4px;
+  color: var(--gold);
+  opacity: 0.85;
+  margin-bottom: 3px;
+}
+
+.cart-item__edition {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--gold);
+  margin-bottom: 5px;
 }
 
 .cart-item__name {
@@ -2861,6 +2871,70 @@ h1, h2, h3, h4 {
   color: var(--gold);
   margin-bottom: 8px;
 }
+
+/* Discovery Composition — one grouped block in the drawer (mirrors the bag). */
+.cart-comp { padding: 22px 0; border-bottom: 1px solid var(--beige, rgba(31,26,22,0.12)); }
+.cart-comp__eyebrow {
+  font-family: var(--font-sans);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.cart-comp__vessel {
+  margin-top: 6px;
+  font-family: var(--font-serif);
+  font-size: 18px;
+  color: var(--deep-charcoal);
+}
+.cart-comp__list { list-style: none; margin: 16px 0; padding: 0; display: grid; gap: 14px; }
+.cart-comp__item { display: flex; align-items: flex-start; gap: 12px; }
+.cart-comp__thumb {
+  flex-shrink: 0;
+  width: 40px;
+  height: 48px;
+  border-radius: 2px;
+}
+.cart-comp__text { display: flex; flex-direction: column; gap: 2px; }
+.cart-comp__chapter {
+  font-family: var(--font-sans);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gold);
+  opacity: 0.85;
+}
+.cart-comp__edition {
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  color: var(--gold);
+}
+.cart-comp__name { font-family: var(--font-serif); font-size: 15px; color: var(--deep-charcoal); }
+.cart-comp__foot { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.cart-comp__total { font-family: var(--font-serif); font-size: 18px; color: var(--deep-charcoal); }
+.cart-comp__savings {
+  font-family: var(--font-sans);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.cart-comp__actions { display: flex; gap: 18px; }
+.cart-comp__refine,
+.cart-comp__remove {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: color 0.3s ease;
+}
+.cart-comp__refine { color: var(--deep-charcoal); border-bottom: 1px solid var(--gold); padding-bottom: 3px; }
+.cart-comp__remove { color: var(--muted); }
+.cart-comp__remove:hover { color: var(--deep-charcoal); }
 
 .cart-item__controls {
   display: flex;

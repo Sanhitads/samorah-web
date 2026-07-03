@@ -109,32 +109,34 @@ export function CartView() {
                       <p className="comp-card__count">{countWord(lines.length)} Signature Candles</p>
                     </div>
 
-                    <ul className="comp-card__list">
-                      {lines.map((l) => (
-                        <li className="comp-card__item" key={l.key}>
-                          <span className={`comp-card__thumb img-fill ${l.gradClass ?? "grad-dark"}`} aria-hidden="true" />
-                          <span className="comp-card__item-text">
-                            {l.chapterName ? <span className="comp-card__chapter">{l.chapterName}</span> : null}
-                            {l.edition ? <span className="comp-card__edition">{l.edition}</span> : null}
-                            <span className="comp-card__name">{l.name}</span>
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
+                    <div className="comp-card__body">
+                      <ul className="comp-card__list">
+                        {lines.map((l) => (
+                          <li className="comp-card__item" key={l.key}>
+                            <span className={`comp-card__thumb img-fill ${l.gradClass ?? "grad-dark"}`} aria-hidden="true" />
+                            <span className="comp-card__item-text">
+                              {l.chapterName ? <span className="comp-card__chapter">{l.chapterName}</span> : null}
+                              {l.edition ? <span className="comp-card__edition">{l.edition}</span> : null}
+                              <span className="comp-card__name">{l.name}</span>
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
 
-                    <div className="comp-card__foot">
-                      <div className="comp-card__pricing">
-                        <p className="comp-card__total-label">Composition Total</p>
-                        <p className="comp-card__total">{inr(total)}</p>
-                        <p className="comp-card__savings">{COMPOSITION_DISCOUNT_PCT}% Savings Applied</p>
-                      </div>
-                      <div className="comp-card__actions">
-                        <button type="button" className="comp-card__edit" onClick={() => editComposition(lines)}>
-                          Refine Composition
-                        </button>
-                        <button type="button" className="comp-card__remove" onClick={() => removeComposition(lines)}>
-                          Remove Composition
-                        </button>
+                      <div className="comp-card__rail">
+                        <div className="comp-card__pricing">
+                          <p className="comp-card__total-label">Composition Total</p>
+                          <p className="comp-card__total">{inr(total)}</p>
+                          <p className="comp-card__savings">{COMPOSITION_DISCOUNT_PCT}% Savings Applied</p>
+                        </div>
+                        <div className="comp-card__actions">
+                          <button type="button" className="comp-card__edit" onClick={() => editComposition(lines)}>
+                            Refine Composition
+                          </button>
+                          <button type="button" className="comp-card__remove" onClick={() => removeComposition(lines)}>
+                            Remove Composition
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>

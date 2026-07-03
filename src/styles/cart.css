@@ -119,14 +119,29 @@
   font-size: 0.92rem;
   color: var(--smoke, #6b6259);
 }
+.comp-card__body {
+  display: grid;
+  grid-template-columns: 1fr minmax(170px, auto);
+  gap: clamp(24px, 4vw, 56px);
+  align-items: start;
+  margin-top: 22px;
+  padding-top: 22px;
+  border-top: 1px solid var(--cart-hairline);
+}
 .comp-card__list {
   list-style: none;
-  margin: 22px 0;
-  padding: 20px 0;
-  border-top: 1px solid var(--cart-hairline);
-  border-bottom: 1px solid var(--cart-hairline);
+  margin: 0;
+  padding: 0;
   display: grid;
   gap: 24px; /* ~8–10px more breathing room between candles */
+}
+/* Right rail — composition total + actions on the right of the panel. */
+.comp-card__rail {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  gap: 24px;
 }
 .comp-card__item { display: flex; align-items: flex-start; gap: 14px; }
 .comp-card__thumb {
@@ -156,13 +171,6 @@
   font-size: 1.1rem;
   color: var(--ink, #1f1a16);
 }
-.comp-card__foot {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 20px;
-  flex-wrap: wrap;
-}
 .comp-card__total-label {
   font-family: var(--font-sans);
   font-size: 10px;
@@ -171,20 +179,25 @@
   color: var(--smoke, #6b6259);
 }
 .comp-card__total {
-  margin-top: 4px;
+  margin-top: 5px;
   font-family: var(--font-serif);
-  font-size: 1.55rem;
+  font-size: 1.6rem;
   color: var(--ink, #1f1a16);
 }
 .comp-card__savings {
-  margin-top: 4px;
+  margin-top: 5px;
   font-family: var(--font-sans);
   font-size: 9px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--cart-gold);
 }
-.comp-card__actions { display: flex; gap: 12px; }
+.comp-card__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
 .comp-card__edit,
 .comp-card__remove {
   padding: 10px 22px;
@@ -378,6 +391,11 @@
 @media (max-width: 900px) {
   .cart-layout { grid-template-columns: 1fr; }
   .cart-summary { position: static; }
+}
+@media (max-width: 640px) {
+  .comp-card__body { grid-template-columns: 1fr; }
+  .comp-card__rail { align-items: flex-start; text-align: left; }
+  .comp-card__actions { align-items: flex-start; }
 }
 @media (max-width: 560px) {
   .cart-line {
