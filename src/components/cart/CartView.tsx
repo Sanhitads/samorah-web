@@ -20,6 +20,8 @@ const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s);
 const variantLabel = (vessel: string, size: string) =>
   [vessel ? cap(vessel) : "", size].filter(Boolean).join(" • ") || "Standard";
+const NUM_WORD = ["Zero", "One", "Two", "Three", "Four", "Five", "Six"];
+const countWord = (n: number) => NUM_WORD[n] ?? String(n);
 
 /**
  * CartView (client) — the full Cart page ("Your Collection"). Reads the persisted
@@ -102,17 +104,19 @@ export function CartView() {
                 <li className="cart-line cart-line--composition" key={item.compositionId}>
                   <div className="comp-card">
                     <div className="comp-card__head">
-                      <p className="comp-card__title">Discovery Composition</p>
+                      <p className="comp-card__eyebrow">Discovery Composition</p>
                       <p className="comp-card__vessel">{cap(lines[0]?.vessel ?? "")} Edition</p>
-                      <p className="comp-card__count">{lines.length} Signature Candles</p>
+                      <p className="comp-card__count">{countWord(lines.length)} Signature Candles</p>
                     </div>
 
                     <ul className="comp-card__list">
                       {lines.map((l) => (
                         <li className="comp-card__item" key={l.key}>
-                          {l.chapterName ? <span className="comp-card__chapter">{l.chapterName}</span> : null}
-                          <span className="comp-card__name">
-                            {l.edition ? `${l.edition} ` : ""}{l.name}
+                          <span className={`comp-card__thumb img-fill ${l.gradClass ?? "grad-dark"}`} aria-hidden="true" />
+                          <span className="comp-card__item-text">
+                            {l.chapterName ? <span className="comp-card__chapter">{l.chapterName}</span> : null}
+                            {l.edition ? <span className="comp-card__edition">{l.edition}</span> : null}
+                            <span className="comp-card__name">{l.name}</span>
                           </span>
                         </li>
                       ))}
@@ -120,12 +124,13 @@ export function CartView() {
 
                     <div className="comp-card__foot">
                       <div className="comp-card__pricing">
-                        <p className="comp-card__savings">{COMPOSITION_DISCOUNT_PCT}% Savings Applied</p>
+                        <p className="comp-card__total-label">Composition Total</p>
                         <p className="comp-card__total">{inr(total)}</p>
+                        <p className="comp-card__savings">{COMPOSITION_DISCOUNT_PCT}% Savings Applied</p>
                       </div>
                       <div className="comp-card__actions">
                         <button type="button" className="comp-card__edit" onClick={() => editComposition(lines)}>
-                          Edit Composition
+                          Refine Composition
                         </button>
                         <button type="button" className="comp-card__remove" onClick={() => removeComposition(lines)}>
                           Remove Composition
@@ -146,8 +151,8 @@ export function CartView() {
                   aria-label={item.name}
                 />
                 <div className="cart-line__info">
-                  {item.edition ? <span className="cart-line__edition">{item.edition}</span> : null}
                   {item.chapterName ? <p className="cart-line__chapter">{item.chapterName}</p> : null}
+                  {item.edition ? <span className="cart-line__edition">{item.edition}</span> : null}
                   <Link href={`/shop/${item.slug}`} className="cart-line__name">{item.name}</Link>
                   <p className="cart-line__variant">{variantLabel(item.vessel, item.size)}</p>
                   <p className="cart-line__unit">{inr(item.price)} each</p>

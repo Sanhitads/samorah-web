@@ -285,9 +285,12 @@ export function toProjection(p: ChapterProductInput): ProductCommerceProjection 
   };
 }
 
-/** Samorah chapter numbering — "Vol. I" + position → "VOL. I.1". */
+/** Samorah numbering — "Vol. I" + position → "No. I.1" (the roman + index).
+ *  The "No. I.1" form is the product's identity across PDP, cart, composition,
+ *  and future order/packing/gift documents. */
 export function editionLabel(volume: string | null, n: number): string {
-  return volume ? `${volume.toUpperCase()}.${n}` : `No. ${n}`;
+  const roman = volume ? volume.replace(/vol\.?\s*/i, "").trim().toUpperCase() : "";
+  return roman ? `No. ${roman}.${n}` : `No. ${n}`;
 }
 
 function toProductView(p: ChapterProductInput, edition: string): ChapterProductView {

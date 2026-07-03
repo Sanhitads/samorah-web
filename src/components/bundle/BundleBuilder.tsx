@@ -275,13 +275,15 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
                         </span>
                       </span>
                       <span className="bundle-card__body">
-                        {candle.chapter?.volume ? (
-                          <span className="bundle-card__edition">{candle.chapter.volume.toUpperCase()}</span>
+                        {candle.chapter ? (
+                          <span className="bundle-card__chapter">
+                            {chapterLabelOf(candle.chapter)}
+                          </span>
+                        ) : null}
+                        {candle.edition ? (
+                          <span className="bundle-card__edition">{candle.edition}</span>
                         ) : null}
                         <span className="bundle-card__name">{candle.name}</span>
-                        {candle.chapter ? (
-                          <span className="bundle-card__chapter">{candle.chapter.name}</span>
-                        ) : null}
                         {candle.tagline ? <span className="bundle-card__notes">{candle.tagline}</span> : null}
                       </span>
                     </button>

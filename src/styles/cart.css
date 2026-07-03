@@ -65,10 +65,11 @@
 .cart-line__chapter {
   font-family: var(--font-sans);
   font-size: 10px;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--smoke, #6b6259);
-  margin-bottom: 6px;
+  color: var(--cart-gold);
+  opacity: 0.85;
+  margin-bottom: 4px;
 }
 .cart-line__name {
   display: inline-block;
@@ -89,57 +90,70 @@
 .cart-line__edition {
   display: block;
   font-family: var(--font-sans);
-  font-size: 9px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
   color: var(--cart-gold);
-  margin-bottom: 5px;
+  margin-bottom: 6px;
 }
 
 /* ── Discovery Composition as one parent item ── */
 .cart-line--composition { display: block; padding: 0; }
 .comp-card { padding: clamp(22px, 2.6vw, 32px) 0; }
-.comp-card__title {
-  font-family: var(--font-serif);
-  font-size: 1.4rem;
-  color: var(--ink, #1f1a16);
-}
-.comp-card__vessel {
-  margin-top: 7px;
+.comp-card__eyebrow {
   font-family: var(--font-sans);
   font-size: 10px;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--cart-gold);
 }
+.comp-card__vessel {
+  margin-top: 8px;
+  font-family: var(--font-serif);
+  font-size: 1.5rem;
+  color: var(--ink, #1f1a16);
+}
 .comp-card__count {
-  margin-top: 4px;
-  font-family: var(--font-sans);
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  margin-top: 5px;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 0.92rem;
   color: var(--smoke, #6b6259);
 }
 .comp-card__list {
   list-style: none;
-  margin: 20px 0;
-  padding: 18px 0;
+  margin: 22px 0;
+  padding: 20px 0;
   border-top: 1px solid var(--cart-hairline);
   border-bottom: 1px solid var(--cart-hairline);
   display: grid;
-  gap: 14px;
+  gap: 24px; /* ~8–10px more breathing room between candles */
 }
-.comp-card__item { display: flex; flex-direction: column; gap: 3px; }
+.comp-card__item { display: flex; align-items: flex-start; gap: 14px; }
+.comp-card__thumb {
+  flex-shrink: 0;
+  width: 46px;
+  height: 56px;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.comp-card__item-text { display: flex; flex-direction: column; gap: 3px; }
 .comp-card__chapter {
   font-family: var(--font-sans);
   font-size: 10px;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--smoke, #6b6259);
+  color: var(--cart-gold);
+  opacity: 0.85;
+}
+.comp-card__edition {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--cart-gold);
 }
 .comp-card__name {
   font-family: var(--font-serif);
-  font-size: 1.08rem;
+  font-size: 1.1rem;
   color: var(--ink, #1f1a16);
 }
 .comp-card__foot {
@@ -149,18 +163,26 @@
   gap: 20px;
   flex-wrap: wrap;
 }
+.comp-card__total-label {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--smoke, #6b6259);
+}
+.comp-card__total {
+  margin-top: 4px;
+  font-family: var(--font-serif);
+  font-size: 1.55rem;
+  color: var(--ink, #1f1a16);
+}
 .comp-card__savings {
+  margin-top: 4px;
   font-family: var(--font-sans);
   font-size: 9px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--cart-gold);
-}
-.comp-card__total {
-  margin-top: 5px;
-  font-family: var(--font-serif);
-  font-size: 1.4rem;
-  color: var(--ink, #1f1a16);
 }
 .comp-card__actions { display: flex; gap: 12px; }
 .comp-card__edit,
