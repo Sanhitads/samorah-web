@@ -4,6 +4,7 @@ import { getShopCatalog } from "@/services/shopCatalog";
 import { buildShopPage, canonicalShopUrl, type ShopProductInput } from "@/lib/shopPage";
 import type { ProductEdition } from "@/services/collectionService";
 import { ProductCard } from "@/components/ui/ProductCard";
+import { ShopToolbar } from "@/components/shop/ShopToolbar";
 
 /**
  * Shop PLP (Template C) — `/shop`. The functional browse grid across EVERY
@@ -49,68 +50,20 @@ export default async function ShopRoute({
       <header className="plp__head">
         <p className="plp__eyebrow">The Shop</p>
         <h1 className="plp__title">All Products</h1>
-        <p className="plp__count">{view.shown} {view.shown === 1 ? "Product" : "Products"}</p>
       </header>
 
-      <div className="plp__controls">
-        <div className="plp__facets">
-          <div className="plp__facet">
-            <span className="plp__facet-label">Type</span>
-            <nav className="plp__filters" aria-label="Filter by product type">
-              {view.types.map((t) => (
-                <Link key={t.key} href={t.href} className="plp__filter" data-active={t.active} scroll={false}>
-                  <span className="plp__filter-name">
-                    {t.label}
-                    <span className="plp__filter-count"> ({t.count})</span>
-                  </span>
-                </Link>
-              ))}
-            </nav>
-          </div>
-
-          <div className="plp__facet">
-            <span className="plp__facet-label">Chapter</span>
-            <nav className="plp__filters" aria-label="Filter by chapter">
-              {view.chapters.map((c) => (
-                <Link key={c.key} href={c.href} className="plp__filter" data-active={c.active} scroll={false}>
-                  {c.volume ? <span className="plp__filter-vol">{c.volume}</span> : null}
-                  <span className="plp__filter-name">
-                    {c.label}
-                    <span className="plp__filter-count"> ({c.count})</span>
-                  </span>
-                </Link>
-              ))}
-            </nav>
-          </div>
-
-          {view.showVessel ? (
-            <div className="plp__facet">
-              <span className="plp__facet-label">Vessel</span>
-              <nav className="plp__filters" aria-label="Filter by vessel">
-                {view.vessels.map((v) => (
-                  <Link key={v.key} href={v.href} className="plp__filter plp__filter--vessel" data-active={v.active} scroll={false}>
-                    <span className="plp__filter-name">
-                      {v.label}
-                      <span className="plp__filter-count"> ({v.count})</span>
-                    </span>
-                  </Link>
-                ))}
-              </nav>
-            </div>
-          ) : null}
-        </div>
-
-        <div className="plp__sort">
-          <span className="plp__sort-label">Sort</span>
-          <nav className="plp__sort-opts" aria-label="Sort products">
-            {view.sorts.map((s) => (
-              <Link key={s.key} href={s.href} className="plp__sort-opt" data-active={s.active} scroll={false}>
-                {s.label}
-              </Link>
-            ))}
-          </nav>
-        </div>
-      </div>
+      <ShopToolbar
+        count={view.shown}
+        activeCount={view.activeCount}
+        activeType={view.activeType}
+        activeChapter={view.activeChapter}
+        activeVessel={view.activeVessel}
+        activeSort={view.activeSort}
+        typeOptions={view.typeOptions}
+        chapterOptions={view.chapterOptions}
+        vesselOptions={view.vesselOptions}
+        sorts={view.sorts}
+      />
 
       {view.cards.length > 0 ? (
         <ul className="plp__grid">

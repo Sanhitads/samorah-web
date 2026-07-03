@@ -78,19 +78,27 @@ export interface ShopSortOption {
   active: boolean;
 }
 
+/** A choice in the Refine drawer (radio-style; no counts — the grid is the hero). */
+export interface ShopFilterChoice {
+  key: string; // "all" | value
+  label: string; // "All" | "Vol. I — Dessert Chapter" | "Glass"
+}
+
 export interface ShopView {
   cards: ProductCardModel[];
   total: number; // total published products (all types)
   shown: number; // after type × chapter × vessel filters
-  types: ShopFilterOption[];
-  chapters: ShopFilterOption[];
-  vessels: ShopFilterOption[];
   sorts: ShopSortOption[];
+  // Full option lists for the Refine drawer (radio-style, not cross-filtered).
+  typeOptions: ShopFilterChoice[];
+  chapterOptions: ShopFilterChoice[];
+  vesselOptions: ShopFilterChoice[];
   activeType: string; // "all" | product type
   activeChapter: string; // "all" | slug
   activeVessel: string; // "all" | vessel enum
   activeSort: ShopSort;
-  showVessel: boolean; // vessel facet only applies to candles
+  activeCount: number; // non-default filters (type/chapter/vessel) → "Refine (N)"
+  showVessel: boolean; // vessel section shows for candles / all only
 }
 
 // Chapter identities for the filter row (volume comes from the collection row).
@@ -113,6 +121,16 @@ const CHAPTER_ALIAS: Record<string, string> = {
 };
 const resolveChapter = (v?: string): string => (v ? CHAPTER_ALIAS[v] ?? v : "all");
 
+// Friendly type aliases (hyphen → underscore) so shared URLs like
+// /shop?type=room-spray resolve. The drawer emits the canonical underscore form.
+const TYPE_ALIAS: Record<string, string> = {
+  "room-spray": "room_spray",
+  "linen-spray": "linen_spray",
+  "wax-melt": "wax_melt",
+  "gift-set": "gift_set",
+};
+const resolveType = (v?: string): string => (v ? TYPE_ALIAS[v] ?? v : "all");
+
 // Vessels available at launch (terracotta is future — not surfaced yet).
 const LAUNCH_VESSELS: { key: string; label: string }[] = [
   { key: "glass", label: "Glass" },
@@ -132,7 +150,7 @@ const isSort = (v: string | undefined): v is ShopSort =>
 /** Canonical `/shop` URL for a set of (possibly aliased) params — for rel=canonical. */
 export function canonicalShopUrl(params: { type?: string; chapter?: string; vessel?: string; sort?: string }): string {
   const sort: ShopSort = isSort(params.sort) ? params.sort : "featured";
-  return href(params.type ?? "all", resolveChapter(params.chapter), params.vessel ?? "all", sort);
+  return href(resolveType(params.type), resolveChapter(params.chapter), params.vessel ?? "all", sort);
 }
 
 /** Build a `/shop` query string, dropping defaults (type/chapter/vessel=all, sort=featured). */
@@ -203,63 +221,43 @@ export function buildShopPage(
   editions?: ReadonlyMap<string, { edition: string }>,
 ): ShopView {
   const activeSort: ShopSort = isSort(params.sort) ? params.sort : "featured";
-  const activeType = params.type ?? "all";
+  const activeType = resolveType(params.type); // hyphen aliases → canonical
   const activeChapter = resolveChapter(params.chapter); // aliases → canonical slug
   const showVessel = VESSEL_TYPES.has(activeType); // vessel applies to candles only
   const activeVessel = showVessel ? params.vessel ?? "all" : "all";
 
   // Product-Type facet — counted within the active chapter; switching type resets
   // vessel (a candle-only refinement). Future types render disabled at 0.
-  const forTypes = products.filter((p) => matchesChapter(p, activeChapter));
-  const types: ShopFilterOption[] = [
-    { key: "all", label: "All", href: href("all", activeChapter, "all", activeSort), active: activeType === "all", count: forTypes.length },
-    // Only surface types that actually have products (future types appear
-    // automatically once seeded — the architecture already supports them).
-    ...TYPE_FILTER.map((t) => ({
+  // ── Full option lists for the Refine drawer (not cross-filtered) ──
+  // Types that actually have products (future types appear once seeded).
+  const typeOptions: ShopFilterChoice[] = [
+    { key: "all", label: "All" },
+    ...TYPE_FILTER.filter((t) => products.some((p) => productTypeOf(p) === t.key)).map((t) => ({
       key: t.key,
       label: t.label,
-      href: href(t.key, activeChapter, "all", activeSort),
-      active: activeType === t.key,
-      count: forTypes.filter((p) => productTypeOf(p) === t.key).length,
-    })).filter((t) => t.count > 0),
+    })),
   ];
 
-  // Chapter facet — within the active type + vessel; in volume order.
-  const forChapters = products.filter((p) => matchesType(p, activeType) && matchesVessel(p, activeVessel));
-  const chapterMap = new Map<string, { name: string; volume: string | null; order: number; count: number }>();
-  for (const p of forChapters) {
+  // Every chapter present, in volume order, labelled "Vol. I — Dessert Chapter".
+  const chapterMap = new Map<string, { name: string; volume: string | null; order: number }>();
+  for (const p of products) {
     const c = p.collection;
-    if (!c) continue;
-    const order = CHAPTER_SHORT[c.slug]?.order ?? 99;
-    const entry = chapterMap.get(c.slug) ?? { name: c.name, volume: c.volume, order, count: 0 };
-    entry.count += 1;
-    chapterMap.set(c.slug, entry);
+    if (!c || chapterMap.has(c.slug)) continue;
+    chapterMap.set(c.slug, { name: c.name, volume: c.volume, order: CHAPTER_SHORT[c.slug]?.order ?? 99 });
   }
-  const chapters: ShopFilterOption[] = [
-    { key: "all", label: "All", href: href(activeType, "all", activeVessel, activeSort), active: activeChapter === "all", count: forChapters.length },
+  const chapterOptions: ShopFilterChoice[] = [
+    { key: "all", label: "All" },
     ...[...chapterMap.entries()]
       .sort((a, b) => a[1].order - b[1].order)
       .map(([slug, meta]) => ({
         key: slug,
-        label: meta.name,
-        volume: meta.volume,
-        href: href(activeType, slug, activeVessel, activeSort),
-        active: activeChapter === slug,
-        count: meta.count,
+        label: meta.volume ? `${meta.volume} — ${meta.name}` : meta.name,
       })),
   ];
 
-  // Vessel facet — within the active type + chapter (candles only).
-  const forVessels = products.filter((p) => matchesType(p, activeType) && matchesChapter(p, activeChapter));
-  const vessels: ShopFilterOption[] = [
-    { key: "all", label: "All", href: href(activeType, activeChapter, "all", activeSort), active: activeVessel === "all", count: forVessels.length },
-    ...LAUNCH_VESSELS.map((v) => ({
-      key: v.key,
-      label: v.label,
-      href: href(activeType, activeChapter, v.key, activeSort),
-      active: activeVessel === v.key,
-      count: forVessels.filter((p) => matchesVessel(p, v.key)).length,
-    })),
+  const vesselOptions: ShopFilterChoice[] = [
+    { key: "all", label: "All" },
+    ...LAUNCH_VESSELS.map((v) => ({ key: v.key, label: v.label })),
   ];
 
   const sorts: ShopSortOption[] = (Object.keys(SORT_LABEL) as ShopSort[]).map((key) => ({
@@ -274,18 +272,22 @@ export function buildShopPage(
   );
   const cards = sortProducts(filtered, activeSort).map((p) => toCard(p, editions));
 
+  const activeCount =
+    (activeType !== "all" ? 1 : 0) + (activeChapter !== "all" ? 1 : 0) + (activeVessel !== "all" ? 1 : 0);
+
   return {
     cards,
     total: products.length,
     shown: cards.length,
-    types,
-    chapters,
-    vessels,
     sorts,
+    typeOptions,
+    chapterOptions,
+    vesselOptions,
     activeType,
     activeChapter,
     activeVessel,
     activeSort,
+    activeCount,
     showVessel,
   };
 }
