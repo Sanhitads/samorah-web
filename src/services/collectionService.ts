@@ -1,4 +1,44 @@
 import { createPublicClient } from "@/lib/supabase/public";
+import { editionLabel } from "@/lib/chapterPage";
+
+export interface ProductEdition {
+  edition: string; // "VOL. I.1"
+  chapterLabel: string; // "Vol. I — Dessert Chapter"
+}
+
+/**
+ * A slug → { edition, chapterLabel } map for EVERY product, computed once from
+ * the collections + their products (hero first, then by creation). The single
+ * source of the Samorah numbering, so the PDP, cart, and composition all show
+ * identical "VOL. I.1 / Vol. I — Dessert Chapter" metadata.
+ */
+export async function getEditionMap(): Promise<Map<string, ProductEdition>> {
+  const db = createPublicClient();
+  const { data, error } = await db
+    .from("collections")
+    .select(
+      "name, volume, hero_product_id, products:products!products_collection_id_fkey(id, slug, is_hero, created_at)",
+    );
+  if (error) throw error;
+
+  const map = new Map<string, ProductEdition>();
+  for (const c of (data ?? []) as unknown as {
+    name: string;
+    volume: string | null;
+    hero_product_id: string | null;
+    products: { id: string; slug: string; is_hero: boolean | null; created_at: string | null }[] | null;
+  }[]) {
+    const prods = c.products ?? [];
+    const heroId = c.hero_product_id ?? prods.find((p) => p.is_hero)?.id ?? prods[0]?.id;
+    const rest = prods
+      .filter((p) => p.id !== heroId)
+      .sort((a, b) => (a.created_at ?? "").localeCompare(b.created_at ?? ""));
+    const ordered = [...prods.filter((p) => p.id === heroId), ...rest];
+    const chapterLabel = c.volume ? `${c.volume} — ${c.name}` : c.name;
+    ordered.forEach((p, i) => map.set(p.slug, { edition: editionLabel(c.volume, i + 1), chapterLabel }));
+  }
+  return map;
+}
 
 /** All active collections (chapters), ordered. */
 export async function getCollections() {

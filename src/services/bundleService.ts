@@ -1,6 +1,7 @@
 import { createPublicClient } from "@/lib/supabase/public";
 import { primaryImage, type VariantLike, type ImageLike } from "@/lib/product";
 import { effectivePrice } from "@/lib/pricing";
+import { getEditionMap } from "@/services/collectionService";
 import { BUNDLE_SIZE_LABEL, CHAPTER_META, type BundleCandle, type BundleChapter } from "@/lib/bundle";
 
 // Product + its collection (chapter) + variants — everything the composer needs
@@ -33,10 +34,10 @@ function toChapter(c: BundleRow["collection"]): BundleChapter | null {
  */
 export async function getBundleCandles(): Promise<BundleCandle[]> {
   const db = createPublicClient();
-  const { data, error } = await db
-    .from("products")
-    .select(BUNDLE_FIELDS)
-    .order("created_at", { ascending: true });
+  const [{ data, error }, editions] = await Promise.all([
+    db.from("products").select(BUNDLE_FIELDS).order("created_at", { ascending: true }),
+    getEditionMap(),
+  ]);
   if (error) throw error;
 
   return ((data ?? []) as unknown as BundleRow[])
@@ -58,6 +59,7 @@ export async function getBundleCandles(): Promise<BundleCandle[]> {
         name: p.name,
         tagline: p.tagline,
         chapter: toChapter(p.collection),
+        edition: editions.get(p.slug)?.edition ?? "",
         image: { url: img?.url ?? GRADIENT, alt: img?.alt_text ?? p.name },
         vessels: options,
       };

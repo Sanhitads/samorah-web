@@ -15,7 +15,8 @@ export interface PurchaseProduct {
   id: string;
   slug: string;
   name: string;
-  chapterName: string | null;
+  chapterName: string | null; // chapter label ("Vol. I — Dessert Chapter")
+  edition?: string; // "VOL. I.1"
   vessels: string[];
   sizes: string[];
   variants: ProductVariantView[];
@@ -49,6 +50,7 @@ export function ProductPurchasePanel({ product }: { product: PurchaseProduct }) 
         name: product.name,
         price: current.price,
         chapterName: product.chapterName ?? undefined,
+        edition: product.edition,
       },
       vessel,
       size,
@@ -136,6 +138,7 @@ export function ProductPurchasePanel({ product }: { product: PurchaseProduct }) 
           slug: product.slug,
           name: product.name,
           chapterName: product.chapterName,
+          edition: product.edition,
           image: product.image ?? "",
         }}
         variants={product.variants.map((v) => ({ vessel: v.vessel, size: v.size, price: v.price }))}

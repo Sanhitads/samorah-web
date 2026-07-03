@@ -9,7 +9,8 @@ export interface CartProduct {
   name: string;
   price: number; // ALWAYS the full unit price — promotions are applied at cart level
   gradClass?: string;
-  chapterName?: string;
+  chapterName?: string; // "Vol. I — Dessert Chapter" (chapter label)
+  edition?: string; // "VOL. I.1"
   /** Tags a line as part of a Discovery Composition (a cart-level promotion). */
   compositionId?: string;
 }
@@ -22,7 +23,8 @@ export interface CartItem {
   name: string;
   price: number; // full unit price (pre-discount)
   gradClass?: string;
-  chapterName?: string;
+  chapterName?: string; // chapter label ("Vol. I — Dessert Chapter")
+  edition?: string; // "VOL. I.1"
   vessel: string;
   size: string;
   qty: number;
@@ -71,6 +73,7 @@ export const useCartStore = create<CartState>()(
                   price: product.price,
                   gradClass: product.gradClass,
                   chapterName: product.chapterName,
+                  edition: product.edition,
                   vessel,
                   size,
                   qty: 1,

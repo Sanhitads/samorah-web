@@ -4,8 +4,8 @@ import type { Metadata } from "next";
 import { getProductBySlug, getProducts, getRelatedProducts } from "@/services/productService";
 import { buildProductPage, type ProductInput } from "@/lib/productPage";
 import { buildCandleEditorial, type RelatedProductInput } from "@/lib/productEditorial";
-import { chapterTheme, editionLabel } from "@/lib/chapterPage";
-import { getCollectionBySlug } from "@/services/collectionService";
+import { chapterTheme } from "@/lib/chapterPage";
+import { getEditionMap } from "@/services/collectionService";
 import { getArtist } from "@/config/artist";
 import { ProductPurchasePanel } from "@/components/product/ProductPurchasePanel";
 import { ProductGallery } from "@/components/product/ProductGallery";
@@ -90,22 +90,10 @@ export default async function ProductRoute({
 
   bootstrapPlatform();
 
-  // Samorah numbering — the product's position in its chapter (hero = .1).
-  if (p.chapterSlug) {
-    const coll = (await getCollectionBySlug(p.chapterSlug)) as
-      | { volume: string | null; hero_product_id: string | null; products?: { id: string; slug: string; is_hero: boolean | null }[] }
-      | null;
-    const products = coll?.products ?? [];
-    if (products.length) {
-      const heroId = coll?.hero_product_id ?? products.find((x) => x.is_hero)?.id ?? products[0]?.id;
-      const ordered = [
-        ...products.filter((x) => x.id === heroId),
-        ...products.filter((x) => x.id !== heroId),
-      ];
-      const idx = ordered.findIndex((x) => x.slug === p.slug);
-      if (idx >= 0) p.edition = editionLabel(coll?.volume ?? null, idx + 1);
-    }
-  }
+  // Samorah numbering — from the shared edition map, so the PDP, cart, and
+  // composition all show identical "VOL. I.1" editions.
+  const editions = await getEditionMap();
+  p.edition = editions.get(p.slug)?.edition ?? p.edition;
 
   // "Continue the Chapter" — SAME chapter only (Decision 25), excluding this
   // product; forcing fragrance_family null makes the rule match by collection.
@@ -158,6 +146,7 @@ export default async function ProductRoute({
               slug: p.slug,
               name: p.name,
               chapterName: p.chapterName,
+              edition: p.edition,
               vessels: p.vessels,
               sizes: p.sizes,
               variants: p.variants,

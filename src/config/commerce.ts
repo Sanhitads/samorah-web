@@ -22,3 +22,16 @@ export function estimateShipping(goodsTotal: number): number {
   if (goodsTotal <= 0) return 0;
   return goodsTotal >= SHIPPING.freeThreshold ? 0 : SHIPPING.flatRate;
 }
+
+/** The free-shipping threshold as a formatted rupee string ("₹1,499"). */
+export function freeShippingLabel(): string {
+  return `₹${SHIPPING.freeThreshold.toLocaleString("en-IN")}`;
+}
+
+/**
+ * The one canonical shipping sentence — every surface (PDP, cart, checkout,
+ * footer, FAQ, policy) reads THIS, so the threshold is never hardcoded twice.
+ */
+export function shippingPolicySentence(): string {
+  return `Complimentary standard shipping within India on orders over ${freeShippingLabel()}.`;
+}

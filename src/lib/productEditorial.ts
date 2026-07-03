@@ -13,6 +13,7 @@ import type { Artist } from "@/config/artist";
 import { getTestimonials } from "@/config/testimonials";
 import type { ProductCardModel } from "@/components/ui/ProductCard";
 import { imageMedia, type MediaContent } from "@/lib/presentation";
+import { freeShippingLabel, shippingPolicySentence } from "@/config/commerce";
 import { effectivePrice, formatINR, type Priceable } from "@/lib/pricing";
 import { primaryImage, productBadge, type ImageLike } from "@/lib/product";
 
@@ -205,7 +206,7 @@ function candleAccordion(view: ProductPageView): AccordionItem[] {
     },
     {
       title: "Shipping & Exchanges",
-      body: "Carefully packed and dispatched within 1–3 business days (a little longer during festive periods). Free standard shipping within India on orders over ₹5,000; most orders arrive in 3–7 business days. Worldwide shipping via trusted couriers (duties/taxes at checkout). Due to the handcrafted nature of our candles we do not accept returns, but if your order arrives damaged or incorrect, write to us within 48 hours and we will make it right.",
+      body: `Carefully packed and dispatched within 1–3 business days (a little longer during festive periods). Complimentary standard shipping within India on orders over ${freeShippingLabel()}; most orders arrive in 3–7 business days. Worldwide shipping via trusted couriers (duties/taxes at checkout). Due to the handcrafted nature of our candles we do not accept returns, but if your order arrives damaged or incorrect, write to us within 48 hours and we will make it right.`,
     },
     {
       title: "Sustainability & Reusability",
@@ -388,7 +389,7 @@ function airAccordion(composition?: string): AccordionItem[] {
     },
     {
       title: "Shipping & Exchanges",
-      body: "Dispatched within 2–3 business days. Complimentary shipping on orders over ₹1,000. Returns accepted within 48 hours of delivery for damaged or incorrect items.",
+      body: `Dispatched within 2–3 business days. ${shippingPolicySentence()} Returns accepted within 48 hours of delivery for damaged or incorrect items.`,
     },
   ];
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Minus, Plus } from "lucide-react";
 import { useStore } from "@/hooks/useStore";
 import {
@@ -11,24 +12,29 @@ import {
   type CartItem,
   type CartState,
 } from "@/store/useCartStore";
+import { useCompositionStore } from "@/store/useCompositionStore";
 import { buildCartSummary } from "@/lib/cart";
-import { BUNDLE_SIZE } from "@/lib/bundle";
+import { composeComposition } from "@/lib/bundle";
 
 const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s);
+const variantLabel = (vessel: string, size: string) =>
+  [vessel ? cap(vessel) : "", size].filter(Boolean).join(" • ") || "Standard";
 
 /**
- * CartView (client) — the full Cart page ("Your Bag"). Reads the persisted cart
- * through the hydration-safe useStore hook (so SSR never renders stale/empty
- * localStorage), lists the line items with variant + composition detail, and
- * shows the order summary (subtotal · composition discount · shipping estimate ·
- * inclusive GST · total) from the shared cart-summary math.
+ * CartView (client) — the full Cart page ("Your Collection"). Reads the persisted
+ * cart through the hydration-safe useStore hook. A Discovery Composition renders
+ * as ONE curated parent item (vessel · its three candles · total · Edit / Remove);
+ * standalone products render as regular lines with a quantity stepper. All items
+ * share the same metadata hierarchy (edition · chapter · name · vessel • size).
  */
 export function CartView() {
   const items = useStore<CartState, CartItem[]>(useCartStore, (s) => s.items);
   const updateQty = useCartStore((s) => s.updateQty);
   const removeItem = useCartStore((s) => s.removeItem);
+  const loadComposition = useCompositionStore((s) => s.loadComposition);
+  const router = useRouter();
 
-  // First render (server + pre-hydration): keep the frame, defer the contents.
   if (items === undefined) {
     return <div className="cart-page cart-page--loading" aria-busy="true" />;
   }
@@ -37,7 +43,7 @@ export function CartView() {
     return (
       <div className="cart-page">
         <div className="cart-empty">
-          <p className="cart-empty__title">Your bag is empty.</p>
+          <p className="cart-empty__title">Your collection is empty.</p>
           <p className="cart-empty__sub">The quiet before the flame — your ritual begins here.</p>
           <Link href="/shop" className="cart-empty__link">Explore the collection</Link>
         </div>
@@ -51,11 +57,29 @@ export function CartView() {
   const summary = buildCartSummary(subtotal, discount);
   const count = items.reduce((n, i) => n + i.qty, 0);
 
-  // Lines per composition group — a group is complete at BUNDLE_SIZE candles.
-  const compCounts = new Map<string, number>();
-  for (const i of items) {
-    if (i.compositionId) compCounts.set(i.compositionId, (compCounts.get(i.compositionId) ?? 0) + 1);
-  }
+  const removeComposition = (lines: CartItem[]) => lines.forEach((l) => removeItem(l.key));
+  const editComposition = (lines: CartItem[]) => {
+    const vessel = (lines[0]?.vessel ?? "").toLowerCase();
+    loadComposition(
+      vessel,
+      lines.map((l) => ({
+        id: l.productId,
+        slug: l.slug,
+        name: l.name,
+        chapterLabel: l.chapterName,
+        edition: l.edition,
+        image: l.gradClass ? `gradient:${l.gradClass}` : "",
+        vessel,
+        size: l.size,
+        price: l.price,
+      })),
+    );
+    removeComposition(lines);
+    router.push("/bundles");
+  };
+
+  // Render order: composition groups collapse into one card at first sight.
+  const seen = new Set<string>();
 
   return (
     <div className="cart-page">
@@ -68,44 +92,67 @@ export function CartView() {
       <div className="cart-layout">
         <ul className="cart-lines">
           {items.map((item) => {
-            const isComposition = Boolean(item.compositionId);
-            const compComplete =
-              isComposition && (compCounts.get(item.compositionId as string) ?? 0) >= BUNDLE_SIZE;
-            return (
-            <li className="cart-line" key={item.key}>
-              <Link
-                href={`/shop/${item.slug}`}
-                className={`cart-line__media img-fill ${item.gradClass ?? "grad-dark"}`}
-                aria-label={item.name}
-              />
-              <div className="cart-line__info">
-                {item.chapterName ? <p className="cart-line__chapter">{item.chapterName}</p> : null}
-                <Link href={`/shop/${item.slug}`} className="cart-line__name">{item.name}</Link>
-                <p className="cart-line__variant">
-                  {[item.vessel, item.size].filter(Boolean).join(" · ") || "Standard"}
-                </p>
-                {isComposition ? (
-                  <div className="cart-line__composition">
-                    <p className="cart-line__tag">Discovery Composition</p>
-                    {compComplete ? (
-                      <>
-                        <p className="cart-line__complete">✓ Discovery Composition Complete</p>
-                        <p className="cart-line__savings">15% Savings Applied</p>
-                      </>
-                    ) : (
-                      <p className="cart-line__pending">Composition incomplete · {BUNDLE_SIZE} candles for 15%</p>
-                    )}
-                  </div>
-                ) : null}
-                <p className="cart-line__unit">{inr(item.price)} each</p>
-              </div>
+            // ── Discovery Composition → one parent item ──
+            if (item.compositionId) {
+              if (seen.has(item.compositionId)) return null;
+              seen.add(item.compositionId);
+              const lines = items.filter((i) => i.compositionId === item.compositionId);
+              const total = composeComposition(lines.map((l) => l.price)).total;
+              return (
+                <li className="cart-line cart-line--composition" key={item.compositionId}>
+                  <div className="comp-card">
+                    <div className="comp-card__head">
+                      <p className="comp-card__title">Discovery Composition</p>
+                      <p className="comp-card__vessel">{cap(lines[0]?.vessel ?? "")} Edition</p>
+                      <p className="comp-card__count">{lines.length} Signature Candles</p>
+                    </div>
 
-              {isComposition ? (
-                <div className="cart-line__qty cart-line__qty--fixed">
-                  <span className="cart-line__qty-label">Quantity</span>
-                  <span className="cart-line__qty-val">{item.qty}</span>
+                    <ul className="comp-card__list">
+                      {lines.map((l) => (
+                        <li className="comp-card__item" key={l.key}>
+                          {l.chapterName ? <span className="comp-card__chapter">{l.chapterName}</span> : null}
+                          <span className="comp-card__name">
+                            {l.edition ? `${l.edition} ` : ""}{l.name}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <div className="comp-card__foot">
+                      <div className="comp-card__pricing">
+                        <p className="comp-card__savings">{COMPOSITION_DISCOUNT_PCT}% Savings Applied</p>
+                        <p className="comp-card__total">{inr(total)}</p>
+                      </div>
+                      <div className="comp-card__actions">
+                        <button type="button" className="comp-card__edit" onClick={() => editComposition(lines)}>
+                          Edit Composition
+                        </button>
+                        <button type="button" className="comp-card__remove" onClick={() => removeComposition(lines)}>
+                          Remove Composition
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </li>
+              );
+            }
+
+            // ── Standalone product ──
+            return (
+              <li className="cart-line" key={item.key}>
+                <Link
+                  href={`/shop/${item.slug}`}
+                  className={`cart-line__media img-fill ${item.gradClass ?? "grad-dark"}`}
+                  aria-label={item.name}
+                />
+                <div className="cart-line__info">
+                  {item.edition ? <span className="cart-line__edition">{item.edition}</span> : null}
+                  {item.chapterName ? <p className="cart-line__chapter">{item.chapterName}</p> : null}
+                  <Link href={`/shop/${item.slug}`} className="cart-line__name">{item.name}</Link>
+                  <p className="cart-line__variant">{variantLabel(item.vessel, item.size)}</p>
+                  <p className="cart-line__unit">{inr(item.price)} each</p>
                 </div>
-              ) : (
+
                 <div className="cart-line__qty" aria-label={`Quantity of ${item.name}`}>
                   <button
                     type="button"
@@ -125,19 +172,14 @@ export function CartView() {
                     <Plus size={13} strokeWidth={1.5} aria-hidden="true" />
                   </button>
                 </div>
-              )}
 
-              <div className="cart-line__amount">
-                <p className="cart-line__total">{inr(item.price * item.qty)}</p>
-                <button
-                  type="button"
-                  className="cart-line__remove"
-                  onClick={() => removeItem(item.key)}
-                >
-                  Remove
-                </button>
-              </div>
-            </li>
+                <div className="cart-line__amount">
+                  <p className="cart-line__total">{inr(item.price * item.qty)}</p>
+                  <button type="button" className="cart-line__remove" onClick={() => removeItem(item.key)}>
+                    Remove
+                  </button>
+                </div>
+              </li>
             );
           })}
         </ul>

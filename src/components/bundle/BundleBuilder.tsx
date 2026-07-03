@@ -10,6 +10,7 @@ import { isGradientPlaceholder, gradientClass } from "@/lib/product";
 import {
   BUNDLE_SIZE,
   BUNDLE_VESSELS,
+  chapterLabelOf,
   composeComposition,
   optionFor,
   vesselLabel,
@@ -108,7 +109,8 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
         id: candle.id,
         slug: candle.slug,
         name: candle.name,
-        chapterName: candle.chapter?.name,
+        chapterLabel: chapterLabelOf(candle.chapter),
+        edition: candle.edition,
         image: candle.image.url,
         vessel,
         size: option.size,
@@ -131,7 +133,8 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
           name: it.name,
           price: it.price, // full price — discount applied in the cart
           gradClass: isGradientPlaceholder(it.image) ? gradientClass(it.image) ?? undefined : undefined,
-          chapterName: it.chapterName,
+          chapterName: it.chapterLabel,
+          edition: it.edition,
           compositionId,
         },
         material,
@@ -330,8 +333,8 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
                       </span>
                       <span className="composition__item-body">
                         <span className="composition__item-name">{it.name}</span>
-                        {it.chapterName ? (
-                          <span className="composition__item-chapter">{it.chapterName}</span>
+                        {it.chapterLabel ? (
+                          <span className="composition__item-chapter">{it.chapterLabel}</span>
                         ) : null}
                       </span>
                       <button

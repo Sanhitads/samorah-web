@@ -82,9 +82,17 @@ export interface BundleCandle {
   name: string;
   tagline: string | null;
   chapter: BundleChapter | null;
+  /** Samorah numbering — "VOL. I.1" — from the shared edition map. */
+  edition: string;
   image: { url: string; alt: string };
   /** 100g options keyed by vessel — a candle appears for a vessel it offers. */
   vessels: BundleVesselOption[];
+}
+
+/** "Vol. I — Dessert Chapter" from a candle's chapter (for consistent metadata). */
+export function chapterLabelOf(chapter: BundleChapter | null): string {
+  if (!chapter) return "";
+  return chapter.volume ? `${chapter.volume} — ${chapter.name}` : chapter.name;
 }
 
 /** A chosen candle + the vessel option it resolves to (for pricing + cart). */

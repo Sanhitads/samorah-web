@@ -86,35 +86,105 @@
   letter-spacing: 0.06em;
   color: var(--smoke, #6b6259);
 }
-.cart-line__composition { margin-top: 10px; }
-.cart-line__tag {
+.cart-line__edition {
+  display: block;
+  font-family: var(--font-sans);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--cart-gold);
+  margin-bottom: 5px;
+}
+
+/* ── Discovery Composition as one parent item ── */
+.cart-line--composition { display: block; padding: 0; }
+.comp-card { padding: clamp(22px, 2.6vw, 32px) 0; }
+.comp-card__title {
+  font-family: var(--font-serif);
+  font-size: 1.4rem;
+  color: var(--ink, #1f1a16);
+}
+.comp-card__vessel {
+  margin-top: 7px;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--cart-gold);
+}
+.comp-card__count {
+  margin-top: 4px;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--smoke, #6b6259);
+}
+.comp-card__list {
+  list-style: none;
+  margin: 20px 0;
+  padding: 18px 0;
+  border-top: 1px solid var(--cart-hairline);
+  border-bottom: 1px solid var(--cart-hairline);
+  display: grid;
+  gap: 14px;
+}
+.comp-card__item { display: flex; flex-direction: column; gap: 3px; }
+.comp-card__chapter {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--smoke, #6b6259);
+}
+.comp-card__name {
+  font-family: var(--font-serif);
+  font-size: 1.08rem;
+  color: var(--ink, #1f1a16);
+}
+.comp-card__foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.comp-card__savings {
   font-family: var(--font-sans);
   font-size: 9px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--cart-gold);
 }
-.cart-line__complete {
+.comp-card__total {
   margin-top: 5px;
   font-family: var(--font-serif);
-  font-size: 0.9rem;
+  font-size: 1.4rem;
   color: var(--ink, #1f1a16);
 }
-.cart-line__savings {
-  margin-top: 2px;
-  font-family: var(--font-sans);
-  font-size: 9px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--cart-gold);
-}
-.cart-line__pending {
-  margin-top: 4px;
+.comp-card__actions { display: flex; gap: 12px; }
+.comp-card__edit,
+.comp-card__remove {
+  padding: 10px 22px;
   font-family: var(--font-sans);
   font-size: 10px;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+.comp-card__edit {
+  background: transparent;
+  border: 1px solid var(--ink, #1f1a16);
+  color: var(--ink, #1f1a16);
+}
+.comp-card__edit:hover { background: var(--ink, #1f1a16); color: var(--ivory, #faf7f2); }
+.comp-card__remove {
+  background: none;
+  border: 1px solid transparent;
   color: var(--smoke, #6b6259);
 }
+.comp-card__remove:hover { color: var(--ink, #1f1a16); }
 .cart-line__unit {
   margin-top: 8px;
   font-family: var(--font-sans);

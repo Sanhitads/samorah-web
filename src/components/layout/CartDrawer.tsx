@@ -79,7 +79,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
           <motion.div className="cart-drawer" {...drawerMotion}>
             <div className="cart-drawer__header">
               <div>
-                <h2 className="cart-drawer__title">Your Ritual</h2>
+                <h2 className="cart-drawer__title">Your Collection</h2>
                 <p className="cart-drawer__count">
                   {count} {count === 1 ? "item" : "items"}
                 </p>

@@ -28,7 +28,7 @@ export function AddToComposition({
   selectedVessel,
   selectedSize,
 }: {
-  product: { id: string; slug: string; name: string; chapterName?: string | null; image: string };
+  product: { id: string; slug: string; name: string; chapterName?: string | null; edition?: string | null; image: string };
   variants: CompositionVariant[];
   selectedVessel: string;
   selectedSize: string;
@@ -65,7 +65,8 @@ export function AddToComposition({
       id: product.id,
       slug: product.slug,
       name: product.name,
-      chapterName: product.chapterName ?? undefined,
+      chapterLabel: product.chapterName ?? undefined,
+      edition: product.edition ?? undefined,
       image: product.image,
       vessel,
       size: option.size,

@@ -12,7 +12,8 @@ export interface CompositionItem {
   id: string;
   slug: string;
   name: string;
-  chapterName?: string;
+  chapterLabel?: string; // "Vol. I — Dessert Chapter"
+  edition?: string; // "VOL. I.1"
   image: string; // url or "gradient:*"
   vessel: string; // enum — "glass" | "ceramic"
   size: string; // "100g"
@@ -27,6 +28,8 @@ export interface CompositionState {
   /** Add a candle if it fits the vessel, isn't a duplicate, and the set isn't full. */
   addCandle: (item: CompositionItem) => void;
   removeCandle: (id: string) => void;
+  /** Replace the whole composition at once (the cart's "Edit Composition"). */
+  loadComposition: (vessel: string, items: CompositionItem[]) => void;
   /** Empty the selection but keep the vessel (compose another set in the same vessel). */
   clear: () => void;
 }
@@ -57,6 +60,8 @@ export const useCompositionStore = create<CompositionState>()(
 
       removeCandle: (id) =>
         set((state) => ({ items: state.items.filter((i) => i.id !== id) })),
+
+      loadComposition: (vessel, items) => set({ vessel, items: items.slice(0, BUNDLE_SIZE) }),
 
       clear: () => set({ items: [] }),
     }),
