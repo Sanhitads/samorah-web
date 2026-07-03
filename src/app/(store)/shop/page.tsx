@@ -48,7 +48,7 @@ export default async function ShopRoute({
   return (
     <main className="plp">
       <header className="plp__head">
-        <p className="plp__eyebrow">The Shop</p>
+        <p className="plp__eyebrow">Shop</p>
         <h1 className="plp__title">The Collection</h1>
       </header>
 

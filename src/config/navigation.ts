@@ -162,7 +162,6 @@ export const FOOTER_SECTIONS: FooterSection[] = [
     title: "Shop",
     links: [
       { label: "All Products", href: "/shop" },
-      { label: "Scented Candles", href: "/shop" },
       { label: "Room & Linen Sprays", href: "/collections/the-everyday" },
       { label: "Ritual Bundles", href: "/bundles" },
       { label: "New Arrivals", href: "/shop?sort=newest" },
