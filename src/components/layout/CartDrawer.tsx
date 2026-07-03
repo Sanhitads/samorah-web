@@ -21,7 +21,7 @@ import { composeComposition } from "@/lib/bundle";
 const NUM_WORD = ["Zero", "One", "Two", "Three", "Four", "Five", "Six"];
 const countWord = (n: number) => NUM_WORD[n] ?? String(n);
 const capVessel = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s);
-const noEdition = (e?: string) => (e ? e.replace(/^VOL\.\s*/i, "No. ") : e);
+const noEdition = (e?: string) => (e ? e.replace(/^(?:VOL|No)\.\s*/i, "NO. ") : e);
 
 /**
  * Editorial Cart Drawer (Phase 6 · Component 5).

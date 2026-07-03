@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { getShopProducts } from "@/services/productService";
+import { getEditionMap } from "@/services/collectionService";
 import { buildShopPage, canonicalShopUrl, type ShopProductInput } from "@/lib/shopPage";
 import { ProductCard } from "@/components/ui/ProductCard";
 
@@ -34,12 +35,16 @@ export default async function ShopRoute({
 }) {
   const params = await searchParams;
   let products: ShopProductInput[] = [];
+  let editions: Awaited<ReturnType<typeof getEditionMap>> = new Map();
   try {
-    products = (await getShopProducts()) as unknown as ShopProductInput[];
+    [products, editions] = await Promise.all([
+      getShopProducts() as unknown as Promise<ShopProductInput[]>,
+      getEditionMap(),
+    ]);
   } catch {
     products = [];
   }
-  const view = buildShopPage(products, params);
+  const view = buildShopPage(products, params, editions);
 
   return (
     <main className="plp">

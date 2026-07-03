@@ -22,8 +22,8 @@ const variantLabel = (vessel: string, size: string) =>
   [vessel ? cap(vessel) : "", size].filter(Boolean).join(" • ") || "Standard";
 const NUM_WORD = ["Zero", "One", "Two", "Three", "Four", "Five", "Six"];
 const countWord = (n: number) => NUM_WORD[n] ?? String(n);
-/** Normalise a legacy "VOL. I.1" edition (persisted before the change) to "No. I.1". */
-const noEdition = (e?: string) => (e ? e.replace(/^VOL\.\s*/i, "No. ") : e);
+/** Normalise any persisted edition ("VOL. I.1" / "No. I.1") to the canonical "NO. I.1". */
+const noEdition = (e?: string) => (e ? e.replace(/^(?:VOL|No)\.\s*/i, "NO. ") : e);
 
 /**
  * CartView (client) — the full Cart page ("Your Collection"). Reads the persisted

@@ -290,7 +290,7 @@ export function toProjection(p: ChapterProductInput): ProductCommerceProjection 
  *  and future order/packing/gift documents. */
 export function editionLabel(volume: string | null, n: number): string {
   const roman = volume ? volume.replace(/vol\.?\s*/i, "").trim().toUpperCase() : "";
-  return roman ? `No. ${roman}.${n}` : `No. ${n}`;
+  return roman ? `NO. ${roman}.${n}` : `NO. ${n}`;
 }
 
 function toProductView(p: ChapterProductInput, edition: string): ChapterProductView {

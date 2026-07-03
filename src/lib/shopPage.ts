@@ -143,16 +143,18 @@ function sortProducts(list: ShopProductInput[], sort: ShopSort): ShopProductInpu
   }
 }
 
-function toCard(p: ShopProductInput): ProductCardModel {
+function toCard(p: ShopProductInput, editions?: ReadonlyMap<string, { edition: string }>): ProductCardModel {
   const img = primaryImage(p.product_images);
   const chapter = p.collection;
+  // Prefer the full "NO. IV.1" numbering; fall back to the volume when unmapped.
+  const edition = editions?.get(p.slug)?.edition ?? (chapter?.volume ? chapter.volume.toUpperCase() : undefined);
   return {
     slug: p.slug,
     name: p.name,
     tagline: p.tagline ?? null,
     media: imageMedia(img?.url ?? GRADIENT, img?.alt_text ?? p.name, "portrait"),
     commerce: toProjection(p),
-    edition: chapter?.volume ? chapter.volume.toUpperCase() : undefined,
+    edition,
     collectionType: chapter?.name ?? undefined,
     priceLabel: formatPrice(p).current,
     cta: { label: "View", href: `/shop/${p.slug}` },
@@ -167,6 +169,7 @@ function toCard(p: ShopProductInput): ProductCardModel {
 export function buildShopPage(
   products: ShopProductInput[],
   params: { chapter?: string; vessel?: string; sort?: string; type?: string } = {},
+  editions?: ReadonlyMap<string, { edition: string }>,
 ): ShopView {
   const activeSort: ShopSort = isSort(params.sort) ? params.sort : "featured";
   const activeChapter = resolveChapter(params.chapter); // aliases → canonical slug
@@ -224,7 +227,7 @@ export function buildShopPage(
   }));
 
   const filtered = typed.filter((p) => matchesChapter(p, activeChapter) && matchesVessel(p, activeVessel));
-  const cards = sortProducts(filtered, activeSort).map(toCard);
+  const cards = sortProducts(filtered, activeSort).map((p) => toCard(p, editions));
 
   return {
     cards,
