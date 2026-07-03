@@ -96,9 +96,14 @@
   margin-bottom: 6px;
 }
 
-/* ── Discovery Composition as one parent item ── */
-.cart-line--composition { display: block; padding: 0; }
-.comp-card { padding: clamp(22px, 2.6vw, 32px) 0; }
+/* ── Discovery Composition as one parent item (a quiet curated panel) ── */
+.cart-line--composition { display: block; padding: 0; border-bottom: none; }
+.comp-card {
+  padding: clamp(22px, 2.6vw, 30px) clamp(20px, 2.4vw, 30px);
+  margin: 8px 0;
+  background: rgba(31, 26, 22, 0.025);
+  border-radius: 3px;
+}
 .comp-card__eyebrow {
   font-family: var(--font-sans);
   font-size: 10px;

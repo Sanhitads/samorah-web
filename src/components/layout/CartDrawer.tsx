@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Minus, Plus, X } from "lucide-react";
@@ -20,6 +21,7 @@ import { composeComposition } from "@/lib/bundle";
 const NUM_WORD = ["Zero", "One", "Two", "Three", "Four", "Five", "Six"];
 const countWord = (n: number) => NUM_WORD[n] ?? String(n);
 const capVessel = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s);
+const noEdition = (e?: string) => (e ? e.replace(/^VOL\.\s*/i, "No. ") : e);
 
 /**
  * Editorial Cart Drawer (Phase 6 · Component 5).
@@ -55,6 +57,10 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
   const removeItem = useCartStore((s) => s.removeItem);
   const loadComposition = useCompositionStore((s) => s.loadComposition);
   const router = useRouter();
+
+  useEffect(() => {
+    router.prefetch("/bundles"); // so "Refine" navigates instantly
+  }, [router]);
 
   const removeComposition = (lines: CartItem[]) => lines.forEach((l) => removeItem(l.key));
   const refineComposition = (lines: CartItem[]) => {
@@ -162,7 +168,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                                   <span className={`cart-comp__thumb ${l.gradClass ?? "grad-dark"}`} aria-hidden="true" />
                                   <span className="cart-comp__text">
                                     {l.chapterName ? <span className="cart-comp__chapter">{l.chapterName}</span> : null}
-                                    {l.edition ? <span className="cart-comp__edition">{l.edition}</span> : null}
+                                    {l.edition ? <span className="cart-comp__edition">{noEdition(l.edition)}</span> : null}
                                     <span className="cart-comp__name">{l.name}</span>
                                   </span>
                                 </li>
@@ -195,7 +201,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                           />
                           <div className="cart-item__body">
                             {item.chapterName && <p className="cart-item__chapter">{item.chapterName}</p>}
-                            {item.edition && <p className="cart-item__edition">{item.edition}</p>}
+                            {item.edition && <p className="cart-item__edition">{noEdition(item.edition)}</p>}
                             <Link href={`/shop/${item.slug}`} className="cart-item__name" onClick={onClose}>
                               {item.name}
                             </Link>

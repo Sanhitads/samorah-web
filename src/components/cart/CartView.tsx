@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Minus, Plus } from "lucide-react";
-import { useStore } from "@/hooks/useStore";
 import {
   COMPOSITION_DISCOUNT_PCT,
   selectCartSubtotal,
@@ -22,6 +22,8 @@ const variantLabel = (vessel: string, size: string) =>
   [vessel ? cap(vessel) : "", size].filter(Boolean).join(" • ") || "Standard";
 const NUM_WORD = ["Zero", "One", "Two", "Three", "Four", "Five", "Six"];
 const countWord = (n: number) => NUM_WORD[n] ?? String(n);
+/** Normalise a legacy "VOL. I.1" edition (persisted before the change) to "No. I.1". */
+const noEdition = (e?: string) => (e ? e.replace(/^VOL\.\s*/i, "No. ") : e);
 
 /**
  * CartView (client) — the full Cart page ("Your Collection"). Reads the persisted
@@ -31,13 +33,21 @@ const countWord = (n: number) => NUM_WORD[n] ?? String(n);
  * share the same metadata hierarchy (edition · chapter · name · vessel • size).
  */
 export function CartView() {
-  const items = useStore<CartState, CartItem[]>(useCartStore, (s) => s.items);
+  const items = useCartStore((s) => s.items);
   const updateQty = useCartStore((s) => s.updateQty);
   const removeItem = useCartStore((s) => s.removeItem);
   const loadComposition = useCompositionStore((s) => s.loadComposition);
   const router = useRouter();
 
-  if (items === undefined) {
+  // Persisted cart hydrates on the client only — render after mount (a single,
+  // synchronous read, so removals reflow once and scroll anchoring holds).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+    router.prefetch("/bundles"); // so "Refine" navigates instantly
+  }, [router]);
+
+  if (!mounted) {
     return <div className="cart-page cart-page--loading" aria-busy="true" />;
   }
 
@@ -116,7 +126,7 @@ export function CartView() {
                             <span className={`comp-card__thumb img-fill ${l.gradClass ?? "grad-dark"}`} aria-hidden="true" />
                             <span className="comp-card__item-text">
                               {l.chapterName ? <span className="comp-card__chapter">{l.chapterName}</span> : null}
-                              {l.edition ? <span className="comp-card__edition">{l.edition}</span> : null}
+                              {l.edition ? <span className="comp-card__edition">{noEdition(l.edition)}</span> : null}
                               <span className="comp-card__name">{l.name}</span>
                             </span>
                           </li>
@@ -154,7 +164,7 @@ export function CartView() {
                 />
                 <div className="cart-line__info">
                   {item.chapterName ? <p className="cart-line__chapter">{item.chapterName}</p> : null}
-                  {item.edition ? <span className="cart-line__edition">{item.edition}</span> : null}
+                  {item.edition ? <span className="cart-line__edition">{noEdition(item.edition)}</span> : null}
                   <Link href={`/shop/${item.slug}`} className="cart-line__name">{item.name}</Link>
                   <p className="cart-line__variant">{variantLabel(item.vessel, item.size)}</p>
                   <p className="cart-line__unit">{inr(item.price)} each</p>
