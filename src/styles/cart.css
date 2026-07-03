@@ -86,13 +86,34 @@
   letter-spacing: 0.06em;
   color: var(--smoke, #6b6259);
 }
+.cart-line__composition { margin-top: 10px; }
 .cart-line__tag {
-  margin-top: 8px;
   font-family: var(--font-sans);
   font-size: 9px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--cart-gold);
+}
+.cart-line__complete {
+  margin-top: 5px;
+  font-family: var(--font-serif);
+  font-size: 0.9rem;
+  color: var(--ink, #1f1a16);
+}
+.cart-line__savings {
+  margin-top: 2px;
+  font-family: var(--font-sans);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--cart-gold);
+}
+.cart-line__pending {
+  margin-top: 4px;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--smoke, #6b6259);
 }
 .cart-line__unit {
   margin-top: 8px;
@@ -125,6 +146,22 @@
   font-size: 1rem;
   color: var(--ink, #1f1a16);
 }
+
+/* Composition lines: fixed at quantity 1 — no stepper, only Remove. */
+.cart-line__qty--fixed {
+  border: none;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.cart-line__qty-label {
+  font-family: var(--font-sans);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--smoke, #6b6259);
+}
+.cart-line__qty--fixed .cart-line__qty-val { min-width: 0; }
 
 .cart-line__amount { text-align: right; }
 .cart-line__total {
@@ -178,11 +215,11 @@
   color: var(--ink, #1f1a16);
 }
 .cart-summary__nudge {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 0.85rem;
-  color: var(--cart-gold);
-  margin: -4px 0 14px;
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  color: var(--smoke, #6b6259);
+  margin: -6px 0 14px;
 }
 .cart-summary__tax {
   font-family: var(--font-sans);

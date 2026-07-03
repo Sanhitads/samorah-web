@@ -12,6 +12,7 @@ import {
   type CartState,
 } from "@/store/useCartStore";
 import { buildCartSummary } from "@/lib/cart";
+import { BUNDLE_SIZE } from "@/lib/bundle";
 
 const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
@@ -50,17 +51,27 @@ export function CartView() {
   const summary = buildCartSummary(subtotal, discount);
   const count = items.reduce((n, i) => n + i.qty, 0);
 
+  // Lines per composition group — a group is complete at BUNDLE_SIZE candles.
+  const compCounts = new Map<string, number>();
+  for (const i of items) {
+    if (i.compositionId) compCounts.set(i.compositionId, (compCounts.get(i.compositionId) ?? 0) + 1);
+  }
+
   return (
     <div className="cart-page">
       <header className="cart-page__head">
         <p className="cart-page__eyebrow">Your Bag</p>
-        <h1 className="cart-page__title">The Ritual</h1>
+        <h1 className="cart-page__title">Your Collection</h1>
         <p className="cart-page__count">{count} {count === 1 ? "item" : "items"}</p>
       </header>
 
       <div className="cart-layout">
         <ul className="cart-lines">
-          {items.map((item) => (
+          {items.map((item) => {
+            const isComposition = Boolean(item.compositionId);
+            const compComplete =
+              isComposition && (compCounts.get(item.compositionId as string) ?? 0) >= BUNDLE_SIZE;
+            return (
             <li className="cart-line" key={item.key}>
               <Link
                 href={`/shop/${item.slug}`}
@@ -73,29 +84,48 @@ export function CartView() {
                 <p className="cart-line__variant">
                   {[item.vessel, item.size].filter(Boolean).join(" · ") || "Standard"}
                 </p>
-                {item.compositionId ? <p className="cart-line__tag">Discovery Composition</p> : null}
+                {isComposition ? (
+                  <div className="cart-line__composition">
+                    <p className="cart-line__tag">Discovery Composition</p>
+                    {compComplete ? (
+                      <>
+                        <p className="cart-line__complete">✓ Discovery Composition Complete</p>
+                        <p className="cart-line__savings">15% Savings Applied</p>
+                      </>
+                    ) : (
+                      <p className="cart-line__pending">Composition incomplete · {BUNDLE_SIZE} candles for 15%</p>
+                    )}
+                  </div>
+                ) : null}
                 <p className="cart-line__unit">{inr(item.price)} each</p>
               </div>
 
-              <div className="cart-line__qty" aria-label={`Quantity of ${item.name}`}>
-                <button
-                  type="button"
-                  className="cart-line__qty-btn"
-                  onClick={() => updateQty(item.key, item.qty - 1)}
-                  aria-label={`Decrease quantity of ${item.name}`}
-                >
-                  <Minus size={13} strokeWidth={1.5} aria-hidden="true" />
-                </button>
-                <span className="cart-line__qty-val">{item.qty}</span>
-                <button
-                  type="button"
-                  className="cart-line__qty-btn"
-                  onClick={() => updateQty(item.key, item.qty + 1)}
-                  aria-label={`Increase quantity of ${item.name}`}
-                >
-                  <Plus size={13} strokeWidth={1.5} aria-hidden="true" />
-                </button>
-              </div>
+              {isComposition ? (
+                <div className="cart-line__qty cart-line__qty--fixed">
+                  <span className="cart-line__qty-label">Quantity</span>
+                  <span className="cart-line__qty-val">{item.qty}</span>
+                </div>
+              ) : (
+                <div className="cart-line__qty" aria-label={`Quantity of ${item.name}`}>
+                  <button
+                    type="button"
+                    className="cart-line__qty-btn"
+                    onClick={() => updateQty(item.key, item.qty - 1)}
+                    aria-label={`Decrease quantity of ${item.name}`}
+                  >
+                    <Minus size={13} strokeWidth={1.5} aria-hidden="true" />
+                  </button>
+                  <span className="cart-line__qty-val">{item.qty}</span>
+                  <button
+                    type="button"
+                    className="cart-line__qty-btn"
+                    onClick={() => updateQty(item.key, item.qty + 1)}
+                    aria-label={`Increase quantity of ${item.name}`}
+                  >
+                    <Plus size={13} strokeWidth={1.5} aria-hidden="true" />
+                  </button>
+                </div>
+              )}
 
               <div className="cart-line__amount">
                 <p className="cart-line__total">{inr(item.price * item.qty)}</p>
@@ -108,7 +138,8 @@ export function CartView() {
                 </button>
               </div>
             </li>
-          ))}
+            );
+          })}
         </ul>
 
         <aside className="cart-summary">
@@ -120,7 +151,7 @@ export function CartView() {
           </div>
           {summary.discount > 0 ? (
             <div className="cart-summary__row cart-summary__row--discount">
-              <span>Composition discount ({COMPOSITION_DISCOUNT_PCT}%)</span>
+              <span>Discovery Composition Savings ({COMPOSITION_DISCOUNT_PCT}%)</span>
               <span>−{inr(summary.discount)}</span>
             </div>
           ) : null}
@@ -141,7 +172,7 @@ export function CartView() {
           <p className="cart-summary__tax">Inclusive of GST ({summary.gstRate}%) · {inr(summary.gst)}</p>
 
           <Link href="/checkout" className="atc-btn cart-summary__checkout">Proceed to Checkout</Link>
-          <Link href="/shop" className="cart-summary__continue">Continue Shopping</Link>
+          <Link href="/shop" className="cart-summary__continue">Continue Exploring</Link>
           <p className="cart-summary__note">
             Shipping is an estimate; final rates and taxes are confirmed at checkout.
           </p>

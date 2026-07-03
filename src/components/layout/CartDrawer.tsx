@@ -177,7 +177,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                         <span>{inr(subtotal)}</span>
                       </div>
                       <div className="cart-drawer__line cart-drawer__line--discount">
-                        <span>Composition discount ({COMPOSITION_DISCOUNT_PCT}%)</span>
+                        <span>Discovery Composition Savings ({COMPOSITION_DISCOUNT_PCT}%)</span>
                         <span>−{inr(compositionDiscount)}</span>
                       </div>
                       <div className="cart-drawer__subtotal">
