@@ -23,14 +23,16 @@ export interface CompositionItem {
 export interface CompositionState {
   vessel: string | null;
   items: CompositionItem[];
+  /** The cart compositionId being edited (null = building a new composition). */
+  editingId: string | null;
   /** Choose (or switch) the vessel — switching clears the composition (no mixing). */
   setVessel: (vessel: string) => void;
   /** Add a candle if it fits the vessel, isn't a duplicate, and the set isn't full. */
   addCandle: (item: CompositionItem) => void;
   removeCandle: (id: string) => void;
-  /** Replace the whole composition at once (the cart's "Edit Composition"). */
-  loadComposition: (vessel: string, items: CompositionItem[]) => void;
-  /** Empty the selection but keep the vessel (compose another set in the same vessel). */
+  /** Load an existing cart composition into the composer to edit in place. */
+  loadComposition: (vessel: string, items: CompositionItem[], editingId?: string | null) => void;
+  /** Empty the selection + exit edit mode (after committing, or discarding). */
   clear: () => void;
 }
 
@@ -45,6 +47,7 @@ export const useCompositionStore = create<CompositionState>()(
     (set) => ({
       vessel: null,
       items: [],
+      editingId: null,
 
       setVessel: (vessel) =>
         set((state) => (vessel === state.vessel ? state : { vessel, items: [] })),
@@ -61,13 +64,14 @@ export const useCompositionStore = create<CompositionState>()(
       removeCandle: (id) =>
         set((state) => ({ items: state.items.filter((i) => i.id !== id) })),
 
-      loadComposition: (vessel, items) => set({ vessel, items: items.slice(0, BUNDLE_SIZE) }),
+      loadComposition: (vessel, items, editingId = null) =>
+        set({ vessel, items: items.slice(0, BUNDLE_SIZE), editingId }),
 
-      clear: () => set({ items: [] }),
+      clear: () => set({ items: [], editingId: null }),
     }),
     {
       name: "samorah_composition",
-      partialize: (state) => ({ vessel: state.vessel, items: state.items }),
+      partialize: (state) => ({ vessel: state.vessel, items: state.items, editingId: state.editingId }),
     },
   ),
 );

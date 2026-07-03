@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Minus, Plus, X } from "lucide-react";
@@ -57,14 +57,17 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
   const removeItem = useCartStore((s) => s.removeItem);
   const loadComposition = useCompositionStore((s) => s.loadComposition);
   const router = useRouter();
+  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
 
   useEffect(() => {
     router.prefetch("/bundles"); // so "Refine" navigates instantly
   }, [router]);
 
   const removeComposition = (lines: CartItem[]) => lines.forEach((l) => removeItem(l.key));
+  // Edit in place — the cart stays as-is until "Update Composition" is clicked.
   const refineComposition = (lines: CartItem[]) => {
     const vessel = (lines[0]?.vessel ?? "").toLowerCase();
+    const editingId = lines[0]?.compositionId ?? null;
     loadComposition(
       vessel,
       lines.map((l) => ({
@@ -72,16 +75,16 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
         slug: l.slug,
         name: l.name,
         chapterLabel: l.chapterName,
-        edition: l.edition,
+        edition: noEdition(l.edition),
         image: l.gradClass ? `gradient:${l.gradClass}` : "",
         vessel,
         size: l.size,
         price: l.price,
       })),
+      editingId,
     );
-    removeComposition(lines);
     onClose();
-    router.push("/bundles");
+    router.push(editingId ? `/bundles?edit=${editingId}` : "/bundles");
   };
 
   const scrimMotion = reduceMotion
@@ -178,14 +181,39 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                               <span className="cart-comp__total">{inr(total)}</span>
                               <span className="cart-comp__savings">{COMPOSITION_DISCOUNT_PCT}% applied</span>
                             </div>
-                            <div className="cart-comp__actions">
-                              <button type="button" className="cart-comp__refine" onClick={() => refineComposition(lines)}>
-                                Refine
-                              </button>
-                              <button type="button" className="cart-comp__remove" onClick={() => removeComposition(lines)}>
-                                Remove
-                              </button>
-                            </div>
+                            {confirmRemoveId === item.compositionId ? (
+                              <div className="cart-comp__confirm">
+                                <p className="cart-comp__confirm-text">Remove all three candles from your collection?</p>
+                                <div className="cart-comp__confirm-actions">
+                                  <button type="button" className="cart-comp__cancel" onClick={() => setConfirmRemoveId(null)}>
+                                    Cancel
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="cart-comp__remove"
+                                    onClick={() => {
+                                      removeComposition(lines);
+                                      setConfirmRemoveId(null);
+                                    }}
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="cart-comp__actions">
+                                <button type="button" className="cart-comp__refine" onClick={() => refineComposition(lines)}>
+                                  Refine
+                                </button>
+                                <button
+                                  type="button"
+                                  className="cart-comp__remove"
+                                  onClick={() => setConfirmRemoveId(item.compositionId ?? null)}
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            )}
                           </div>
                         );
                       }

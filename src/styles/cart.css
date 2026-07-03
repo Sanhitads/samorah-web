@@ -225,6 +225,47 @@
   color: var(--smoke, #6b6259);
 }
 .comp-card__remove:hover { color: var(--ink, #1f1a16); }
+
+/* Remove-composition confirmation. */
+.comp-card__confirm { max-width: 240px; text-align: right; }
+.comp-card__confirm-text {
+  font-family: var(--font-serif);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--ink, #1f1a16);
+  margin-bottom: 14px;
+}
+.comp-card__confirm-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+.comp-card__cancel {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background: none;
+  border: none;
+  color: var(--smoke, #6b6259);
+  cursor: pointer;
+  transition: color 0.3s ease;
+}
+.comp-card__cancel:hover { color: var(--ink, #1f1a16); }
+.comp-card__confirm-remove {
+  padding: 10px 22px;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  background: var(--ink, #1f1a16);
+  border: 1px solid var(--ink, #1f1a16);
+  color: var(--ivory, #faf7f2);
+  cursor: pointer;
+  transition: opacity 0.3s ease;
+}
+.comp-card__confirm-remove:hover { opacity: 0.86; }
 .cart-line__unit {
   margin-top: 8px;
   font-family: var(--font-sans);

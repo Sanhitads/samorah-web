@@ -28,6 +28,7 @@ import {
 export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
   const vessel = useCompositionStore((s) => s.vessel);
   const items = useCompositionStore((s) => s.items);
+  const editingId = useCompositionStore((s) => s.editingId);
   const setVessel = useCompositionStore((s) => s.setVessel);
   const addCandle = useCompositionStore((s) => s.addCandle);
   const removeCandle = useCompositionStore((s) => s.removeCandle);
@@ -43,6 +44,8 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
   const [pendingVessel, setPendingVessel] = useState<string | null>(null);
 
   const addItem = useCartStore((s) => s.addItem);
+  const cartItems = useCartStore((s) => s.items);
+  const removeItem = useCartStore((s) => s.removeItem);
   const openCart = useUIStore((s) => s.openCart);
   const reduce = useReducedMotion();
 
@@ -122,9 +125,13 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
   const addComposition = () => {
     if (!composition.complete || !vessel) return;
     const material = vesselLabel(vessel);
-    // Tag the three lines as one composition — the 15% is a cart-level promotion,
-    // recomputed from the full prices (never baked into the stored line price).
-    const compositionId = `comp-${vessel}-${Date.now()}`;
+    // Editing → reuse the same compositionId and replace the existing cart lines
+    // in place (no duplicate bundle). New → a fresh id. The 15% stays a cart-level
+    // promotion recomputed from full prices (never baked into the line price).
+    const compositionId = editingId ?? `comp-${vessel}-${Date.now()}`;
+    if (editingId) {
+      cartItems.filter((i) => i.compositionId === editingId).forEach((i) => removeItem(i.key));
+    }
     for (const it of items) {
       addItem(
         {
@@ -377,13 +384,23 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
                 onClick={addComposition}
               >
                 {added
-                  ? "✓ Composition added to bag"
+                  ? editingId
+                    ? "✓ Composition updated"
+                    : "✓ Composition added to bag"
                   : composition.complete
-                    ? "Add Composition to Bag"
+                    ? editingId
+                      ? "Update Composition"
+                      : "Add Composition to Bag"
                     : `Choose ${BUNDLE_SIZE - items.length} more`}
               </button>
 
-              <p className="composition__note">Any three 100g candles · 15% composition discount.</p>
+              {editingId ? (
+                <p className="composition__note composition__note--editing">
+                  Editing this composition will update the version currently in your bag.
+                </p>
+              ) : (
+                <p className="composition__note">Any three 100g candles · 15% composition discount.</p>
+              )}
             </div>
           </aside>
         </div>

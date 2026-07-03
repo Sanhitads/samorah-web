@@ -547,6 +547,11 @@
   color: var(--smoke, #6b6259);
   text-align: center;
 }
+.composition__note--editing {
+  color: var(--ink, #1f1a16);
+  padding-top: 12px;
+  border-top: 1px solid var(--bundle-hairline);
+}
 
 .bundle-empty {
   max-width: var(--container-wide, 1280px);

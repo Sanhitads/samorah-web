@@ -42,6 +42,7 @@ export function CartView() {
   // Persisted cart hydrates on the client only — render after mount (a single,
   // synchronous read, so removals reflow once and scroll anchoring holds).
   const [mounted, setMounted] = useState(false);
+  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
   useEffect(() => {
     setMounted(true);
     router.prefetch("/bundles"); // so "Refine" navigates instantly
@@ -70,8 +71,11 @@ export function CartView() {
   const count = items.reduce((n, i) => n + i.qty, 0);
 
   const removeComposition = (lines: CartItem[]) => lines.forEach((l) => removeItem(l.key));
+  // Load the composition into the composer to edit IN PLACE — the cart is left
+  // untouched until the customer clicks "Update Composition".
   const editComposition = (lines: CartItem[]) => {
     const vessel = (lines[0]?.vessel ?? "").toLowerCase();
+    const editingId = lines[0]?.compositionId ?? null;
     loadComposition(
       vessel,
       lines.map((l) => ({
@@ -79,15 +83,15 @@ export function CartView() {
         slug: l.slug,
         name: l.name,
         chapterLabel: l.chapterName,
-        edition: l.edition,
+        edition: noEdition(l.edition),
         image: l.gradClass ? `gradient:${l.gradClass}` : "",
         vessel,
         size: l.size,
         price: l.price,
       })),
+      editingId,
     );
-    removeComposition(lines);
-    router.push("/bundles");
+    router.push(editingId ? `/bundles?edit=${editingId}` : "/bundles");
   };
 
   // Render order: composition groups collapse into one card at first sight.
@@ -139,14 +143,41 @@ export function CartView() {
                           <p className="comp-card__total">{inr(total)}</p>
                           <p className="comp-card__savings">{COMPOSITION_DISCOUNT_PCT}% Savings Applied</p>
                         </div>
-                        <div className="comp-card__actions">
-                          <button type="button" className="comp-card__edit" onClick={() => editComposition(lines)}>
-                            Refine Composition
-                          </button>
-                          <button type="button" className="comp-card__remove" onClick={() => removeComposition(lines)}>
-                            Remove Composition
-                          </button>
-                        </div>
+                        {confirmRemoveId === item.compositionId ? (
+                          <div className="comp-card__confirm" role="alertdialog" aria-label="Remove composition">
+                            <p className="comp-card__confirm-text">
+                              Removing this composition will remove all three candles from your collection.
+                            </p>
+                            <div className="comp-card__confirm-actions">
+                              <button type="button" className="comp-card__cancel" onClick={() => setConfirmRemoveId(null)}>
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                className="comp-card__confirm-remove"
+                                onClick={() => {
+                                  removeComposition(lines);
+                                  setConfirmRemoveId(null);
+                                }}
+                              >
+                                Remove Composition
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="comp-card__actions">
+                            <button type="button" className="comp-card__edit" onClick={() => editComposition(lines)}>
+                              Refine Composition
+                            </button>
+                            <button
+                              type="button"
+                              className="comp-card__remove"
+                              onClick={() => setConfirmRemoveId(item.compositionId ?? null)}
+                            >
+                              Remove Composition
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
