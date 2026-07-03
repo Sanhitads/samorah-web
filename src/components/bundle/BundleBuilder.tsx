@@ -38,6 +38,8 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
   // chooser; only an already-active composition (candles added, e.g. from a PDP)
   // reveals the grid automatically.
   const [started, setStarted] = useState(false);
+  // A vessel switch the customer must confirm (it clears an in-progress set).
+  const [pendingVessel, setPendingVessel] = useState<string | null>(null);
 
   const addItem = useCartStore((s) => s.addItem);
   const openCart = useUIStore((s) => s.openCart);
@@ -71,12 +73,27 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
   const isFull = items.length >= BUNDLE_SIZE;
 
   const chooseVessel = (key: string) => {
-    setStarted(true); // reveal the grid (also handles re-selecting a stale vessel)
     setAdded(false);
-    if (key !== vessel) {
-      setVessel(key); // store clears items on a vessel switch (no mixing)
-      setChapter("All");
+    if (key === vessel) {
+      setStarted(true); // re-selecting the current/stale vessel just reveals the grid
+      return;
     }
+    // Switching away from an in-progress composition needs confirmation.
+    if (items.length > 0) {
+      setPendingVessel(key);
+      return;
+    }
+    setStarted(true);
+    setVessel(key);
+    setChapter("All");
+  };
+
+  const confirmVesselSwitch = () => {
+    if (!pendingVessel) return;
+    setStarted(true);
+    setVessel(pendingVessel); // store clears items on a vessel switch (no mixing)
+    setChapter("All");
+    setPendingVessel(null);
   };
 
   const toggle = (candle: BundleCandle) => {
@@ -158,6 +175,22 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
             );
           })}
         </div>
+
+        {pendingVessel ? (
+          <div className="vessel-confirm" role="alertdialog" aria-label="Change vessel">
+            <p className="vessel-confirm__text">
+              Switching to {vesselLabel(pendingVessel)} will clear your current composition.
+            </p>
+            <div className="vessel-confirm__actions">
+              <button type="button" className="vessel-confirm__cancel" onClick={() => setPendingVessel(null)}>
+                Cancel
+              </button>
+              <button type="button" className="vessel-confirm__switch" onClick={confirmVesselSwitch}>
+                Switch
+              </button>
+            </div>
+          </div>
+        ) : null}
       </section>
 
       {/* ── Step 2 · Compose (revealed once a vessel is chosen here, or when a

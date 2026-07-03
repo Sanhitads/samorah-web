@@ -159,6 +159,51 @@
   color: var(--bundle-gold);
 }
 
+/* Confirm before a vessel switch clears an in-progress composition. */
+.vessel-confirm {
+  max-width: 460px;
+  margin: clamp(24px, 3vw, 36px) auto 0;
+  padding: clamp(20px, 2.5vw, 28px);
+  background: var(--surface, #faf7f2);
+  border: 1px solid var(--bundle-gold);
+  border-radius: 3px;
+  text-align: center;
+}
+.vessel-confirm__text {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  line-height: 1.5;
+  color: var(--ink, #1f1a16);
+  margin-bottom: 18px;
+}
+.vessel-confirm__actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+.vessel-confirm__cancel,
+.vessel-confirm__switch {
+  padding: 11px 28px;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+.vessel-confirm__cancel {
+  background: transparent;
+  border: 1px solid rgba(31, 26, 22, 0.24);
+  color: var(--smoke, #6b6259);
+}
+.vessel-confirm__cancel:hover { color: var(--ink, #1f1a16); border-color: var(--ink, #1f1a16); }
+.vessel-confirm__switch {
+  background: var(--ink, #1f1a16);
+  border: 1px solid var(--ink, #1f1a16);
+  color: var(--ivory, #faf7f2);
+}
+.vessel-confirm__switch:hover { opacity: 0.86; }
+
 /* ── Step 2 · Compose (revealed) ── */
 .bundle-split {
   display: grid;
