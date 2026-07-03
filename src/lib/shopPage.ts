@@ -203,8 +203,9 @@ function toCard(p: ShopProductInput, editions?: ReadonlyMap<string, { edition: s
     media: imageMedia(img?.url ?? GRADIENT, img?.alt_text ?? p.name, "portrait"),
     commerce: toProjection(p),
     edition,
-    // Product type on every card so a mixed listing stays clear.
-    collectionType: PRODUCT_TYPE_LABEL[productTypeOf(p)] ?? chapter?.name ?? undefined,
+    // The chapter name grounds the card in its collection (product type is a
+    // Refine filter, not card noise).
+    collectionType: chapter?.name ?? undefined,
     priceLabel: formatPrice(p).current,
     cta: { label: "View", href: `/shop/${p.slug}` },
   };

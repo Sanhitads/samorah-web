@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { X, ChevronDown } from "lucide-react";
@@ -44,7 +45,23 @@ export function ShopToolbar(props: ShopToolbarProps) {
   const { count, activeCount, sorts, activeSort } = props;
   const [refineOpen, setRefineOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
+  const sortRef = useRef<HTMLDivElement>(null);
   const activeSortLabel = sorts.find((s) => s.key === activeSort)?.label ?? "Featured";
+
+  // Close the sort menu on an outside click or Escape (hover-close was fragile).
+  useEffect(() => {
+    if (!sortOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (sortRef.current && !sortRef.current.contains(e.target as Node)) setSortOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setSortOpen(false);
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [sortOpen]);
 
   return (
     <div className="shop-toolbar">
@@ -55,7 +72,7 @@ export function ShopToolbar(props: ShopToolbarProps) {
           Refine{activeCount > 0 ? <span className="shop-toolbar__badge"> ({activeCount})</span> : null}
         </button>
 
-        <div className="shop-sort" onMouseLeave={() => setSortOpen(false)}>
+        <div className="shop-sort" ref={sortRef}>
           <button
             type="button"
             className="shop-sort__button"
@@ -71,9 +88,15 @@ export function ShopToolbar(props: ShopToolbarProps) {
             <ul className="shop-sort__menu" role="listbox">
               {sorts.map((s) => (
                 <li key={s.key} role="option" aria-selected={s.active}>
-                  <a href={s.href} className="shop-sort__opt" data-active={s.active}>
+                  <Link
+                    href={s.href}
+                    scroll={false}
+                    className="shop-sort__opt"
+                    data-active={s.active}
+                    onClick={() => setSortOpen(false)}
+                  >
                     {s.label}
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>
