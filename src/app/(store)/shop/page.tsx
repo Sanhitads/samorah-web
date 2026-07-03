@@ -57,23 +57,14 @@ export default async function ShopRoute({
           <div className="plp__facet">
             <span className="plp__facet-label">Type</span>
             <nav className="plp__filters" aria-label="Filter by product type">
-              {view.types.map((t) =>
-                t.disabled ? (
-                  <span key={t.key} className="plp__filter plp__filter--soon" aria-disabled="true">
-                    <span className="plp__filter-name">
-                      {t.label}
-                      <span className="plp__filter-count"> · Soon</span>
-                    </span>
+              {view.types.map((t) => (
+                <Link key={t.key} href={t.href} className="plp__filter" data-active={t.active} scroll={false}>
+                  <span className="plp__filter-name">
+                    {t.label}
+                    <span className="plp__filter-count"> ({t.count})</span>
                   </span>
-                ) : (
-                  <Link key={t.key} href={t.href} className="plp__filter" data-active={t.active} scroll={false}>
-                    <span className="plp__filter-name">
-                      {t.label}
-                      <span className="plp__filter-count"> ({t.count})</span>
-                    </span>
-                  </Link>
-                ),
-              )}
+                </Link>
+              ))}
             </nav>
           </div>
 

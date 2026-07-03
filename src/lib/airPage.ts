@@ -7,7 +7,7 @@
 import type { Page } from "@/platform/page";
 import type { SectionInstance } from "@/platform/section";
 import type { SeoMeta } from "@/platform/content";
-import type { AirVolume, HourGroup, HourGroupKind } from "@/config/theHours";
+import { airEditionOf, type AirVolume, type HourGroup, type HourGroupKind } from "@/config/theHours";
 import type { ChapterHeroSettings } from "@/lib/chapterPage";
 import {
   imageMedia,
@@ -21,6 +21,7 @@ export type HourAlign = "image-left" | "image-right";
 
 export interface HourBlockView {
   hourLabel: string; // "HOUR 07:00"
+  edition: string; // "VOL. I.1"
   moment: string; // "Morning Begins"
   name: string;
   category: string; // "Room Spray" · "Linen Spray"
@@ -55,9 +56,15 @@ export interface AirFutureVolumeSettings {
 
 const categoryOf = (kind: HourGroupKind) => (kind === "room" ? "Room Spray" : "Linen Spray");
 
-function toHourBlock(h: HourGroup["hours"][number], globalIndex: number, kind: HourGroupKind): HourBlockView {
+function toHourBlock(
+  h: HourGroup["hours"][number],
+  globalIndex: number,
+  kind: HourGroupKind,
+  volume: AirVolume,
+): HourBlockView {
   return {
     hourLabel: `HOUR ${h.time}`,
+    edition: airEditionOf(volume, h.productSlug),
     moment: h.moment,
     name: h.name,
     category: categoryOf(kind),
@@ -72,13 +79,13 @@ function toHourBlock(h: HourGroup["hours"][number], globalIndex: number, kind: H
   };
 }
 
-function toGroupSettings(group: HourGroup, startIndex: number): AirHoursGroupSettings {
+function toGroupSettings(group: HourGroup, startIndex: number, volume: AirVolume): AirHoursGroupSettings {
   return {
     kind: group.kind,
     label: group.label,
     title: group.title,
     note: group.note,
-    hours: group.hours.map((h, i) => toHourBlock(h, startIndex + i, group.kind)),
+    hours: group.hours.map((h, i) => toHourBlock(h, startIndex + i, group.kind, volume)),
     a11y: { headingLevel: 2, landmark: "region" },
   };
 }
@@ -133,14 +140,14 @@ export function buildAirVolumePage(vol: AirVolume): Page {
   const roomCount = room?.hours.length ?? 0;
   const sections: SectionInstance[] = [
     fill("hero", hero, { trackingId: "air:hero" }),
-    fill("hours-room", room ? toGroupSettings(room, 0) : {}, {
+    fill("hours-room", room ? toGroupSettings(room, 0, vol) : {}, {
       visibility: Boolean(room?.hours.length),
       trackingId: "air:room",
     }),
     // a quiet hairline between the groups — turning the page (no label; the
     // group headers carry the names)
     fill("hours-divider", {}, { visibility: Boolean(linen?.hours.length) }),
-    fill("hours-linen", linen ? toGroupSettings(linen, roomCount) : {}, {
+    fill("hours-linen", linen ? toGroupSettings(linen, roomCount, vol) : {}, {
       visibility: Boolean(linen?.hours.length),
       trackingId: "air:linen",
     }),

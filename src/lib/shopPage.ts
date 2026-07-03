@@ -213,17 +213,15 @@ export function buildShopPage(
   const forTypes = products.filter((p) => matchesChapter(p, activeChapter));
   const types: ShopFilterOption[] = [
     { key: "all", label: "All", href: href("all", activeChapter, "all", activeSort), active: activeType === "all", count: forTypes.length },
-    ...TYPE_FILTER.map((t) => {
-      const count = forTypes.filter((p) => productTypeOf(p) === t.key).length;
-      return {
-        key: t.key,
-        label: t.label,
-        href: href(t.key, activeChapter, "all", activeSort),
-        active: activeType === t.key,
-        count,
-        disabled: Boolean(t.future) && count === 0,
-      };
-    }),
+    // Only surface types that actually have products (future types appear
+    // automatically once seeded — the architecture already supports them).
+    ...TYPE_FILTER.map((t) => ({
+      key: t.key,
+      label: t.label,
+      href: href(t.key, activeChapter, "all", activeSort),
+      active: activeType === t.key,
+      count: forTypes.filter((p) => productTypeOf(p) === t.key).length,
+    })).filter((t) => t.count > 0),
   ];
 
   // Chapter facet — within the active type + vessel; in volume order.

@@ -53,6 +53,7 @@ function HourBlock({ hour, headingLevel }: { hour: HourBlockView; headingLevel: 
       </Link>
       <div className="hour-block__body">
         <p className="hour-block__hour">{hour.hourLabel}</p>
+        {hour.edition ? <p className="hour-block__edition">{hour.edition}</p> : null}
         {hour.moment ? <p className="hour-block__moment">{hour.moment}</p> : null}
         <H className="hour-block__name">{hour.name}</H>
         <p className="hour-block__category">{hour.category}</p>

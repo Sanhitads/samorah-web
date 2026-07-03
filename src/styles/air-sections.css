@@ -112,7 +112,14 @@ main[data-experience="air-chapters"] #hours-linen {
   letter-spacing: 0.3em;
   text-transform: uppercase;
   color: var(--accent, var(--gold));
-  margin-bottom: 8px;
+  margin-bottom: 6px;
+}
+.hour-block__edition {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  color: var(--accent, var(--gold));
+  margin-bottom: 14px;
 }
 .hour-block__moment {
   font-family: var(--font-serif);
