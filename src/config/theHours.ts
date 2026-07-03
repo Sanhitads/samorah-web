@@ -204,6 +204,19 @@ export const AIR_VOLUMES: AirVolume[] = [
   },
 ];
 
+/** Air numbering — "VOL. I.1" (the hour's position across the whole volume),
+ *  the Hours equivalent of the candle "NO. I.1" edition. */
+export function airEditionOf(volume: AirVolume, productSlug: string): string {
+  const allHours = volume.groups.flatMap((g) => g.hours);
+  const idx = allHours.findIndex((h) => h.productSlug === productSlug);
+  return `${volume.volume.replace(/volume/i, "Vol.").toUpperCase()}.${Math.max(0, idx) + 1}`;
+}
+
+/** The product-type key for an Hour's group (room → room_spray, linen → linen_spray). */
+export function airProductType(kind: HourGroupKind): "room_spray" | "linen_spray" {
+  return kind === "room" ? "room_spray" : "linen_spray";
+}
+
 /** Visible volumes. */
 export function getAirVolumes(): AirVolume[] {
   return AIR_VOLUMES.filter((v) => !v.isComingSoon);

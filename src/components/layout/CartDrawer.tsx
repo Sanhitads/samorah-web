@@ -229,12 +229,15 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                           />
                           <div className="cart-item__body">
                             {item.chapterName && <p className="cart-item__chapter">{item.chapterName}</p>}
-                            {item.edition && <p className="cart-item__edition">{noEdition(item.edition)}</p>}
+                            {item.edition && (
+                              <p className="cart-item__edition">{item.hour ? item.edition : noEdition(item.edition)}</p>
+                            )}
+                            {item.hour && <p className="cart-item__hour">Hour {item.hour}</p>}
                             <Link href={`/shop/${item.slug}`} className="cart-item__name" onClick={onClose}>
                               {item.name}
                             </Link>
                             <p className="cart-item__meta">
-                              {[capVessel(item.vessel), item.size].filter(Boolean).join(" • ")}
+                              {item.hour ? item.productType ?? "" : [capVessel(item.vessel), item.size].filter(Boolean).join(" • ")}
                             </p>
                             <p className="cart-item__price">{inr(item.price * item.qty)}</p>
                           </div>

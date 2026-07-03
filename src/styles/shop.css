@@ -87,6 +87,8 @@
   transition: color 0.3s ease;
 }
 .plp__filter-count { font-size: 9px; opacity: 0.6; }
+.plp__filter--soon { opacity: 0.4; cursor: not-allowed; }
+.plp__filter--soon .plp__filter-count { color: var(--plp-gold); }
 .plp__filter:hover .plp__filter-name { color: var(--ink, #1f1a16); }
 .plp__filter[data-active="true"] { background: var(--ink, #1f1a16); }
 .plp__filter[data-active="true"] .plp__filter-name { color: var(--ivory, #faf7f2); }

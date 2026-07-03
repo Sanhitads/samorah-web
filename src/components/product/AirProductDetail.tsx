@@ -58,10 +58,10 @@ export function AirProductDetail({
           <ProductGallery images={[{ src: hour.gradient, alt: hour.name }]} name={hour.name} />
 
         <div className="pdp__info">
-          <p className="pdp__edition">{edition}</p>
           <Link href={`/collections/${volume.slug}`} className="pdp__chapter">
             The Hours · {volume.title}
           </Link>
+          <p className="pdp__edition">{edition}</p>
           <h1 className="pdp__name">{hour.name}</h1>
           <p className="pdp__air-hour">Hour {hour.time} · {hour.moment}</p>
           <p className="pdp__tagline">{hour.story}</p>
@@ -73,6 +73,9 @@ export function AirProductDetail({
               slug: hour.productSlug,
               name: hour.name,
               chapterName: `The Hours · ${volume.title}`,
+              edition,
+              hour: hour.time,
+              productType: category,
               vessels: [],
               sizes: [],
               variants: [variant],

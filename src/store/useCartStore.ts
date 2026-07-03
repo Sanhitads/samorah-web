@@ -10,7 +10,9 @@ export interface CartProduct {
   price: number; // ALWAYS the full unit price — promotions are applied at cart level
   gradClass?: string;
   chapterName?: string; // "Vol. I — Dessert Chapter" (chapter label)
-  edition?: string; // "VOL. I.1"
+  edition?: string; // "NO. I.1" (candle) / "VOL. I.1" (air)
+  hour?: string; // Air only — "09:20"
+  productType?: string; // display label — "Room Spray" | "Linen Spray"
   /** Tags a line as part of a Discovery Composition (a cart-level promotion). */
   compositionId?: string;
 }
@@ -24,7 +26,9 @@ export interface CartItem {
   price: number; // full unit price (pre-discount)
   gradClass?: string;
   chapterName?: string; // chapter label ("Vol. I — Dessert Chapter")
-  edition?: string; // "VOL. I.1"
+  edition?: string; // "NO. I.1" / "VOL. I.1"
+  hour?: string; // Air only — "09:20"
+  productType?: string; // "Room Spray" | "Linen Spray"
   vessel: string;
   size: string;
   qty: number;
@@ -74,6 +78,8 @@ export const useCartStore = create<CartState>()(
                   gradClass: product.gradClass,
                   chapterName: product.chapterName,
                   edition: product.edition,
+                  hour: product.hour,
+                  productType: product.productType,
                   vessel,
                   size,
                   qty: 1,

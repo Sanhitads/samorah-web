@@ -195,9 +195,14 @@ export function CartView() {
                 />
                 <div className="cart-line__info">
                   {item.chapterName ? <p className="cart-line__chapter">{item.chapterName}</p> : null}
-                  {item.edition ? <span className="cart-line__edition">{noEdition(item.edition)}</span> : null}
+                  {item.edition ? (
+                    <span className="cart-line__edition">{item.hour ? item.edition : noEdition(item.edition)}</span>
+                  ) : null}
+                  {item.hour ? <p className="cart-line__hour">Hour {item.hour}</p> : null}
                   <Link href={`/shop/${item.slug}`} className="cart-line__name">{item.name}</Link>
-                  <p className="cart-line__variant">{variantLabel(item.vessel, item.size)}</p>
+                  <p className="cart-line__variant">
+                    {item.hour ? item.productType ?? "" : variantLabel(item.vessel, item.size)}
+                  </p>
                   <p className="cart-line__unit">{inr(item.price)} each</p>
                 </div>
 

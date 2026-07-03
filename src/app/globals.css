@@ -2838,6 +2838,14 @@ h1, h2, h3, h4 {
   margin-bottom: 5px;
 }
 
+.cart-item__hour {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--smoke);
+  margin-bottom: 5px;
+}
+
 .cart-item__name {
   font-family: var(--font-serif);
   font-size: 16px;

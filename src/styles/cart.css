@@ -95,6 +95,13 @@
   color: var(--cart-gold);
   margin-bottom: 6px;
 }
+.cart-line__hour {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--smoke, #6b6259);
+  margin-bottom: 6px;
+}
 
 /* ── Discovery Composition as one parent item (a quiet curated panel) ── */
 .cart-line--composition { display: block; padding: 0; border-bottom: none; }

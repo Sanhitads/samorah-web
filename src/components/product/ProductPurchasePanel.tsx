@@ -16,7 +16,9 @@ export interface PurchaseProduct {
   slug: string;
   name: string;
   chapterName: string | null; // chapter label ("Vol. I — Dessert Chapter")
-  edition?: string; // "VOL. I.1"
+  edition?: string; // "NO. I.1" / "VOL. I.1"
+  hour?: string; // Air only — "09:20"
+  productType?: string; // "Room Spray" | "Linen Spray"
   vessels: string[];
   sizes: string[];
   variants: ProductVariantView[];
@@ -51,6 +53,8 @@ export function ProductPurchasePanel({ product }: { product: PurchaseProduct }) 
         price: current.price,
         chapterName: product.chapterName ?? undefined,
         edition: product.edition,
+        hour: product.hour,
+        productType: product.productType,
       },
       vessel,
       size,
