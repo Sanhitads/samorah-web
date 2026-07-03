@@ -91,6 +91,15 @@
   color: var(--ink-muted, var(--muted));
   margin-top: 12px;
 }
+.product-card__type {
+  display: block;
+  font-family: var(--font-sans);
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent, var(--gold));
+  margin-top: 5px;
+}
 .product-card__tagline {
   font-family: var(--font-serif);
   font-style: italic;

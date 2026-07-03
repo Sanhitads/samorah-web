@@ -30,6 +30,9 @@ export interface ProductCardModel {
   edition?: string;
   /** "Core Collection" | "Limited Collection" | … shown under the name. */
   collectionType?: string;
+  /** Product-type label ("Room Spray" / "Linen Spray") — used where a mixed
+   *  listing needs the category (e.g. Air products on the Shop grid). */
+  productTypeLabel?: string;
   /** Editorial price label ("From ₹899"); falls back to the projection display. */
   priceLabel?: string;
   /** The action label/target — from settings, not hardcoded. */
@@ -64,7 +67,7 @@ export function ProductCard({
   if (state === "hidden") return null;
 
   const caps = { ...DEFAULT_CARD_CAPABILITIES, ...capabilities };
-  const { slug, name, tagline, media, commerce, cta, edition, collectionType, priceLabel } = product;
+  const { slug, name, tagline, media, commerce, cta, edition, collectionType, productTypeLabel, priceLabel } = product;
   const aspect = media.aspect ?? "portrait";
   const level = a11y?.headingLevel ?? 3;
   const Heading = `h${level}` as keyof JSX.IntrinsicElements;
@@ -104,6 +107,7 @@ export function ProductCard({
           <Heading className="product-card__name">{name}</Heading>
           {tagline ? <p className="product-card__tagline">{tagline}</p> : null}
           {collectionType ? <span className="product-card__collection">{collectionType}</span> : null}
+          {productTypeLabel ? <span className="product-card__type">{productTypeLabel}</span> : null}
           {caps.price ? (
             <span className="product-card__price">{priceLabel ?? commerce.priceRange.display}</span>
           ) : null}

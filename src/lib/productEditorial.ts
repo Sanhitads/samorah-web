@@ -8,7 +8,7 @@ import type { SectionInstance } from "@/platform/section";
 import { composeSections } from "@/platform/template";
 import { CANDLE_PDP_TEMPLATE, AIR_PDP_TEMPLATE } from "@/platform/coreTemplates";
 import type { ProductPageView } from "@/lib/productPage";
-import type { AirVolume, HourEntry } from "@/config/theHours";
+import { airEditionOf, type AirVolume, type HourEntry } from "@/config/theHours";
 import type { Artist } from "@/config/artist";
 import { getTestimonials } from "@/config/testimonials";
 import type { ProductCardModel } from "@/components/ui/ProductCard";
@@ -368,11 +368,12 @@ export interface AirEditorialInput {
   others: HourEntry[];
 }
 
-function toHourCard(h: HourEntry): ProductCardModel {
+function toHourCard(h: HourEntry, volume: AirVolume): ProductCardModel {
   return {
     slug: h.productSlug,
     name: h.name,
     tagline: h.feels[0] ?? h.scent.join(" · "),
+    edition: airEditionOf(volume, h.productSlug), // "VOL. I.3"
     media: imageMedia(h.gradient, h.name, "portrait"),
     priceLabel: h.priceLabel,
     commerce: { priceRange: { min: h.price, max: h.price, display: h.priceLabel } },
@@ -448,7 +449,7 @@ export function buildAirEditorial({ hour, volume, others }: AirEditorialInput): 
     fill("related", {
       eyebrow: "Continue",
       heading: `Continue ${volume.title}`,
-      products: others.map(toHourCard),
+      products: others.map((h) => toHourCard(h, volume)),
     } satisfies RelatedProductsSettings, { visibility: others.length > 0 }),
   ];
 

@@ -194,6 +194,7 @@ function sortProducts(list: ShopProductInput[], sort: ShopSort): ShopProductInpu
 function toCard(p: ShopProductInput, editions?: ReadonlyMap<string, { edition: string }>): ProductCardModel {
   const img = primaryImage(p.product_images);
   const chapter = p.collection;
+  const type = productTypeOf(p);
   // Prefer the full "NO. IV.1" numbering; fall back to the volume when unmapped.
   const edition = editions?.get(p.slug)?.edition ?? (chapter?.volume ? chapter.volume.toUpperCase() : undefined);
   return {
@@ -206,6 +207,10 @@ function toCard(p: ShopProductInput, editions?: ReadonlyMap<string, { edition: s
     // The chapter name grounds the card in its collection (product type is a
     // Refine filter, not card noise).
     collectionType: chapter?.name ?? undefined,
+    // Air products are sprays within one chapter — surface the category so a
+    // mixed Shop listing reads clearly (candles omit it; their chapter suffices).
+    productTypeLabel:
+      type === "room_spray" || type === "linen_spray" ? PRODUCT_TYPE_LABEL[type] : undefined,
     priceLabel: formatPrice(p).current,
     cta: { label: "View", href: `/shop/${p.slug}` },
   };

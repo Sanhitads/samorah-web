@@ -49,7 +49,7 @@ export default async function ShopRoute({
     <main className="plp">
       <header className="plp__head">
         <p className="plp__eyebrow">The Shop</p>
-        <h1 className="plp__title">All Products</h1>
+        <h1 className="plp__title">The Collection</h1>
       </header>
 
       <ShopToolbar
