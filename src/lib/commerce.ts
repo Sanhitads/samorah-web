@@ -1,84 +1,84 @@
 /**
  * Commerce money engine — the ONE place order totals are computed, GST-compliant
- * for India. Pipeline (in order):
+ * for India, in INTEGER PAISE (no float drift). Pipeline (in order):
  *   line totals → promotions (allocated per line) → per-line taxable + GST
- *   extraction at the line's HSN rate → aggregate → shipping + shipping GST
- *   (composite supply) → CGST/SGST vs IGST split → gift cards → amount payable.
+ *   extraction at the line's OWN HSN rate → aggregate → shipping + shipping GST
+ *   (composite supply, principal rate) → CGST/SGST vs IGST split → gift card
+ *   (payment) → amount payable.
  *
  * GST is NEVER extracted from a discounted CART total — each line is discounted
- * (pro-rata) first, then GST is extracted per line at its own rate, then summed.
- * Money is GST-inclusive throughout. `buildCartSummary` / `calculateOrderTotals`
- * are thin views over this engine (unchanged public API).
+ * (pro-rata) first, then GST is extracted per line, then summed. Every money
+ * field returned is PAISE (integer); the UI is the only place it becomes rupees.
+ * `buildCartSummary` / `calculateOrderTotals` are thin views over this engine.
  */
 import {
   DEFAULT_TAX_CLASS,
   SHIPPING,
   STORE_STATE,
   TAX_CLASSES,
+  TAX_VERSION,
   estimateShipping,
 } from "@/config/commerce";
-import { computePromotions, type AppliedPromotion, type PromoLine } from "@/lib/promotions";
+import { toPaise, extractPaise } from "@/lib/money";
+import { computePromotions, type PromotionSnapshot, type PromoLine } from "@/lib/promotions";
 
-const round2 = (n: number) => Math.round(n * 100) / 100;
 const norm = (s: string) => s.trim().toLowerCase();
 
 /** A priced line the engine taxes. Carries its tax class → HSN + GST rate. */
 export interface CommerceLine {
   key: string;
   name: string;
-  unitPrice: number; // GST-inclusive
+  unitPrice: number; // rupees (source)
   qty: number;
   taxClass: string; // key into TAX_CLASSES
   compositionId?: string;
 }
 
+/** All money fields in PAISE (integer). */
 export interface LineBreakdown {
   key: string;
   name: string;
   qty: number;
-  unitPrice: number;
-  lineTotal: number; // inclusive, pre-discount
-  discount: number; // allocated promotion
-  netInclusive: number; // lineTotal − discount
+  unitPrice: number; // paise
+  lineTotal: number; // paise, inclusive, pre-discount
+  discount: number; // paise allocated
+  netInclusive: number; // paise
   hsn: string;
   gstRate: number;
-  taxableValue: number; // extracted from netInclusive
-  gst: number;
+  taxableValue: number; // paise
+  gst: number; // paise
 }
 
+/** All money fields in PAISE (integer). */
 export interface OrderTotals {
-  subtotal: number; // Σ lineTotal (inclusive, pre-discount)
-  discount: number; // promotions
-  goodsTotal: number; // Σ netInclusive
+  subtotal: number;
+  discount: number;
+  goodsTotal: number;
   shipping: number;
   shippingTaxable: number;
   shippingGst: number;
   shippingGstRate: number;
   freeShipping: boolean;
-  freeShippingRemaining: number;
-  taxableValue: number; // goods + shipping
-  gst: number; // goods + shipping
-  gstRate: number; // principal rate (for display)
+  freeShippingRemaining: number; // paise
+  taxableValue: number;
+  gst: number;
+  gstRate: number; // principal rate (display)
   interState: boolean;
   cgst: number;
   sgst: number;
   igst: number;
   giftCard: number;
-  total: number; // goodsTotal + shipping (inclusive)
-  payable: number; // total − giftCard
+  total: number;
+  payable: number;
+  taxVersion: string; // stamped so historical invoices never depend on live config
   lines: LineBreakdown[];
-  promotions: AppliedPromotion[];
+  promotions: PromotionSnapshot[];
+  promotionsSkipped: { code: string; reason: string }[];
 }
 
 const classOf = (taxClass: string) => TAX_CLASSES[taxClass] ?? TAX_CLASSES[DEFAULT_TAX_CLASS];
 
-/** Extract GST from a GST-inclusive amount at a rate. */
-function extract(inclusive: number, rate: number): { taxable: number; gst: number } {
-  const taxable = round2(inclusive / (1 + rate / 100));
-  return { taxable, gst: round2(inclusive - taxable) };
-}
-
-/** The principal (dominant-by-value) rate — shipping GST follows it (composite). */
+/** Principal (dominant-by-value) rate — shipping GST follows it (composite). */
 function principalRate(lines: LineBreakdown[]): number {
   const byRate = new Map<number, number>();
   for (const l of lines) byRate.set(l.gstRate, (byRate.get(l.gstRate) ?? 0) + l.netInclusive);
@@ -90,11 +90,11 @@ function principalRate(lines: LineBreakdown[]): number {
 
 export interface ComputeOpts {
   state?: string;
-  giftCard?: number;
+  giftCard?: number; // paise
   couponCode?: string;
 }
 
-/** The full GST-compliant order totals for a set of lines. */
+/** The full GST-compliant order totals (paise) for a set of lines. */
 export function computeOrderTotals(lines: CommerceLine[], opts: ComputeOpts = {}): OrderTotals {
   const promoLines: PromoLine[] = lines.map((l) => ({
     key: l.key,
@@ -102,20 +102,21 @@ export function computeOrderTotals(lines: CommerceLine[], opts: ComputeOpts = {}
     qty: l.qty,
     compositionId: l.compositionId,
   }));
-  const promo = computePromotions(promoLines, opts.couponCode);
+  const promo = computePromotions(promoLines, opts.couponCode); // byLine in paise
 
-  // Per-line: discount → net → GST extraction at the line's own rate.
+  // Per line: discount → net → GST extraction at the line's own rate (paise).
   const breakdown: LineBreakdown[] = lines.map((l) => {
-    const lineTotal = round2(l.unitPrice * l.qty);
-    const discount = round2(promo.byLine[l.key] ?? 0);
-    const netInclusive = round2(lineTotal - discount);
+    const unitPrice = toPaise(l.unitPrice);
+    const lineTotal = unitPrice * l.qty;
+    const discount = promo.byLine[l.key] ?? 0;
+    const netInclusive = lineTotal - discount;
     const cls = classOf(l.taxClass);
-    const { taxable, gst } = extract(netInclusive, cls.gstRate);
+    const { taxable, gst } = extractPaise(netInclusive, cls.gstRate);
     return {
       key: l.key,
       name: l.name,
       qty: l.qty,
-      unitPrice: l.unitPrice,
+      unitPrice,
       lineTotal,
       discount,
       netInclusive,
@@ -126,29 +127,30 @@ export function computeOrderTotals(lines: CommerceLine[], opts: ComputeOpts = {}
     };
   });
 
-  const subtotal = round2(breakdown.reduce((s, l) => s + l.lineTotal, 0));
-  const discount = round2(breakdown.reduce((s, l) => s + l.discount, 0));
-  const goodsTotal = round2(breakdown.reduce((s, l) => s + l.netInclusive, 0));
-  const goodsTaxable = round2(breakdown.reduce((s, l) => s + l.taxableValue, 0));
-  const goodsGst = round2(breakdown.reduce((s, l) => s + l.gst, 0));
+  const subtotal = breakdown.reduce((s, l) => s + l.lineTotal, 0);
+  const discount = breakdown.reduce((s, l) => s + l.discount, 0);
+  const goodsTotal = breakdown.reduce((s, l) => s + l.netInclusive, 0);
+  const goodsTaxable = breakdown.reduce((s, l) => s + l.taxableValue, 0);
+  const goodsGst = breakdown.reduce((s, l) => s + l.gst, 0);
 
   // Shipping — a taxable composite supply; GST at the principal rate.
-  const freeShipping = promo.freeShipping || estimateShipping(goodsTotal) === 0;
-  const shipping = freeShipping ? 0 : estimateShipping(goodsTotal);
+  const freeThreshold = toPaise(SHIPPING.freeThreshold);
+  const freeShipping = promo.freeShipping || goodsTotal >= freeThreshold;
+  const shipping = freeShipping ? 0 : toPaise(estimateShipping(SHIPPING.freeThreshold - 1)); // flat rate
   const shippingGstRate = principalRate(breakdown);
-  const ship = extract(shipping, shippingGstRate);
+  const ship = extractPaise(shipping, shippingGstRate);
 
-  const taxableValue = round2(goodsTaxable + ship.taxable);
-  const gst = round2(goodsGst + ship.gst);
+  const taxableValue = goodsTaxable + ship.taxable;
+  const gst = goodsGst + ship.gst;
 
   const interState = opts.state ? norm(opts.state) !== norm(STORE_STATE) : false;
-  const cgst = interState ? 0 : round2(gst / 2);
-  const sgst = interState ? 0 : round2(gst - cgst);
+  const cgst = interState ? 0 : Math.round(gst / 2);
+  const sgst = interState ? 0 : gst - cgst;
   const igst = interState ? gst : 0;
 
-  const total = round2(goodsTotal + shipping);
-  const giftCard = round2(Math.min(opts.giftCard ?? 0, total));
-  const payable = round2(total - giftCard);
+  const total = goodsTotal + shipping;
+  const giftCard = Math.min(opts.giftCard ?? 0, total);
+  const payable = total - giftCard;
 
   return {
     subtotal,
@@ -159,7 +161,7 @@ export function computeOrderTotals(lines: CommerceLine[], opts: ComputeOpts = {}
     shippingGst: ship.gst,
     shippingGstRate,
     freeShipping: freeShipping && goodsTotal > 0,
-    freeShippingRemaining: goodsTotal >= SHIPPING.freeThreshold ? 0 : SHIPPING.freeThreshold - goodsTotal,
+    freeShippingRemaining: goodsTotal >= freeThreshold ? 0 : freeThreshold - goodsTotal,
     taxableValue,
     gst,
     gstRate: shippingGstRate,
@@ -170,8 +172,10 @@ export function computeOrderTotals(lines: CommerceLine[], opts: ComputeOpts = {}
     giftCard,
     total,
     payable,
+    taxVersion: TAX_VERSION,
     lines: breakdown,
     promotions: promo.applied,
+    promotionsSkipped: promo.skipped,
   };
 }
 

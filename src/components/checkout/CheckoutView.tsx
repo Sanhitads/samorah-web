@@ -11,9 +11,9 @@ import {
   type AddressForm,
 } from "@/lib/checkout";
 import { INDIAN_STATES, COMMERCE } from "@/config/commerce";
+import { formatPaise, formatPaise2 } from "@/lib/money";
 
-const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`;
-const money = (n: number) => `₹${(Math.round(n * 100) / 100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`; // rupee line inputs
 
 const ADDRESS_FIELDS: { name: keyof AddressForm; label: string; type?: string; half?: boolean; placeholder?: string }[] = [
   { name: "fullName", label: "Full name" },
@@ -229,27 +229,27 @@ export function CheckoutView() {
           </div>
 
           <div className="checkout__totals">
-            <div className="checkout__row"><span>Subtotal</span><span>{inr(totals.subtotal)}</span></div>
+            <div className="checkout__row"><span>Subtotal</span><span>{formatPaise(totals.subtotal)}</span></div>
             {totals.discount > 0 ? (
               <div className="checkout__row checkout__row--discount">
                 <span>Discovery Composition Savings ({COMPOSITION_DISCOUNT_PCT}%)</span>
-                <span>−{inr(totals.discount)}</span>
+                <span>−{formatPaise(totals.discount)}</span>
               </div>
             ) : null}
             <div className="checkout__row">
               <span>Shipping{totals.freeShipping ? "" : " (estimate)"}</span>
-              <span>{totals.freeShipping ? "Free" : inr(totals.shipping)}</span>
+              <span>{totals.freeShipping ? "Free" : formatPaise(totals.shipping)}</span>
             </div>
-            <div className="checkout__row checkout__row--muted"><span>Taxable value</span><span>{money(totals.taxableValue)}</span></div>
+            <div className="checkout__row checkout__row--muted"><span>Taxable value</span><span>{formatPaise2(totals.taxableValue)}</span></div>
             {totals.interState ? (
-              <div className="checkout__row checkout__row--muted"><span>IGST</span><span>{money(totals.igst)}</span></div>
+              <div className="checkout__row checkout__row--muted"><span>IGST</span><span>{formatPaise2(totals.igst)}</span></div>
             ) : (
               <>
-                <div className="checkout__row checkout__row--muted"><span>CGST</span><span>{money(totals.cgst)}</span></div>
-                <div className="checkout__row checkout__row--muted"><span>SGST</span><span>{money(totals.sgst)}</span></div>
+                <div className="checkout__row checkout__row--muted"><span>CGST</span><span>{formatPaise2(totals.cgst)}</span></div>
+                <div className="checkout__row checkout__row--muted"><span>SGST</span><span>{formatPaise2(totals.sgst)}</span></div>
               </>
             )}
-            <div className="checkout__row checkout__row--total"><span>Total</span><span>{inr(totals.total)}</span></div>
+            <div className="checkout__row checkout__row--total"><span>Total</span><span>{formatPaise(totals.total)}</span></div>
             <p className="checkout__tax-note">
               Inclusive of GST{ship.state ? `, billed as ${totals.interState ? "IGST" : "CGST + SGST"}` : ""}. Mixed
               rates are extracted per item (per HSN).

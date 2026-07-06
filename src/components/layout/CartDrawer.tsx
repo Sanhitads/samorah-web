@@ -15,6 +15,7 @@ import {
 import { useCompositionStore } from "@/store/useCompositionStore";
 import { composeComposition } from "@/lib/bundle";
 import { buildCartSummary } from "@/lib/cart";
+import { formatPaise } from "@/lib/money";
 
 const NUM_WORD = ["Zero", "One", "Two", "Three", "Four", "Five", "Six"];
 const countWord = (n: number) => NUM_WORD[n] ?? String(n);
@@ -280,21 +281,21 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                     <>
                       <div className="cart-drawer__line">
                         <span>Subtotal</span>
-                        <span>{inr(subtotal)}</span>
+                        <span>{formatPaise(subtotal)}</span>
                       </div>
                       <div className="cart-drawer__line cart-drawer__line--discount">
                         <span>Discovery Composition Savings ({COMPOSITION_DISCOUNT_PCT}%)</span>
-                        <span>−{inr(compositionDiscount)}</span>
+                        <span>−{formatPaise(compositionDiscount)}</span>
                       </div>
                       <div className="cart-drawer__subtotal">
                         <span>Total</span>
-                        <span>{inr(total)}</span>
+                        <span>{formatPaise(total)}</span>
                       </div>
                     </>
                   ) : (
                     <div className="cart-drawer__subtotal">
                       <span>Subtotal</span>
-                      <span>{inr(subtotal)}</span>
+                      <span>{formatPaise(subtotal)}</span>
                     </div>
                   )}
                   <Link

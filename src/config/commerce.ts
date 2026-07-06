@@ -31,11 +31,16 @@ export const COMMERCE = {
     /** Days after delivery a return/exchange is accepted (handcrafted — narrow). */
     returnWindowDays: 2,
     cancellation: "Orders may be cancelled before dispatch. Once shipped, our returns policy applies.",
+    /** An order may be cancelled by the customer up to (and including) this status. */
+    cancellableUntil: "packed" as const,
     termsHref: "/terms",
     privacyHref: "/privacy",
     shippingReturnsHref: "/shipping",
   },
 } as const;
+
+/** Stock is held this long after create-order; the expiry cron releases it. */
+export const RESERVATION_TTL_MINUTES = 15;
 
 // ── Tax (per HSN — never a single global rate) ────────────────────────────────
 export interface TaxClass {
@@ -63,6 +68,13 @@ export const DEFAULT_TAX_CLASS = "candle";
 /** Shipping is a taxable service (HSN 9968). GST on shipping follows the
  *  principal supply rate (composite supply) — resolved per-cart, not fixed. */
 export const SHIPPING_HSN = "9968";
+
+/**
+ * Tax-rule version stamped on every order, so a future GST change never alters a
+ * historical invoice (the order keeps its `taxVersion`; new orders use the new
+ * rules). Bump this string whenever any HSN/rate in TAX_CLASSES changes.
+ */
+export const TAX_VERSION = "GST_2026_01";
 
 /** @deprecated single-rate shim — kept only for legacy callers; use TAX_CLASSES. */
 export const GST_RATE = TAX_CLASSES.candle.gstRate;

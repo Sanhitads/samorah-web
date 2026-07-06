@@ -12,6 +12,7 @@ import {
 import { useCompositionStore } from "@/store/useCompositionStore";
 import { buildCartSummary } from "@/lib/cart";
 import { composeComposition } from "@/lib/bundle";
+import { formatPaise } from "@/lib/money";
 
 const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s);
@@ -236,29 +237,29 @@ export function CartView() {
 
           <div className="cart-summary__row">
             <span>Subtotal</span>
-            <span>{inr(summary.subtotal)}</span>
+            <span>{formatPaise(summary.subtotal)}</span>
           </div>
           {summary.discount > 0 ? (
             <div className="cart-summary__row cart-summary__row--discount">
               <span>Discovery Composition Savings ({COMPOSITION_DISCOUNT_PCT}%)</span>
-              <span>−{inr(summary.discount)}</span>
+              <span>−{formatPaise(summary.discount)}</span>
             </div>
           ) : null}
           <div className="cart-summary__row">
             <span>Shipping{summary.freeShipping ? "" : " (estimate)"}</span>
-            <span>{summary.freeShipping ? "Free" : inr(summary.shipping)}</span>
+            <span>{summary.freeShipping ? "Free" : formatPaise(summary.shipping)}</span>
           </div>
           {!summary.freeShipping && summary.freeShippingRemaining > 0 ? (
             <p className="cart-summary__nudge">
-              Add {inr(summary.freeShippingRemaining)} more for complimentary shipping.
+              Add {formatPaise(summary.freeShippingRemaining)} more for complimentary shipping.
             </p>
           ) : null}
 
           <div className="cart-summary__row cart-summary__row--total">
             <span>Total</span>
-            <span>{inr(summary.total)}</span>
+            <span>{formatPaise(summary.total)}</span>
           </div>
-          <p className="cart-summary__tax">Inclusive of GST ({summary.gstRate}%) · {inr(summary.gst)}</p>
+          <p className="cart-summary__tax">Inclusive of GST ({summary.gstRate}%) · {formatPaise(summary.gst)}</p>
 
           <Link href="/checkout" className="atc-btn cart-summary__checkout">Proceed to Checkout</Link>
           <Link href="/shop" className="cart-summary__continue">Continue Exploring</Link>
