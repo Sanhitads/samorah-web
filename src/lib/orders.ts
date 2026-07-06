@@ -156,6 +156,17 @@ export function canCancel(status: OrderStatus): boolean {
   return at >= 0 && until >= 0 && at <= until;
 }
 
+// ── Zero-rupee bypass — never send a ₹0 order to Razorpay ─────────────────────
+/**
+ * When a gift card / loyalty covers the whole payable (₹0), Razorpay cannot
+ * process it. `requiresPayment` is false → the server confirms the order
+ * internally (mark paid · allocate invoice · consume stock · fire the same
+ * webhook side-effects + emails) WITHOUT opening the Razorpay overlay.
+ */
+export function requiresPayment(payablePaise: number): boolean {
+  return payablePaise > 0;
+}
+
 // ── Razorpay retry — reuse an existing order rather than creating duplicates ───
 /**
  * On a retry, reuse the SAME Razorpay order while payment is still open (pending /

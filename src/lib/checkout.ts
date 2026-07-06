@@ -55,3 +55,32 @@ export function fieldErrors<T>(schema: z.ZodType<T>, values: unknown): Record<st
 
 /** Back-compat helper (shipping address). */
 export const validateAddress = (values: Partial<AddressForm>) => fieldErrors(addressSchema, values);
+
+// ── PIN ↔ state cross-check (place-of-supply integrity) ───────────────────────
+// A wrong state dropdown vs the PIN would compute CGST/SGST instead of IGST → an
+// illegal invoice. We map the high-confidence 2-digit PIN prefixes to their state
+// and flag only a CONFIDENT mismatch (unknown prefixes never block).
+const range = (from: number, to: number, state: string): [string, string][] => {
+  const out: [string, string][] = [];
+  for (let n = from; n <= to; n++) out.push([String(n).padStart(2, "0"), state]);
+  return out;
+};
+export const PIN_STATE: Record<string, string> = Object.fromEntries([
+  ["11", "Delhi"],
+  ["17", "Himachal Pradesh"],
+  ...range(30, 34, "Rajasthan"),
+  ...range(36, 39, "Gujarat"),
+  ...range(40, 44, "Maharashtra"),
+  ...range(56, 59, "Karnataka"),
+  ...range(60, 64, "Tamil Nadu"),
+  ...range(67, 69, "Kerala"),
+  ...range(70, 74, "West Bengal"),
+  ["78", "Assam"],
+]);
+
+/** True when the PIN's region confidently belongs to a DIFFERENT state. */
+export function pinStateMismatch(pin: string, state: string): boolean {
+  if (!/^\d{6}$/.test(pin) || !state) return false;
+  const expected = PIN_STATE[pin.slice(0, 2)];
+  return Boolean(expected) && expected.toLowerCase() !== state.trim().toLowerCase();
+}

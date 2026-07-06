@@ -78,14 +78,12 @@ export interface OrderTotals {
 
 const classOf = (taxClass: string) => TAX_CLASSES[taxClass] ?? TAX_CLASSES[DEFAULT_TAX_CLASS];
 
-/** Principal (dominant-by-value) rate — shipping GST follows it (composite). */
-function principalRate(lines: LineBreakdown[]): number {
-  const byRate = new Map<number, number>();
-  for (const l of lines) byRate.set(l.gstRate, (byRate.get(l.gstRate) ?? 0) + l.netInclusive);
-  let rate = classOf(DEFAULT_TAX_CLASS).gstRate;
-  let max = -1;
-  for (const [r, v] of byRate) if (v > max) ((max = v), (rate = r));
-  return rate;
+/** Shipping GST rate = the HIGHEST rate present in the cart. Freight bundled with
+ *  mixed-rate goods is a composite/mixed supply that attracts the highest rate
+ *  (conservative + matches the tax matrix): all-candle → 12%, candle+spray → 18%. */
+function shippingRate(lines: LineBreakdown[]): number {
+  if (lines.length === 0) return classOf(DEFAULT_TAX_CLASS).gstRate;
+  return Math.max(...lines.map((l) => l.gstRate));
 }
 
 export interface ComputeOpts {
@@ -135,9 +133,11 @@ export function computeOrderTotals(lines: CommerceLine[], opts: ComputeOpts = {}
 
   // Shipping — a taxable composite supply; GST at the principal rate.
   const freeThreshold = toPaise(SHIPPING.freeThreshold);
-  const freeShipping = promo.freeShipping || goodsTotal >= freeThreshold;
-  const shipping = freeShipping ? 0 : toPaise(estimateShipping(SHIPPING.freeThreshold - 1)); // flat rate
-  const shippingGstRate = principalRate(breakdown);
+  // Free when a promo grants it, the threshold is met, OR there's nothing to ship
+  // (a fully-discounted / empty order carries no shipping and therefore no GST).
+  const freeShip = promo.freeShipping || goodsTotal >= freeThreshold || goodsTotal <= 0;
+  const shipping = freeShip ? 0 : toPaise(estimateShipping(SHIPPING.freeThreshold - 1)); // flat rate
+  const shippingGstRate = shippingRate(breakdown);
   const ship = extractPaise(shipping, shippingGstRate);
 
   const taxableValue = goodsTaxable + ship.taxable;
@@ -160,7 +160,7 @@ export function computeOrderTotals(lines: CommerceLine[], opts: ComputeOpts = {}
     shippingTaxable: ship.taxable,
     shippingGst: ship.gst,
     shippingGstRate,
-    freeShipping: freeShipping && goodsTotal > 0,
+    freeShipping: freeShip && goodsTotal > 0,
     freeShippingRemaining: goodsTotal >= freeThreshold ? 0 : freeThreshold - goodsTotal,
     taxableValue,
     gst,

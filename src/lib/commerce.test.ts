@@ -1,5 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { computeOrderTotals, type CommerceLine } from "@/lib/commerce";
+import { requiresPayment } from "@/lib/orders";
+import { COUPONS, type Coupon } from "@/lib/promotions";
 import { TAX_VERSION } from "@/config/commerce";
 
 const line = (key: string, price: number, taxClass = "candle", qty = 1, compositionId?: string): CommerceLine => ({
@@ -90,4 +92,49 @@ describe("commerce engine — GST-compliant totals (paise)", () => {
     expect(intra.interState).toBe(false);
     expect(intra.igst).toBe(0);
   });
+
+  // ── Additions from the Commerce Test Matrix ──
+  it("GST-004 — mixed cart: shipping taxed at the HIGHEST rate (18%)", () => {
+    const t = computeOrderTotals([line("a", 899, "candle"), line("b", 499, "room_spray")], { state: "Maharashtra" });
+    expect(t.freeShipping).toBe(false); // 1398 < 1499
+    expect(t.shipping).toBe(9900);
+    expect(t.shippingGstRate).toBe(18); // highest rate present
+    expect(t.shippingGst).toBe(9900 - Math.round(9900 / 1.18));
+  });
+
+  it("GST-005 — line-item taxes sum EXACTLY to the header (no 1-paisa drift)", () => {
+    const t = computeOrderTotals(
+      [line("a", 899, "candle"), line("b", 499, "room_spray"), line("c", 333, "linen_spray")],
+      { state: "Karnataka" },
+    );
+    const lineGst = t.lines.reduce((s, l) => s + l.gst, 0);
+    const lineTax = t.lines.reduce((s, l) => s + l.taxableValue, 0);
+    expect(lineGst + t.shippingGst).toBe(t.gst);
+    expect(lineTax + t.shippingTaxable).toBe(t.taxableValue);
+    expect(t.cgst + t.sgst + t.igst).toBe(t.gst);
+  });
+
+  it("GC-001 — gift card covering the total → payable ₹0, Razorpay bypassed", () => {
+    const t = computeOrderTotals([line("a", 899)], { state: "Maharashtra", giftCard: 9_99_999 });
+    expect(t.payable).toBe(0);
+    expect(requiresPayment(t.payable)).toBe(false);
+    expect(requiresPayment(t.total)).toBe(true); // the order still has value
+  });
+
+  it("GST-006 — 100% discount (free order) → taxable ₹0, GST ₹0, no shipping", () => {
+    const c: Coupon = {
+      code: "FREE100", label: "Free", campaign: "x", version: "v1", priority: 5,
+      stackable: true, exclusive: false, combinableWith: ["*"], type: "percentage", value: 100, active: true,
+    };
+    COUPONS.push(c);
+    const t = computeOrderTotals([line("a", 899)], { state: "Maharashtra", couponCode: "FREE100" });
+    expect(t.goodsTotal).toBe(0);
+    expect(t.shipping).toBe(0);
+    expect(t.gst).toBe(0);
+    expect(t.taxableValue).toBe(0);
+  });
+});
+
+afterEach(() => {
+  COUPONS.length = 0;
 });

@@ -8,6 +8,7 @@ import {
   addressSchema,
   businessSchema,
   fieldErrors,
+  pinStateMismatch,
   type AddressForm,
 } from "@/lib/checkout";
 import { INDIAN_STATES, COMMERCE } from "@/config/commerce";
@@ -68,7 +69,13 @@ export function CheckoutView() {
     e.preventDefault();
     const found: Record<string, string> = {};
     Object.entries(fieldErrors(addressSchema, ship)).forEach(([k, v]) => (found[`ship_${k}`] = v));
-    if (!billSame) Object.entries(fieldErrors(addressSchema, bill)).forEach(([k, v]) => (found[`bill_${k}`] = v));
+    if (!found.ship_pincode && pinStateMismatch(ship.pincode, ship.state))
+      found.ship_pincode = "PIN code does not match the selected state";
+    if (!billSame) {
+      Object.entries(fieldErrors(addressSchema, bill)).forEach(([k, v]) => (found[`bill_${k}`] = v));
+      if (!found.bill_pincode && pinStateMismatch(bill.pincode, bill.state))
+        found.bill_pincode = "PIN code does not match the selected state";
+    }
     if (wantGst) Object.entries(fieldErrors(businessSchema, biz)).forEach(([k, v]) => (found[k] = v));
     if (!consent) found.consent = "Please accept to continue";
     setErrors(found);
