@@ -12,7 +12,9 @@
  * `buildCartSummary` / `calculateOrderTotals` are thin views over this engine.
  */
 import {
+  COMMERCE_ENGINE_VERSION,
   DEFAULT_TAX_CLASS,
+  PRICING_VERSION,
   SHIPPING,
   STORE_STATE,
   TAX_CLASSES,
@@ -70,7 +72,10 @@ export interface OrderTotals {
   giftCard: number;
   total: number;
   payable: number;
-  taxVersion: string; // stamped so historical invoices never depend on live config
+  // Provenance stamps — frozen on the order; historical invoices never recompute.
+  taxVersion: string; // HSN/rate table version
+  pricingVersion: string; // shipping + promotion rule version
+  commerceVersion: string; // calculation engine version
   lines: LineBreakdown[];
   promotions: PromotionSnapshot[];
   promotionsSkipped: { code: string; reason: string }[];
@@ -173,6 +178,8 @@ export function computeOrderTotals(lines: CommerceLine[], opts: ComputeOpts = {}
     total,
     payable,
     taxVersion: TAX_VERSION,
+    pricingVersion: PRICING_VERSION,
+    commerceVersion: COMMERCE_ENGINE_VERSION,
     lines: breakdown,
     promotions: promo.applied,
     promotionsSkipped: promo.skipped,

@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { computeOrderTotals, type CommerceLine } from "@/lib/commerce";
 import { requiresPayment } from "@/lib/orders";
 import { COUPONS, type Coupon } from "@/lib/promotions";
-import { TAX_VERSION } from "@/config/commerce";
+import { TAX_VERSION, PRICING_VERSION, COMMERCE_ENGINE_VERSION } from "@/config/commerce";
 
 const line = (key: string, price: number, taxClass = "candle", qty = 1, compositionId?: string): CommerceLine => ({
   key,
@@ -23,7 +23,10 @@ describe("commerce engine — GST-compliant totals (paise)", () => {
   it("money-safety: every money field is an integer (paise)", () => {
     const t = computeOrderTotals([line("a", 899), line("b", 499, "room_spray")], { state: "Maharashtra" });
     for (const k of MONEY_KEYS) expect(Number.isInteger(t[k]), `${k}=${t[k]}`).toBe(true);
+    // provenance stamps frozen on the order
     expect(t.taxVersion).toBe(TAX_VERSION);
+    expect(t.pricingVersion).toBe(PRICING_VERSION);
+    expect(t.commerceVersion).toBe(COMMERCE_ENGINE_VERSION);
   });
 
   it("single product GST — candle ₹899 @12% (intra-state)", () => {

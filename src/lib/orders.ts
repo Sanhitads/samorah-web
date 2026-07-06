@@ -52,12 +52,15 @@ export const ORDER_EVENTS = [
   "invoice_generated", "shipment_created", "delivered", "refunded",
 ] as const;
 export type OrderEvent = (typeof ORDER_EVENTS)[number];
+export type EventActor = "customer" | "system" | "webhook" | "admin";
+/** An append-only event: unique id · event · timestamp · actor · payload. */
 export interface OrderEventRecord {
-  type: OrderEvent;
-  at: string; // ISO
-  actor?: "customer" | "system" | "webhook" | "admin";
+  id: string; // uuid (crypto.randomUUID at write time)
+  event: OrderEvent;
+  at: string; // ISO timestamp
+  actor: EventActor;
   note?: string;
-  meta?: Record<string, unknown>;
+  payload?: Record<string, unknown>;
 }
 
 // ── Stock reservation (15-min hold; the expiry cron releases it) ──────────────
@@ -130,7 +133,10 @@ export interface OrderRecord {
   gift: GiftFields;
   lines: OrderLineSnapshot[];
   totals: OrderTotalsSnapshot;
-  taxVersion: string; // frozen tax-rule version (config TAX_VERSION at order time)
+  // Provenance stamps frozen at order time (mirror the totals snapshot).
+  taxVersion: string; // HSN/rate table version
+  pricingVersion: string; // shipping + promotion rule version
+  commerceVersion: string; // calculation engine version
   promotions: PromotionSnapshot[]; // immutable — why the discount was given
   events: OrderEventRecord[];
   shipments: Shipment[];

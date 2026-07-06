@@ -70,11 +70,17 @@ export const DEFAULT_TAX_CLASS = "candle";
 export const SHIPPING_HSN = "9968";
 
 /**
- * Tax-rule version stamped on every order, so a future GST change never alters a
- * historical invoice (the order keeps its `taxVersion`; new orders use the new
- * rules). Bump this string whenever any HSN/rate in TAX_CLASSES changes.
+ * Version stamps frozen on every order (forensic provenance — two years later you
+ * know exactly which rules produced an invoice). Bump the relevant one when its
+ * inputs change; old orders keep their stamps and never recompute.
+ *   · TAX_VERSION      — the HSN/rate table (TAX_CLASSES). Bump on any rate change.
+ *   · PRICING_VERSION  — pricing rules: shipping thresholds + promotion config.
+ *   · COMMERCE_ENGINE_VERSION — the calculation ENGINE (lib/commerce.ts). Bump on
+ *     any change to the pipeline / rounding / allocation logic (semver).
  */
 export const TAX_VERSION = "GST_2026_01";
+export const PRICING_VERSION = "PRICE_2026_07";
+export const COMMERCE_ENGINE_VERSION = "1.0";
 
 /** @deprecated single-rate shim — kept only for legacy callers; use TAX_CLASSES. */
 export const GST_RATE = TAX_CLASSES.candle.gstRate;
