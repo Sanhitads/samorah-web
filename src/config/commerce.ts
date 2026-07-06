@@ -13,8 +13,10 @@ export const COMMERCE = {
   constitution: "Proprietorship",
   gstin: "29BCZPD3150Q1ZS", // 29 = Karnataka
   registeredAddress: {
-    line1: "TODO — registered business street address",
+    line1: "1383/433, 3rd Floor, Dex Co Work, 5th B Main Road",
+    line2: "HBR Layout",
     city: "Bengaluru",
+    district: "Bengaluru Urban",
     state: "Karnataka",
     pincode: "560045",
     country: "India",
