@@ -43,6 +43,20 @@ describe("promotion engine — stacking rules + snapshots", () => {
     expect(r.skipped[0]).toMatchObject({ code: "WELCOME10" });
   });
 
+  it("PROMO-005 — an inactive/expired coupon is rejected", () => {
+    COUPONS.push({
+      code: "OLDSALE", label: "Old", campaign: "x", version: "v1", priority: 20,
+      stackable: true, exclusive: false, combinableWith: ["*"], type: "percentage", value: 10, active: false,
+    });
+    const r = computePromotions([comp("a", 580), comp("b", 580), comp("c", 580)], "OLDSALE");
+    expect(r.applied.map((p) => p.code)).toEqual(["DISCOVERY_COMPOSITION"]); // coupon ignored
+  });
+
+  it("PROMO-006 — an unknown coupon code applies nothing extra", () => {
+    const r = computePromotions([comp("a", 580), comp("b", 580), comp("c", 580)], "DOESNOTEXIST");
+    expect(r.applied.map((p) => p.code)).toEqual(["DISCOVERY_COMPOSITION"]);
+  });
+
   it("determinism — lower priority applies first", () => {
     const early: Coupon = {
       code: "EARLY", label: "Early", campaign: "x", version: "v1",

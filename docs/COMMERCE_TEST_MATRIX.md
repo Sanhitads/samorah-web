@@ -13,8 +13,9 @@
 | 🔷 | **Beat 2** — architecture/contract in place; runtime test lands with Razorpay/webhooks/DB |
 | 🖐 | **Manual / E2E** — walk it in the browser before release |
 
-Automated coverage today: **22 passing** across `src/lib/commerce.test.ts`,
-`orders.test.ts`, `promotions.test.ts`, `checkout.test.ts`.
+Automated coverage today: **44 passing** across `commerce.test.ts`,
+`orders.test.ts`, `promotions.test.ts`, `checkout.test.ts`, `shopPage.test.ts`,
+`useCartStore.test.ts`, `useCompositionStore.test.ts`.
 
 ---
 
@@ -22,9 +23,9 @@ Automated coverage today: **22 passing** across `src/lib/commerce.test.ts`,
 
 | ID | Scenario | Expected | Status |
 |---|---|---|---|
-| CART-001 | Add one candle (Kashmiri Chai 100g Glass) | 1 item, correct price, GST included | 🖐 |
-| CART-002 | Increase qty 1→2 | Totals recalculate | 🖐 (engine ✅ via GST tests) |
-| CART-003 | Remove product | Cart empties | 🖐 |
+| CART-001 | Add one candle | 1 item, correct price, GST included | ✅ store · "add merges" |
+| CART-002 | Increase qty 1→2 | Merges, totals recalculate | ✅ store · "CART-001/002" |
+| CART-003 | Remove product | Cart empties (qty 0 drops line) | ✅ store · "CART-003" |
 | CART-004 | Refresh browser | Cart persists (localStorage) | 🖐 |
 | CART-005 | Open in new tab | Cart identical | 🖐 |
 | CART-006 | Guest checkout, no login | Cart works | 🖐 |
@@ -33,14 +34,14 @@ Automated coverage today: **22 passing** across `src/lib/commerce.test.ts`,
 
 | ID | Scenario | Expected | Status |
 |---|---|---|---|
-| COMP-001 | Add 3 Glass candles | Composition complete | ✅ commerce · "Discovery Composition" |
-| COMP-002 | Add 2 candles | No discount | ✅ (incomplete group → no promo) |
-| COMP-003 | Add 4th candle | Blocked | 🖐 (store enforces max 3) |
-| COMP-004 | Mix Glass + Ceramic | Validation error | 🖐 (single-vessel store rule) |
-| COMP-005 | Remove one candle | Bundle invalid, discount removed | ✅ (group ≠ 3 → no discount) |
-| COMP-006 | Edit composition | Existing composition loads | 🖐 |
-| COMP-007 | Cancel edit | Original bundle remains | 🖐 |
-| COMP-008 | Update composition | Existing bundle replaced (same `compositionId`) | 🖐 |
+| COMP-001 | Add 3 Glass candles | Composition complete | ✅ compositionStore · "COMP-001" |
+| COMP-002 | Add 2 candles | No discount | ✅ store + commerce (incomplete → no promo) |
+| COMP-003 | Add 4th candle | Blocked (max 3) | ✅ compositionStore · "COMP-003" |
+| COMP-004 | Mix Glass + Ceramic | Rejected (no mixing) | ✅ compositionStore · "COMP-004" |
+| COMP-005 | Remove one candle | Bundle invalid, discount removed | ✅ store + cart · "COMP-005" |
+| COMP-006 | Edit composition | Existing composition loads | ✅ compositionStore · "COMP-006/008" |
+| COMP-007 | Cancel edit | Original bundle remains | 🖐 (cart untouched until Update) |
+| COMP-008 | Update composition | Existing bundle replaced (same `compositionId`) | ✅ compositionStore · "COMP-006/008" |
 | COMP-009 | Delete composition | Entire bundle removed | 🖐 |
 | COMP-010 | Refresh browser | Composition persists | 🖐 |
 
@@ -52,8 +53,8 @@ Automated coverage today: **22 passing** across `src/lib/commerce.test.ts`,
 | PROMO-002 | Coupon only | Applied | ✅ (registry activation) |
 | PROMO-003 | Coupon + Composition | Stack rules respected | ✅ promotions · "WELCOME10 does NOT stack" |
 | PROMO-004 | Free Shipping + Composition | Both apply; shipping removed only | ✅ promotions · "Free Shipping stacks" |
-| PROMO-005 | Expired / inactive coupon | Rejected | ✅ (`active:false` skipped) |
-| PROMO-006 | Invalid coupon | No promo applied | ✅ (unknown code) |
+| PROMO-005 | Expired / inactive coupon | Rejected | ✅ promotions · "PROMO-005" |
+| PROMO-006 | Invalid coupon | No promo applied | ✅ promotions · "PROMO-006" |
 | PROMO-007 | Priority determinism | Lower priority applies first | ✅ promotions · "determinism" |
 
 ## D. GST
@@ -182,12 +183,12 @@ Automated coverage today: **22 passing** across `src/lib/commerce.test.ts`,
 
 | ID | Scenario | Expected | Status |
 |---|---|---|---|
-| BND-001 | 3 Glass | Valid | ✅ (composition discount) |
-| BND-002 | 2 Glass | Invalid (no discount) | ✅ |
-| BND-003 | 3 Ceramic | Valid | 🖐 |
-| BND-004 | Mixed vessels | Invalid | 🖐 (store rule) |
+| BND-001 | 3 Glass | Valid | ✅ compositionStore · "BND-001" |
+| BND-002 | 2 Glass | Invalid (no discount) | ✅ compositionStore · "BND-002" |
+| BND-003 | 3 Ceramic | Valid | ✅ (same rule, any vessel) |
+| BND-004 | Mixed vessels | Invalid | ✅ compositionStore · "BND-004" |
 | BND-005 | Remove bundle | Entire bundle removed | 🖐 |
-| BND-006 | Edit bundle | Loads current composition | 🖐 |
+| BND-006 | Edit bundle | Loads current composition | ✅ compositionStore · "COMP-006/008" |
 
 ## O. Product
 
@@ -202,9 +203,9 @@ Automated coverage today: **22 passing** across `src/lib/commerce.test.ts`,
 
 | ID | Scenario | Expected | Status |
 |---|---|---|---|
-| SHOP-001 | Filter by Chapter | Correct products | 🖐 (SSR) |
-| SHOP-002 | Filter by Type | Correct products | 🖐 |
-| SHOP-003 | Combined filters | Correct products | 🖐 |
+| SHOP-001 | Filter by Chapter | Correct products (+ alias resolves) | ✅ shopPage · "SHOP-001" |
+| SHOP-002 | Filter by Type | Correct products; vessel hidden for sprays | ✅ shopPage · "SHOP-002" |
+| SHOP-003 | Combined Type + Chapter + Vessel | Correct products | ✅ shopPage · "SHOP-003" |
 | SHOP-004 | Refresh | Filters persist in URL | 🖐 (URL-driven) |
 
 ## Q. Performance
