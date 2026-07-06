@@ -2,7 +2,11 @@ import { describe, it, expect, afterEach } from "vitest";
 import { computeOrderTotals, type CommerceLine } from "@/lib/commerce";
 import { requiresPayment } from "@/lib/orders";
 import { COUPONS, type Coupon } from "@/lib/promotions";
-import { TAX_VERSION, PRICING_VERSION, COMMERCE_ENGINE_VERSION } from "@/config/commerce";
+import { TAX_VERSION, PRICING_VERSION, COMMERCE_ENGINE_VERSION, STORE_STATE } from "@/config/commerce";
+
+// Config-driven so the tests follow the registered state (place of supply).
+const HOME = STORE_STATE; // intra-state → CGST + SGST
+const AWAY = STORE_STATE.toLowerCase() === "maharashtra" ? "Karnataka" : "Maharashtra"; // inter → IGST
 
 const line = (key: string, price: number, taxClass = "candle", qty = 1, compositionId?: string): CommerceLine => ({
   key,
@@ -21,7 +25,7 @@ const MONEY_KEYS = [
 
 describe("commerce engine — GST-compliant totals (paise)", () => {
   it("money-safety: every money field is an integer (paise)", () => {
-    const t = computeOrderTotals([line("a", 899), line("b", 499, "room_spray")], { state: "Maharashtra" });
+    const t = computeOrderTotals([line("a", 899), line("b", 499, "room_spray")], { state: HOME });
     for (const k of MONEY_KEYS) expect(Number.isInteger(t[k]), `${k}=${t[k]}`).toBe(true);
     // provenance stamps frozen on the order
     expect(t.taxVersion).toBe(TAX_VERSION);
@@ -30,7 +34,7 @@ describe("commerce engine — GST-compliant totals (paise)", () => {
   });
 
   it("single product GST — candle ₹899 @12% (intra-state)", () => {
-    const t = computeOrderTotals([line("a", 899)], { state: "Maharashtra" });
+    const t = computeOrderTotals([line("a", 899)], { state: HOME });
     expect(t.subtotal).toBe(89900);
     // 899 < 1499 → ₹99 shipping applies
     expect(t.freeShipping).toBe(false);
@@ -45,7 +49,7 @@ describe("commerce engine — GST-compliant totals (paise)", () => {
 
   it("Discovery Composition — 3 candles ₹580, 15% per line", () => {
     const items = [line("a", 580, "candle", 1, "c1"), line("b", 580, "candle", 1, "c1"), line("c", 580, "candle", 1, "c1")];
-    const t = computeOrderTotals(items, { state: "Maharashtra" });
+    const t = computeOrderTotals(items, { state: HOME });
     expect(t.subtotal).toBe(174000);
     // 580 → bundleUnitPrice 493; discount (580−493)*3 = ₹261
     expect(t.discount).toBe(26100);
@@ -57,7 +61,7 @@ describe("commerce engine — GST-compliant totals (paise)", () => {
   it("mixed GST rates — candle 12% + two sprays 18% (per-line, not cart-total)", () => {
     const t = computeOrderTotals(
       [line("a", 899, "candle"), line("b", 499, "room_spray"), line("c", 499, "linen_spray")],
-      { state: "Maharashtra" },
+      { state: HOME },
     );
     // ≥ ₹1,499 → free shipping; pure goods GST
     expect(t.freeShipping).toBe(true);
@@ -71,7 +75,7 @@ describe("commerce engine — GST-compliant totals (paise)", () => {
   });
 
   it("shipping GST — ₹99 shipping is taxable at the principal rate (12%)", () => {
-    const t = computeOrderTotals([line("a", 580), line("b", 520)], { state: "Karnataka" }); // goods 1100 < 1499
+    const t = computeOrderTotals([line("a", 580), line("b", 520)], { state: AWAY }); // goods 1100 < 1499
     expect(t.freeShipping).toBe(false);
     expect(t.shipping).toBe(9900);
     expect(t.shippingGstRate).toBe(12);
@@ -88,17 +92,17 @@ describe("commerce engine — GST-compliant totals (paise)", () => {
   });
 
   it("inter-state place of supply → IGST, intra-state → CGST+SGST", () => {
-    const inter = computeOrderTotals([line("a", 899)], { state: "Karnataka" });
+    const inter = computeOrderTotals([line("a", 899)], { state: AWAY });
     expect(inter.interState).toBe(true);
     expect(inter.igst).toBe(inter.gst);
-    const intra = computeOrderTotals([line("a", 899)], { state: "Maharashtra" });
+    const intra = computeOrderTotals([line("a", 899)], { state: HOME });
     expect(intra.interState).toBe(false);
     expect(intra.igst).toBe(0);
   });
 
   // ── Additions from the Commerce Test Matrix ──
   it("GST-004 — mixed cart: shipping taxed at the HIGHEST rate (18%)", () => {
-    const t = computeOrderTotals([line("a", 899, "candle"), line("b", 499, "room_spray")], { state: "Maharashtra" });
+    const t = computeOrderTotals([line("a", 899, "candle"), line("b", 499, "room_spray")], { state: HOME });
     expect(t.freeShipping).toBe(false); // 1398 < 1499
     expect(t.shipping).toBe(9900);
     expect(t.shippingGstRate).toBe(18); // highest rate present
@@ -108,7 +112,7 @@ describe("commerce engine — GST-compliant totals (paise)", () => {
   it("GST-005 — line-item taxes sum EXACTLY to the header (no 1-paisa drift)", () => {
     const t = computeOrderTotals(
       [line("a", 899, "candle"), line("b", 499, "room_spray"), line("c", 333, "linen_spray")],
-      { state: "Karnataka" },
+      { state: AWAY },
     );
     const lineGst = t.lines.reduce((s, l) => s + l.gst, 0);
     const lineTax = t.lines.reduce((s, l) => s + l.taxableValue, 0);
@@ -118,7 +122,7 @@ describe("commerce engine — GST-compliant totals (paise)", () => {
   });
 
   it("GC-001 — gift card covering the total → payable ₹0, Razorpay bypassed", () => {
-    const t = computeOrderTotals([line("a", 899)], { state: "Maharashtra", giftCard: 9_99_999 });
+    const t = computeOrderTotals([line("a", 899)], { state: HOME, giftCard: 9_99_999 });
     expect(t.payable).toBe(0);
     expect(requiresPayment(t.payable)).toBe(false);
     expect(requiresPayment(t.total)).toBe(true); // the order still has value
@@ -130,7 +134,7 @@ describe("commerce engine — GST-compliant totals (paise)", () => {
       stackable: true, exclusive: false, combinableWith: ["*"], type: "percentage", value: 100, active: true,
     };
     COUPONS.push(c);
-    const t = computeOrderTotals([line("a", 899)], { state: "Maharashtra", couponCode: "FREE100" });
+    const t = computeOrderTotals([line("a", 899)], { state: HOME, couponCode: "FREE100" });
     expect(t.goodsTotal).toBe(0);
     expect(t.shipping).toBe(0);
     expect(t.gst).toBe(0);

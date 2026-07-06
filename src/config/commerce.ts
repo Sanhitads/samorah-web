@@ -8,17 +8,17 @@
 // ── Brand / legal identity (confirm before the first live invoice) ────────────
 export const COMMERCE = {
   brandName: "SAMORAH",
-  legalName: "Samorah Fragrances Pvt. Ltd.", // TODO confirm
-  gstin: "27AAAAA0000A1Z5", // TODO confirm — drives place-of-supply + invoice
+  legalName: "Samorah Fragrances Pvt. Ltd.", // TODO confirm registered legal name
+  gstin: "29BCZPD3150Q1ZS", // 29 = Karnataka
   registeredAddress: {
     line1: "TODO — registered business address",
-    city: "Mumbai",
-    state: "Maharashtra",
-    pincode: "400001",
+    city: "Bengaluru",
+    state: "Karnataka",
+    pincode: "560001", // TODO confirm exact registered PIN
     country: "India",
   },
   /** Place of supply. Intra-state → CGST+SGST; inter-state → IGST. */
-  registeredState: "Maharashtra",
+  registeredState: "Karnataka",
   currency: "INR",
   currencySymbol: "₹",
 
