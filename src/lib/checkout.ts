@@ -1,67 +1,49 @@
 /**
- * Checkout domain (Phase 3 · Beat 1) — the GST-accurate order totals and the
- * shipping-address contract. Extends the shared cart summary with the CGST/SGST
- * vs IGST split (place-of-supply), so cart · checkout · invoice read one source.
- * Money is GST-inclusive; GST is extracted, never added.
+ * Checkout domain (Phase 3) — the shipping/billing address + business-GST
+ * contracts, and the order totals for checkout (the full GST-compliant engine
+ * with the CGST/SGST vs IGST split). `calculateOrderTotals` delegates to the
+ * money engine (lib/commerce.ts) — one source for cart · checkout · invoice.
  */
 import { z } from "zod";
-import { GST_RATE, STORE_STATE } from "@/config/commerce";
-import { gstBreakdown } from "@/lib/pricing";
-import { buildCartSummary, type CartSummary } from "@/lib/cart";
+import { computeOrderTotals, toCommerceLines, type OrderTotals, type CommerceLine } from "@/lib/commerce";
 
-const round2 = (n: number) => Math.round(n * 100) / 100;
-const norm = (s: string) => s.trim().toLowerCase();
+export type { OrderTotals };
 
-export interface OrderTotals extends CartSummary {
-  taxableValue: number; // pre-tax value extracted from the inclusive total
-  interState: boolean; // place-of-supply ≠ store state → IGST
-  cgst: number;
-  sgst: number;
-  igst: number;
-}
-
-/**
- * Full order totals for a shipping state. Intra-state splits the embedded GST
- * into CGST + SGST; inter-state books it all as IGST (BRD P11/P12). No state yet
- * (address incomplete) → treated as intra-state for a provisional display.
- */
+/** Order totals for a shipping state (place of supply). Intra-state → CGST+SGST;
+ *  inter-state → IGST. `giftCard` is payment, applied after tax (Beat 2 UI). */
 export function calculateOrderTotals(
-  subtotal: number,
-  discount: number,
-  customerState?: string,
+  items: { key: string; name: string; price: number; qty: number; productType?: string; compositionId?: string }[],
+  state?: string,
+  opts?: { giftCard?: number; couponCode?: string },
 ): OrderTotals {
-  const s = buildCartSummary(subtotal, discount);
-  const { taxable } = gstBreakdown(s.goodsTotal + s.shipping, GST_RATE);
-  const interState = customerState ? norm(customerState) !== norm(STORE_STATE) : false;
-  const cgst = interState ? 0 : round2(s.gst / 2);
-  const sgst = interState ? 0 : round2(s.gst - cgst);
-  const igst = interState ? s.gst : 0;
-  return { ...s, taxableValue: taxable, interState, cgst, sgst, igst };
+  const lines: CommerceLine[] = toCommerceLines(items);
+  return computeOrderTotals(lines, { state, giftCard: opts?.giftCard, couponCode: opts?.couponCode });
 }
 
-/** Shipping address — validated at the checkout boundary (India). */
+// ── Address (India) ───────────────────────────────────────────────────────────
 export const addressSchema = z.object({
   fullName: z.string().trim().min(2, "Please enter your full name"),
   email: z.string().trim().email("Enter a valid email"),
-  phone: z
-    .string()
-    .trim()
-    .regex(/^[6-9]\d{9}$/, "Enter a 10-digit Indian mobile number"),
+  phone: z.string().trim().regex(/^[6-9]\d{9}$/, "Enter a 10-digit Indian mobile number"),
   line1: z.string().trim().min(3, "Enter your address"),
   line2: z.string().trim().optional(),
   city: z.string().trim().min(2, "Enter your city"),
   state: z.string().trim().min(2, "Select your state"),
-  pincode: z
-    .string()
-    .trim()
-    .regex(/^\d{6}$/, "Enter a 6-digit PIN code"),
+  pincode: z.string().trim().regex(/^\d{6}$/, "Enter a 6-digit PIN code"),
 });
-
 export type AddressForm = z.infer<typeof addressSchema>;
 
-/** Validate a partial address form → field errors (empty when valid). */
-export function validateAddress(values: Partial<AddressForm>): Record<string, string> {
-  const result = addressSchema.safeParse(values);
+/** GSTIN — 15 chars: 2 state + 10 PAN + 1 entity + 'Z' + 1 checksum. */
+export const GSTIN_RE = /^\d{2}[A-Z]{5}\d{4}[A-Z]{1}[A-Z\d]{1}Z[A-Z\d]{1}$/;
+export const businessSchema = z.object({
+  companyName: z.string().trim().min(2, "Enter the company name"),
+  gstin: z.string().trim().toUpperCase().regex(GSTIN_RE, "Enter a valid 15-character GSTIN"),
+});
+export type BusinessForm = z.infer<typeof businessSchema>;
+
+/** Validate a form against a schema → field errors (empty when valid). */
+export function fieldErrors<T>(schema: z.ZodType<T>, values: unknown): Record<string, string> {
+  const result = schema.safeParse(values);
   if (result.success) return {};
   const errors: Record<string, string> = {};
   for (const issue of result.error.issues) {
@@ -70,3 +52,6 @@ export function validateAddress(values: Partial<AddressForm>): Record<string, st
   }
   return errors;
 }
+
+/** Back-compat helper (shipping address). */
+export const validateAddress = (values: Partial<AddressForm>) => fieldErrors(addressSchema, values);

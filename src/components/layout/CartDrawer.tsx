@@ -9,14 +9,12 @@ import { useOverlay } from "@/hooks/useOverlay";
 import {
   COMPOSITION_DISCOUNT_PCT,
   selectCartCount,
-  selectCartSubtotal,
-  selectCartTotal,
-  selectCompositionDiscount,
   useCartStore,
   type CartItem,
 } from "@/store/useCartStore";
 import { useCompositionStore } from "@/store/useCompositionStore";
 import { composeComposition } from "@/lib/bundle";
+import { buildCartSummary } from "@/lib/cart";
 
 const NUM_WORD = ["Zero", "One", "Two", "Three", "Four", "Five", "Six"];
 const countWord = (n: number) => NUM_WORD[n] ?? String(n);
@@ -50,9 +48,10 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
 
   const items = useCartStore((s) => s.items);
   const count = useCartStore(selectCartCount);
-  const subtotal = useCartStore(selectCartSubtotal);
-  const compositionDiscount = useCartStore(selectCompositionDiscount);
-  const total = useCartStore(selectCartTotal);
+  const summary = buildCartSummary(items);
+  const subtotal = summary.subtotal;
+  const compositionDiscount = summary.discount;
+  const total = summary.total;
   const updateQty = useCartStore((s) => s.updateQty);
   const removeItem = useCartStore((s) => s.removeItem);
   const loadComposition = useCompositionStore((s) => s.loadComposition);

@@ -6,11 +6,8 @@ import { useEffect, useState } from "react";
 import { Minus, Plus } from "lucide-react";
 import {
   COMPOSITION_DISCOUNT_PCT,
-  selectCartSubtotal,
-  selectCompositionDiscount,
   useCartStore,
   type CartItem,
-  type CartState,
 } from "@/store/useCartStore";
 import { useCompositionStore } from "@/store/useCompositionStore";
 import { buildCartSummary } from "@/lib/cart";
@@ -64,10 +61,7 @@ export function CartView() {
     );
   }
 
-  const state = { items } as CartState;
-  const subtotal = selectCartSubtotal(state);
-  const discount = selectCompositionDiscount(state);
-  const summary = buildCartSummary(subtotal, discount);
+  const summary = buildCartSummary(items);
   const count = items.reduce((n, i) => n + i.qty, 0);
 
   const removeComposition = (lines: CartItem[]) => lines.forEach((l) => removeItem(l.key));

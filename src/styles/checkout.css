@@ -81,6 +81,34 @@ select.checkout-field__input { cursor: pointer; }
   letter-spacing: 0.02em;
 }
 
+select.checkout-field__input { cursor: pointer; }
+.checkout-field--notes { grid-column: 1 / -1; margin-top: clamp(20px, 2.5vw, 30px); }
+.checkout-field__textarea {
+  border: 1px solid var(--co-hairline);
+  border-radius: 3px;
+  padding: 12px 14px;
+  font-family: var(--font-serif);
+  font-size: 0.95rem;
+  resize: vertical;
+}
+.checkout-fields--biz { margin-top: 16px; }
+
+/* Checkboxes (billing · business · consent) */
+.checkout-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: clamp(22px, 2.8vw, 34px);
+  font-family: var(--font-serif);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--ink, #1f1a16);
+  cursor: pointer;
+}
+.checkout-check input { margin-top: 4px; accent-color: var(--ink, #1f1a16); width: 15px; height: 15px; flex-shrink: 0; }
+.checkout-check--consent[data-error="true"] { color: #a8443a; }
+.checkout-link { color: var(--co-gold); text-decoration: underline; text-underline-offset: 2px; }
+
 .checkout__submit {
   width: 100%;
   margin-top: clamp(28px, 3.5vw, 44px);
@@ -95,7 +123,8 @@ select.checkout-field__input { cursor: pointer; }
   cursor: pointer;
   transition: opacity 0.3s ease;
 }
-.checkout__submit:hover { opacity: 0.88; }
+.checkout__submit:hover:not(:disabled) { opacity: 0.88; }
+.checkout__submit:disabled { opacity: 0.4; cursor: not-allowed; }
 .checkout__next {
   margin-top: clamp(28px, 3.5vw, 44px);
   padding: 22px 24px;
@@ -141,7 +170,23 @@ select.checkout-field__input { cursor: pointer; }
 .checkout__item-meta { display: block; margin-top: 3px; font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.06em; color: var(--smoke, #6b6259); }
 .checkout__item-price { font-family: var(--font-serif); font-size: 1rem; color: var(--ink, #1f1a16); }
 
-.checkout__totals { padding-top: 6px; }
+.checkout__delivery {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 14px 0;
+  margin-bottom: 6px;
+  border-top: 1px solid var(--co-hairline);
+  border-bottom: 1px solid var(--co-hairline);
+  font-family: var(--font-sans);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--smoke, #6b6259);
+}
+.checkout__delivery-value { font-style: italic; text-transform: none; letter-spacing: 0.02em; font-family: var(--font-serif); font-size: 0.85rem; }
+
+.checkout__totals { padding-top: 14px; }
 .checkout__row {
   display: flex;
   justify-content: space-between;

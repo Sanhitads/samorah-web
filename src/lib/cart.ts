@@ -1,39 +1,44 @@
 /**
- * Cart summary (Phase 2) — the pure order-total math the Cart page and drawer
- * read. Takes the cart's full subtotal and the composition promotion, then adds
- * the shipping estimate and extracts the embedded GST. One place, so cart /
- * checkout / invoice never drift. GST-inclusive throughout (extracted, not added).
+ * Cart summary — the lightweight order-total view the Cart page + drawer read.
+ * A thin projection over the GST-compliant money engine (lib/commerce.ts), so
+ * cart / checkout / invoice never drift. GST-inclusive throughout.
  */
-import { GST_RATE, SHIPPING, estimateShipping } from "@/config/commerce";
-import { gstBreakdown } from "@/lib/pricing";
+import { computeOrderTotals, toCommerceLines } from "@/lib/commerce";
+
+/** The minimal cart-line shape the summary needs (CartItem satisfies it). */
+export interface SummaryLine {
+  key: string;
+  name: string;
+  price: number;
+  qty: number;
+  productType?: string;
+  compositionId?: string;
+}
 
 export interface CartSummary {
   subtotal: number; // Σ full line prices (pre-discount, inclusive)
-  discount: number; // composition promotion
+  discount: number; // promotions
   goodsTotal: number; // subtotal − discount
-  shipping: number; // estimate (0 when free)
+  shipping: number;
   freeShipping: boolean;
-  freeShippingRemaining: number; // spend needed to reach free shipping (0 if met)
-  gstRate: number;
-  gst: number; // GST embedded in (goodsTotal + shipping)
+  freeShippingRemaining: number;
+  gstRate: number; // principal rate (display)
+  gst: number; // GST embedded in (goods + shipping)
   total: number; // goodsTotal + shipping
 }
 
-/** Build the order summary from the cart's subtotal + composition discount. */
-export function buildCartSummary(subtotal: number, discount: number): CartSummary {
-  const goodsTotal = Math.max(0, subtotal - discount);
-  const shipping = estimateShipping(goodsTotal);
-  const total = goodsTotal + shipping;
-  const { gst } = gstBreakdown(total, GST_RATE);
+/** Build the cart summary from the cart lines. */
+export function buildCartSummary(items: SummaryLine[]): CartSummary {
+  const t = computeOrderTotals(toCommerceLines(items));
   return {
-    subtotal,
-    discount,
-    goodsTotal,
-    shipping,
-    freeShipping: shipping === 0 && goodsTotal > 0,
-    freeShippingRemaining: goodsTotal >= SHIPPING.freeThreshold ? 0 : SHIPPING.freeThreshold - goodsTotal,
-    gstRate: GST_RATE,
-    gst,
-    total,
+    subtotal: t.subtotal,
+    discount: t.discount,
+    goodsTotal: t.goodsTotal,
+    shipping: t.shipping,
+    freeShipping: t.freeShipping,
+    freeShippingRemaining: t.freeShippingRemaining,
+    gstRate: t.gstRate,
+    gst: t.gst,
+    total: t.total,
   };
 }
