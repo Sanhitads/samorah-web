@@ -50,5 +50,7 @@ recipient may print instead (UI later; fields reserved now).
 
 ## 5. Seller identity (printed)
 
-From `COMMERCE`: legal name · **GSTIN** · registered address · state. Confirm all
-before the first live invoice.
+From `COMMERCE`: **legal name** (`SANHITA DAS`) · **trade name** (`M/s Samorah`) ·
+**constitution** (Proprietorship) · **GSTIN** (`29BCZPD3150Q1ZS`) · registered
+address (Bengaluru, Karnataka — 560045) · state. Still TODO: the exact registered
+**street address** (`line1`).
