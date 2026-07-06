@@ -11,7 +11,7 @@
 > name the conflict** before writing code. Never silently replace an approved
 > decision. If a document is missing or outdated, say exactly which one.
 >
-> **Last updated:** 2026-06-29 · Phase 7 Homepage COMPLETE. **Phase 8 platform engines COMPLETE** (Decision 23 + 24) — build steps 1–8 done: architecture docs · data models · Theme/Design-System Registry · Asset System · Relationship Engine · Section Engine · **Template Engine** (versioning · inheritance · slots · rules) · **Page Engine** (documented resolver pipeline + cache-policy/events/middleware/preview-session/manifest contracts). **Architecture frozen.** Next: **step 9 — Chapter Pages** through `PageView` (proving the platform with real pages). Homepage untouched (5.26 kB).
+> **Last updated:** 2026-07-04 · Phases 7–8 + Chapter/Air/PDP/Bundle/Shop/Cart complete; **Phase 3 Checkout Beat 1 built.** Since the frozen platform (Decision 23/24): **Chapter Pages** (`/chapters/[slug]`) · **Air Chapters / The Hours** (`/collections/[slug]`, real Volume I content) · **Editorial PDPs** (candle + air, block-composed) · **Discovery Composition** (`/bundles` — single-vessel, 15% cart-level promotion, non-destructive edit-in-place) · **Shop PLP** (`/shop` = "The Collection": type-driven catalogue merging DB candles + config Air sprays, **minimal toolbar + Refine drawer**, SSR/URL filters) · **Cart** (`/cart`) + drawer (composition grouped as one item) · **Checkout Beat 1** (`/checkout` — address + GST-accurate totals). **Numbering identity** unified via `getEditionMap` → candles `NO. I.1`, air `VOL. I.1` (PDP · PLP · cart · bag · Continue rails). **Single money source** = `config/commerce.ts` (GST rate · shipping threshold · store state) → `lib/cart.ts` + `lib/checkout.ts`. **Next: Checkout Beat 2** (Razorpay · idempotent webhook · order persistence · confirmation — needs keys + `npm i razorpay` + orders-table wiring).
 
 ---
 
@@ -135,6 +135,9 @@ prototype as the **locked design + content source of truth**.
 | P13 | **Gradient placeholders → real photography** per SPD | Phase 17 / upload | `gradient:<class>` rows become Cloudinary IDs; gradient stays as the blur placeholder |
 | P14 | **Narrative product fields** (story, flame_persona, cultural_reference, lifestyle_use, SEO) not seeded | Phase 9 / content | Seed left them null intentionally |
 | P15 | **Atmosphere Language (§4 Atmosphere Index) revisit** — leader-rule is a provisional Phase 7 treatment | post-site + real photography | Decorative auto-generated lengths now; redesign the whole descriptor language once photography is integrated (Decision 18) |
+| P16 | **Checkout Beat 2** — Razorpay create-order/verify · **idempotent webhook** (order SoT) · `orders`/`order_items` persistence · per-FY invoice sequence · stock_reservations · confirmation page/email | Beat 2 | Needs `RAZORPAY_*` keys + `npm i razorpay` + orders-table wiring (Decision 26). Beat 1 ships the address + GST-accurate summary only |
+| P17 | **Confirm legal/tax config before first live order** — GSTIN · registered `STORE_STATE` (currently "Maharashtra") · HSN/GST rate w/ CA · ₹1,499 free-ship threshold | before launch | All centralised in `config/commerce.ts`; change one value, it propagates everywhere |
+| P18 | **Shiprocket serviceability/rate** replaces the flat shipping estimate | Phase 13 | Rate-by-pincode at checkout; `estimateShipping()` is the provisional stand-in |
 
 ## 7. Document index & authority
 
@@ -232,6 +235,20 @@ Samorah avoids traditional ecommerce discovery patterns; the PDP stays editorial
 - **From Our Homes** — curated editorial testimonials (quotes only; no stars, counts, avatars or "verified buyer"). **Shipped** on the candle PDP (`config/testimonials.ts` + the `Testimonials` block); a studio-curated set, not user-generated reviews. Conventional star reviews remain excluded.
 - **Complete the Ritual** — pairs complementary products (candle + room spray + linen mist) by **fragrance family**, presented editorially — not generic upsell.
 - **EditorialDivider** (shipping in Beat 3) is the reusable hairline + short-line block that separates chapters · products · artist · lifestyle site-wide, so the whole site reads as one publication.
+
+### Checkout — payment & order pipeline (Decision 26 · 2026-07-04)
+
+The commerce flow is built cart-first: the **Discovery Composition 15% is a true cart-level promotion** (full-price lines tagged with a `compositionId`; the discount is recomputed from the cart, never baked into a line price — `selectCompositionDiscount`), so it flows unchanged into checkout/GST/Razorpay/invoice. **One money source** = `config/commerce.ts` (`GST_RATE` 12% HSN 3406 · `SHIPPING` free ≥ ₹1,499 else ₹99 · `STORE_STATE`) → `lib/cart.ts` `buildCartSummary` → `lib/checkout.ts` `calculateOrderTotals`. Prices are **GST-inclusive**; GST is *extracted*, and split **CGST+SGST intra-state / IGST inter-state** by place of supply (customer state vs `STORE_STATE`).
+
+**Built now — Checkout Beat 1 (`/checkout`):** contact + shipping-address form (Zod-validated: Indian mobile · 6-digit PIN · state select) + a **GST-accurate order summary** (taxable value · CGST/SGST or IGST · total). Client island behind a mount guard (persisted cart, no SSR mismatch); "Proceed to Secure Payment" validates and shows the Beat-2 handoff (no charge).
+
+**Deferred — Checkout Beat 2 (needs Razorpay keys + `npm i razorpay` + orders-table wiring):**
+- **Webhook = order source of truth** (BRD USD P5/P6): ALL side effects (inventory · Shiprocket · GST invoice · email) live in `/api/razorpay/webhook`; `/verify` only redirects. **Idempotent** (`UPDATE … WHERE idempotency_key IS NULL` → branch on rows affected) + `webhook_logs`.
+- `create-order` (server, reads `RAZORPAY_*` env) → Razorpay Checkout → verify → webhook persists to `orders`/`order_items` with a **per-FY invoice sequence** allocated on payment success.
+- **stock_reservations** (15-min hold + expiry cron) before payment; oversell guard.
+- **Confirmation** page + transactional email (React Email + Resend, Phase 14).
+- **Shiprocket** serviceability/rate at pincode replaces the flat shipping estimate (Phase 13).
+- **Confirm before first live order:** GSTIN · registered `STORE_STATE` · HSN/GST rate with a CA · the ₹1,499 free-shipping threshold (currently one config value; reconcile any remaining copy to it).
 
 ---
 

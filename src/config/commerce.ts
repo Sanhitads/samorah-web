@@ -9,6 +9,21 @@
  *  before the first live invoice (BRD §9.1). Per-line HSN arrives with invoicing. */
 export const GST_RATE = 12;
 
+/** The registered place of supply. Intra-state → CGST+SGST; inter-state → IGST.
+ *  Set to the business's GST-registered state before the first live order. */
+export const STORE_STATE = "Maharashtra";
+
+/** Indian states + UTs — the checkout state selector + GST place-of-supply. */
+export const INDIAN_STATES = [
+  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa",
+  "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala",
+  "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland",
+  "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura",
+  "Uttar Pradesh", "Uttarakhand", "West Bengal",
+  "Andaman & Nicobar Islands", "Chandigarh", "Dadra & Nagar Haveli and Daman & Diu",
+  "Delhi", "Jammu & Kashmir", "Ladakh", "Lakshadweep", "Puducherry",
+] as const;
+
 /** Shipping estimate (provisional until Shiprocket serviceability, Phase 13). */
 export const SHIPPING = {
   /** Free standard shipping at or above this order value (₹). */
