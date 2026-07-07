@@ -136,6 +136,9 @@ export const RAZORPAY = {
   // secret + webhook secret are server-only (never NEXT_PUBLIC_):
   keySecret: process.env.RAZORPAY_KEY_SECRET ?? "",
   webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET ?? "",
+  // Our merchant/account id ("acc_XXXX") — when set, webhook events are checked
+  // against it so a stray event for another account is rejected (defence-in-depth).
+  accountId: process.env.RAZORPAY_ACCOUNT_ID ?? "",
   get configured() {
     return Boolean(this.keyId && this.keySecret);
   },

@@ -1,21 +1,50 @@
 import { NextResponse } from "next/server";
+import crypto from "node:crypto";
 import { RAZORPAY, COMMERCE } from "@/config/commerce";
 import { repriceCart, type ClientCartLine } from "@/lib/repricing";
+import { buildPendingPayload, createPendingOrder, reserveStock, type OrderAddress } from "@/services/orderService";
+import type { OrderTotals } from "@/lib/commerce";
+
+/** Deterministic SHA-256 fingerprint of the priced cart (server-side only) —
+ *  {sku:qty:unit:discount} per line + shipping + GST + payable. Detects tampering
+ *  and aids fraud/debug investigation. */
+function computeCartHash(t: OrderTotals, skuOf: (key: string) => string, state: string): string {
+  const lines = t.lines
+    .map((l) => `${skuOf(l.key)}:${l.qty}:${l.unitPrice}:${l.discount}`)
+    .sort()
+    .join("|");
+  const canonical = `${lines}#ship:${t.shipping}:${t.shippingGst}#gst:${t.gst}#pay:${t.payable}#st:${state.toLowerCase()}`;
+  return crypto.createHash("sha256").update(canonical).digest("hex");
+}
 
 /**
- * POST /api/razorpay/create-order — Stage 2A. Re-prices the cart server-side,
- * validates the composition, then creates a Razorpay order for the SERVER-computed
- * `payable` (never a client amount). Returns the Razorpay order id + public key so
- * the client can open Checkout. No order is persisted yet (that's the webhook,
- * Stage 2B).
+ * POST /api/razorpay/create-order — Stage 2B. Re-prices the cart server-side,
+ * validates the composition, creates a Razorpay order for the SERVER-computed
+ * `payable` (never a client amount), then writes a PENDING order (server-priced,
+ * keyed by razorpay_order_id). Payment success — via /verify OR the webhook —
+ * finalizes that pending order through the single idempotent persistOrder().
  */
 export const runtime = "nodejs";
 
+/** In local dev, surface the real error message so failures are debuggable. */
+const devDetail = (e: unknown) =>
+  process.env.NODE_ENV !== "production" ? { detail: e instanceof Error ? e.message : String(e) } : {};
+
+interface Utm {
+  source?: string;
+  medium?: string;
+  campaign?: string;
+  content?: string;
+  term?: string;
+}
 interface Body {
   items: ClientCartLine[];
   state?: string;
   email?: string;
   couponCode?: string;
+  address?: OrderAddress;
+  notes?: string;
+  utm?: Utm;
 }
 
 export async function POST(request: Request) {
@@ -30,7 +59,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
 
-  const priced = await repriceCart(body.items ?? [], body.state, body.couponCode);
+  const address = body.address;
+  const email = body.email?.trim();
+  if (!address || !email) {
+    return NextResponse.json({ error: "Delivery details are required." }, { status: 400 });
+  }
+  // Place of supply = the delivery state — never the client's chosen `state`.
+  let priced: Awaited<ReturnType<typeof repriceCart>>;
+  try {
+    priced = await repriceCart(body.items ?? [], address.state, body.couponCode);
+  } catch (e) {
+    console.error("repriceCart failed", e);
+    return NextResponse.json({ error: "Could not price your bag. Please try again.", ...devDetail(e) }, { status: 500 });
+  }
   if (!priced.valid || !priced.totals) {
     return NextResponse.json({ error: priced.reason ?? "Your bag could not be validated." }, { status: 422 });
   }
@@ -38,11 +79,40 @@ export async function POST(request: Request) {
   const amount = priced.totals.payable; // paise, server-authoritative
   if (amount <= 0) {
     // A gift-card/loyalty-covered ₹0 order is confirmed internally, not via Razorpay
-    // (Stage 2B). Gift cards aren't live yet, so this shouldn't occur.
+    // (later). Gift cards aren't live yet, so this shouldn't occur.
     return NextResponse.json({ error: "This order needs no payment." }, { status: 400 });
   }
 
-  // Create the Razorpay order via the REST API (no SDK dependency).
+  // Fingerprint + composition ids (server-derived) — attached to the Razorpay order
+  // notes for reconciliation and stored on our order too.
+  const cartHash = computeCartHash(priced.totals, (key) => priced.details[key]?.sku ?? key, address.state);
+  const compositionIds = [...new Set(priced.lines.map((l) => l.compositionId).filter(Boolean))].join(",");
+
+  // 0) Reserve stock BEFORE charging — atomic availability check prevents oversell
+  //    and blocks payment for anything that just sold out. Air lines carry no
+  //    variant/stock, so only candle lines (with a variantId) are held.
+  const reservationSession = crypto.randomUUID();
+  const reserveItems = priced.totals.lines
+    .map((l) => ({ detail: priced.details[l.key], qty: l.qty }))
+    .filter((x) => x.detail?.variantId)
+    .map((x) => ({ variantId: x.detail!.variantId as string, quantity: x.qty, sku: x.detail!.sku }));
+  if (reserveItems.length) {
+    let reserved: { ok: boolean };
+    try {
+      reserved = await reserveStock({ sessionId: reservationSession, items: reserveItems });
+    } catch (e) {
+      console.error("reserveStock failed (is the Stage 2B migration applied?)", e);
+      return NextResponse.json({ error: "Checkout is temporarily unavailable. Please try again shortly.", ...devDetail(e) }, { status: 500 });
+    }
+    if (!reserved.ok) {
+      return NextResponse.json(
+        { error: "One or more items in your collection just sold out. Please review your bag." },
+        { status: 409 },
+      );
+    }
+  }
+
+  // 1) Create the Razorpay order via REST (no SDK dependency).
   const auth = Buffer.from(`${RAZORPAY.keyId}:${RAZORPAY.keySecret}`).toString("base64");
   const rzpRes = await fetch("https://api.razorpay.com/v1/orders", {
     method: "POST",
@@ -51,24 +121,51 @@ export async function POST(request: Request) {
       amount,
       currency: COMMERCE.currency,
       receipt: `rcpt_${Date.now()}`,
-      notes: { state: body.state ?? "", items: String(priced.lines.length) },
+      notes: {
+        state: address.state,
+        email,
+        cart_hash: cartHash,
+        tax_version: priced.totals.taxVersion,
+        promotion_version: priced.totals.pricingVersion,
+        commerce_version: priced.totals.commerceVersion,
+        composition_ids: compositionIds,
+      },
     }),
   });
-
   if (!rzpRes.ok) {
     const detail = await rzpRes.text();
     console.error("razorpay create-order failed", rzpRes.status, detail);
     return NextResponse.json({ error: "Could not start payment. Please try again." }, { status: 502 });
   }
-
   const order = (await rzpRes.json()) as { id: string; amount: number; currency: string };
+
+  // 2) Persist the PENDING order so the webhook can finalize even if the browser
+  //    closes before /verify. The reprice is the single source of the snapshot.
+  const payload = buildPendingPayload(priced, {
+    email,
+    address,
+    couponCode: body.couponCode,
+    notes: body.notes,
+    razorpayOrderId: order.id,
+    cartHash,
+    reservationSession, // links the holds made above to this order
+    utm: body.utm,
+  });
+  if (!payload) {
+    return NextResponse.json({ error: "Your bag could not be validated." }, { status: 422 });
+  }
+  try {
+    await createPendingOrder(payload);
+  } catch (e) {
+    console.error("create pending order failed", e);
+    return NextResponse.json({ error: "Could not start payment. Please try again.", ...devDetail(e) }, { status: 500 });
+  }
 
   return NextResponse.json({
     orderId: order.id,
     amount: order.amount,
     currency: order.currency,
     keyId: RAZORPAY.keyId,
-    // A compact summary so the client can show the exact server figures (paise).
     summary: {
       subtotal: priced.totals.subtotal,
       discount: priced.totals.discount,

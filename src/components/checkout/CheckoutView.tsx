@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Script from "next/script";
+import { useRouter } from "next/navigation";
 import { useMemo, useState, useEffect } from "react";
 import { COMPOSITION_DISCOUNT_PCT, useCartStore, type CartItem } from "@/store/useCartStore";
 import {
@@ -15,6 +16,7 @@ import {
 import { COMMERCE } from "@/config/commerce";
 import { composeComposition } from "@/lib/bundle";
 import { formatPaise, formatPaise2 } from "@/lib/money";
+import { readStoredUtm } from "@/lib/utm";
 import { StateSelect } from "./StateSelect";
 
 const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`; // rupee line inputs
@@ -56,6 +58,8 @@ const TRUST = [
  */
 export function CheckoutView() {
   const items = useCartStore((s) => s.items);
+  const clearCart = useCartStore((s) => s.clearCart);
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -133,11 +137,21 @@ export function CheckoutView() {
         qty: i.qty,
         compositionId: i.compositionId,
         productType: i.productType,
+        edition: i.edition,
       }));
+      const address = {
+        fullName: ship.fullName,
+        phone: ship.phone,
+        line1: ship.line1,
+        line2: ship.line2,
+        city: ship.city,
+        state: ship.state,
+        pincode: ship.pincode,
+      };
       const res = await fetch("/api/razorpay/create-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: payload, state: ship.state, email: ship.email, couponCode: couponCode || undefined }),
+        body: JSON.stringify({ items: payload, email: ship.email, address, notes: notes || undefined, couponCode: couponCode || undefined, utm: readStoredUtm() }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -160,9 +174,32 @@ export function CheckoutView() {
         prefill: { name: ship.fullName, email: ship.email, contact: ship.phone },
         notes: { state: ship.state },
         theme: { color: "#1f1a16" },
-        handler: () => {
-          // Payment captured. The order is confirmed by the webhook (Stage 2B);
-          // here we only acknowledge. The bag stays until persistence confirms.
+        handler: async (response) => {
+          // Payment captured. Confirm via /verify (shared persistOrder); the
+          // webhook is the backstop. The cart clears ONLY after an order number
+          // comes back — so a failed verify keeps the bag (webhook will finalize).
+          setPaying(true);
+          try {
+            const vr = await fetch("/api/razorpay/verify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              }),
+            });
+            const vd = await vr.json();
+            if (vr.ok && vd.orderNumber && vd.token) {
+              clearCart();
+              router.push(`/order/${vd.orderNumber}?t=${encodeURIComponent(vd.token)}`);
+              return;
+            }
+          } catch {
+            /* fall through to the backstop acknowledgement */
+          }
+          // Payment succeeded but confirmation is still settling — the webhook
+          // finalizes it. Keep the bag until an order number exists.
           setPaid(true);
           setPaying(false);
         },

@@ -11,7 +11,10 @@ import "@/styles/bundle.css";
 import "@/styles/shop.css";
 import "@/styles/cart.css";
 import "@/styles/checkout.css";
+import "@/styles/order.css";
+import "@/styles/invoice.css";
 import { AuthProvider } from "@/components/auth/AuthProvider";
+import { UtmCapture } from "@/components/analytics/UtmCapture";
 import { canonicalOrigin } from "@/config/site";
 import { buildThemeStylesheet } from "@/platform/themeStylesheet";
 
@@ -53,6 +56,7 @@ export default function RootLayout({
         <style href="samorah-themes" precedence="high">
           {buildThemeStylesheet()}
         </style>
+        <UtmCapture />
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

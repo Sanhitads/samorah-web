@@ -11,6 +11,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { buildCartSummary } from "@/lib/cart";
 import { calculateOrderTotals } from "@/lib/checkout";
+import { computeOrderTotals, toCommerceLines } from "@/lib/commerce";
+import { buildPendingPayload } from "@/services/orderService";
 import { STORE_STATE } from "@/config/commerce";
 
 // The Razorpay path (repriceCart) re-derives prices from the catalogue. We mock the
@@ -121,6 +123,47 @@ describe("INVARIANT · Razorpay create-order == Checkout (server re-price, one e
   });
 });
 
-// TODO(2B): when the webhook / invoice / order-confirmation land, assert their
-// totals are byte-identical to `repriceCart(...).totals` here. The webhook is the
-// ONLY place the cart may be cleared — after the order is persisted.
+describe("INVARIANT · persisted order payload == engine totals (INV-P07)", () => {
+  const P = (v: unknown) => Math.round(Number(v) * 100); // rupees(2dp) → paise, float-safe
+
+  for (const [label, skus] of [["single candle", SINGLE], ["Discovery Composition", COMPOSITION]] as const) {
+    for (const state of [HOME, AWAY]) {
+      it(`${label} @ ${state}: header + line snapshot reconcile to the engine, paise-exact`, () => {
+        const lines = toCommerceLines(cartItems(skus));
+        const totals = computeOrderTotals(lines, { state });
+        const payload = buildPendingPayload(
+          { valid: true, lines, details: {}, totals },
+          {
+            email: "guest@example.com",
+            address: { fullName: "Guest", phone: "9000000000", line1: "1 Road", city: "City", state, pincode: "560001" },
+            razorpayOrderId: "order_test",
+          },
+        );
+        if (!payload) throw new Error("payload was null");
+        const items = payload.items as Array<Record<string, unknown>>;
+
+        // Header amounts equal the engine (persisted order never diverges from reprice).
+        expect(P(payload.subtotal)).toBe(totals.subtotal);
+        expect(P(payload.discount_amount)).toBe(totals.discount);
+        expect(P(payload.shipping_amount)).toBe(totals.shipping);
+        expect(P(payload.total_amount)).toBe(totals.payable);
+        expect(P(payload.taxable_amount)).toBe(totals.taxableValue);
+        expect(P(payload.cgst_amount) + P(payload.sgst_amount) + P(payload.igst_amount)).toBe(totals.gst);
+
+        // Version + shipping snapshot are stamped from the engine, not config-at-read-time.
+        expect(payload.tax_version).toBe(totals.taxVersion);
+        expect(payload.commerce_version).toBe(totals.commerceVersion);
+        expect(P(payload.shipping_gst)).toBe(totals.shippingGst);
+
+        // Line snapshot sums reconcile to the goods figures (no drift).
+        expect(items.reduce((s, i) => s + P(i.line_total), 0)).toBe(totals.goodsTotal);
+        expect(items.reduce((s, i) => s + P(i.line_discount), 0)).toBe(totals.discount);
+        const lineGst = items.reduce((s, i) => s + P(i.line_cgst) + P(i.line_sgst) + P(i.line_igst), 0);
+        expect(lineGst).toBe(totals.gst - totals.shippingGst);
+      });
+    }
+  }
+});
+
+// TODO(2C): assert the FINALIZED DB order totals equal repriceCart once a test DB
+// harness exists. The cart may be cleared ONLY after the order is persisted.
