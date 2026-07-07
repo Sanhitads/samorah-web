@@ -12,6 +12,7 @@ import "@/styles/shop.css";
 import "@/styles/cart.css";
 import "@/styles/checkout.css";
 import { AuthProvider } from "@/components/auth/AuthProvider";
+import { canonicalOrigin } from "@/config/site";
 import { buildThemeStylesheet } from "@/platform/themeStylesheet";
 
 // Fonts from the prototype design system (BRD §4.3), loaded via next/font.
@@ -30,9 +31,9 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
-  ),
+  // Canonical origin — the single source of truth for all absolute URLs
+  // (canonical · OG · sitemap · JSON-LD). Derives from config/site.ts.
+  metadataBase: new URL(canonicalOrigin()),
   title: {
     default: "Samorah — Luxury Handmade Scented Candles",
     template: "%s · Samorah",

@@ -13,9 +13,9 @@
 | 🔷 | **Beat 2** — architecture/contract in place; runtime test lands with Razorpay/webhooks/DB |
 | 🖐 | **Manual / E2E** — walk it in the browser before release |
 
-Automated coverage today: **44 passing** across `commerce.test.ts`,
-`orders.test.ts`, `promotions.test.ts`, `checkout.test.ts`, `shopPage.test.ts`,
-`useCartStore.test.ts`, `useCompositionStore.test.ts`.
+Automated coverage today: **55 passing** across `commerce.test.ts`,
+`orders.test.ts`, `promotions.test.ts`, `checkout.test.ts`, `invariants.test.ts`,
+`shopPage.test.ts`, `useCartStore.test.ts`, `useCompositionStore.test.ts`.
 
 ---
 
@@ -119,6 +119,21 @@ Automated coverage today: **44 passing** across `commerce.test.ts`,
 | PAY-004 | Retry payment | **Same** Razorpay order reused | ✅ orders · "retry reuses" (helper) |
 | PAY-005 | Double-click Pay | One order only (idempotency key) | 🔷 |
 | PAY-006 | Network failure | Safe recovery (webhook rescue) | 🔷 |
+
+### Cross-surface money invariants (one engine, no duplicate math)
+
+The Razorpay amount is the SERVER re-priced `payable` — never a client number — and
+must equal what Checkout showed, field for field. These lock that.
+
+| ID | Scenario | Expected | Status |
+|---|---|---|---|
+| INV-P01 | Cart subtotal/discount/shipping/total/GST vs Checkout | Identical (same items → same engine) | ✅ invariants · "Cart ↔ Checkout parity" |
+| INV-P02 | Composition discount in Cart vs Checkout | Identical amount | ✅ invariants · "Discovery Composition parity" |
+| INV-P03 | Taxable Value + GST = Total | Exact in paise (goods + shipping) | ✅ invariants · "Taxable + GST = Total" |
+| INV-P04 | CGST + SGST = Total GST (intra); IGST = Total GST (inter) | Split reconciles to GST | ✅ invariants · "GST accounting identities" |
+| INV-P05 | Razorpay create-order (`repriceCart`) vs Checkout | Every money field + `payable` identical, HOME & AWAY | ✅ invariants · "create-order == Checkout" |
+| INV-P06 | Tampered composition (2 candles) at create-order | Rejected; never priced | ✅ invariants · "rejects a tampered composition" |
+| INV-P07 | Webhook / invoice / order-confirmation totals | Byte-identical to `repriceCart` | 🔷 **Stage 2B** (`TODO(2B)` guard in `invariants.test.ts`) |
 
 ## H. Webhook
 

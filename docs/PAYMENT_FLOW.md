@@ -49,14 +49,36 @@ Create Shiprocket shipment  (serviceability/rate by validated PIN→state)
   ▼
 Send confirmation email  (React Email + Resend)
   ▼
-Redirect to Thank-You page
+Thank-You page reads the SERVER-CONFIRMED order  →  NOW clear the cart
 ```
+
+## Cart-clearing lifecycle (non-negotiable)
+
+The cart is a recovery buffer until an order provably exists. It is cleared at
+**exactly one point**: the Thank-You page, after it has read the order the
+**webhook** persisted. Never on popup-open, never in the success `handler`
+callback, never on `/verify`.
+
+```
+Payment failed     → cart remains exactly as-is
+Payment cancelled  → cart remains exactly as-is
+Payment successful → webhook verifies → order persisted → invoice → stock
+                     committed → Thank-You page → THEN clear cart
+```
+
+Why: the browser success callback is not proof of an order. Clearing on popup-open
+or on `handler` risks *money charged, no order, empty cart* — unrecoverable for the
+customer. Clearing only against a persisted order keeps the bag recoverable through
+every failure path.
 
 ## Client rules
 
 - `/verify` (if used) **only redirects** — it performs no side effects.
-- **Cart is never cleared before a real payment.** On cancel/failure the customer
-  can retry / edit address / continue shopping (`PAY-002/003`).
+- **Cart is never cleared before the webhook persists the order.** On
+  cancel/failure the customer keeps their bag and can retry / edit address /
+  continue shopping (`PAY-002/003`).
+- **Stage 2A note:** payment success shows an acknowledgement only; the cart is
+  intentionally left intact because no order is persisted yet.
 - **Double-click Pay** → one order (idempotency key) (`PAY-005`).
 
 ## Idempotency & races

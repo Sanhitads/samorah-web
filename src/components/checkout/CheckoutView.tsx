@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import Script from "next/script";
 import { useMemo, useState, useEffect } from "react";
-import { COMPOSITION_DISCOUNT_PCT, useCartStore } from "@/store/useCartStore";
+import { COMPOSITION_DISCOUNT_PCT, useCartStore, type CartItem } from "@/store/useCartStore";
 import {
   calculateOrderTotals,
   addressSchema,
@@ -11,10 +12,19 @@ import {
   pinStateMismatch,
   type AddressForm,
 } from "@/lib/checkout";
-import { INDIAN_STATES, COMMERCE } from "@/config/commerce";
+import { COMMERCE } from "@/config/commerce";
+import { composeComposition } from "@/lib/bundle";
 import { formatPaise, formatPaise2 } from "@/lib/money";
+import { StateSelect } from "./StateSelect";
 
 const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`; // rupee line inputs
+const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s);
+const variantLabel = (vessel: string, size: string) =>
+  [vessel ? cap(vessel) : "", size].filter(Boolean).join(" • ") || "Standard";
+const NUM_WORD = ["Zero", "One", "Two", "Three", "Four", "Five", "Six"];
+const countWord = (n: number) => NUM_WORD[n] ?? String(n);
+/** Normalise any persisted edition ("VOL. I.1" / "No. I.1") to the canonical "NO. I.1". */
+const noEdition = (e?: string) => (e ? e.replace(/^(?:VOL|No)\.\s*/i, "NO. ") : e);
 
 const ADDRESS_FIELDS: { name: keyof AddressForm; label: string; type?: string; half?: boolean; placeholder?: string }[] = [
   { name: "fullName", label: "Full name" },
@@ -27,13 +37,22 @@ const ADDRESS_FIELDS: { name: keyof AddressForm; label: string; type?: string; h
 ];
 const EMPTY: AddressForm = { fullName: "", email: "", phone: "", line1: "", line2: "", city: "", state: "", pincode: "" };
 
+const TRUST = [
+  "Secure Razorpay Payment",
+  "GST Invoice Available",
+  "Orders ship within 24–48 hours",
+  "100% Secure Checkout",
+];
+
 /**
  * CheckoutView (client) — Phase 3. Guest-first checkout: contact + shipping
  * address, optional separate billing, optional business-GST invoice, order
- * notes, legal consent, and a GST-accurate summary (per-line HSN rates, CGST/SGST
- * intra-state, IGST inter-state) from the shared money engine. Payment (Razorpay)
- * + order persistence are Beat 2; the cart is never cleared before a real
- * payment. Reads the persisted cart behind a mount guard.
+ * notes, legal consent, and a premium GST-accurate summary (per-line HSN rates,
+ * CGST/SGST intra-state, IGST inter-state) from the shared money engine. The
+ * summary mirrors the Cart's editorial hierarchy (chapter · edition · hour ·
+ * name · vessel • size) so the archive reads consistently end to end. Payment
+ * (Razorpay) + order persistence are Beat 2; the cart is never cleared before a
+ * real payment. Reads the persisted cart behind a mount guard.
  */
 export function CheckoutView() {
   const items = useCartStore((s) => s.items);
@@ -48,13 +67,22 @@ export function CheckoutView() {
   const [notes, setNotes] = useState("");
   const [consent, setConsent] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [placed, setPlaced] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [paid, setPaid] = useState(false);
+  const [payError, setPayError] = useState("");
+  const [showCode, setShowCode] = useState(false);
+  const [codeInput, setCodeInput] = useState("");
+  const [couponCode, setCouponCode] = useState("");
 
   // Place of supply = the delivery (shipping) state (GST §12/13).
-  const totals = useMemo(() => calculateOrderTotals(items, ship.state), [items, ship.state]);
+  const totals = useMemo(
+    () => calculateOrderTotals(items, ship.state, { couponCode: couponCode || undefined }),
+    [items, ship.state, couponCode],
+  );
+  const couponApplied = couponCode ? totals.promotions.some((p) => p.code === couponCode.toUpperCase()) : false;
 
   if (!mounted) return <div className="checkout checkout--loading" aria-busy="true" />;
-  if (items.length === 0 && !placed) {
+  if (items.length === 0 && !paid) {
     return (
       <div className="checkout">
         <div className="checkout__empty">
@@ -79,7 +107,76 @@ export function CheckoutView() {
     if (wantGst) Object.entries(fieldErrors(businessSchema, biz)).forEach(([k, v]) => (found[k] = v));
     if (!consent) found.consent = "Please accept to continue";
     setErrors(found);
-    if (Object.keys(found).length === 0) setPlaced(true);
+    if (Object.keys(found).length === 0) void pay();
+  };
+
+  const applyCode = () => {
+    setCouponCode(codeInput.trim().toUpperCase());
+  };
+
+  /**
+   * Stage 2A — start payment. The server re-prices the cart and returns a
+   * Razorpay order for the authoritative amount; we open Checkout (Test Mode).
+   * The cart is NEVER cleared here — only a persisted order (webhook, Stage 2B)
+   * clears it, so a cancelled/failed payment leaves the bag intact.
+   */
+  const pay = async () => {
+    setPayError("");
+    setPaying(true);
+    try {
+      const payload = items.map((i) => ({
+        key: i.key,
+        slug: i.slug,
+        name: i.name,
+        vessel: i.vessel,
+        size: i.size,
+        qty: i.qty,
+        compositionId: i.compositionId,
+        productType: i.productType,
+      }));
+      const res = await fetch("/api/razorpay/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: payload, state: ship.state, email: ship.email, couponCode: couponCode || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPayError(data.error ?? "Could not start payment. Please try again.");
+        setPaying(false);
+        return;
+      }
+      if (typeof window === "undefined" || !window.Razorpay) {
+        setPayError("Payment could not load. Please refresh and try again.");
+        setPaying(false);
+        return;
+      }
+      const rzp = new window.Razorpay({
+        key: data.keyId,
+        amount: data.amount,
+        currency: data.currency,
+        order_id: data.orderId,
+        name: "SAMORAH",
+        description: "Your Collection",
+        prefill: { name: ship.fullName, email: ship.email, contact: ship.phone },
+        notes: { state: ship.state },
+        theme: { color: "#1f1a16" },
+        handler: () => {
+          // Payment captured. The order is confirmed by the webhook (Stage 2B);
+          // here we only acknowledge. The bag stays until persistence confirms.
+          setPaid(true);
+          setPaying(false);
+        },
+        modal: { ondismiss: () => setPaying(false) }, // cancelled → cart intact
+      });
+      rzp.on("payment.failed", (resp) => {
+        setPayError(resp.error?.description ?? "Payment failed. Your bag is safe — please try again.");
+        setPaying(false);
+      });
+      rzp.open();
+    } catch {
+      setPayError("Something went wrong. Your bag is safe — please try again.");
+      setPaying(false);
+    }
   };
 
   const addressFieldset = (
@@ -113,29 +210,86 @@ export function CheckoutView() {
         })}
         <label className="checkout-field" data-half>
           <span className="checkout-field__label">State</span>
-          <select
-            className="checkout-field__input"
+          <StateSelect
             value={value.state}
-            onChange={(e) => {
-              setValue({ ...value, state: e.target.value });
+            onChange={(s) => {
+              setValue({ ...value, state: s });
               if (errors[`${prefix}_state`]) setErrors((x) => ({ ...x, [`${prefix}_state`]: "" }));
             }}
-            aria-invalid={Boolean(errors[`${prefix}_state`])}
-          >
-            <option value="">Select state</option>
-            {INDIAN_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
+            invalid={Boolean(errors[`${prefix}_state`])}
+          />
           {errors[`${prefix}_state`] ? <span className="checkout-field__error">{errors[`${prefix}_state`]}</span> : null}
         </label>
       </div>
     </fieldset>
   );
 
+  // ── Summary items — mirror the Cart's editorial hierarchy exactly ──
+  const seen = new Set<string>();
+  const summaryItem = (item: CartItem) => {
+    // Discovery Composition → one card (same read as the Cart's comp-card).
+    if (item.compositionId) {
+      if (seen.has(item.compositionId)) return null;
+      seen.add(item.compositionId);
+      const lines = items.filter((i) => i.compositionId === item.compositionId);
+      const total = composeComposition(lines.map((l) => l.price)).total;
+      return (
+        <li className="checkout__comp" key={item.compositionId}>
+          <div className="checkout__comp-head">
+            <span className="checkout__comp-eyebrow">Discovery Composition</span>
+            <span className="checkout__comp-vessel">{cap(lines[0]?.vessel ?? "")} Edition</span>
+            <span className="checkout__comp-count">{countWord(lines.length)} Signature Candles</span>
+          </div>
+          <ul className="checkout__comp-list">
+            {lines.map((l) => (
+              <li className="checkout__comp-item" key={l.key}>
+                <span className={`checkout__comp-thumb img-fill ${l.gradClass ?? "grad-dark"}`} aria-hidden="true" />
+                <span className="checkout__comp-text">
+                  {l.chapterName ? <span className="checkout__item-chapter">{l.chapterName}</span> : null}
+                  {l.edition ? <span className="checkout__item-edition">{noEdition(l.edition)}</span> : null}
+                  <span className="checkout__item-name">{l.name}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <div className="checkout__comp-foot">
+            <span className="checkout__comp-total-label">Composition Total</span>
+            <span className="checkout__comp-total">{inr(total)}</span>
+          </div>
+          <span className="checkout__comp-savings">{COMPOSITION_DISCOUNT_PCT}% Savings Applied</span>
+        </li>
+      );
+    }
+
+    // Standalone product / Air — chapter · edition · hour · name · variant · unit.
+    return (
+      <li key={item.key} className="checkout__item">
+        <span className={`checkout__item-media img-fill ${item.gradClass ?? "grad-dark"}`} aria-hidden="true" />
+        <span className="checkout__item-body">
+          {item.chapterName ? <span className="checkout__item-chapter">{item.chapterName}</span> : null}
+          {item.edition ? (
+            <span className="checkout__item-edition">{item.hour ? item.edition : noEdition(item.edition)}</span>
+          ) : null}
+          {item.hour ? <span className="checkout__item-hour">Hour {item.hour}</span> : null}
+          <span className="checkout__item-name">{item.name}</span>
+          <span className="checkout__item-variant">
+            {item.hour ? item.productType ?? "" : variantLabel(item.vessel, item.size)}
+          </span>
+          <span className="checkout__item-unit">
+            {inr(item.price)} each{item.qty > 1 ? ` · ×${item.qty}` : ""}
+          </span>
+        </span>
+        <span className="checkout__item-price">{inr(item.price * item.qty)}</span>
+      </li>
+    );
+  };
+
   return (
     <div className="checkout">
+      <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="afterInteractive" />
       <header className="checkout__head">
-        <p className="checkout__eyebrow">Checkout · Guest or Account</p>
-        <h1 className="checkout__title">Your Details</h1>
+        <p className="checkout__eyebrow">Checkout</p>
+        <h1 className="checkout__title">Complete Your Collection</h1>
       </header>
 
       <div className="checkout__layout">
@@ -143,35 +297,40 @@ export function CheckoutView() {
           {addressFieldset("ship", ship, setShip, "Contact & Shipping")}
 
           {/* Billing */}
-          <label className="checkout-check">
-            <input type="checkbox" checked={billSame} onChange={(e) => setBillSame(e.target.checked)} />
-            <span>Billing address same as shipping</span>
-          </label>
-          {!billSame ? addressFieldset("bill", bill, setBill, "Billing Address") : null}
+          <div className="checkout-block">
+            <p className="checkout-block__label">Billing Address</p>
+            <label className="checkout-check checkout-check--soft">
+              <input type="checkbox" checked={billSame} onChange={(e) => setBillSame(e.target.checked)} />
+              <span>Same as shipping</span>
+            </label>
+            {!billSame ? addressFieldset("bill", bill, setBill, "Billing Address") : null}
+          </div>
 
           {/* Business GST */}
-          <label className="checkout-check">
-            <input type="checkbox" checked={wantGst} onChange={(e) => setWantGst(e.target.checked)} />
-            <span>I need a GST invoice (business purchase)</span>
-          </label>
-          {wantGst ? (
-            <div className="checkout-fields checkout-fields--biz">
-              <label className="checkout-field">
-                <span className="checkout-field__label">Company name</span>
-                <input className="checkout-field__input" value={biz.companyName}
-                  onChange={(e) => { setBiz({ ...biz, companyName: e.target.value }); if (errors.companyName) setErrors((x) => ({ ...x, companyName: "" })); }}
-                  aria-invalid={Boolean(errors.companyName)} />
-                {errors.companyName ? <span className="checkout-field__error">{errors.companyName}</span> : null}
-              </label>
-              <label className="checkout-field">
-                <span className="checkout-field__label">GSTIN</span>
-                <input className="checkout-field__input" value={biz.gstin} placeholder="15-character GSTIN"
-                  onChange={(e) => { setBiz({ ...biz, gstin: e.target.value.toUpperCase() }); if (errors.gstin) setErrors((x) => ({ ...x, gstin: "" })); }}
-                  aria-invalid={Boolean(errors.gstin)} />
-                {errors.gstin ? <span className="checkout-field__error">{errors.gstin}</span> : null}
-              </label>
-            </div>
-          ) : null}
+          <div className="checkout-block">
+            <label className="checkout-check checkout-check--soft">
+              <input type="checkbox" checked={wantGst} onChange={(e) => setWantGst(e.target.checked)} />
+              <span>Need a GST Invoice?</span>
+            </label>
+            {wantGst ? (
+              <div className="checkout-fields checkout-fields--biz">
+                <label className="checkout-field">
+                  <span className="checkout-field__label">GSTIN</span>
+                  <input className="checkout-field__input" value={biz.gstin} placeholder="15-character GSTIN"
+                    onChange={(e) => { setBiz({ ...biz, gstin: e.target.value.toUpperCase() }); if (errors.gstin) setErrors((x) => ({ ...x, gstin: "" })); }}
+                    aria-invalid={Boolean(errors.gstin)} />
+                  {errors.gstin ? <span className="checkout-field__error">{errors.gstin}</span> : null}
+                </label>
+                <label className="checkout-field">
+                  <span className="checkout-field__label">Business name</span>
+                  <input className="checkout-field__input" value={biz.companyName}
+                    onChange={(e) => { setBiz({ ...biz, companyName: e.target.value }); if (errors.companyName) setErrors((x) => ({ ...x, companyName: "" })); }}
+                    aria-invalid={Boolean(errors.companyName)} />
+                  {errors.companyName ? <span className="checkout-field__error">{errors.companyName}</span> : null}
+                </label>
+              </div>
+            ) : null}
+          </div>
 
           {/* Order notes */}
           <label className="checkout-field checkout-field--notes">
@@ -192,47 +351,64 @@ export function CheckoutView() {
           </label>
           {errors.consent ? <span className="checkout-field__error">{errors.consent}</span> : null}
 
-          {placed ? (
+          {paid ? (
             <div className="checkout__next" role="status">
-              <p className="checkout__next-title">✓ Details saved for {ship.fullName.split(" ")[0]}.</p>
+              <p className="checkout__next-title">✓ Payment received — thank you, {ship.fullName.split(" ")[0]}.</p>
               <p className="checkout__next-sub">
-                Secure payment (Razorpay) and order confirmation are the next build step — no charge has been made,
-                and your bag is preserved.
+                Your payment succeeded in Test Mode. Order confirmation, invoice and email are the next build step
+                (the webhook confirms every order) — your bag stays until the order is recorded.
               </p>
             </div>
           ) : (
-            <button type="submit" className="checkout__submit" disabled={!consent}>
-              Proceed to Secure Payment
-            </button>
+            <>
+              {payError ? <p className="checkout__pay-error" role="alert">{payError}</p> : null}
+              <button type="submit" className="checkout__submit" disabled={paying}>
+                {paying ? "Opening secure payment…" : "Continue to Payment"}
+              </button>
+              <ul className="checkout__trust">
+                {TRUST.map((t) => <li key={t} className="checkout__trust-item">{t}</li>)}
+              </ul>
+            </>
           )}
-          <p className="checkout__note">
-            Guest checkout — no account required. Payments are processed securely; the webhook confirms every order.
-          </p>
+          <p className="checkout__note">One final step before your collection begins its journey.</p>
+          <p className="checkout__note-sub">Secure checkout. No account required.</p>
         </form>
 
         {/* ── Summary ── */}
         <aside className="checkout__summary">
           <h2 className="checkout__summary-title">Order Summary</h2>
 
-          <ul className="checkout__items">
-            {items.map((item) => (
-              <li key={item.key} className="checkout__item">
-                <span className={`checkout__item-media img-fill ${item.gradClass ?? "grad-dark"}`} aria-hidden="true" />
-                <span className="checkout__item-body">
-                  <span className="checkout__item-name">{item.name}</span>
-                  <span className="checkout__item-meta">
-                    {item.hour ? item.productType ?? "" : [item.vessel, item.size].filter(Boolean).join(" · ")}
-                    {item.qty > 1 ? ` · ×${item.qty}` : ""}
-                  </span>
-                </span>
-                <span className="checkout__item-price">{inr(item.price * item.qty)}</span>
-              </li>
-            ))}
-          </ul>
+          <ul className="checkout__items">{items.map(summaryItem)}</ul>
+
+          {/* Coupon — deliberately minimal (not an Amazon-style field) */}
+          <div className="checkout__code-wrap">
+            {couponApplied ? (
+              <p className="checkout__code-applied">Code {couponCode} applied.</p>
+            ) : !showCode ? (
+              <button type="button" className="checkout__code-toggle" onClick={() => setShowCode(true)}>
+                Have a code?
+              </button>
+            ) : (
+              <div className="checkout__code">
+                <input
+                  className="checkout__code-input"
+                  value={codeInput}
+                  placeholder="Enter code"
+                  onChange={(e) => setCodeInput(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); applyCode(); } }}
+                />
+                <button type="button" className="checkout__code-apply" onClick={applyCode}>Apply</button>
+              </div>
+            )}
+            {couponCode && !couponApplied ? (
+              <p className="checkout__code-error">That code isn’t recognised.</p>
+            ) : null}
+          </div>
 
           <div className="checkout__delivery">
-            <span>Estimated Delivery</span>
-            <span className="checkout__delivery-value">Available after payment</span>
+            <span className="checkout__delivery-label">Estimated Delivery</span>
+            <span className="checkout__delivery-value">Ships in 1–2 business days</span>
+            <span className="checkout__delivery-note">Estimated delivery calculated after PIN verification.</span>
           </div>
 
           <div className="checkout__totals">
@@ -258,8 +434,7 @@ export function CheckoutView() {
             )}
             <div className="checkout__row checkout__row--total"><span>Total</span><span>{formatPaise(totals.total)}</span></div>
             <p className="checkout__tax-note">
-              Inclusive of GST{ship.state ? `, billed as ${totals.interState ? "IGST" : "CGST + SGST"}` : ""}. Mixed
-              rates are extracted per item (per HSN).
+              Inclusive of all applicable GST{ship.state ? `, billed as ${totals.interState ? "IGST" : "CGST + SGST"}` : ""}.
             </p>
           </div>
 
