@@ -32,6 +32,11 @@ export interface PackagingAsset {
   vendor?: string;
   barcode?: string;
   active: boolean;
+  // §3 inventory (optional — defaults handled by the inventory helpers)
+  currentStock?: number;
+  minStock?: number;
+  reorderLevel?: number;
+  purchaseCostInr?: number;
 }
 
 export type ProfileItemRole = "box" | "insert" | "filler" | "wrap" | "seal";

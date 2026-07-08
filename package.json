@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "send-emails": "node scripts/send-emails.mjs"
+    "send-emails": "node scripts/send-emails.mjs",
+    "dispatch": "node scripts/dispatch.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
