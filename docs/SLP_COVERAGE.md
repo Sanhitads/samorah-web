@@ -1,113 +1,147 @@
-# SLP — Coverage Matrix (what's built vs pending)
+# SLP — Coverage Matrix (built vs partial vs pending)
 
-Status of every engine / module / point against the current codebase. Keep this in
-sync as slices land. Legend: ✅ built · 🟡 partial · ⬜ not built.
+Authoritative status of every engine responsibility, point (A–M), and module against
+the codebase. Keep in sync as slices land. Legend: ✅ built · 🟡 partial · ⬜ not built.
 
-## The 4 engines
-| Engine | Status | Where | Notes |
-|---|---|---|---|
-| 1 · Packaging | ✅ (multi-box ⬜) | `lib/packaging/*`, `config/packaging.ts` | Structure + wired; real measurements + multi-box pending |
-| 2 · Shipping | ✅ Manual (adapters ⬜) | `lib/shipping/*` | Interface + Manual live; Shiprocket/Delhivery/India Post pending creds |
-| 3 · Fulfillment | 🟡 | `lib/fulfillment/state.ts`, `lib/orderState.ts`, `lib/shipment/state.ts` | State machines ✅; dashboard + packing workflow ⬜ |
-| 4 · Notification | 🟡 | `lib/email/*`, `lib/notifications/triggers.ts` | Email ✅; WhatsApp/SMS/push ⬜ |
+---
 
-## Points A–K
-| Pt | Item | Status | Where / pending |
-|---|---|---|---|
-| A | Packaging Profiles | ✅ | `packaging_profiles` + `config/packaging.ts` |
-| B | Shipping Rules | ✅ (data ⬜) | `lib/rules/engine.ts` + `business_rules` table (empty) |
-| C | Volumetric Weight | ✅ | `config/logistics.volumetricWeightKg`, packaging calc |
-| E | Shipping Weight | ✅ | `computeParcel` (net + packaging) |
-| F | Box Dimensions | ✅ | `packaging_assets` L/W/H → parcel dims |
-| G | Pickup Address | ✅ | `warehouses` table + `warehouseService` |
-| H | Courier Preferences | ✅ (data ⬜) | `decideCourier(preferred)`; `courier_capabilities` empty |
-| K | Return Rules | 🟡 | Returns engine ✅ (`lib/returns/state.ts`); reason→action rules via business-rule engine (data ⬜) |
-
-## Module 1 — Fulfillment Core
-| Item | Status | Where / pending |
+## Engine responsibilities (decoupling contract)
+### Engine 1 — Packaging (never knows Shiprocket ✅)
+| Responsibility | Status | Where / pending |
 |---|---|---|
-| Order State Machine | ✅ | `lib/orderState.ts` |
-| Shipment State Machine | ✅ | `lib/shipment/state.ts` |
-| Fulfillment State Machine | ✅ | `lib/fulfillment/state.ts` (reserved→…→shipped, QC gate) |
-| Fulfillment Dashboard | ⬜ | **NEXT** — admin UI + auth |
-| Packing Workflow | 🟡 | states exist; no service/UI to drive pick→pack→QC yet |
-| Dispatch Workflow | ✅ | `markShipmentDispatched` + `/api/fulfillment/dispatch` + `ORDER_DISPATCHED` |
+| What box to use | ✅ | `selectPackaging` (rules → profile) |
+| What inserts are needed | ✅ | profile items (tissue/filler/wrap) |
+| Total shipping weight | ✅ | `computeParcel` (net + packaging) |
+| External dimensions | ✅ | box asset L/W/H |
+| Fragile handling | ✅ | modifier rule (ceramic → bubble wrap) |
+| Multi-box packing | ⬜ | single box/order today |
 
-## Module 2 — Packaging Engine
-| Item | Status | Where / pending |
+### Engine 2 — Shipping (doesn't know how products are packed ✅)
+| Responsibility | Status | Where / pending |
 |---|---|---|
-| Packaging Assets | ✅ | `packaging_assets` (+ inventory cols) |
-| Packaging Profiles | ✅ | `packaging_profiles` / `_items` |
-| Packaging Rules | ✅ | `packaging_rules` (select/modifier) |
-| Weight Calculator | ✅ | `computeParcel` (net/packaging/shipping) |
-| Dimension Calculator | ✅ | box dims from the chosen profile |
-| Volumetric Weight | ✅ | `/5000` divisor (settings-configurable) |
-| Multi-box Packing | ⬜ | single box/order today; `shipments.unique(order_id)` to relax |
-| Packaging Cost | ✅ | `estimatedPackagingCostInr` → shipment `packaging_cost` |
-| Packaging Inventory | ✅ | `inventory.ts` (low/reorder); levels are data ⬜ |
-| Recommendation → confirm | ✅ | `recommend.ts` + `shipments.packaging_confirmed` |
+| Creating shipments | ✅ | `provider.createShipment` + `create_shipment` |
+| Selecting provider | ✅ | settings + `getShippingProvider` + Decision Engine |
+| Tracking | 🟡 | timeline ✅; live courier tracking ⬜ (webhook/adapter) |
+| Labels | 🟡 | interface method ✅; real label generation ⬜ (adapter) |
+| Courier status | 🟡 | `trackShipment` interface ✅; real feed ⬜ |
 
-## Module 3 — Shipping Engine
-| Item | Status | Where / pending |
+### Engine 3 — Fulfillment (doesn't know which courier ✅)
+| Responsibility | Status | Where / pending |
 |---|---|---|
-| Shipping Provider Interface | ✅ | `lib/shipping/provider.ts` |
-| Manual Provider | ✅ | `lib/shipping/providers/manual.ts` |
-| Shiprocket Adapter | ⬜ | needs sandbox EMAIL/PASSWORD |
-| Delhivery Adapter | ⬜ | future contract |
-| India Post Adapter | ⬜ | future |
-| Future Providers | ✅ | factory + env/settings selection ready |
+| Picking | 🟡 | states in `fulfillment/state.ts`; no workflow/UI |
+| Packing | 🟡 | states + packaging engine; no workflow/UI |
+| Dispatch | ✅ | `markShipmentDispatched` + endpoint |
+| Warehouse workflow | 🟡 | warehouse model ✅; routing/workflow ⬜ |
 
-## Module 4 — Courier Decision Engine
-| Item | Status | Where / pending |
+### Engine 4 — Notification (doesn't care manual vs auto ✅)
+| Responsibility | Status | Where / pending |
 |---|---|---|
-| cheapest | ✅ | `decideCourier("cheapest")` |
-| fastest | ✅ | `decideCourier("fastest")` |
-| preferred | ✅ | `decideCourier("preferred", order)` |
-| luxury | ✅ | `decideCourier("luxury")` |
-| insurance (capability) | ✅ | `capableCouriers` (supportsInsurance) |
-| fragile | ✅ | `capableCouriers` (fragileOk) |
-| COD support | ✅ | `capableCouriers` (supportsCod) |
-| serviceability | ✅ | zone/pincode-prefix filter |
-| — data | ⬜ | `courier_capabilities` empty; strategy=manual until couriers added |
+| Emails | ✅ | provider-agnostic; confirmation + dispatch |
+| WhatsApp | ⬜ | channel declared; sender pending |
+| SMS | ⬜ | channel declared; sender pending |
+| Customer tracking | ✅ | `/order/[n]/track` |
 
-## Module 5 — Tracking Engine
-| Item | Status | Where / pending |
-|---|---|---|
-| webhook processing | ⬜ | courier webhook → `add_shipment_event` (needs adapter/creds) |
-| manual updates | ✅ | `addShipmentEvent` |
-| customer timeline | ✅ | `/order/[n]/track` + `toCustomerStatus` |
-| delivery proof (POD) | ⬜ | capture signature/photo on delivery |
-| RTO | 🟡 | `rto` status exists; no RTO workflow/entity |
-| exceptions | ✅ | `shipment_exceptions` + `lib/exceptions/state.ts` |
+---
 
-## Module 6 — Analytics
-| Metric | Status | Data ready? |
-|---|---|---|
-| Average Delivery Time | ⬜ | yes — `shipment_events` timestamps |
-| Courier Cost | ⬜ | yes — `shipments.courier_cost` |
-| RTO Rate | ⬜ | yes — shipment status |
-| Damage % | ⬜ | yes — exceptions (courier_damaged) |
-| Lost % | ⬜ | yes — exceptions (lost) |
-| Average Shipping Cost | ⬜ | yes — cost columns |
-| Packaging Cost | ⬜ | yes — `packaging_cost` |
-| Profit After Shipping | ⬜ | yes — order total − `total_logistics_cost` |
-| Courier Performance | ⬜ | yes — per-provider aggregates |
-| State-wise Delivery Time | ⬜ | yes — `ship_state` + timestamps |
-| COD % | ⬜ | yes — `payment_mode` |
+## Points A–M
+### A. Packaging Profiles → **Packaging Assets** ✅
+Every packing item is inventory (ID, name, type, H/W/L, weight, max weight, max
+products, fragile, cost, vendor, barcode, active). ✅ `packaging_assets` has all
+fields; type covers outer/rigid/mailer/pouch/gift/insert/tissue/foam/filler/wrap/
+tape/leak_seal. Real asset data ⬜.
 
-**Analytics is not built, but every metric's DATA foundation exists** — it's an
-aggregation/reporting slice, no new capture needed.
+### B. Shipping Rules = **Business Rules** ✅ (data ⬜)
+1 candle→A, 2→B, gift→C, ceramic→+bubble, spray→leak. ✅ `packaging_rules`
+(select/modifier) + general `business_rules`. Example rules in the placeholder
+catalog; real rule data ⬜.
 
-## Summary
-- **Fully built:** all state machines (order/shipment/fulfillment/exception/return),
-  Packaging Engine (assets/profiles/rules/weights/dims/cost/inventory/recommend),
-  Shipping abstraction + Manual provider, Courier Decision Engine (logic), Cost
-  Engine, Business Rule Engine, Warehouses, Shipping Settings, Tracking timeline +
-  customer page, Email notifications (confirmation + dispatch), and the wiring of
-  these into `createShipmentForOrder`.
-- **Partial:** Fulfillment (needs dashboard + packing workflow), Notification
-  (needs multi-channel senders), Return rules, RTO workflow.
-- **Not built (by design / awaiting input):** Fulfillment Dashboard (NEXT),
-  Multi-box packing, Shiprocket/Delhivery/India Post adapters, courier tracking
-  webhook, delivery proof, Analytics, and all DATA (real packaging measurements,
-  courier capabilities, business rules, packaging inventory levels).
+### C. Volumetric Weight ✅
+Computed AFTER packaging is chosen (Products → Packaging → Actual Weight →
+Dimensions → Volumetric → Chargeable). ✅ exactly this order in `computeParcel`.
+
+### D. Product Weight — split, never overwrite 🟡
+Weight split into Net / Packaging / Shipping / Volumetric / Chargeable — **separate
+columns, computed independently** ✅. **Net-weight sub-components (wax + jar + lid +
+label) NOT modelled** ⬜, and real per-variant net weight is a placeholder ⬜.
+
+### E. Shipping Weight ✅
+The value handed to any provider. ✅ (`shipping_weight_kg` / `chargeable_weight_kg`).
+
+### F. Box Dimensions ✅
+External dims stored (couriers charge on these). ✅ (asset L/W/H → shipment dims).
+
+### G. Pickup Address → dynamic **Warehouse** 🟡
+Warehouse entity (id, name, address, GST, phone, pickup hours, active) ✅
+(`warehouses` + `warehouseService`). **Order → warehouse ROUTING (which warehouse
+fulfils an order) NOT built** ⬜ — currently always the default warehouse.
+
+### H. Courier Preferences 🟡
+`decideCourier("preferred", order)` supports a priority list ✅. **Segment-based
+priority matrix (Metro / Remote / Luxury / Heavy each with their own courier order)
+NOT modelled as data** ⬜; `courier_capabilities` empty ⬜.
+
+### I. Insurance Rules 🟡
+Single `insurance_threshold` (≥ ₹3000 → insured) + `add_insurance` business action ✅.
+**Tiered bands (₹0–1000 none · ₹1000–3000 OPTIONAL · ₹3000+ mandatory) NOT
+modelled** ⬜ — no "optional" tier / customer choice.
+
+### J. COD Rules 🟡
+COD fee (flat + %) in the cost engine ✅; `cod_threshold` setting ✅; capability
+`supportsCod` ✅. **NOT built:** max COD value enforcement 🟡, **blocked pincodes ⬜**,
+**prepaid-only products ⬜**. COD is not yet offered at checkout (all prepaid).
+
+### K. Return Rules 🟡
+Returns state machine ✅ (requested→approved→pickup→received→qc→refund→closed) +
+reasons (damaged/wrong_item/not_as_described/changed_mind/defective) ✅. Lost shipment
+→ exceptions ✅. **NOT built:** **Replacement / Exchange outcomes** (only Refund
+modelled) ⬜, **RTO ↔ return linkage** 🟡, manufacturing-defect vs courier-damage
+routing ⬜.
+
+### L. Packaging Database — four separate things ✅
+Packaging Assets ✅ · Packaging Profiles ✅ · Packaging Rules ✅ · Packaging Inventory ✅
+(all distinct entities). Inventory LEVELS are data ⬜.
+
+### M. Shipping Workflow (18 steps) 🟡
+The STATES exist across the order / fulfillment / shipment machines
+(reserved→picking→picked→packaging-selected→packed→qc→ready→shipment-created→courier-
+assigned→label→pickup→in-transit→out-for-delivery→delivered→completed). **The
+end-to-end ORCHESTRATION is NOT driven** ⬜ — today payment auto-creates the shipment,
+skipping pick/pack/QC/weight-verify. Needs the Packing Workflow + full §14 gate.
+
+---
+
+## Modules 1–6 (summary)
+- **M1 Fulfillment Core:** Order/Shipment/Fulfillment state machines ✅; Dispatch ✅;
+  **Dashboard ⬜ (NEXT)**; **Packing Workflow 🟡**.
+- **M2 Packaging:** assets/profiles/rules/weight/dimension/volumetric/cost ✅;
+  **Multi-box ⬜**.
+- **M3 Shipping:** interface ✅, Manual ✅, factory ✅; **Shiprocket/Delhivery/India
+  Post ⬜**.
+- **M4 Courier Decision:** cheapest/fastest/preferred/luxury/insurance/fragile/COD/
+  serviceability logic ✅; **capability + segment-priority DATA ⬜**.
+- **M5 Tracking:** manual updates ✅, customer timeline ✅, exceptions ✅; **webhook ⬜,
+  delivery proof (POD) ⬜, RTO workflow 🟡**.
+- **M6 Analytics:** all 11 metrics ⬜ (every metric's DATA foundation exists).
+
+---
+
+## Consolidated gap list (build queue)
+**Logic/engine gaps (no external blocker):**
+1. Fulfillment Dashboard + auth (NEXT) · Packing Workflow (drive pick→pack→QC→ready)
+2. Full Shipping Workflow orchestration + §14 gate (point M)
+3. Multi-box packing (Engine 1 / M2)
+4. Net-weight sub-components: wax/jar/lid/label per variant (point D)
+5. Order → warehouse routing (point G)
+6. Courier segment-priority matrix: Metro/Remote/Luxury/Heavy (point H)
+7. Insurance tiers with an "optional" band (point I)
+8. COD rules: blocked pincodes, prepaid-only products, max-value enforcement (point J)
+9. Returns: Replacement / Exchange outcomes + RTO↔return linkage (point K)
+10. Tracking: delivery proof (POD), RTO workflow
+11. Analytics engine (11 metrics — data-ready)
+
+**Awaiting DATA (from Samorah):** real packaging measurements + per-variant net
+weights, courier capabilities + segment priorities, business-rule data, insurance/COD
+config values, packaging inventory levels.
+
+**Awaiting CREDENTIALS:** Shiprocket/Delhivery/India Post adapters, courier tracking
+webhooks, WhatsApp/SMS/push senders.
