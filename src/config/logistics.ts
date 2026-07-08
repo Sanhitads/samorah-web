@@ -52,3 +52,9 @@ export function volumetricWeightKg(d: ParcelDimensions, divisor = 5000): number 
 export function chargeableWeightKg(shippingWeightKg: number, d: ParcelDimensions): number {
   return Math.max(shippingWeightKg, volumetricWeightKg(d));
 }
+
+/** Cost-engine rates (§9). Placeholders until courier contracts are finalised. */
+export const LOGISTICS_INSURANCE_RATE_PCT = 1; // % of declared value when insured
+export const LOGISTICS_TAX_PCT = 18; // GST on logistics services
+/** Placeholder per-unit net product weight (g) until real per-variant data lands. */
+export const PLACEHOLDER_NET_WEIGHT_G = 300; // TODO(real-data): wax + jar + lid + label

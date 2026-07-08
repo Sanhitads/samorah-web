@@ -179,3 +179,44 @@ flag + the fulfillment state machine will gate it so QC precedes dispatch.
 
 Each slice is additive and verified before the next. This document is the contract they
 build against.
+
+---
+
+## Wired into the live flow (createShipmentForOrder) — [DONE]
+- §11 settings → provider selection (`shipping_settings.default_provider`).
+- §3/§6 Packaging Engine → parcel weights/dimensions + packaging cost (via the
+  EXAMPLE catalog until real data).
+- §12 business rules → actions at shipment creation (`add_insurance`, `set_provider`).
+- §9 cost engine → persisted breakdown (courier/packaging/insurance/COD/fuel/tax/total)
+  on the shipment.
+- §14 gate present (`auto_create_after_fulfillment`, default OFF).
+
+## PENDING — awaiting DATA, CREDENTIALS, or a future slice
+These are intentionally deferred. The engines/interfaces exist; only the input below
+is missing. Filling them is a **data or adapter change, not a redesign.**
+
+**Awaiting real packaging DATA (from Samorah):**
+- Real box weights & dimensions + per-variant **net product weights** (wax+jar+lid+label).
+  Replace `EXAMPLE_PACKAGING_CATALOG` + `PLACEHOLDER_NET_WEIGHT_G` (config/packaging.ts,
+  config/logistics.ts). Until then, parcel weights/costs are indicative.
+- Additional packaging **rules** (e.g. 4+ products, per-vessel boxes) + capturing the
+  **gift flag** at checkout so `PackContext.isGift` is real.
+- Packaging **inventory levels** (current/min/reorder) entered into `packaging_assets`.
+
+**Awaiting CREDENTIALS:**
+- **Shiprocket adapter** (`ShiprocketProvider implements ShippingProvider`) — auth,
+  serviceability, create-shipment, AWB, pickup — needs sandbox EMAIL/PASSWORD.
+- **Courier tracking webhook** (Shiprocket/Delhivery) → normalise → `add_shipment_event`.
+- Delhivery / Blue Dart / India Post adapters (as contracts are signed).
+- WhatsApp / SMS / push **notification senders** (email is live).
+
+**Future slices (no external blocker):**
+- **Courier capability DATA** (`courier_capabilities` empty) + strategy ≠ manual, so the
+  Decision Engine (§5) actually chooses between couriers.
+- **Business-rule DATA** (`business_rules` empty) — e.g. order>₹3000→insurance, COD→Delhivery.
+- **Admin dashboard + auth**: fulfillment board (pick/pack/QC/dispatch), and CRUD for
+  settings, rules, warehouses, packaging assets, courier capabilities, exceptions, returns.
+- **§14 full gate**: drive `orders.fulfillment_status` through the fulfillment workflow so
+  the ready-to-ship gate is meaningful (then enable `auto_create_after_fulfillment`).
+- **Analytics Engine** (§ roadmap 7) — cost/delivery-time/RTO/damage/profit dashboards.
+- Multi-channel notification wiring via `notification_triggers` once senders exist.
