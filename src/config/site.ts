@@ -38,6 +38,19 @@ export function canonicalUrl(path = ""): string {
   return `${canonicalOrigin()}${p}`;
 }
 
+/** The production origin — ALWAYS the primary domain, ignoring the dev/preview
+ *  override. Use for links that leave the app (emails, invoices, webhooks) so they
+ *  never point at localhost / vercel.app / a preview URL. */
+export function productionOrigin(): string {
+  return `${SITE_CONFIG.protocol}://${SITE_CONFIG.primaryDomain}`;
+}
+
+/** An absolute production URL (for emails etc.) — never a dev/preview host. */
+export function productionUrl(path = ""): string {
+  const p = path ? (path.startsWith("/") ? path : `/${path}`) : "";
+  return `${productionOrigin()}${p}`;
+}
+
 /** True when a request host is NOT the primary (an alias or any other domain). */
 export function isNonPrimaryHost(host: string): boolean {
   const bare = bareHost(host);

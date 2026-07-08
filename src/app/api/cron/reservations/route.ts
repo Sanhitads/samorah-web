@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cronAuthorized } from "@/lib/cronAuth";
 import { releaseExpiredReservations, expireStalePendingOrders } from "@/services/orderService";
 
 /**
@@ -9,15 +10,8 @@ import { releaseExpiredReservations, expireStalePendingOrders } from "@/services
  */
 export const runtime = "nodejs";
 
-function authorized(request: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-  const header = request.headers.get("x-cron-secret") ?? request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  return header === secret;
-}
-
 export async function POST(request: Request) {
-  if (!authorized(request)) {
+  if (!cronAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
   try {

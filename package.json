@@ -10,7 +10,8 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "send-emails": "node scripts/send-emails.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

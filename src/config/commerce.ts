@@ -27,8 +27,18 @@ export const COMMERCE = {
   currencySymbol: "₹",
 
   support: {
-    email: "care@samorah.example", // TODO confirm
-    phone: "+91 00000 00000", // TODO confirm
+    email: "hello@samorahstudio.com", // customer-facing (Google Workspace inbox)
+    phone: "+91 00000 00000", // TODO confirm — placeholder
+  },
+  /** Google Workspace aliases. Sending is via Resend from `hello@` (EMAIL_FROM);
+   *  these route inbound mail. No address is hardcoded in send paths — the email
+   *  layer reads EMAIL_FROM / EMAIL_REPLY_TO from env. */
+  emails: {
+    customer: "hello@samorahstudio.com",
+    support: "support@samorahstudio.com",
+    orders: "orders@samorahstudio.com",
+    returns: "returns@samorahstudio.com",
+    admin: "samorah@samorahstudio.com",
   },
 
   policy: {

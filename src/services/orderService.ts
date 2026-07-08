@@ -343,3 +343,31 @@ export async function getOrderByNumber(orderNumber: string) {
   if (error) throw error;
   return data;
 }
+
+/** Read a finalized order by id (fulfillment worker). */
+export async function getOrderById(orderId: string) {
+  const db = createAdminClient();
+  const { data, error } = await db.from("orders").select("*, order_items(*)").eq("id", orderId).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+// ── Fulfillment worker ────────────────────────────────────────────────────────
+export async function claimFulfillmentJobs(
+  jobType: "email" | "shiprocket",
+  limit = 10,
+): Promise<{ id: string; orderId: string; attempts: number }[]> {
+  const rows = await callRpc<{ id: string; order_id: string; attempts: number }[]>("claim_fulfillment_jobs", {
+    p_job_type: jobType,
+    p_limit: limit,
+  });
+  return (rows ?? []).map((r) => ({ id: r.id, orderId: r.order_id, attempts: r.attempts }));
+}
+
+export async function completeFulfillmentJob(
+  id: string,
+  status: "done" | "failed" | "queued",
+  error?: string,
+): Promise<void> {
+  await callRpc<void>("complete_fulfillment_job", { p_id: id, p_status: status, p_error: error ?? "" });
+}
