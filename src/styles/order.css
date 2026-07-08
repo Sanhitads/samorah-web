@@ -247,6 +247,35 @@
 .order-conf--missing { text-align: center; }
 .order-conf--missing .order-conf__lead { margin-bottom: 8px; }
 
+/* ── Tracking timeline ── */
+.track-notice {
+  margin: 0 0 clamp(24px, 3vw, 34px);
+  padding: 16px 20px;
+  border: 1px solid var(--oc-gold);
+  border-radius: 3px;
+  font-family: var(--font-serif);
+  font-size: 0.95rem;
+  color: var(--ink, #1f1a16);
+  text-align: center;
+}
+.track-events { list-style: none; margin: clamp(28px, 3.4vw, 40px) 0 0; padding: 0; }
+.track-event { display: flex; gap: 16px; padding-bottom: clamp(18px, 2vw, 24px); position: relative; }
+.track-event:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 14px;
+  bottom: 0;
+  width: 1px;
+  background: var(--oc-hairline);
+}
+.track-event__dot { flex-shrink: 0; width: 11px; height: 11px; margin-top: 4px; border-radius: 50%; background: var(--oc-gold); z-index: 1; }
+.track-event__body { display: flex; flex-direction: column; gap: 3px; }
+.track-event__status { font-family: var(--font-serif); font-size: 1rem; color: var(--ink, #1f1a16); }
+.track-event__desc { font-family: var(--font-serif); font-size: 0.9rem; color: var(--smoke, #6b6259); line-height: 1.5; }
+.track-event__time { font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.06em; color: var(--smoke, #6b6259); }
+.track-empty { margin-top: clamp(28px, 3.4vw, 40px); font-family: var(--font-serif); font-style: italic; font-size: 0.95rem; color: var(--smoke, #6b6259); text-align: center; }
+
 @media (max-width: 560px) {
   .order-conf__timeline { flex-wrap: wrap; gap: 16px 8px; }
   .oc-step { flex: 0 0 30%; }

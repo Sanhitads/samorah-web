@@ -344,7 +344,7 @@ export async function getOrderById(orderId: string) {
 
 // ── Fulfillment worker ────────────────────────────────────────────────────────
 export async function claimFulfillmentJobs(
-  jobType: "email" | "shipping",
+  jobType: "email" | "shipping" | "dispatch_email",
   limit = 10,
 ): Promise<{ id: string; orderId: string; attempts: number }[]> {
   const rows = await callRpc<{ id: string; order_id: string; attempts: number }[]>("claim_fulfillment_jobs", {

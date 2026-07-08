@@ -10,6 +10,19 @@ import type { ShipmentRequest } from "@/lib/shipping/types";
 import { toCustomerStatus, type ShipmentStatus } from "@/lib/shipment/state";
 import { DEFAULT_WAREHOUSE, DEFAULT_PARCEL, volumetricWeightKg, chargeableWeightKg } from "@/config/logistics";
 import { callRpc } from "@/lib/supabase/rpc";
+import { createAdminClient } from "@/lib/supabase/admin";
+
+/** Loose admin accessor for the shipments/* tables (not in generated DB types). */
+function adminLoose() {
+  return createAdminClient() as unknown as {
+    from: (t: string) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      select: (q?: string) => any;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      update: (v: Record<string, unknown>) => any;
+    };
+  };
+}
 
 /** The order fields the shipping layer needs (loose — decoupled from DB types). */
 export interface ShippableOrder {
@@ -132,3 +145,56 @@ export async function addShipmentEvent(
     },
   });
 }
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/** The order + shipment + event timeline for the customer tracking page. */
+export async function getShipmentForOrderNumber(orderNumber: string): Promise<{ order: any; shipment: any } | null> {
+  const db = adminLoose();
+  const { data: order } = await db
+    .from("orders")
+    .select("id,order_number,status,email,ship_full_name,ship_line1,ship_line2,ship_city,ship_state,ship_pincode,ship_phone")
+    .eq("order_number", orderNumber)
+    .maybeSingle();
+  if (!order) return null;
+  const { data: shipment } = await db
+    .from("shipments")
+    .select("*, shipment_events(*)")
+    .eq("order_id", order.id)
+    .maybeSingle();
+  return { order, shipment };
+}
+
+export interface DispatchInfo {
+  order_number: string;
+  ship_full_name: string | null;
+  email: string;
+  courier_name: string | null;
+  awb: string | null;
+}
+/** Minimal data for the ORDER_DISPATCHED email. */
+export async function getDispatchInfo(orderId: string): Promise<DispatchInfo | null> {
+  const db = adminLoose();
+  const { data: order } = await db.from("orders").select("order_number,ship_full_name,email").eq("id", orderId).maybeSingle();
+  if (!order) return null;
+  const { data: shipment } = await db.from("shipments").select("awb,courier_name").eq("order_id", orderId).maybeSingle();
+  return {
+    order_number: order.order_number,
+    ship_full_name: order.ship_full_name ?? null,
+    email: order.email,
+    courier_name: shipment?.courier_name ?? null,
+    awb: shipment?.awb ?? null,
+  };
+}
+
+/** Mark a shipment dispatched (picked up), advance the order → shipped, queue the
+ *  dispatch email. Admin/manual action today; a provider webhook later. */
+export async function markShipmentDispatched(orderId: string): Promise<{ ok: boolean; reason?: string }> {
+  const db = adminLoose();
+  const { data: shipment } = await db.from("shipments").select("id,status").eq("order_id", orderId).maybeSingle();
+  if (!shipment) return { ok: false, reason: "no shipment for order" };
+  await addShipmentEvent(shipment.id, "picked_up", { description: "Dispatched — parcel handed to courier", source: "admin" });
+  await db.from("orders").update({ status: "shipped" }).eq("id", orderId);
+  await callRpc<void>("queue_fulfillment_job", { p_order_id: orderId, p_job_type: "dispatch_email" });
+  return { ok: true };
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */

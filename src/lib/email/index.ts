@@ -8,6 +8,7 @@ export type { EmailProvider, EmailMessage, EmailSendResult } from "./provider";
 export type { EmailType } from "./types";
 export { EMAIL_TYPES, IMPLEMENTED_EMAIL_TYPES } from "./types";
 export { buildOrderConfirmationEmail, type EmailOrder, type EmailItem } from "./orderConfirmation";
+export { buildDispatchNotificationEmail, type DispatchEmailInput } from "./dispatchNotification";
 export { emailFrom, emailReplyTo } from "./config";
 
 /** True when the active provider has credentials — the worker gates on this. */
