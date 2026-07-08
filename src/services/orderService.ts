@@ -11,23 +11,12 @@
  * All money is derived from the server re-price (RepriceResult), never the client.
  */
 import { createAdminClient } from "@/lib/supabase/admin";
+import { callRpc } from "@/lib/supabase/rpc";
 import { toRupees } from "@/lib/money";
 import { COMMERCE } from "@/config/commerce";
 import { validateRazorpayPayment } from "@/lib/razorpayApi";
 import { signOrderToken } from "@/lib/orderToken";
 import type { RepriceResult } from "@/lib/repricing";
-
-/** Contained cast for RPCs that aren't in the generated Database types. Note: the
- *  rpc call MUST be a method call on the client (`db.rpc(...)`) so `this` stays
- *  bound — extracting the function detaches it and PostgREST fails on `this.url`. */
-async function callRpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
-  const db = createAdminClient() as unknown as {
-    rpc: (n: string, a: Record<string, unknown>) => PromiseLike<{ data: T; error: { message: string } | null }>;
-  };
-  const { data, error } = await db.rpc(fn, args);
-  if (error) throw new Error(error.message);
-  return data;
-}
 
 export interface OrderAddress {
   fullName: string;
@@ -77,7 +66,8 @@ export async function expireStalePendingOrders(minutes = 30): Promise<number> {
 async function enqueueFulfillment(orderId: string): Promise<void> {
   try {
     await callRpc<void>("queue_fulfillment_job", { p_order_id: orderId, p_job_type: "email" });
-    await callRpc<void>("queue_fulfillment_job", { p_order_id: orderId, p_job_type: "shiprocket" });
+    // Provider-agnostic: the shipping engine picks the courier (Manual today).
+    await callRpc<void>("queue_fulfillment_job", { p_order_id: orderId, p_job_type: "shipping" });
   } catch (e) {
     console.error("enqueueFulfillment failed", e); // externals never block the response
   }
@@ -354,7 +344,7 @@ export async function getOrderById(orderId: string) {
 
 // ── Fulfillment worker ────────────────────────────────────────────────────────
 export async function claimFulfillmentJobs(
-  jobType: "email" | "shiprocket",
+  jobType: "email" | "shipping",
   limit = 10,
 ): Promise<{ id: string; orderId: string; attempts: number }[]> {
   const rows = await callRpc<{ id: string; order_id: string; attempts: number }[]>("claim_fulfillment_jobs", {

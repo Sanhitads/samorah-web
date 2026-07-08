@@ -2,12 +2,14 @@ import { NextResponse } from "next/server";
 import { cronAuthorized } from "@/lib/cronAuth";
 import { claimFulfillmentJobs, completeFulfillmentJob, getOrderById } from "@/services/orderService";
 import { emailConfigured, sendEmail, buildOrderConfirmationEmail, type EmailOrder } from "@/lib/email";
+import { createShipmentForOrder } from "@/services/shipmentService";
 
 /**
- * POST /api/cron/fulfillment — drains the fulfillment_jobs queue. Runs on a
- * schedule (or a manual trigger). Currently processes confirmation-email jobs;
- * Shiprocket jobs are left queued until Stage 2B.4b. External failures never touch
- * the order — a job just retries (up to 3 attempts) then goes to `failed`.
+ * POST /api/cron/fulfillment — drains the fulfillment_jobs queue. Processes:
+ *  - `email`    confirmation emails (gated on Resend being configured)
+ *  - `shipping` creates the shipment via the active provider (Manual today — always
+ *               available). External failures never touch the order — a job retries
+ *               (≤3) then goes to `failed`.
  */
 export const runtime = "nodejs";
 const MAX_ATTEMPTS = 3;
@@ -29,9 +31,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
-  const result = { emailConfigured: emailConfigured(), emailsSent: 0, emailsFailed: 0 };
+  const result = { emailConfigured: emailConfigured(), emailsSent: 0, emailsFailed: 0, shipmentsCreated: 0, shipmentsFailed: 0 };
 
   try {
+    // ── Shipping jobs — always processed (Manual provider needs no creds) ──
+    const shipJobs = await claimFulfillmentJobs("shipping", 20);
+    for (const j of shipJobs) {
+      try {
+        const res = await createShipmentForOrder(j.orderId);
+        if (res.ok) {
+          await safeComplete(j.id, "done");
+          result.shipmentsCreated++;
+        } else {
+          await safeComplete(j.id, j.attempts < MAX_ATTEMPTS ? "queued" : "failed", res.reason);
+          result.shipmentsFailed++;
+        }
+      } catch (e) {
+        await safeComplete(j.id, j.attempts < MAX_ATTEMPTS ? "queued" : "failed", e instanceof Error ? e.message : "error");
+        result.shipmentsFailed++;
+      }
+    }
+
     // Only claim email jobs when Resend is configured, so attempts don't climb
     // while unconfigured — jobs wait untouched in the queue.
     if (result.emailConfigured) {
