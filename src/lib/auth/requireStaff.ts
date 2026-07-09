@@ -17,17 +17,17 @@ export const ROLE_RANK: Record<string, number> = {
 
 export type StaffRole = keyof typeof ROLE_RANK;
 
-export async function requireStaff(min: StaffRole = "editor"): Promise<{ ok: boolean; role: string | null }> {
+export async function requireStaff(min: StaffRole = "editor"): Promise<{ ok: boolean; role: string | null; userId: string | null }> {
   try {
     const db = await createClient();
     const {
       data: { user },
     } = await db.auth.getUser();
-    if (!user) return { ok: false, role: null };
+    if (!user) return { ok: false, role: null, userId: null };
     const { data: profile } = await db.from("users").select("role").eq("id", user.id).single();
     const role = profile?.role ?? "customer";
-    return { ok: (ROLE_RANK[role] ?? 0) >= (ROLE_RANK[min] ?? 99), role };
+    return { ok: (ROLE_RANK[role] ?? 0) >= (ROLE_RANK[min] ?? 99), role, userId: user.id };
   } catch {
-    return { ok: false, role: null };
+    return { ok: false, role: null, userId: null };
   }
 }

@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "orderNumber and a valid `to` status are required." }, { status: 400 });
   }
   try {
-    const result = await advanceFulfillment(orderNumber, to as FulfillmentStatus);
+    const result = await advanceFulfillment(orderNumber, to as FulfillmentStatus, { actorId: staff.userId ?? undefined });
     return NextResponse.json(result);
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Failed." }, { status: 422 });

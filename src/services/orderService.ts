@@ -16,6 +16,7 @@ import { toRupees } from "@/lib/money";
 import { COMMERCE } from "@/config/commerce";
 import { validateRazorpayPayment } from "@/lib/razorpayApi";
 import { signOrderToken } from "@/lib/orderToken";
+import { logEvent } from "@/services/auditService";
 import type { RepriceResult } from "@/lib/repricing";
 
 export interface OrderAddress {
@@ -307,6 +308,16 @@ export async function persistOrder(input: {
       }
     }
     await enqueueFulfillment(data.order_id);
+    await logEvent({
+      orderId: data.order_id,
+      entityType: "order",
+      entityId: data.order_id,
+      event: "order.confirmed",
+      actorType: input.source === "webhook" ? "webhook" : "system",
+      newState: "confirmed",
+      notes: data.invoice_number ? `Invoice ${data.invoice_number}` : undefined,
+      metadata: { paymentId: input.paymentId, method: check.method ?? null },
+    });
   }
 
   return {

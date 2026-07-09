@@ -20,8 +20,8 @@ export async function POST(request: Request) {
 
   try {
     const result = body.resume
-      ? await resumeFulfillment(body.orderNumber)
-      : await holdFulfillment(body.orderNumber, body.reason);
+      ? await resumeFulfillment(body.orderNumber, { actorId: staff.userId ?? undefined })
+      : await holdFulfillment(body.orderNumber, body.reason, { actorId: staff.userId ?? undefined });
     return NextResponse.json(result);
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Failed." }, { status: 422 });

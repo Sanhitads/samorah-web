@@ -23,8 +23,8 @@ export async function POST(request: Request) {
   const order = await getOrderByNumber(body.orderNumber);
   if (!order) return NextResponse.json({ error: "Order not found." }, { status: 404 });
 
-  const result = await createShipmentForOrder(order.id);
+  const result = await createShipmentForOrder(order.id, { actorId: staff.userId ?? undefined });
   if (!result.ok) return NextResponse.json({ error: result.reason ?? "Could not create shipment." }, { status: 422 });
-  await tryAdvanceFulfillment(body.orderNumber, "courier_assigned");
+  await tryAdvanceFulfillment(body.orderNumber, "courier_assigned", { actorId: staff.userId ?? undefined });
   return NextResponse.json({ ...result });
 }

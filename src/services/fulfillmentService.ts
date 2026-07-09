@@ -12,6 +12,7 @@ import {
   nextFulfillmentStates,
   type FulfillmentStatus,
 } from "@/lib/fulfillment/state";
+import { logEvent } from "@/services/auditService";
 
 const START: FulfillmentStatus = "reserved";
 const TERMINAL_ORDER = new Set(["cancelled", "delivered", "returned", "rto"]);
@@ -24,6 +25,7 @@ function loose() {
 export async function advanceFulfillment(
   orderNumber: string,
   to: FulfillmentStatus,
+  opts?: { actorId?: string },
 ): Promise<{ ok: boolean; from: FulfillmentStatus; to: FulfillmentStatus }> {
   const db = loose();
   const { data: order } = await db
@@ -39,21 +41,22 @@ export async function advanceFulfillment(
   const mapped = fulfillmentToOrderStatus(to);
   if (mapped && mapped !== order.status) patch.status = mapped;
   await db.from("orders").update(patch).eq("id", order.id);
+  await logEvent({ orderId: order.id, entityType: "fulfillment", entityId: order.id, event: `fulfillment.${to}`, actorId: opts?.actorId, previousState: from, newState: to });
   return { ok: true, from, to };
 }
 
 /** Best-effort advance — used alongside shipment actions; ignores illegal jumps
  *  (e.g. an order that was auto-shipped without the manual workflow). */
-export async function tryAdvanceFulfillment(orderNumber: string, to: FulfillmentStatus): Promise<void> {
+export async function tryAdvanceFulfillment(orderNumber: string, to: FulfillmentStatus, opts?: { actorId?: string }): Promise<void> {
   try {
-    await advanceFulfillment(orderNumber, to);
+    await advanceFulfillment(orderNumber, to, opts);
   } catch {
     /* not on the expected path — leave fulfillment status as-is */
   }
 }
 
 /** Put an order on hold, remembering the exact prior state + an optional reason. */
-export async function holdFulfillment(orderNumber: string, reason?: string): Promise<{ ok: boolean; from: FulfillmentStatus }> {
+export async function holdFulfillment(orderNumber: string, reason?: string, opts?: { actorId?: string }): Promise<{ ok: boolean; from: FulfillmentStatus }> {
   const db = loose();
   const { data: order } = await db.from("orders").select("id,fulfillment_status").eq("order_number", orderNumber).maybeSingle();
   if (!order) throw new Error("order not found");
@@ -69,11 +72,12 @@ export async function holdFulfillment(orderNumber: string, reason?: string): Pro
       updated_at: new Date().toISOString(),
     })
     .eq("id", order.id);
+  await logEvent({ orderId: order.id, entityType: "fulfillment", entityId: order.id, event: "fulfillment.on_hold", actorId: opts?.actorId, previousState: from, newState: "on_hold", notes: reason?.trim() || undefined });
   return { ok: true, from };
 }
 
 /** Resume a held order to its exact prior state; syncs the coarse order status. */
-export async function resumeFulfillment(orderNumber: string): Promise<{ ok: boolean; to: FulfillmentStatus }> {
+export async function resumeFulfillment(orderNumber: string, opts?: { actorId?: string }): Promise<{ ok: boolean; to: FulfillmentStatus }> {
   const db = loose();
   const { data: order } = await db
     .from("orders")
@@ -93,6 +97,7 @@ export async function resumeFulfillment(orderNumber: string): Promise<{ ok: bool
   const mapped = fulfillmentToOrderStatus(to);
   if (mapped && mapped !== order.status) patch.status = mapped;
   await db.from("orders").update(patch).eq("id", order.id);
+  await logEvent({ orderId: order.id, entityType: "fulfillment", entityId: order.id, event: "fulfillment.resumed", actorId: opts?.actorId, previousState: "on_hold", newState: to });
   return { ok: true, to };
 }
 

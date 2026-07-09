@@ -161,7 +161,7 @@ Management** = cancellations + commercial/financial · **Shipping** = courier ·
 | a | Fulfillment Board is a warehouse tool, not order management | ✅ (Cancel removed from board) |
 | b | All providers implement one Shipping Provider Interface | ✅ |
 | c | Warehouse staff never perform financial operations | ✅ (no Cancel/refund on board) |
-| d | Every business action generates an audit event | 🟡 (audit_logs partial; fulfillment transitions not logged) |
+| d | Every business action generates an audit event | ✅ `audit_events` stream — order.confirmed, fulfillment.*, shipment.created/dispatched, hold/resume all write via `logEvent` (non-blocking) |
 | e | Every customer notification is event-driven | 🟡 (triggers exist; confirmation+dispatch only) |
 | f | Business rules configurable, not hardcoded | ✅ (rule + packaging engines) |
 | g | All logistics modules provider-independent | ✅ |
@@ -186,15 +186,15 @@ Management** = cancellations + commercial/financial · **Shipping** = courier ·
 | 15 | Customer notes inline (Gift Wrap/Leave at Reception/Call Before) | 🟡 internal_notes stored; not shown on board |
 | 16 | Payment badge (Paid/COD/Refund Pending/Refunded) | ⬜ (payment_status ready) |
 | 17 | Inventory status (Reserved/Allocated/Missing Stock) | ⬜ (reservations exist) |
-| 18 | Immutable analytics event log (Picking Started…Refund Completed) | 🟡 audit_logs + shipment_events partial; fulfillment events ⬜ |
+| 18 | Immutable analytics event log (Picking Started…Refund Completed) | ✅ `audit_events` (append-only, RLS, service-role only) captures order/fulfillment/shipment events; cancellation/refund events land when Order Mgmt ships |
 | 19 | Customer notifications (Confirmation/Dispatch/Delivery/Cancellation/Refund) | 🟡 Confirmation+Dispatch ✅; Delivery/Cancellation/Refund ⬜ |
 | 20 | Role-based permissions (Warehouse/CS/Finance/Admin) | 🟡 RBAC roles + board gate (editor+); per-action role split ⬜ |
 | 21 | Separate admin modules + nav (Dashboard/Orders/Fulfillment/Shipments/Returns/Customers/Catalog/Warehouses/Packaging/Rules/Providers/Settings/Analytics) | ⬜ (only Fulfillment; no shell/nav) |
-| 22 | Audit trail per transition/action (timestamp/user/prev/new/action/notes) | 🟡 audit_logs exists; not comprehensive; no user attribution on fulfillment |
+| 22 | Audit trail per transition/action (timestamp/user/prev/new/action/notes) | ✅ each row = timestamp · actor (staff.userId threaded from routes) · previous→new state · event · notes · metadata; `getOrderTimeline(orderId)` reads it back |
 | 23 | Colour coding (Reserved 🟦/Picking 🟨/Packing 🟧/Ready 🟩/Exception 🟥/Cancelled ⚫) | 🟡 some status colours; not the exact semantic palette |
 
 ### Build queue implied by v2 (priority order)
-1. **Audit-event log** (d, 18, 22) — one immutable stream every action writes to (unblocks Analytics).
+1. ~~**Audit-event log** (d, 18, 22)~~ ✅ **DONE** — `audit_events` table + `record_audit_event` RPC + `auditService.logEvent`/`getOrderTimeline`; wired into order confirm, fulfillment advance/hold/resume, shipment create/dispatch, with staff actor attribution. Non-blocking (never breaks the business action). Cancellation/refund events attach when Order Mgmt ships.
 2. **Order Management module** (7, 8, 9) — cancellation (role-gated, confirm, reason) → refund workflow (Razorpay) → cancellation/refund emails.
 3. **Board context columns** (11–17) — priority, tags, SLA age+colour, payment badge, notes, item count, inventory status.
 4. **Admin shell + nav** (21) — real /admin area; then Orders, Shipments, Returns, Settings/Rules/Warehouses/Packaging/Providers screens.

@@ -27,6 +27,7 @@ import { computeLogisticsCost } from "@/lib/logistics/cost";
 import { getShippingSettings } from "@/lib/settings/shippingSettings";
 import { loadBusinessRules } from "@/services/logisticsService";
 import { runBusinessRules } from "@/lib/rules/engine";
+import { logEvent } from "@/services/auditService";
 
 /** Loose admin accessor for the shipments/* tables (not in generated DB types). */
 function adminLoose() {
@@ -136,7 +137,7 @@ export interface ShipmentCreateResult {
 /** Create + persist a shipment for an order (idempotent). Wires: shipping settings
  *  (§11) → provider; Packaging Engine (§3/§6) → parcel; Business Rules (§12) →
  *  insurance/flags; Cost Engine (§9) → persisted logistics cost. Provider-agnostic. */
-export async function createShipmentForOrder(orderId: string): Promise<ShipmentCreateResult> {
+export async function createShipmentForOrder(orderId: string, opts?: { actorId?: string }): Promise<ShipmentCreateResult> {
   const order = (await getOrderById(orderId)) as unknown as (ShippableOrder & { fulfillment_status?: string | null }) | null;
   if (!order) return { ok: false, created: false, reason: "order not found" };
 
@@ -243,6 +244,19 @@ export async function createShipmentForOrder(orderId: string): Promise<ShipmentC
     console.error("shipment cost persist failed (non-fatal)", e);
   }
 
+  if (data.created) {
+    await logEvent({
+      orderId,
+      entityType: "shipment",
+      entityId: data.shipment_id,
+      event: "shipment.created",
+      actorId: opts?.actorId,
+      newState: status,
+      notes: shipment.awb ? `${shipment.courierName ?? shipment.provider} · ${shipment.awb}` : undefined,
+      metadata: { provider: shipment.provider, awb: shipment.awb ?? null, courier: shipment.courierName ?? null },
+    });
+  }
+
   return { ok: true, created: data.created, shipmentId: data.shipment_id, awb: shipment.awb, orderNumber: data.order_number };
 }
 
@@ -306,13 +320,14 @@ export async function getDispatchInfo(orderId: string): Promise<DispatchInfo | n
 
 /** Mark a shipment dispatched (picked up), advance the order → shipped, queue the
  *  dispatch email. Admin/manual action today; a provider webhook later. */
-export async function markShipmentDispatched(orderId: string): Promise<{ ok: boolean; reason?: string }> {
+export async function markShipmentDispatched(orderId: string, opts?: { actorId?: string }): Promise<{ ok: boolean; reason?: string }> {
   const db = adminLoose();
   const { data: shipment } = await db.from("shipments").select("id,status").eq("order_id", orderId).maybeSingle();
   if (!shipment) return { ok: false, reason: "no shipment for order" };
   await addShipmentEvent(shipment.id, "picked_up", { description: "Dispatched — parcel handed to courier", source: "admin" });
   await db.from("orders").update({ status: "shipped" }).eq("id", orderId);
   await callRpc<void>("queue_fulfillment_job", { p_order_id: orderId, p_job_type: "dispatch_email" });
+  await logEvent({ orderId, entityType: "shipment", entityId: shipment.id, event: "shipment.dispatched", actorId: opts?.actorId, previousState: shipment.status, newState: "picked_up" });
   return { ok: true };
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */

@@ -23,8 +23,8 @@ export async function POST(request: Request) {
   const order = await getOrderByNumber(body.orderNumber);
   if (!order) return NextResponse.json({ error: "Order not found." }, { status: 404 });
 
-  const result = await markShipmentDispatched(order.id);
+  const result = await markShipmentDispatched(order.id, { actorId: staff.userId ?? undefined });
   if (!result.ok) return NextResponse.json({ error: result.reason ?? "Could not dispatch." }, { status: 422 });
-  await tryAdvanceFulfillment(body.orderNumber, "picked_up");
+  await tryAdvanceFulfillment(body.orderNumber, "picked_up", { actorId: staff.userId ?? undefined });
   return NextResponse.json({ dispatched: true, orderNumber: body.orderNumber });
 }
