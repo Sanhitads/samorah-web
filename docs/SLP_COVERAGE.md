@@ -70,10 +70,12 @@ The value handed to any provider. ✅ (`shipping_weight_kg` / `chargeable_weight
 ### F. Box Dimensions ✅
 External dims stored (couriers charge on these). ✅ (asset L/W/H → shipment dims).
 
-### G. Pickup Address → dynamic **Warehouse** 🟡
-Warehouse entity (id, name, address, GST, phone, pickup hours, active) ✅
-(`warehouses` + `warehouseService`). **Order → warehouse ROUTING (which warehouse
-fulfils an order) NOT built** ⬜ — currently always the default warehouse.
+### G. Pickup Address → dynamic **Warehouse** ✅
+Warehouse entity (id, name, address, GST, phone, pickup hours, active) ✅ + **admin
+UI** `/admin/warehouses` (CRUD, set-default, guardrails). **Order → warehouse
+ROUTING ✅** — `routeWarehouse` (pure, tested): region routing over `serves_states`,
+else highest-priority active; wired into `createShipmentForOrder` so shipments pick
+up from the routed warehouse (not a hardcoded default). Routing preview in the UI.
 
 ### H. Courier Preferences 🟡
 `decideCourier("preferred", order)` supports a priority list ✅. **Segment-based
@@ -140,7 +142,7 @@ skipping pick/pack/QC/weight-verify. Needs the Packing Workflow + full §14 gate
    enabling `auto_create_after_fulfillment` for hands-off gating is the remaining bit
 3. Multi-box packing (Engine 1 / M2)
 4. Net-weight sub-components: wax/jar/lid/label per variant (point D)
-5. Order → warehouse routing (point G)
+5. ~~Order → warehouse routing (point G)~~ ✅ DONE — region routing (`serves_states` → warehouse) wired into shipment creation; admin UI + preview
 6. Courier segment-priority matrix: Metro/Remote/Luxury/Heavy (point H)
 7. Insurance tiers with an "optional" band (point I)
 8. COD rules: blocked pincodes, prepaid-only products, max-value enforcement (point J)

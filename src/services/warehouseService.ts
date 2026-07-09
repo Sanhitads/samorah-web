@@ -5,6 +5,7 @@
  */
 import { createAdminClient } from "@/lib/supabase/admin";
 import { WAREHOUSES, DEFAULT_WAREHOUSE } from "@/config/logistics";
+import { routeWarehouse } from "@/lib/logistics/routing";
 import type { PickupLocation } from "@/lib/shipping/types";
 
 export interface Warehouse extends PickupLocation {
@@ -13,6 +14,7 @@ export interface Warehouse extends PickupLocation {
   workingHours?: string;
   priority: number;
   active: boolean;
+  servesStates: string[]; // delivery states this warehouse claims (empty = anywhere)
 }
 
 /** Pure mapper: DB row → Warehouse (PickupLocation-compatible). */
@@ -26,6 +28,7 @@ export function mapWarehouseRow(row: Record<string, unknown>): Warehouse {
     workingHours: (row.working_hours as string) ?? undefined,
     priority: Number(row.priority ?? 100),
     active: (row.active as boolean) ?? true,
+    servesStates: Array.isArray(row.serves_states) ? (row.serves_states as string[]) : [],
     address: {
       name: String(row.name),
       phone: (row.phone as string) ?? "",
@@ -40,7 +43,7 @@ export function mapWarehouseRow(row: Record<string, unknown>): Warehouse {
 }
 
 const configFallback = (): Warehouse[] =>
-  WAREHOUSES.map((w) => ({ ...w, priority: 100, active: true }));
+  WAREHOUSES.map((w) => ({ ...w, priority: 100, active: true, servesStates: [] }));
 
 /** Active warehouses, highest priority first. Falls back to config on any error. */
 export async function getWarehouses(): Promise<Warehouse[]> {
@@ -59,4 +62,27 @@ export async function getWarehouses(): Promise<Warehouse[]> {
 export async function getDefaultWarehouse(): Promise<PickupLocation> {
   const all = await getWarehouses();
   return all[0] ?? DEFAULT_WAREHOUSE;
+}
+
+/** ALL warehouses (incl. inactive), priority order — for the admin screen. */
+export async function getAllWarehouses(): Promise<Warehouse[]> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = createAdminClient() as any;
+    const { data } = await db.from("warehouses").select("*").order("priority");
+    if (!data || data.length === 0) return configFallback();
+    return (data as Record<string, unknown>[]).map(mapWarehouseRow);
+  } catch {
+    return configFallback();
+  }
+}
+
+/**
+ * Which warehouse fulfils this order (coverage §G). Region routing over the active
+ * warehouses; falls back to the config default when the table is empty/unreachable.
+ */
+export async function routeWarehouseForOrder(order: { ship_state?: string | null }): Promise<PickupLocation> {
+  const active = await getWarehouses(); // active, priority order
+  const routed = routeWarehouse(order.ship_state ?? null, active);
+  return routed ?? active[0] ?? DEFAULT_WAREHOUSE;
 }

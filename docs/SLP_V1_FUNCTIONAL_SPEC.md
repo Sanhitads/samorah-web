@@ -36,7 +36,7 @@ Existing (do not change; extend only):
 - **payment_attempts / webhook_logs / stock_reservations / counters** [BUILT].
 
 Planned (additive tables):
-- **warehouses** [PLANNED] — id, name, address, gstin, manager, phone, working_hours,
+- **warehouses** [BUILT — /admin/warehouses + region routing (serves_states) wired into shipments] — id, name, address, gstin, manager, phone, working_hours,
   priority, active. *(config WAREHOUSES exists; promote to table.)* — §Missing 2.
 - **packaging_assets** += current_stock, min_stock, reorder_level, purchase_cost, vendor
   [PLANNED] — §Missing 3.

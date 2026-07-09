@@ -6,7 +6,8 @@
  */
 import { getOrderById } from "@/services/orderService";
 import { getShippingProvider } from "@/lib/shipping";
-import type { ProviderName, ShipmentRequest } from "@/lib/shipping/types";
+import type { ProviderName, ShipmentRequest, PickupLocation } from "@/lib/shipping/types";
+import { routeWarehouseForOrder } from "@/services/warehouseService";
 import { toCustomerStatus, assertShipmentTransition, nextShipmentStates, type ShipmentStatus } from "@/lib/shipment/state";
 import { fulfillmentReadyToShip, type FulfillmentStatus } from "@/lib/fulfillment/state";
 import {
@@ -96,7 +97,7 @@ export function buildPackContext(order: ShippableOrder): PackContext {
 /** Build the provider-agnostic shipment request. Parcel weight/dimensions now come
  *  from the Packaging Engine (placeholder catalog until real measurements land),
  *  falling back to DEFAULT_PARCEL if no profile matches. */
-export function buildShipmentRequest(order: ShippableOrder, parcel?: PackedParcel | null): ShipmentRequest {
+export function buildShipmentRequest(order: ShippableOrder, parcel?: PackedParcel | null, pickup?: PickupLocation | null): ShipmentRequest {
   const items = (order.order_items ?? []).map((it) => ({
     name: it.product_name,
     sku: it.sku,
@@ -109,7 +110,7 @@ export function buildShipmentRequest(order: ShippableOrder, parcel?: PackedParce
   const weightKg = packed?.chargeableWeightKg ?? chargeableWeightKg(DEFAULT_PARCEL.weightKg, DEFAULT_PARCEL.dimensions);
   return {
     referenceId: order.order_number,
-    pickup: DEFAULT_WAREHOUSE,
+    pickup: pickup ?? DEFAULT_WAREHOUSE,
     delivery: {
       name: order.ship_full_name ?? "",
       phone: order.ship_phone ?? "",
@@ -156,7 +157,10 @@ export async function createShipmentForOrder(orderId: string, opts?: { actorId?:
   // catalog from the DB (falls back to the config example until it's seeded).
   const catalog = await getPackagingCatalog();
   const parcel = packOrder(buildPackContext(order), catalog);
-  const req = buildShipmentRequest(order, parcel);
+
+  // §G routing → which warehouse fulfils this order (region routing over the DB).
+  const pickup = await routeWarehouseForOrder({ ship_state: order.ship_state });
+  const req = buildShipmentRequest(order, parcel, pickup);
 
   // §12 business rules → actions (e.g. add_insurance, set_courier).
   const rules = await loadBusinessRules("order.created");

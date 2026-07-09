@@ -197,8 +197,8 @@ Cross-cutting capabilities first, so later modules don't duplicate logic:
 4. ~~**Shipment Management** — post-dispatch lifecycle + POD + webhook~~ ✅
 5. ~~**Settings / Business Rules** UI~~ ✅ (shipping settings + rule CRUD + dry-run)
 6. ~~**Packaging Management** UI~~ ✅ (assets/profiles/rules + inventory; DB catalog now drives packing)
-7. **Warehouses** UI  ← next
-8. **Analytics** (builds on the metrics in §9)
+7. ~~**Warehouses** UI~~ ✅ (CRUD + set-default + region routing wired into shipments)
+8. **Analytics** (builds on the metrics in §9)  ← next
 
 Board/order **refinements** (Commercial-Cancellation naming, Next-Action hint, Effective Priority,
 refund sub-states, inventory states, work-queue filter, dashboard metrics) land as a first pass
