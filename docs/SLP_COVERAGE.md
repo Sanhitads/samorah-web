@@ -175,9 +175,9 @@ Management** = cancellations + commercial/financial · **Shipping** = courier ·
 | 4 | ⋯ More: Hold/Resume/Report Exception/Request Cancellation/Reassign/Print slip/Print label/View Timeline | 🟡 Hold/Resume/Fail-QC ✅; the rest ⬜ |
 | 5 | Hold: optional reason, resume to prior, no notify, no financial impact | ✅ (preset reasons ⬜) |
 | 6 | Exception workflow (operational, pauses work, no payment impact) | 🟡 entity+SM exist (§7); board "Report Exception" + type alignment ⬜ |
-| 7 | Business cancellation: Admin/CS only, confirm dialog, reason, optional release-inventory/refund/email | ⬜ (Order Management module) |
-| 8 | Refund workflow (Razorpay refund, async failures, cancel≠refund) | ⬜ |
-| 9 | Dedicated cancellation email (order#, reason, refund amount/status/timeline, support) | ⬜ |
+| 7 | Business cancellation: Admin/CS only, confirm dialog, reason, optional release-inventory/refund/email | ✅ `/admin/orders` — manager+ only (editors view-only), `cancel_order` RPC (reason, optional restock, idempotent), confirm dialog, cancellation email queued |
+| 8 | Refund workflow (Razorpay refund, async failures, cancel≠refund) | ✅ `refunds` ledger + `begin_refund`/`settle_refund` (DB over-refund guard, async status initiated→processing→processed/failed); Razorpay REST + manual fallback; cancel and refund are separate actions/events |
+| 9 | Dedicated cancellation email (order#, reason, refund amount/status/timeline, support) | ✅ `buildCancellationEmail` — order#, reason, conditional refund block (amount + gateway/manual timeline), support line; unit-tested |
 | 10 | Shipment workflow provider-independent; manual dispatches immediately; couriers via webhook | ✅ Manual; courier webhook ⬜ |
 | 11 | Row context columns (Priority/Item Count/Tags/Assigned To/SLA/Payment Badge/Next Action) | 🟡 Order/Customer/Stage/Shipment/Next ✅; Priority/Items/Tags/Assignee/SLA/Payment ⬜ |
 | 12 | Priority (Normal/High/Urgent/VIP) | ⬜ |
@@ -187,7 +187,7 @@ Management** = cancellations + commercial/financial · **Shipping** = courier ·
 | 16 | Payment badge (Paid/COD/Refund Pending/Refunded) | ⬜ (payment_status ready) |
 | 17 | Inventory status (Reserved/Allocated/Missing Stock) | ⬜ (reservations exist) |
 | 18 | Immutable analytics event log (Picking Started…Refund Completed) | ✅ `audit_events` (append-only, RLS, service-role only) captures order/fulfillment/shipment events; cancellation/refund events land when Order Mgmt ships |
-| 19 | Customer notifications (Confirmation/Dispatch/Delivery/Cancellation/Refund) | 🟡 Confirmation+Dispatch ✅; Delivery/Cancellation/Refund ⬜ |
+| 19 | Customer notifications (Confirmation/Dispatch/Delivery/Cancellation/Refund) | 🟡 Confirmation+Dispatch+Cancellation ✅; standalone Refund email + Delivery ⬜ |
 | 20 | Role-based permissions (Warehouse/CS/Finance/Admin) | 🟡 RBAC roles + board gate (editor+); per-action role split ⬜ |
 | 21 | Separate admin modules + nav (Dashboard/Orders/Fulfillment/Shipments/Returns/Customers/Catalog/Warehouses/Packaging/Rules/Providers/Settings/Analytics) | ⬜ (only Fulfillment; no shell/nav) |
 | 22 | Audit trail per transition/action (timestamp/user/prev/new/action/notes) | ✅ each row = timestamp · actor (staff.userId threaded from routes) · previous→new state · event · notes · metadata; `getOrderTimeline(orderId)` reads it back |
@@ -195,7 +195,7 @@ Management** = cancellations + commercial/financial · **Shipping** = courier ·
 
 ### Build queue implied by v2 (priority order)
 1. ~~**Audit-event log** (d, 18, 22)~~ ✅ **DONE** — `audit_events` table + `record_audit_event` RPC + `auditService.logEvent`/`getOrderTimeline`; wired into order confirm, fulfillment advance/hold/resume, shipment create/dispatch, with staff actor attribution. Non-blocking (never breaks the business action). Cancellation/refund events attach when Order Mgmt ships.
-2. **Order Management module** (7, 8, 9) — cancellation (role-gated, confirm, reason) → refund workflow (Razorpay) → cancellation/refund emails.
+2. ~~**Order Management module** (7, 8, 9)~~ ✅ **DONE** — `/admin/orders` (manager+; editors view-only) with confirm-dialog cancellation (reason, optional restock), a `refunds` ledger with a DB over-refund guard + async status, Razorpay-REST refunds with a manual fallback, and a dedicated cancellation email. Cancel ≠ refund (separate actions, separate audit events). Standalone refund email deferred to the notifications pass.
 3. **Board context columns** (11–17) — priority, tags, SLA age+colour, payment badge, notes, item count, inventory status.
 4. **Admin shell + nav** (21) — real /admin area; then Orders, Shipments, Returns, Settings/Rules/Warehouses/Packaging/Providers screens.
 5. **Fine-grained roles** (20) — warehouse vs CS vs finance action gating.

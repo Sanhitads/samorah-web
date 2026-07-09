@@ -14,6 +14,56 @@ export interface PaymentCheck {
   reason?: string;
 }
 
+/**
+ * Create a refund against a captured payment. Razorpay refunds are asynchronous:
+ * the create call returns a refund object whose `status` is usually `pending`
+ * (money in flight) and settles later to `processed`/`failed` via webhook. We map
+ * that to our ledger states. `amountPaise` omitted = full refund.
+ */
+export interface RefundResult {
+  status: "ok" | "failed" | "unavailable";
+  refundId?: string;
+  refundStatus?: "processing" | "processed" | "failed"; // normalized
+  errorCode?: string;
+  errorDescription?: string;
+}
+
+export async function createRazorpayRefund(
+  paymentId: string,
+  amountPaise: number,
+  opts?: { notes?: Record<string, string>; speed?: "normal" | "optimum" },
+): Promise<RefundResult> {
+  if (!RAZORPAY.configured) return { status: "unavailable", errorDescription: "not configured" };
+  try {
+    const auth = Buffer.from(`${RAZORPAY.keyId}:${RAZORPAY.keySecret}`).toString("base64");
+    const res = await fetch(`https://api.razorpay.com/v1/payments/${paymentId}/refund`, {
+      method: "POST",
+      headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        amount: amountPaise,
+        speed: opts?.speed ?? "normal",
+        notes: opts?.notes ?? {},
+      }),
+    });
+    const body = (await res.json()) as {
+      id?: string;
+      status?: string; // pending | processed | failed
+      error?: { code?: string; description?: string };
+    };
+    if (!res.ok || body.error) {
+      return {
+        status: "failed",
+        errorCode: body.error?.code,
+        errorDescription: body.error?.description ?? `refund ${res.status}`,
+      };
+    }
+    const normalized = body.status === "processed" ? "processed" : body.status === "failed" ? "failed" : "processing";
+    return { status: "ok", refundId: body.id, refundStatus: normalized };
+  } catch (e) {
+    return { status: "unavailable", errorDescription: e instanceof Error ? e.message : "error" };
+  }
+}
+
 export async function validateRazorpayPayment(orderId: string, paymentId: string): Promise<PaymentCheck> {
   if (!RAZORPAY.configured) return { status: "unavailable", reason: "not configured" };
   try {

@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { cronAuthorized } from "@/lib/cronAuth";
 import { claimFulfillmentJobs, completeFulfillmentJob, getOrderById } from "@/services/orderService";
-import { emailConfigured, sendEmail, buildOrderConfirmationEmail, buildDispatchNotificationEmail, type EmailOrder } from "@/lib/email";
+import { emailConfigured, sendEmail, buildOrderConfirmationEmail, buildDispatchNotificationEmail, buildCancellationEmail, type EmailOrder } from "@/lib/email";
 import { createShipmentForOrder, getDispatchInfo } from "@/services/shipmentService";
+import { getCancellationInfo } from "@/services/cancellationService";
 import { getShippingSettings } from "@/lib/settings/shippingSettings";
 
 /**
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
-  const result = { emailConfigured: emailConfigured(), autoAssign: false, emailsSent: 0, emailsFailed: 0, shipmentsCreated: 0, shipmentsSkipped: 0, shipmentsFailed: 0, dispatchEmailsSent: 0 };
+  const result = { emailConfigured: emailConfigured(), autoAssign: false, emailsSent: 0, emailsFailed: 0, shipmentsCreated: 0, shipmentsSkipped: 0, shipmentsFailed: 0, dispatchEmailsSent: 0, cancellationEmailsSent: 0 };
 
   try {
     // ── Shipping jobs ──
@@ -105,6 +106,31 @@ export async function POST(request: Request) {
           if (r.sent) {
             await safeComplete(j.id, "done");
             result.dispatchEmailsSent++;
+          } else {
+            await safeComplete(j.id, j.attempts < MAX_ATTEMPTS ? "queued" : "failed", r.reason);
+            result.emailsFailed++;
+          }
+        } catch (e) {
+          await safeComplete(j.id, j.attempts < MAX_ATTEMPTS ? "queued" : "failed", e instanceof Error ? e.message : "error");
+          result.emailsFailed++;
+        }
+      }
+
+      // ── Cancellation emails (ORDER_CANCELLED) ──
+      const cancelJobs = await claimFulfillmentJobs("cancellation_email", 20);
+      for (const j of cancelJobs) {
+        try {
+          const info = await getCancellationInfo(j.orderId);
+          if (!info) {
+            await safeComplete(j.id, "failed", "cancellation info not found");
+            result.emailsFailed++;
+            continue;
+          }
+          const { subject, html, text } = buildCancellationEmail(info);
+          const r = await sendEmail({ to: info.email, subject, html, text });
+          if (r.sent) {
+            await safeComplete(j.id, "done");
+            result.cancellationEmailsSent++;
           } else {
             await safeComplete(j.id, j.attempts < MAX_ATTEMPTS ? "queued" : "failed", r.reason);
             result.emailsFailed++;

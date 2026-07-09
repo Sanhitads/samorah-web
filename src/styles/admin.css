@@ -113,3 +113,25 @@
   background: rgba(168, 68, 58, 0.12);
   color: #8a3d2f;
 }
+
+/* ── Order Management: status colours, payment badge, modal ── */
+.ff-status[data-s="cancelled"], .ff-status[data-s="returned"], .ff-status[data-s="rto"] { background: rgba(107, 98, 89, 0.14); color: #6b6259; }
+.ff-status[data-s="delivered"] { background: rgba(60, 120, 70, 0.14); color: #2f6b3c; }
+.ff-status[data-s="confirmed"], .ff-status[data-s="processing"], .ff-status[data-s="packed"] { background: rgba(201, 169, 110, 0.2); color: #8a6d3b; }
+
+.om-pay { display: inline-block; padding: 2px 8px; border-radius: 999px; font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; }
+.om-pay[data-tone="paid"] { background: rgba(60, 120, 70, 0.14); color: #2f6b3c; }
+.om-pay[data-tone="pending"] { background: rgba(201, 169, 110, 0.18); color: #8a6d3b; }
+.om-pay[data-tone="refunded"] { background: rgba(107, 98, 89, 0.14); color: #6b6259; }
+.om-pay[data-tone="failed"] { background: rgba(168, 68, 58, 0.12); color: #8a3d2f; }
+
+.om-modal { position: fixed; inset: 0; background: rgba(31, 26, 22, 0.42); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 60; }
+.om-modal__card { background: #fff; border: 1px solid var(--ad-hair); border-radius: 6px; padding: 24px; width: 100%; max-width: 440px; box-shadow: 0 24px 60px rgba(31, 26, 22, 0.2); text-align: left; }
+.om-modal__title { font-family: var(--font-serif); font-size: 1.15rem; margin-bottom: 8px; }
+.om-modal__note { font-family: var(--font-sans); font-size: 12px; color: var(--smoke, #6b6259); line-height: 1.5; margin-bottom: 14px; }
+.om-field { display: block; margin-bottom: 12px; }
+.om-field > span { display: block; font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--smoke, #6b6259); margin-bottom: 5px; }
+.om-field textarea, .om-field input { width: 100%; padding: 8px 10px; font-family: var(--font-sans); font-size: 13px; border: 1px solid var(--ad-hair); border-radius: 3px; background: #fff; box-sizing: border-box; }
+.om-check { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 10px; font-family: var(--font-sans); font-size: 12px; color: var(--ink, #1f1a16); line-height: 1.4; }
+.om-check input { margin-top: 2px; }
+.om-modal__actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
