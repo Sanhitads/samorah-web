@@ -1,25 +1,33 @@
 import { NextResponse } from "next/server";
 import { cronAuthorized } from "@/lib/cronAuth";
-import { claimFulfillmentJobs, completeFulfillmentJob, getOrderById } from "@/services/orderService";
-import { emailConfigured, sendEmail, buildOrderConfirmationEmail, buildDispatchNotificationEmail, buildCancellationEmail, type EmailOrder } from "@/lib/email";
-import { createShipmentForOrder, getDispatchInfo } from "@/services/shipmentService";
-import { getCancellationInfo } from "@/services/cancellationService";
+import { claimFulfillmentJobs, completeFulfillmentJob } from "@/services/orderService";
+import { emailConfigured } from "@/lib/email";
+import { notify } from "@/lib/notifications/engine";
+import type { NotificationEvent } from "@/lib/notifications/types";
+import { createShipmentForOrder } from "@/services/shipmentService";
 import { getShippingSettings } from "@/lib/settings/shippingSettings";
 
 /**
- * POST /api/cron/fulfillment — drains the fulfillment_jobs queue. Processes:
- *  - `email`    confirmation emails (gated on Resend being configured)
- *  - `shipping` creates the shipment via the active provider (Manual today — always
- *               available). External failures never touch the order — a job retries
- *               (≤3) then goes to `failed`.
+ * POST /api/cron/fulfillment — drains the fulfillment_jobs queue.
+ *  - `shipping` creates the shipment via the active provider (Manual today).
+ *  - notification jobs (`email`/`dispatch_email`/`cancellation_email`) each map to
+ *    a business EVENT and go through the Notification Engine, which fans out to
+ *    every subscribed channel. External failures never touch the order — a job
+ *    retries (≤3) then goes to `failed`.
  */
 export const runtime = "nodejs";
 const MAX_ATTEMPTS = 3;
 
+// job_type → notification event. The engine owns channels + templates.
+const NOTIFY_JOBS: { type: "email" | "dispatch_email" | "cancellation_email"; event: NotificationEvent }[] = [
+  { type: "email", event: "order.confirmed" },
+  { type: "dispatch_email", event: "order.dispatched" },
+  { type: "cancellation_email", event: "order.cancelled" },
+];
+
 const devDetail = (e: unknown) =>
   process.env.NODE_ENV !== "production" ? { detail: e instanceof Error ? e.message : String(e) } : {};
 
-/** Marking a job's outcome must never crash the worker. */
 async function safeComplete(id: string, status: "done" | "failed" | "queued", error?: string) {
   try {
     await completeFulfillmentJob(id, status, error);
@@ -33,13 +41,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
-  const result = { emailConfigured: emailConfigured(), autoAssign: false, emailsSent: 0, emailsFailed: 0, shipmentsCreated: 0, shipmentsSkipped: 0, shipmentsFailed: 0, dispatchEmailsSent: 0, cancellationEmailsSent: 0 };
+  const result = { emailConfigured: emailConfigured(), autoAssign: false, notificationsSent: 0, notificationsFailed: 0, shipmentsCreated: 0, shipmentsSkipped: 0, shipmentsFailed: 0 };
 
   try {
     // ── Shipping jobs ──
-    // Manual mode (auto_assign = false): the shipment is created by staff via the
-    // Fulfillment Dashboard at "Ready for Dispatch", so the worker SKIPS these jobs.
-    // Auto mode (auto_assign = true): create the shipment on payment (hands-off).
     const settings = await getShippingSettings();
     result.autoAssign = settings.autoAssign;
     const shipJobs = await claimFulfillmentJobs("shipping", 20);
@@ -64,83 +69,30 @@ export async function POST(request: Request) {
       }
     }
 
-    // Only claim email jobs when Resend is configured, so attempts don't climb
-    // while unconfigured — jobs wait untouched in the queue.
+    // ── Notification jobs → Notification Engine ──
+    // Only claim while email (the only live channel) is configured, so attempts
+    // don't climb on unconfigured infra — jobs wait untouched in the queue.
     if (result.emailConfigured) {
-      const jobs = await claimFulfillmentJobs("email", 20);
-      for (const j of jobs) {
-        try {
-          const order = await getOrderById(j.orderId);
-          if (!order) {
-            await safeComplete(j.id, "failed", "order not found");
-            result.emailsFailed++;
-            continue;
+      for (const { type, event } of NOTIFY_JOBS) {
+        const jobs = await claimFulfillmentJobs(type, 20);
+        for (const j of jobs) {
+          try {
+            const { anyFailed } = await notify(event, { orderId: j.orderId });
+            if (!anyFailed) {
+              await safeComplete(j.id, "done");
+              result.notificationsSent++;
+            } else {
+              await safeComplete(j.id, j.attempts < MAX_ATTEMPTS ? "queued" : "failed", "a channel failed");
+              result.notificationsFailed++;
+            }
+          } catch (e) {
+            await safeComplete(j.id, j.attempts < MAX_ATTEMPTS ? "queued" : "failed", e instanceof Error ? e.message : "error");
+            result.notificationsFailed++;
           }
-          const { subject, html, text } = buildOrderConfirmationEmail(order as unknown as EmailOrder);
-          const r = await sendEmail({ to: order.email, subject, html, text });
-          if (r.sent) {
-            await safeComplete(j.id, "done");
-            result.emailsSent++;
-          } else {
-            await safeComplete(j.id, j.attempts < MAX_ATTEMPTS ? "queued" : "failed", r.reason);
-            result.emailsFailed++;
-          }
-        } catch (e) {
-          await safeComplete(j.id, j.attempts < MAX_ATTEMPTS ? "queued" : "failed", e instanceof Error ? e.message : "error");
-          result.emailsFailed++;
-        }
-      }
-
-      // ── Dispatch emails (ORDER_DISPATCHED) ──
-      const dispatchJobs = await claimFulfillmentJobs("dispatch_email", 20);
-      for (const j of dispatchJobs) {
-        try {
-          const info = await getDispatchInfo(j.orderId);
-          if (!info) {
-            await safeComplete(j.id, "failed", "dispatch info not found");
-            result.emailsFailed++;
-            continue;
-          }
-          const { subject, html, text } = buildDispatchNotificationEmail(info);
-          const r = await sendEmail({ to: info.email, subject, html, text });
-          if (r.sent) {
-            await safeComplete(j.id, "done");
-            result.dispatchEmailsSent++;
-          } else {
-            await safeComplete(j.id, j.attempts < MAX_ATTEMPTS ? "queued" : "failed", r.reason);
-            result.emailsFailed++;
-          }
-        } catch (e) {
-          await safeComplete(j.id, j.attempts < MAX_ATTEMPTS ? "queued" : "failed", e instanceof Error ? e.message : "error");
-          result.emailsFailed++;
-        }
-      }
-
-      // ── Cancellation emails (ORDER_CANCELLED) ──
-      const cancelJobs = await claimFulfillmentJobs("cancellation_email", 20);
-      for (const j of cancelJobs) {
-        try {
-          const info = await getCancellationInfo(j.orderId);
-          if (!info) {
-            await safeComplete(j.id, "failed", "cancellation info not found");
-            result.emailsFailed++;
-            continue;
-          }
-          const { subject, html, text } = buildCancellationEmail(info);
-          const r = await sendEmail({ to: info.email, subject, html, text });
-          if (r.sent) {
-            await safeComplete(j.id, "done");
-            result.cancellationEmailsSent++;
-          } else {
-            await safeComplete(j.id, j.attempts < MAX_ATTEMPTS ? "queued" : "failed", r.reason);
-            result.emailsFailed++;
-          }
-        } catch (e) {
-          await safeComplete(j.id, j.attempts < MAX_ATTEMPTS ? "queued" : "failed", e instanceof Error ? e.message : "error");
-          result.emailsFailed++;
         }
       }
     }
+
     return NextResponse.json(result);
   } catch (e) {
     console.error("fulfillment cron failed", e);
