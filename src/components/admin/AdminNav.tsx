@@ -40,7 +40,7 @@ const NAV: NavGroup[] = [
   },
   {
     title: "Insights",
-    items: [{ label: "Analytics", icon: "▲" }],
+    items: [{ label: "Analytics", href: "/admin/analytics", icon: "▲" }],
   },
 ];
 

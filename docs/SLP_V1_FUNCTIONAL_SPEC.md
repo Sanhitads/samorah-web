@@ -20,7 +20,7 @@ complete (§14).
 | Shipping | provider interface, create/cancel/track/label/pickup/estimate, courier decision | [BUILT] Manual; [PLANNED] adapters + decision |
 | Tracking | provider status → unified timeline, POD, RTO, exceptions | [BUILT] timeline |
 | Notification | event → email/WhatsApp/SMS/push | [BUILT] email; [PLANNED] multi-channel + triggers |
-| Analytics | cost, delivery time, RTO/damage/lost %, profit-after-shipping | [PLANNED] |
+| Analytics | cost, delivery time, RTO/exception %, revenue-after-shipping, returns, courier perf | [BUILT — /admin/analytics] |
 
 ---
 

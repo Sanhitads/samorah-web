@@ -131,7 +131,11 @@ skipping pick/pack/QC/weight-verify. Needs the Packing Workflow + full §14 gate
   (provider-agnostic ingest + status map), POD ✅ (delivered_to/pod_note + delivery
   email), RTO ✅ (order→rto sync)**. Real courier adapter ⬜; reverse-pickup shipment
   for returns ⬜.
-- **M6 Analytics:** all 11 metrics ⬜ (every metric's DATA foundation exists).
+- **M6 Analytics:** ✅ `/admin/analytics` (analytics.view) — revenue (gross/net/AOV/
+  units), fulfillment (pick/pack/cycle), delivery (avg time · RTO% · exception%),
+  logistics (shipping cost · revenue-after-shipping), returns (rate + reasons),
+  refunds, per-courier performance; time-window filter (7/30/90/all). All derived
+  from the audit stream + orders/shipments/returns/refunds. Meaningful once volume exists.
 
 ---
 
@@ -148,7 +152,7 @@ skipping pick/pack/QC/weight-verify. Needs the Packing Workflow + full §14 gate
 8. COD rules: blocked pincodes, prepaid-only products, max-value enforcement (point J)
 9. Returns: Replacement / Exchange outcomes + RTO↔return linkage (point K)
 10. Tracking: delivery proof (POD), RTO workflow
-11. Analytics engine (11 metrics — data-ready)
+11. ~~Analytics engine (11 metrics)~~ ✅ DONE — /admin/analytics (revenue · fulfillment · delivery RTO/exception · logistics · returns+reasons · refunds · courier perf; window filter)
 
 **Awaiting DATA (from Samorah):** real packaging measurements + per-variant net
 weights, courier capabilities + segment priorities, business-rule data, insurance/COD
@@ -220,7 +224,7 @@ Management** = cancellations + commercial/financial · **Shipping** = courier ·
 9. ~~**Shipment Management**~~ ✅ **DONE** — `/admin/shipments` post-dispatch lifecycle (in-transit → OFD → delivered w/ POD → `delivery.completed` email; exception/NDR w/ reason + reattempt; RTO w/ order sync; cancel; label). Provider-agnostic courier **webhook** `/api/webhooks/shipping/[provider]` (shared secret) maps raw→unified status and drives the same lifecycle. Real courier adapter + reverse-pickup shipment for returns are the remaining deferrals.
 10. ~~**Settings/Business Rules** UI~~ ✅ **DONE** — `/admin/settings` (shipping singleton: provider/strategy/auto-assign/thresholds/fragile/volumetric/warehouse/working-days/holidays, with hard+soft guardrails + audit) & providers overview; `/admin/rules` (business-rule CRUD, typed-value coercion, active toggle, priority, **dry-run tester** against a sample order). Gated shipping.configure / rules.manage.
 11. ~~**Packaging** UI~~ ✅ **DONE** — `/admin/packaging` (Assets/Profiles/Rules CRUD + inventory: stock adjust, low-stock flags, dashboard reorder KPI); engine reads the DB catalog (config fallback until seeded); FK-restrict guard on in-use assets. Seed measurements still ⬜ (DATA).
-12. **Warehouses** UI · 13. **Analytics** (builds on §9 metrics).
+12. ~~**Warehouses** UI~~ ✅ · 13. ~~**Analytics**~~ ✅ **DONE** — the Insights module, deriving every metric from the modules built above.
 14. **Delivery + courier webhook** (10, 19) — POD + delivery notification (needs adapter).
 15. **Colour palette + simplified visible flow polish** (2, 23).
 
