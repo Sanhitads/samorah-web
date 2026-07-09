@@ -189,7 +189,7 @@ Management** = cancellations + commercial/financial · **Shipping** = courier ·
 | 18 | Immutable analytics event log (Picking Started…Refund Completed) | ✅ `audit_events` (append-only, RLS, service-role only) captures order/fulfillment/shipment events; cancellation/refund events land when Order Mgmt ships |
 | 19 | Customer notifications (Confirmation/Dispatch/Delivery/Cancellation/Refund) | 🟡 Confirmation+Dispatch+Cancellation ✅; standalone Refund email + Delivery ⬜ |
 | 20 | Role-based permissions (Warehouse/CS/Finance/Admin) | 🟡 RBAC roles + board gate (editor+); per-action role split ⬜ |
-| 21 | Separate admin modules + nav (Dashboard/Orders/Fulfillment/Shipments/Returns/Customers/Catalog/Warehouses/Packaging/Rules/Providers/Settings/Analytics) | ⬜ (only Fulfillment; no shell/nav) |
+| 21 | Separate admin modules + nav (Dashboard/Orders/Fulfillment/Shipments/Returns/Customers/Catalog/Warehouses/Packaging/Rules/Providers/Settings/Analytics) | 🟡 admin shell + module-map sidebar + Dashboard landing (KPI tiles) ✅; live: Dashboard/Orders/Fulfillment; rest render "soon" (Shipments/Returns/Catalog/Warehouses/Packaging/Rules/Providers/Settings/Analytics) — build as their UIs land |
 | 22 | Audit trail per transition/action (timestamp/user/prev/new/action/notes) | ✅ each row = timestamp · actor (staff.userId threaded from routes) · previous→new state · event · notes · metadata; `getOrderTimeline(orderId)` reads it back |
 | 23 | Colour coding (Reserved 🟦/Picking 🟨/Packing 🟧/Ready 🟩/Exception 🟥/Cancelled ⚫) | 🟡 some status colours; not the exact semantic palette |
 
@@ -197,7 +197,7 @@ Management** = cancellations + commercial/financial · **Shipping** = courier ·
 1. ~~**Audit-event log** (d, 18, 22)~~ ✅ **DONE** — `audit_events` table + `record_audit_event` RPC + `auditService.logEvent`/`getOrderTimeline`; wired into order confirm, fulfillment advance/hold/resume, shipment create/dispatch, with staff actor attribution. Non-blocking (never breaks the business action). Cancellation/refund events attach when Order Mgmt ships.
 2. ~~**Order Management module** (7, 8, 9)~~ ✅ **DONE** — `/admin/orders` (manager+; editors view-only) with confirm-dialog cancellation (reason, optional restock), a `refunds` ledger with a DB over-refund guard + async status, Razorpay-REST refunds with a manual fallback, and a dedicated cancellation email. Cancel ≠ refund (separate actions, separate audit events). Standalone refund email deferred to the notifications pass.
 3. ~~**Board context columns** (11–17)~~ ✅ **DONE** — every board row now carries priority (editable, drives sort), item count, tags (Gift/COD derived + editable ops tags), assignee (assign-to-me), SLA age+colour, payment badge, gift/warehouse notes, and inventory status (Allocated/Missing). New `orders.priority/assigned_to/ops_tags/ops_note`; all edits audit-logged via the event stream.
-4. **Admin shell + nav** (21) — real /admin area; then Orders, Shipments, Returns, Settings/Rules/Warehouses/Packaging/Providers screens.
+4. 🟡 **Admin shell + nav** (21) — ✅ shell (`/admin/layout.tsx`) + module-map sidebar + Dashboard landing with KPI tiles; Dashboard/Orders/Fulfillment live, remaining modules render "soon". Still to build: Shipments, Returns, Settings/Rules/Warehouses/Packaging/Providers, Catalog, Analytics screens.
 5. **Fine-grained roles** (20) — warehouse vs CS vs finance action gating.
 6. **Delivery + courier webhook** (10, 19) — POD, delivery notification (needs adapter).
 7. **Colour palette + simplified visible flow polish** (2, 23).

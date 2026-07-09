@@ -19,6 +19,42 @@ export interface OrderOverviewRow {
   placedAt: string;
 }
 
+export interface DashboardStats {
+  awaitingFulfillment: number; // paid, not terminal, not yet shipped
+  onHold: number;
+  readyForDispatch: number;
+  shippedActive: number; // shipped but not delivered
+  refundsPending: number; // refunds not yet processed/failed
+  totalOrders: number;
+}
+
+/** Headline counts for the admin Dashboard (principle 21's landing module). Uses
+ *  PostgREST head+exact counts, so no rows travel — just the numbers. */
+export async function getDashboardStats(): Promise<DashboardStats> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = createAdminClient() as any;
+  const active = ["confirmed", "processing", "packed"]; // paid but pre-ship, non-terminal
+  const head = (q: unknown) => (q as { count: number | null }).count ?? 0;
+
+  const [awaiting, onHold, ready, shippedActive, total, refundsPending] = await Promise.all([
+    db.from("orders").select("id", { count: "exact", head: true }).eq("payment_status", "paid").in("status", active),
+    db.from("orders").select("id", { count: "exact", head: true }).eq("fulfillment_status", "on_hold"),
+    db.from("orders").select("id", { count: "exact", head: true }).eq("fulfillment_status", "ready_for_dispatch"),
+    db.from("orders").select("id", { count: "exact", head: true }).eq("status", "shipped"),
+    db.from("orders").select("id", { count: "exact", head: true }),
+    db.from("refunds").select("id", { count: "exact", head: true }).in("status", ["initiated", "processing"]),
+  ]);
+
+  return {
+    awaitingFulfillment: head(awaiting),
+    onHold: head(onHold),
+    readyForDispatch: head(ready),
+    shippedActive: head(shippedActive),
+    totalOrders: head(total),
+    refundsPending: head(refundsPending),
+  };
+}
+
 /** Recent orders, newest first, for the management list. */
 export async function getOrdersOverview(limit = 100): Promise<OrderOverviewRow[]> {
   const db = createAdminClient();

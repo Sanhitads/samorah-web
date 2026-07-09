@@ -181,3 +181,51 @@
 .bc-assign { padding: 4px 9px; font-family: var(--font-sans); font-size: 11px; background: none; border: 1px solid var(--ad-hair); border-radius: 3px; cursor: pointer; color: var(--ink, #1f1a16); white-space: nowrap; }
 .bc-assign:hover:not(:disabled) { background: var(--soft-beige, #efe9e0); }
 .bc-assign:disabled { opacity: 0.5; cursor: default; }
+
+/* ── Admin shell (principle 21): sidebar + module map ── */
+.ash { display: flex; align-items: flex-start; min-height: 100vh; --ad-hair: rgba(31, 26, 22, 0.14); }
+.ash__sidebar { flex: 0 0 224px; position: sticky; top: 0; align-self: stretch; border-right: 1px solid var(--ad-hair); background: #fbf9f5; min-height: 100vh; }
+.ash__main { flex: 1 1 auto; min-width: 0; }
+
+.ash-nav { display: flex; flex-direction: column; padding: 22px 14px 32px; gap: 18px; }
+.ash-brand { display: block; text-decoration: none; padding: 4px 10px 14px; border-bottom: 1px solid var(--ad-hair); }
+.ash-brand__mark { display: block; font-family: var(--font-serif); font-size: 15px; letter-spacing: 3px; color: var(--ink, #1f1a16); }
+.ash-brand__sub { display: block; font-family: var(--font-sans); font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--ad-gold); margin-top: 3px; }
+
+.ash-group__title { font-family: var(--font-sans); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--smoke, #6b6259); padding: 0 10px; margin-bottom: 6px; }
+.ash-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+.ash-item { display: flex; align-items: center; gap: 9px; padding: 7px 10px; border-radius: 5px; font-family: var(--font-sans); font-size: 13px; color: var(--ink, #1f1a16); text-decoration: none; }
+.ash-item:hover { background: rgba(31, 26, 22, 0.05); }
+.ash-item[data-active="1"] { background: #1f1a16; color: #faf7f2; }
+.ash-item__icon { width: 16px; text-align: center; opacity: 0.7; font-size: 12px; }
+.ash-item[data-active="1"] .ash-item__icon { opacity: 1; }
+.ash-item--soon { color: var(--smoke, #6b6259); cursor: default; opacity: 0.65; }
+.ash-item--soon:hover { background: none; }
+.ash-soon { margin-left: auto; font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase; background: rgba(201, 169, 110, 0.2); color: #8a6d3b; padding: 1px 5px; border-radius: 3px; }
+.ash-role { margin-top: auto; padding: 12px 10px 0; font-family: var(--font-sans); font-size: 10px; color: var(--smoke, #6b6259); border-top: 1px solid var(--ad-hair); }
+
+/* Dashboard tiles */
+.ash-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.ash-tile { display: flex; flex-direction: column; gap: 6px; padding: 18px; border: 1px solid var(--ad-hair); border-radius: 6px; background: #fff; text-decoration: none; }
+.ash-tile--link:hover { border-color: rgba(31, 26, 22, 0.3); }
+.ash-tile__value { font-family: var(--font-serif); font-size: 2rem; line-height: 1; color: var(--ink, #1f1a16); }
+.ash-tile__value[data-tone="gold"] { color: #8a6d3b; }
+.ash-tile__value[data-tone="warn"] { color: #8a3d2f; }
+.ash-tile__label { font-family: var(--font-sans); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--smoke, #6b6259); }
+
+.ash-jump { margin-top: 36px; }
+.ash-jump__title { font-family: var(--font-serif); font-size: 1.1rem; margin-bottom: 12px; }
+.ash-jump__row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.ash-jump__card { display: flex; flex-direction: column; gap: 4px; padding: 16px 18px; border: 1px solid var(--ad-hair); border-radius: 6px; text-decoration: none; background: #fff; }
+.ash-jump__card:hover { border-color: rgba(31, 26, 22, 0.3); }
+.ash-jump__name { font-family: var(--font-serif); font-size: 1.05rem; color: var(--ink, #1f1a16); }
+.ash-jump__desc { font-family: var(--font-sans); font-size: 12px; color: var(--smoke, #6b6259); }
+
+@media (max-width: 860px) {
+  .ash { flex-direction: column; }
+  .ash__sidebar { flex-basis: auto; width: 100%; min-height: 0; position: static; border-right: none; border-bottom: 1px solid var(--ad-hair); }
+  .ash-nav { flex-direction: row; flex-wrap: wrap; gap: 12px 20px; padding: 14px 16px; }
+  .ash-brand { border-bottom: none; padding: 0 8px 0 0; }
+  .ash-group { min-width: 130px; }
+  .ash-role { display: none; }
+}
