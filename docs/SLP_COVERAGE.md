@@ -50,7 +50,7 @@ products, fragile, cost, vendor, barcode, active). ✅ `packaging_assets` has al
 fields; type covers outer/rigid/mailer/pouch/gift/insert/tissue/foam/filler/wrap/
 tape/leak_seal. Real asset data ⬜.
 
-### B. Shipping Rules = **Business Rules** ✅ (data ⬜)
+### B. Shipping Rules = **Business Rules** ✅ (admin CRUD + dry-run at `/admin/rules`; seed data still ⬜)
 1 candle→A, 2→B, gift→C, ceramic→+bubble, spray→leak. ✅ `packaging_rules`
 (select/modifier) + general `business_rules`. Example rules in the placeholder
 catalog; real rule data ⬜.
@@ -165,7 +165,7 @@ Management** = cancellations + commercial/financial · **Shipping** = courier ·
 | c | Warehouse staff never perform financial operations | ✅ (no Cancel/refund on board) |
 | d | Every business action generates an audit event | ✅ `audit_events` stream — order.confirmed, fulfillment.*, shipment.created/dispatched, hold/resume all write via `logEvent` (non-blocking) |
 | e | Every customer notification is event-driven | ✅ **Notification Engine** — `notify(event, ctx)` fans out via subscriptions → per-channel template → provider; idempotent `notification_dispatches` log; email live (WhatsApp/SMS/push register as channels). Business services emit events, never build emails |
-| f | Business rules configurable, not hardcoded | ✅ (rule + packaging engines) |
+| f | Business rules configurable, not hardcoded | ✅ engines + **admin UI**: `/admin/settings` (shipping singleton, guardrails + audit) & `/admin/rules` (trigger→condition→action CRUD, typed-value coercion, dry-run tester) — change behaviour without a deploy |
 | g | All logistics modules provider-independent | ✅ |
 
 **Numbered principles**
@@ -211,7 +211,8 @@ Management** = cancellations + commercial/financial · **Shipping** = courier ·
 7. ~~**Notification Engine** (8/e/19)~~ ✅ **DONE** — `lib/notifications/` (types, subscriptions, channels, engine) + `notification_dispatches` idempotent log; the fulfillment worker now emits `order.confirmed/dispatched/cancelled` events through `notify()` instead of building emails; new channels (WhatsApp/SMS/push) register without touching services. Refund/delivery/return templates plug in as events are added.
 8. ~~**Returns Module**~~ ✅ **DONE** — `/admin/returns` + `returnService`: RMA lifecycle over the existing state machine, `return_items` (partial + restock flags), and the integrative ties — on settle it **restocks** inventory (`restock_return_items`, skipping damaged/defective) and issues a **refund** (via the ledger, once), writing every transition to the **audit** stream. Capability split: operate (warehouse) vs approve/refund (finance). Reverse-shipment scheduling + customer return emails plug into the shipment/notification engines next.
 9. ~~**Shipment Management**~~ ✅ **DONE** — `/admin/shipments` post-dispatch lifecycle (in-transit → OFD → delivered w/ POD → `delivery.completed` email; exception/NDR w/ reason + reattempt; RTO w/ order sync; cancel; label). Provider-agnostic courier **webhook** `/api/webhooks/shipping/[provider]` (shared secret) maps raw→unified status and drives the same lifecycle. Real courier adapter + reverse-pickup shipment for returns are the remaining deferrals.
-10. **Settings/Business Rules** UI · 11. **Packaging** UI · 12. **Warehouses** UI · 13. **Analytics** (builds on §9 metrics).
+10. ~~**Settings/Business Rules** UI~~ ✅ **DONE** — `/admin/settings` (shipping singleton: provider/strategy/auto-assign/thresholds/fragile/volumetric/warehouse/working-days/holidays, with hard+soft guardrails + audit) & providers overview; `/admin/rules` (business-rule CRUD, typed-value coercion, active toggle, priority, **dry-run tester** against a sample order). Gated shipping.configure / rules.manage.
+11. **Packaging** UI · 12. **Warehouses** UI · 13. **Analytics** (builds on §9 metrics).
 14. **Delivery + courier webhook** (10, 19) — POD + delivery notification (needs adapter).
 15. **Colour palette + simplified visible flow polish** (2, 23).
 

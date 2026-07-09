@@ -9,7 +9,7 @@ import { callRpc } from "@/lib/supabase/rpc";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type ActorType = "staff" | "customer" | "system" | "webhook";
-export type AuditEntity = "order" | "shipment" | "fulfillment" | "return" | "exception" | "payment";
+export type AuditEntity = "order" | "shipment" | "fulfillment" | "return" | "exception" | "payment" | "settings" | "rule";
 
 export interface AuditEventInput {
   orderId?: string;

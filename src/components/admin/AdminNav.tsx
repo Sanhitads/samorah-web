@@ -34,9 +34,8 @@ const NAV: NavGroup[] = [
     items: [
       { label: "Warehouses", icon: "⌂" },
       { label: "Packaging", icon: "▧" },
-      { label: "Rules", icon: "≡" },
-      { label: "Providers", icon: "◈" },
-      { label: "Settings", icon: "⚙" },
+      { label: "Rules", href: "/admin/rules", icon: "≡" },
+      { label: "Settings", href: "/admin/settings", icon: "⚙" },
     ],
   },
   {

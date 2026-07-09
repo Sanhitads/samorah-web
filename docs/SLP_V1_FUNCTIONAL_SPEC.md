@@ -44,8 +44,8 @@ Planned (additive tables):
   fragile_ok, dangerous_goods_ok, max_weight_kg, max_length_cm, pickup_sla_hrs, zones. — §Missing 4.
 - **shipping_settings** [PLANNED] — singleton: default_provider, auto_assign, insurance_threshold,
   cod_threshold, default_warehouse_id, fragile_policy, volumetric_divisor, working_days,
-  holiday_calendar. Admin-editable. — §Missing 11.
-- **business_rules** [PLANNED] — trigger, condition (jsonb), action (jsonb), priority, active.
+  holiday_calendar. Admin-editable. — §Missing 11. [BUILT — /admin/settings]
+- **business_rules** [BUILT — /admin/rules] — trigger, condition (jsonb), action (jsonb), priority, active.
   Generalises packaging_rules. — §Missing 12.
 - **shipment_costs** [PLANNED] (or columns on shipments) — courier_cost, packaging_cost,
   insurance, cod_fee, fuel_surcharge, tax, total_logistics_cost. — §Missing 9.
@@ -114,7 +114,7 @@ Engine then executes the chosen provider — selection is data, not code.
 
 ---
 
-## 7. Business Rule Engine — §Missing 12 [PLANNED]
+## 7. Business Rule Engine — §Missing 12 [BUILT — admin CRUD + dry-run at /admin/rules]
 General `trigger → condition → action` (generalises packaging_rules):
 - `IF order.total > ₹3000 → add insurance`
 - `IF gift → packaging profile C`

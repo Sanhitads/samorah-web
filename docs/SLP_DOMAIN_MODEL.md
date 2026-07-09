@@ -195,8 +195,8 @@ Cross-cutting capabilities first, so later modules don't duplicate logic:
 2. ~~**Notification Engine** — centralized event fan-out (§4)~~ ✅
 3. ~~**Returns Module** — the integrative business module (§3)~~ ✅
 4. ~~**Shipment Management** — post-dispatch lifecycle + POD + webhook~~ ✅
-5. **Settings / Business Rules** UI  ← next
-6. **Packaging Management** UI
+5. ~~**Settings / Business Rules** UI~~ ✅ (shipping settings + rule CRUD + dry-run)
+6. **Packaging Management** UI  ← next
 7. **Warehouses** UI
 8. **Analytics** (builds on the metrics in §9)
 

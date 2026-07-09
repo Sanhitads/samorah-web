@@ -279,3 +279,38 @@
 .ff-status[data-s="exception"] { background: rgba(168, 68, 58, 0.14); color: #8a3d2f; }
 .ff-status[data-s="rto"], .ff-status[data-s="cancelled"] { background: rgba(107, 98, 89, 0.14); color: #6b6259; }
 .ff-status[data-s="pending"], .ff-status[data-s="ready_to_ship"], .ff-status[data-s="shipment_created"], .ff-status[data-s="courier_assigned"], .ff-status[data-s="label_generated"], .ff-status[data-s="pickup_scheduled"] { background: rgba(107, 98, 89, 0.1); color: #6b6259; }
+
+/* ── Configuration: Settings + Business Rules ── */
+.cfg { display: flex; flex-direction: column; gap: 18px; }
+.cfg-section { margin-bottom: 32px; }
+.cfg-section__title { font-family: var(--font-serif); font-size: 1.15rem; margin-bottom: 14px; }
+.cfg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+.cfg-field { display: flex; flex-direction: column; gap: 5px; }
+.cfg-field > span { font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--smoke, #6b6259); }
+.cfg-field input, .cfg-field select { padding: 8px 10px; font-family: var(--font-sans); font-size: 13px; border: 1px solid var(--ad-hair); border-radius: 3px; background: #fff; }
+.cfg-checks { display: flex; flex-direction: column; gap: 8px; }
+.cfg-days { display: flex; flex-wrap: wrap; gap: 6px; }
+.cfg-day { padding: 6px 12px; border: 1px solid var(--ad-hair); border-radius: 999px; background: #fff; cursor: pointer; font-family: var(--font-sans); font-size: 12px; text-transform: capitalize; }
+.cfg-day[data-on="1"] { background: #1f1a16; color: #faf7f2; border-color: #1f1a16; }
+.cfg-actions { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+.cfg-msg { font-family: var(--font-sans); font-size: 12px; }
+.cfg-msg--ok { color: #2f6b3c; }
+.cfg-msg--warn { color: #8a6d3b; }
+.cfg-msg--err { color: #8a3d2f; }
+.cfg-readonly { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.cfg-readonly dt { font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--smoke, #6b6259); }
+.cfg-readonly dd { font-family: var(--font-serif); font-size: 1rem; margin: 2px 0 0; }
+.cfg-hint { font-family: var(--font-sans); font-size: 12px; color: var(--smoke, #6b6259); margin-top: 10px; }
+.cfg-hint code { font-family: ui-monospace, monospace; font-size: 11px; background: rgba(31,26,22,0.06); padding: 1px 4px; border-radius: 3px; }
+.cfg-sub { font-family: var(--font-sans); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--smoke, #6b6259); margin: 14px 0 6px; }
+.cfg-row { display: grid; grid-template-columns: 1.4fr 0.9fr 1.2fr auto; gap: 6px; margin-bottom: 6px; }
+.cfg-row select, .cfg-row input { padding: 6px 8px; font-family: var(--font-sans); font-size: 12px; border: 1px solid var(--ad-hair); border-radius: 3px; background: #fff; }
+.cfg-rule-summary { font-family: ui-monospace, monospace; font-size: 11px; color: var(--ink, #1f1a16); max-width: 360px; }
+.cfg-toggle { padding: 4px 12px; border-radius: 999px; border: 1px solid var(--ad-hair); background: #fff; cursor: pointer; font-family: var(--font-sans); font-size: 11px; }
+.cfg-toggle[data-on="1"] { background: rgba(60, 120, 70, 0.14); color: #2f6b3c; border-color: transparent; }
+.cfg-toggle[data-on="0"] { color: var(--smoke, #6b6259); }
+.cfg-test { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--ad-hair); }
+.cfg-test-out { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.cfg-test-out li { font-family: var(--font-sans); font-size: 13px; padding: 6px 10px; border-radius: 4px; }
+.cfg-test-out li[data-match="1"] { background: rgba(60, 120, 70, 0.1); }
+.om-modal__card--wide { max-width: 620px; }
