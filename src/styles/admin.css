@@ -67,3 +67,49 @@
 .ff-err { font-family: var(--font-sans); font-size: 11px; color: #8a3d2f; }
 .ff-done { font-family: var(--font-sans); font-size: 11px; color: #2f6b3c; letter-spacing: 0.04em; }
 .ff-refreshing { font-family: var(--font-sans); font-size: 10px; color: var(--smoke, #6b6259); font-style: italic; }
+
+/* Hold / More */
+.ff-more-toggle {
+  padding: 5px 10px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--smoke, #6b6259);
+  background: transparent;
+  border: 1px solid var(--ad-hair);
+  border-radius: 3px;
+  cursor: pointer;
+}
+.ff-more-toggle:hover:not(:disabled) { background: var(--soft-beige, #efe9e0); }
+.ff-more-toggle:disabled { opacity: 0.5; cursor: not-allowed; }
+.ff-more { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; width: 100%; margin-top: 4px; }
+.ff-more__item {
+  padding: 5px 10px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--ink, #1f1a16);
+  background: #fff;
+  border: 1px solid var(--ad-hair);
+  border-radius: 3px;
+  cursor: pointer;
+}
+.ff-more__item:hover:not(:disabled) { background: var(--soft-beige, #efe9e0); }
+.ff-more__item--danger { color: #8a3d2f; border-color: rgba(138, 61, 47, 0.4); }
+.ff-hold-form { display: inline-flex; gap: 6px; align-items: center; }
+.ff-hold-input {
+  padding: 5px 8px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  border: 1px solid var(--ad-hair);
+  border-radius: 3px;
+  min-width: 150px;
+}
+.ff-hold-input:focus { outline: none; border-color: var(--ink, #1f1a16); }
+.ff-hold-badge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  background: rgba(168, 68, 58, 0.12);
+  color: #8a3d2f;
+}

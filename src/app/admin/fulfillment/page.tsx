@@ -69,6 +69,7 @@ export default async function FulfillmentDashboard() {
                     fulfillmentStatus={r.fulfillmentStatus}
                     nextStates={r.nextStates}
                     shipmentStatus={r.shipmentStatus}
+                    holdReason={r.holdReason}
                   />
                 </td>
               </tr>

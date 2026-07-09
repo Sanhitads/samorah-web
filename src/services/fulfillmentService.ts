@@ -52,6 +52,50 @@ export async function tryAdvanceFulfillment(orderNumber: string, to: Fulfillment
   }
 }
 
+/** Put an order on hold, remembering the exact prior state + an optional reason. */
+export async function holdFulfillment(orderNumber: string, reason?: string): Promise<{ ok: boolean; from: FulfillmentStatus }> {
+  const db = loose();
+  const { data: order } = await db.from("orders").select("id,fulfillment_status").eq("order_number", orderNumber).maybeSingle();
+  if (!order) throw new Error("order not found");
+  const from = (order.fulfillment_status ?? START) as FulfillmentStatus;
+  if (from === "on_hold") return { ok: true, from };
+  assertFulfillmentTransition(from, "on_hold");
+  await db
+    .from("orders")
+    .update({
+      fulfillment_status: "on_hold",
+      fulfillment_prev_status: from,
+      fulfillment_hold_reason: reason?.trim() || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", order.id);
+  return { ok: true, from };
+}
+
+/** Resume a held order to its exact prior state; syncs the coarse order status. */
+export async function resumeFulfillment(orderNumber: string): Promise<{ ok: boolean; to: FulfillmentStatus }> {
+  const db = loose();
+  const { data: order } = await db
+    .from("orders")
+    .select("id,fulfillment_status,fulfillment_prev_status,status")
+    .eq("order_number", orderNumber)
+    .maybeSingle();
+  if (!order) throw new Error("order not found");
+  if (order.fulfillment_status !== "on_hold") throw new Error("order is not on hold");
+  const to = (order.fulfillment_prev_status ?? START) as FulfillmentStatus;
+  assertFulfillmentTransition("on_hold", to);
+  const patch: Record<string, unknown> = {
+    fulfillment_status: to,
+    fulfillment_prev_status: null,
+    fulfillment_hold_reason: null,
+    updated_at: new Date().toISOString(),
+  };
+  const mapped = fulfillmentToOrderStatus(to);
+  if (mapped && mapped !== order.status) patch.status = mapped;
+  await db.from("orders").update(patch).eq("id", order.id);
+  return { ok: true, to };
+}
+
 export interface FulfillmentQueueRow {
   orderNumber: string;
   customerName: string;
@@ -61,6 +105,7 @@ export interface FulfillmentQueueRow {
   shipmentStatus: string | null;
   awb: string | null;
   courierName: string | null;
+  holdReason: string | null;
   placedAt: string;
 }
 
@@ -69,7 +114,7 @@ export async function getFulfillmentQueue(limit = 100): Promise<FulfillmentQueue
   const db = loose();
   const { data } = await db
     .from("orders")
-    .select("id,order_number,status,fulfillment_status,ship_full_name,placed_at,shipments(status,awb,courier_name)")
+    .select("id,order_number,status,fulfillment_status,fulfillment_hold_reason,ship_full_name,placed_at,shipments(status,awb,courier_name)")
     .eq("payment_status", "paid")
     .order("placed_at", { ascending: false })
     .limit(limit);
@@ -87,6 +132,7 @@ export async function getFulfillmentQueue(limit = 100): Promise<FulfillmentQueue
         shipmentStatus: sh?.status ?? null,
         awb: sh?.awb ?? null,
         courierName: sh?.courier_name ?? null,
+        holdReason: o.fulfillment_hold_reason ?? null,
         placedAt: o.placed_at,
       };
     });

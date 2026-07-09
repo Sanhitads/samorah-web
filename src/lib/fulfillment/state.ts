@@ -28,12 +28,13 @@ const TRANSITIONS: Record<FulfillmentStatus, FulfillmentStatus[]> = {
   packing: ["packed", "on_hold", "cancelled"],
   packed: ["qc_passed", "qc_failed", "on_hold"],
   qc_failed: ["packing", "cancelled"], // rework
-  qc_passed: ["ready_for_dispatch"],
+  qc_passed: ["ready_for_dispatch", "on_hold"],
   ready_for_dispatch: ["courier_assigned", "on_hold"],
-  courier_assigned: ["picked_up", "on_hold"],
+  courier_assigned: ["picked_up"], // shipment exists — use cancel/exception, not hold
   picked_up: ["shipped"],
   shipped: [], // handoff to Shipping/Tracking
-  on_hold: ["picking", "packing", "ready_for_dispatch", "cancelled"], // resume or cancel
+  // Resume returns to the EXACT prior state, so on_hold may re-enter any holdable state.
+  on_hold: ["reserved", "picking", "picked", "packing", "packed", "qc_passed", "ready_for_dispatch", "cancelled"],
   cancelled: [],
 };
 

@@ -34,6 +34,14 @@ describe("fulfillment state machine (§1)", () => {
     expect(canTransitionFulfillment("on_hold", "cancelled")).toBe(true);
   });
 
+  it("resume returns to the EXACT prior state (on_hold → any holdable state)", () => {
+    for (const s of ["reserved", "picked", "packed", "qc_passed", "ready_for_dispatch"] as const) {
+      expect(canTransitionFulfillment("on_hold", s), `on_hold→${s}`).toBe(true);
+    }
+    // once a shipment exists, hold is no longer offered
+    expect(canTransitionFulfillment("courier_assigned", "on_hold")).toBe(false);
+  });
+
   it("§14 gate: only ready_for_dispatch onward may ship", () => {
     expect(fulfillmentReadyToShip("packed")).toBe(false);
     expect(fulfillmentReadyToShip("qc_passed")).toBe(false);
