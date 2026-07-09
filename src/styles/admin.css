@@ -264,3 +264,10 @@
 .ash-metric__v { font-family: var(--font-serif); font-size: 1.5rem; line-height: 1; color: var(--ink, #1f1a16); }
 .ash-metric__v[data-tone="warn"] { color: #8a3d2f; }
 .ash-metric__l { font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--smoke, #6b6259); }
+
+/* ── Returns module ── */
+.admin__headrow { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 6px; }
+.ff-status[data-s="requested"] { background: rgba(107, 98, 89, 0.12); color: #6b6259; }
+.ff-status[data-s="approved"], .ff-status[data-s="pickup_scheduled"], .ff-status[data-s="received"], .ff-status[data-s="qc"] { background: rgba(201, 169, 110, 0.2); color: #8a6d3b; }
+.ff-status[data-s="refund"] { background: rgba(60, 120, 70, 0.14); color: #2f6b3c; }
+.ff-status[data-s="rejected"] { background: rgba(168, 68, 58, 0.12); color: #8a3d2f; }

@@ -175,6 +175,7 @@ Management** = cancellations + commercial/financial · **Shipping** = courier ·
 | 4 | ⋯ More: Hold/Resume/Report Exception/Request Cancellation/Reassign/Print slip/Print label/View Timeline | 🟡 Hold/Resume/Fail-QC ✅; the rest ⬜ |
 | 5 | Hold: optional reason, resume to prior, no notify, no financial impact | ✅ (preset reasons ⬜) |
 | 6 | Exception workflow (operational, pauses work, no payment impact) | 🟡 entity+SM exist (§7); board "Report Exception" + type alignment ⬜ |
+| — | **Returns module** (integrative — review point 9) | ✅ `/admin/returns` RMA lifecycle; restock + refund + audit ties; capability split operate/approve |
 | 7 | Business cancellation: Admin/CS only, confirm dialog, reason, optional release-inventory/refund/email | ✅ `/admin/orders` — manager+ only (editors view-only), `cancel_order` RPC (reason, optional restock, idempotent), confirm dialog, cancellation email queued |
 | 8 | Refund workflow (Razorpay refund, async failures, cancel≠refund) | ✅ `refunds` ledger + `begin_refund`/`settle_refund` (DB over-refund guard, async status initiated→processing→processed/failed); Razorpay REST + manual fallback; cancel and refund are separate actions/events |
 | 9 | Dedicated cancellation email (order#, reason, refund amount/status/timeline, support) | ✅ `buildCancellationEmail` — order#, reason, conditional refund block (amount + gateway/manual timeline), support line; unit-tested |
@@ -206,7 +207,7 @@ Management** = cancellations + commercial/financial · **Shipping** = courier ·
 **Adopted build order (review point 14 — cross-cutting capabilities first):**
 6. ~~**Permission System** (7/20)~~ ✅ **DONE** — `lib/auth/capabilities.ts` (12 capabilities, role→bundle map) + `requireCapability` guard; all admin routes gate on capabilities; UI hides uncapable controls; cancel-flow refund re-checks order.refund. Unit-tested.
 7. ~~**Notification Engine** (8/e/19)~~ ✅ **DONE** — `lib/notifications/` (types, subscriptions, channels, engine) + `notification_dispatches` idempotent log; the fulfillment worker now emits `order.confirmed/dispatched/cancelled` events through `notify()` instead of building emails; new channels (WhatsApp/SMS/push) register without touching services. Refund/delivery/return templates plug in as events are added.
-8. **Returns Module** (new) — the integrative business module: return lifecycle + reverse shipping + refund + restock + notifications.
+8. ~~**Returns Module**~~ ✅ **DONE** — `/admin/returns` + `returnService`: RMA lifecycle over the existing state machine, `return_items` (partial + restock flags), and the integrative ties — on settle it **restocks** inventory (`restock_return_items`, skipping damaged/defective) and issues a **refund** (via the ledger, once), writing every transition to the **audit** stream. Capability split: operate (warehouse) vs approve/refund (finance). Reverse-shipment scheduling + customer return emails plug into the shipment/notification engines next.
 9. **Shipment Management** UI · 10. **Settings/Business Rules** UI · 11. **Packaging** UI · 12. **Warehouses** UI · 13. **Analytics** (builds on §9 metrics).
 14. **Delivery + courier webhook** (10, 19) — POD + delivery notification (needs adapter).
 15. **Colour palette + simplified visible flow polish** (2, 23).

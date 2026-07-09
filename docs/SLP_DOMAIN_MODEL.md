@@ -44,8 +44,8 @@ never mixed on one screen (SLP principles a/c: warehouse never performs financia
 | Reservation | `stock_reservations` | pre-payment stock hold | consumed → real stock decrement at finalize |
 | Fulfillment job | `fulfillment_jobs` | async side-effect queue | job types: email, shipping, dispatch_email, cancellation_email → **subsumed by Notifications** |
 | Audit event | `audit_events` | immutable business-event stream | timestamp · actor · prev→new · event · notes · metadata |
-| **Return** *(planned)* | `returns` / `return_items` | reverse lifecycle | ties order·inventory·refund·shipping |
-| **Notification** *(planned)* | `notifications` | per-recipient, per-channel dispatch log | idempotent per (event, channel, recipient) |
+| Return | `returns` / `return_items` | reverse lifecycle | ✅ ties order·inventory(restock)·refund(ledger)·audit; reverse shipping + emails next |
+| Notification dispatch | `notification_dispatches` | per-recipient, per-channel dispatch log | ✅ idempotent per (order, event, channel, recipient) |
 | **Capability grant** *(planned)* | code table first, DB later | role→capability mapping | see §5 |
 
 ---
@@ -190,10 +190,10 @@ Computed from `audit_events` timestamp deltas (the stream already stamps every t
 
 Cross-cutting capabilities first, so later modules don't duplicate logic:
 
-1. **Permission System** — capability-based (§5)
-2. **Notification Engine** — centralized event fan-out (§4)
-3. **Returns Module** — the integrative business module (§3)
-4. **Shipment Management** — read/label/track surface
+1. ~~**Permission System** — capability-based (§5)~~ ✅
+2. ~~**Notification Engine** — centralized event fan-out (§4)~~ ✅
+3. ~~**Returns Module** — the integrative business module (§3)~~ ✅
+4. **Shipment Management** — read/label/track surface  ← next
 5. **Settings / Business Rules** UI
 6. **Packaging Management** UI
 7. **Warehouses** UI
