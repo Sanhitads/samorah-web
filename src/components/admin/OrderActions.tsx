@@ -19,6 +19,8 @@ export function OrderActions({
   total,
   refundAmount,
   hasPayment,
+  canCancel: canCancelCap = true,
+  canRefund: canRefundCap = true,
 }: {
   orderNumber: string;
   status: string;
@@ -26,6 +28,8 @@ export function OrderActions({
   total: number;
   refundAmount: number;
   hasPayment: boolean;
+  canCancel?: boolean;
+  canRefund?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -35,8 +39,8 @@ export function OrderActions({
 
   const paid = REFUNDABLE_PAYMENT.has(paymentStatus);
   const remaining = Math.max(0, total - refundAmount);
-  const canCancel = CANCELLABLE.has(status);
-  const canRefund = paid && remaining > 0;
+  const canCancel = canCancelCap && CANCELLABLE.has(status);
+  const canRefund = canRefundCap && paid && remaining > 0;
 
   // Cancel dialog fields
   const [reason, setReason] = useState("");

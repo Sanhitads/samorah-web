@@ -191,7 +191,7 @@ Management** = cancellations + commercial/financial · **Shipping** = courier ·
 | 10b | Work queues (derived) | ✅ Ready to Pick / Pack / Ship · Exceptions · On Hold as queue tabs (predicates over state, no new storage) — review point 10 |
 | 18 | Immutable analytics event log (Picking Started…Refund Completed) | ✅ `audit_events` (append-only, RLS, service-role only) captures order/fulfillment/shipment events; cancellation/refund events land when Order Mgmt ships |
 | 19 | Customer notifications (Confirmation/Dispatch/Delivery/Cancellation/Refund) | 🟡 Confirmation+Dispatch+Cancellation ✅; standalone Refund email + Delivery ⬜ |
-| 20 | Role-based permissions (Warehouse/CS/Finance/Admin) | 🟡 RBAC roles + board gate (editor+); per-action role split ⬜ |
+| 20 | Role-based permissions (Warehouse/CS/Finance/Admin) | ✅ **capability-based** — `hasCapability`/`requireCapability`; roles = capability bundles (editor=Warehouse, manager=CS/Finance, admin, super_admin). Routes gate on capabilities (order.cancel/refund, fulfillment.operate/triage); UI hides controls the caller lacks; cancel-flow refund re-checks order.refund. Adding a role = data change, no route edits |
 | 21 | Separate admin modules + nav (Dashboard/Orders/Fulfillment/Shipments/Returns/Customers/Catalog/Warehouses/Packaging/Rules/Providers/Settings/Analytics) | 🟡 admin shell + module-map sidebar + Dashboard landing (KPI tiles) ✅; live: Dashboard/Orders/Fulfillment; rest render "soon" (Shipments/Returns/Catalog/Warehouses/Packaging/Rules/Providers/Settings/Analytics) — build as their UIs land |
 | 22 | Audit trail per transition/action (timestamp/user/prev/new/action/notes) | ✅ each row = timestamp · actor (staff.userId threaded from routes) · previous→new state · event · notes · metadata; `getOrderTimeline(orderId)` reads it back |
 | 23 | Colour coding (Reserved 🟦/Picking 🟨/Packing 🟧/Ready 🟩/Exception 🟥/Cancelled ⚫) | 🟡 some status colours; not the exact semantic palette |
@@ -204,7 +204,7 @@ Management** = cancellations + commercial/financial · **Shipping** = courier ·
 5. ~~**Board/order refinements** (review points 1–5, 10, 12)~~ ✅ **DONE** — Commercial Cancellation + `cancellation_type` taxonomy; explicit Next Action; Effective Priority; refund payment sub-states; extended inventory states; derived work-queue tabs; Dashboard operational metrics (avg pick/pack, oldest waiting). See [`SLP_DOMAIN_MODEL.md`](./SLP_DOMAIN_MODEL.md).
 
 **Adopted build order (review point 14 — cross-cutting capabilities first):**
-6. **Permission System** (7/20) — capability-based access (`hasCapability`/`requireCapability`); roles become capability groups.
+6. ~~**Permission System** (7/20)~~ ✅ **DONE** — `lib/auth/capabilities.ts` (12 capabilities, role→bundle map) + `requireCapability` guard; all admin routes gate on capabilities; UI hides uncapable controls; cancel-flow refund re-checks order.refund. Unit-tested.
 7. **Notification Engine** (8/e/19) — centralized event → subscriptions → per-channel template → provider (email now; WhatsApp/SMS/push later). Stops per-email growth.
 8. **Returns Module** (new) — the integrative business module: return lifecycle + reverse shipping + refund + restock + notifications.
 9. **Shipment Management** UI · 10. **Settings/Business Rules** UI · 11. **Packaging** UI · 12. **Warehouses** UI · 13. **Analytics** (builds on §9 metrics).

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { requireStaff } from "@/lib/auth/requireStaff";
+import { requireCapability } from "@/lib/auth/requireStaff";
+import { hasCapability } from "@/lib/auth/capabilities";
 import { cancelOrder, type CancellationType } from "@/services/cancellationService";
 
 /**
@@ -10,8 +11,8 @@ import { cancelOrder, type CancellationType } from "@/services/cancellationServi
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  const staff = await requireStaff("manager");
-  if (!staff.ok) return NextResponse.json({ error: "Forbidden — cancellation requires manager access." }, { status: 403 });
+  const staff = await requireCapability("order.cancel");
+  if (!staff.ok) return NextResponse.json({ error: "Forbidden — you lack the order.cancel capability." }, { status: 403 });
 
   let body: {
     orderNumber?: string;
@@ -28,12 +29,16 @@ export async function POST(request: Request) {
   }
   if (!body.orderNumber) return NextResponse.json({ error: "orderNumber is required." }, { status: 400 });
 
+  // A refund via the cancel flow still requires the order.refund capability —
+  // cancelling and refunding are separate powers even when done in one step.
+  const mayRefund = hasCapability(staff.role, "order.refund");
+
   const result = await cancelOrder({
     orderNumber: body.orderNumber,
     reason: body.reason,
     cancellationType: body.cancellationType,
     releaseInventory: body.releaseInventory,
-    issueRefund: body.issueRefund,
+    issueRefund: Boolean(body.issueRefund) && mayRefund,
     refundAmount: body.refundAmount,
     actorId: staff.userId ?? undefined,
   });

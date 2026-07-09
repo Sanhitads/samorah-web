@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { requireStaff, ROLE_RANK } from "@/lib/auth/requireStaff";
+import { requireStaff } from "@/lib/auth/requireStaff";
+import { hasCapability } from "@/lib/auth/capabilities";
 import { getOrdersOverview } from "@/services/orderAdminService";
 import { OrderActions } from "@/components/admin/OrderActions";
 import { refundBadge } from "@/lib/fulfillment/derive";
@@ -30,7 +31,10 @@ function paymentBadge(paymentStatus: string, isCod: boolean, latestRefundStatus:
 export default async function OrdersPage() {
   const staff = await requireStaff("editor");
   if (!staff.ok) redirect("/login");
-  const canManage = (ROLE_RANK[staff.role ?? "customer"] ?? 0) >= ROLE_RANK.manager;
+  // Actions are per-capability: someone may cancel, refund, both, or neither.
+  const canCancel = hasCapability(staff.role, "order.cancel");
+  const canRefund = hasCapability(staff.role, "order.refund");
+  const canManage = canCancel || canRefund;
 
   const orders = await getOrdersOverview();
 
@@ -41,7 +45,7 @@ export default async function OrdersPage() {
         <h1 className="admin__title">Orders</h1>
         <p className="admin__count">
           {orders.length} {orders.length === 1 ? "order" : "orders"}
-          {canManage ? "" : " · view only (cancel & refund need manager access)"}
+          {canManage ? "" : " · view only (no cancel/refund capability)"}
         </p>
       </header>
 
@@ -79,6 +83,8 @@ export default async function OrdersPage() {
                         total={o.total}
                         refundAmount={o.refundAmount}
                         hasPayment={o.hasPayment}
+                        canCancel={canCancel}
+                        canRefund={canRefund}
                       />
                     </td>
                   ) : null}

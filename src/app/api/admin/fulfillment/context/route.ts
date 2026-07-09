@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireStaff } from "@/lib/auth/requireStaff";
+import { requireCapability } from "@/lib/auth/requireStaff";
 import { setPriority, assignOrder, setOpsTags, type BoardPriority } from "@/services/fulfillmentService";
 
 /**
@@ -10,7 +10,7 @@ import { setPriority, assignOrder, setOpsTags, type BoardPriority } from "@/serv
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  const staff = await requireStaff("editor");
+  const staff = await requireCapability("fulfillment.triage");
   if (!staff.ok) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
 
   let body: {

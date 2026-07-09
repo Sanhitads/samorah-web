@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireStaff } from "@/lib/auth/requireStaff";
+import { requireCapability } from "@/lib/auth/requireStaff";
 import { getOrderByNumber } from "@/services/orderService";
 import { createShipmentForOrder } from "@/services/shipmentService";
 import { tryAdvanceFulfillment } from "@/services/fulfillmentService";
@@ -9,7 +9,7 @@ import { tryAdvanceFulfillment } from "@/services/fulfillmentService";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  const staff = await requireStaff("editor");
+  const staff = await requireCapability("fulfillment.operate");
   if (!staff.ok) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
 
   let body: { orderNumber?: string };

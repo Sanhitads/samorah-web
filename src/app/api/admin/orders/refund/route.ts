@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireStaff } from "@/lib/auth/requireStaff";
+import { requireCapability } from "@/lib/auth/requireStaff";
 import { getOrderByNumber } from "@/services/orderService";
 import { issueRefund } from "@/services/refundService";
 
@@ -14,8 +14,8 @@ import { issueRefund } from "@/services/refundService";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  const staff = await requireStaff("manager");
-  if (!staff.ok) return NextResponse.json({ error: "Forbidden — refunds require manager access." }, { status: 403 });
+  const staff = await requireCapability("order.refund");
+  if (!staff.ok) return NextResponse.json({ error: "Forbidden — you lack the order.refund capability." }, { status: 403 });
 
   let body: { orderNumber?: string; amount?: number; reason?: string };
   try {
