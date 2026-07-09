@@ -229,3 +229,38 @@
   .ash-group { min-width: 130px; }
   .ash-role { display: none; }
 }
+
+/* ── Board refinements (review points 2–5, 10, 12) ── */
+/* Effective priority (computed) + manual override control */
+.bc-eff { display: inline-block; padding: 3px 9px; border-radius: 999px; font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; font-weight: 600; }
+.bc-eff[data-p="critical"] { background: rgba(168, 68, 58, 0.16); color: #8a3d2f; }
+.bc-eff[data-p="high"] { background: rgba(201, 169, 110, 0.24); color: #8a6d3b; }
+.bc-eff[data-p="normal"] { background: rgba(107, 98, 89, 0.12); color: #6b6259; }
+.bc-eff-set { margin-top: 5px; }
+
+/* Next action hint */
+.bc-next { font-family: var(--font-sans); font-size: 11px; color: var(--ink, #1f1a16); margin-top: 5px; font-weight: 500; }
+
+/* Refund-progress payment tone */
+.om-pay[data-tone="refundprog"] { background: rgba(201, 169, 110, 0.2); color: #8a6d3b; }
+
+/* Inventory extra states */
+.bc-inv[data-inv="reserved"] { color: #6b6259; }
+.bc-inv[data-inv="picking"] { color: #8a6d3b; }
+.bc-inv[data-inv="backordered"] { color: #8a3d2f; }
+
+/* Work-queue tabs */
+.ff-queues { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; }
+.ff-queue { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid var(--ad-hair); border-radius: 999px; font-family: var(--font-sans); font-size: 12px; color: var(--ink, #1f1a16); text-decoration: none; }
+.ff-queue:hover { background: rgba(31, 26, 22, 0.05); }
+.ff-queue[data-active="1"] { background: #1f1a16; color: #faf7f2; border-color: #1f1a16; }
+.ff-queue__n { font-size: 10px; opacity: 0.7; }
+.ff-queue[data-q="exceptions"] .ff-queue__n { color: inherit; }
+
+/* Dashboard operational metrics */
+.ash-metrics { margin-top: 32px; }
+.ash-metrics__row { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+.ash-metric { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; border: 1px solid var(--ad-hair); border-radius: 6px; background: #fbf9f5; }
+.ash-metric__v { font-family: var(--font-serif); font-size: 1.5rem; line-height: 1; color: var(--ink, #1f1a16); }
+.ash-metric__v[data-tone="warn"] { color: #8a3d2f; }
+.ash-metric__l { font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--smoke, #6b6259); }

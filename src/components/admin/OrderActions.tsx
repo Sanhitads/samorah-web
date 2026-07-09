@@ -40,6 +40,7 @@ export function OrderActions({
 
   // Cancel dialog fields
   const [reason, setReason] = useState("");
+  const [cancellationType, setCancellationType] = useState<"customer" | "warehouse_exception" | "fraud" | "admin">("customer");
   const [release, setRelease] = useState(true);
   const [doRefund, setDoRefund] = useState(paid);
   // Refund dialog fields
@@ -74,7 +75,7 @@ export function OrderActions({
     }
     post(
       "/api/admin/orders/cancel",
-      { orderNumber, reason: reason.trim(), releaseInventory: release, issueRefund: doRefund && paid },
+      { orderNumber, reason: reason.trim(), cancellationType, releaseInventory: release, issueRefund: doRefund && paid },
       "cancel",
     );
   };
@@ -111,8 +112,17 @@ export function OrderActions({
       {dialog === "cancel" ? (
         <div className="om-modal" role="dialog" aria-modal="true" onClick={() => !disabled && setDialog(null)}>
           <div className="om-modal__card" onClick={(e) => e.stopPropagation()}>
-            <h2 className="om-modal__title">Cancel order {orderNumber}</h2>
+            <h2 className="om-modal__title">Commercial Cancellation · {orderNumber}</h2>
             <p className="om-modal__note">This stops the order. Cancelling does not refund on its own — choose below.</p>
+            <label className="om-field">
+              <span>Type</span>
+              <select value={cancellationType} onChange={(e) => setCancellationType(e.target.value as typeof cancellationType)}>
+                <option value="customer">Customer request</option>
+                <option value="warehouse_exception">Warehouse exception</option>
+                <option value="fraud">Fraud</option>
+                <option value="admin">Admin</option>
+              </select>
+            </label>
             <label className="om-field">
               <span>Reason</span>
               <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} placeholder="Why is this order being cancelled?" />

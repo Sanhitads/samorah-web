@@ -12,6 +12,16 @@ import {
   nextFulfillmentStates,
   type FulfillmentStatus,
 } from "@/lib/fulfillment/state";
+import {
+  effectivePriority,
+  queueOf,
+  nextActionLabel,
+  EFFECTIVE_RANK,
+  type EffectivePriority,
+  type WorkQueue,
+  type InventorySignal,
+  type SlaTone,
+} from "@/lib/fulfillment/derive";
 import { logEvent } from "@/services/auditService";
 
 const START: FulfillmentStatus = "reserved";
@@ -104,8 +114,8 @@ export async function resumeFulfillment(orderNumber: string, opts?: { actorId?: 
 export type BoardPriority = "normal" | "high" | "urgent" | "vip";
 export const BOARD_PRIORITIES: BoardPriority[] = ["normal", "high", "urgent", "vip"];
 /** Preset operational tags an operator can attach (Gift/COD are derived, not here). */
-export const OPS_TAGS = ["Fragile", "Express", "Replacement", "Wholesale"] as const;
-export type InventorySignal = "allocated" | "missing" | "unknown";
+export const OPS_TAGS = ["Fragile", "Express", "Replacement", "Wholesale", "Complaint"] as const;
+export type { InventorySignal, WorkQueue, EffectivePriority } from "@/lib/fulfillment/derive";
 
 export interface FulfillmentQueueRow {
   orderNumber: string;
@@ -119,24 +129,51 @@ export interface FulfillmentQueueRow {
   holdReason: string | null;
   placedAt: string;
   // ── context (principles 11–17) ──
-  priority: BoardPriority;
-  assignedTo: string | null; // user id
+  priority: BoardPriority;            // manual override input
+  effectivePriority: EffectivePriority; // computed (Critical/High/Normal) — board sorts on this
+  slaTone: SlaTone;
+  queue: WorkQueue;                   // derived functional queue (point 10)
+  nextAction: string;                 // explicit next step (point 2)
+  assignedTo: string | null;          // user id
   assigneeName: string | null;
-  tags: string[]; // derived (Gift/COD) + operational
+  tags: string[];                     // derived (Gift/COD) + operational
   itemCount: number;
   paymentStatus: string;
   isCod: boolean;
   refundAmount: number;
-  note: string | null; // gift note / occasion + warehouse note, combined for display
+  latestRefundStatus: string | null;  // ledger sub-state (point 4)
+  note: string | null;                // gift note / occasion + warehouse note, combined for display
   inventory: InventorySignal;
 }
 
-// Rank so VIP/Urgent float to the top, then newest first within a priority.
-const PRIORITY_RANK: Record<BoardPriority, number> = { vip: 0, urgent: 1, high: 2, normal: 3 };
+/** SLA tone from order age — shared by reader (for priority) and UI. */
+function slaToneOf(placedAt: string, now: number): SlaTone {
+  const hrs = Math.max(0, (now - new Date(placedAt).getTime()) / 3.6e6);
+  return hrs >= 48 ? "over" : hrs >= 24 ? "warn" : "ok";
+}
 
-/** Orders awaiting/undergoing fulfillment (paid, not terminal), priority then newest. */
-export async function getFulfillmentQueue(limit = 100): Promise<FulfillmentQueueRow[]> {
+/** Latest non-failed refund status per order (point 4) — one query for the whole page. */
+async function latestRefundStatuses(db: any, orderIds: string[]): Promise<Map<string, string>> {
+  const m = new Map<string, string>();
+  if (!orderIds.length) return m;
+  const { data } = await db
+    .from("refunds")
+    .select("order_id,status,created_at")
+    .in("order_id", orderIds)
+    .neq("status", "failed")
+    .order("created_at", { ascending: false });
+  for (const r of data ?? []) if (!m.has(r.order_id)) m.set(r.order_id, r.status); // first = newest
+  return m;
+}
+
+/**
+ * Orders awaiting/undergoing fulfillment (paid, not terminal), sorted by EFFECTIVE
+ * priority then newest. Optional `queue` narrows to one functional queue (point 10).
+ */
+export async function getFulfillmentQueue(opts: { limit?: number; queue?: WorkQueue } = {}): Promise<FulfillmentQueueRow[]> {
+  const limit = opts.limit ?? 100;
   const db = loose();
+  const now = Date.now();
   const { data } = await db
     .from("orders")
     .select(
@@ -148,72 +185,90 @@ export async function getFulfillmentQueue(limit = 100): Promise<FulfillmentQueue
     .order("placed_at", { ascending: false })
     .limit(limit);
 
-  // Resolve assignee names in one shot (small staff table).
+  const live = (data ?? []).filter((o: any) => !TERMINAL_ORDER.has(o.status));
+
+  // Resolve assignee names + latest refund states in one shot each (small tables).
   const staff = new Map<string, string>();
-  const assigneeIds = [...new Set((data ?? []).map((o: any) => o.assigned_to).filter(Boolean))];
+  const assigneeIds = [...new Set(live.map((o: any) => o.assigned_to).filter(Boolean))];
   if (assigneeIds.length) {
     const { data: users } = await db.from("users").select("id,full_name").in("id", assigneeIds);
     for (const u of users ?? []) staff.set(u.id, u.full_name ?? "");
   }
+  const refundStatus = await latestRefundStatuses(db, live.map((o: any) => o.id));
 
-  const rows: FulfillmentQueueRow[] = (data ?? [])
-    .filter((o: any) => !TERMINAL_ORDER.has(o.status))
-    .map((o: any) => {
-      const fs = (o.fulfillment_status ?? START) as FulfillmentStatus;
-      const sh = Array.isArray(o.shipments) ? o.shipments[0] : o.shipments;
-      const items = Array.isArray(o.order_items) ? o.order_items : [];
-      const itemCount = items.reduce((s: number, it: any) => s + (it.quantity ?? 0), 0);
+  const rows: FulfillmentQueueRow[] = live.map((o: any) => {
+    const fs = (o.fulfillment_status ?? START) as FulfillmentStatus;
+    const sh = Array.isArray(o.shipments) ? o.shipments[0] : o.shipments;
+    const items = Array.isArray(o.order_items) ? o.order_items : [];
+    const itemCount = items.reduce((s: number, it: any) => s + (it.quantity ?? 0), 0);
 
-      // Inventory (17): paid orders have consumed their hold → allocated; a negative
-      // variant stock means we're oversold / short → flag for the operator.
-      let inventory: InventorySignal = items.length ? "allocated" : "unknown";
-      for (const it of items) {
-        const v = Array.isArray(it.variants) ? it.variants[0] : it.variants;
-        if (v && typeof v.stock === "number" && v.stock < 0) inventory = "missing";
-      }
+    // Inventory (5/17): missing (oversold) → picking (in progress) → allocated (paid).
+    let inventory: InventorySignal = items.length ? "allocated" : "unknown";
+    for (const it of items) {
+      const v = Array.isArray(it.variants) ? it.variants[0] : it.variants;
+      if (v && typeof v.stock === "number" && v.stock < 0) inventory = "missing";
+    }
+    if (inventory === "allocated" && fs === "picking") inventory = "picking";
 
-      // Tags (13): derived Gift/COD first, then operational tags.
-      const tags: string[] = [];
-      if (o.is_gift) tags.push("Gift");
-      if (o.is_cod) tags.push("COD");
-      for (const t of o.ops_tags ?? []) if (!tags.includes(t)) tags.push(t);
+    // Tags (13): derived Gift/COD first, then operational tags.
+    const tags: string[] = [];
+    if (o.is_gift) tags.push("Gift");
+    if (o.is_cod) tags.push("COD");
+    for (const t of o.ops_tags ?? []) if (!tags.includes(t)) tags.push(t);
 
-      // Note (15): customer gift note/occasion + internal warehouse note.
-      const noteParts = [
-        o.gift_note ? `Gift: ${o.gift_note}` : null,
-        o.gift_occasion ? `Occasion: ${o.gift_occasion}` : null,
-        o.ops_note || null,
-      ].filter(Boolean);
+    const noteParts = [
+      o.gift_note ? `Gift: ${o.gift_note}` : null,
+      o.gift_occasion ? `Occasion: ${o.gift_occasion}` : null,
+      o.ops_note || null,
+    ].filter(Boolean);
 
-      return {
-        orderNumber: o.order_number,
-        customerName: o.ship_full_name ?? "",
-        orderStatus: o.status,
-        fulfillmentStatus: fs,
-        nextStates: nextFulfillmentStates(fs),
-        shipmentStatus: sh?.status ?? null,
-        awb: sh?.awb ?? null,
-        courierName: sh?.courier_name ?? null,
-        holdReason: o.fulfillment_hold_reason ?? null,
-        placedAt: o.placed_at,
-        priority: (o.priority ?? "normal") as BoardPriority,
-        assignedTo: o.assigned_to ?? null,
-        assigneeName: o.assigned_to ? staff.get(o.assigned_to) ?? null : null,
-        tags,
-        itemCount,
-        paymentStatus: o.payment_status,
-        isCod: o.is_cod,
-        refundAmount: Number(o.refund_amount ?? 0),
-        note: noteParts.length ? noteParts.join(" · ") : null,
-        inventory,
-      };
-    });
+    const manual = (o.priority ?? "normal") as BoardPriority;
+    const slaTone = slaToneOf(o.placed_at, now);
+    const eff = effectivePriority(manual, { slaTone, tags });
 
-  return rows.sort((a, b) => {
-    const pr = PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
+    return {
+      orderNumber: o.order_number,
+      customerName: o.ship_full_name ?? "",
+      orderStatus: o.status,
+      fulfillmentStatus: fs,
+      nextStates: nextFulfillmentStates(fs),
+      shipmentStatus: sh?.status ?? null,
+      awb: sh?.awb ?? null,
+      courierName: sh?.courier_name ?? null,
+      holdReason: o.fulfillment_hold_reason ?? null,
+      placedAt: o.placed_at,
+      priority: manual,
+      effectivePriority: eff,
+      slaTone,
+      queue: queueOf(fs, inventory),
+      nextAction: nextActionLabel(fs, sh?.status ?? null),
+      assignedTo: o.assigned_to ?? null,
+      assigneeName: o.assigned_to ? staff.get(o.assigned_to) ?? null : null,
+      tags,
+      itemCount,
+      paymentStatus: o.payment_status,
+      isCod: o.is_cod,
+      refundAmount: Number(o.refund_amount ?? 0),
+      latestRefundStatus: refundStatus.get(o.id) ?? null,
+      note: noteParts.length ? noteParts.join(" · ") : null,
+      inventory,
+    };
+  });
+
+  const filtered = opts.queue ? rows.filter((r) => r.queue === opts.queue) : rows;
+  return filtered.sort((a, b) => {
+    const pr = EFFECTIVE_RANK[a.effectivePriority] - EFFECTIVE_RANK[b.effectivePriority];
     if (pr !== 0) return pr;
     return b.placedAt.localeCompare(a.placedAt);
   });
+}
+
+/** Counts per work queue (for the board's queue tabs) — one pass over the full set. */
+export async function getQueueCounts(): Promise<Record<WorkQueue, number>> {
+  const all = await getFulfillmentQueue({ limit: 500 });
+  const counts: Record<WorkQueue, number> = { pick: 0, pack: 0, ship: 0, exceptions: 0, hold: 0 };
+  for (const r of all) counts[r.queue]++;
+  return counts;
 }
 
 // ── Board context mutators (principles 11–13, 15) ────────────────────────────

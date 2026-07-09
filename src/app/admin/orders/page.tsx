@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { requireStaff, ROLE_RANK } from "@/lib/auth/requireStaff";
 import { getOrdersOverview } from "@/services/orderAdminService";
 import { OrderActions } from "@/components/admin/OrderActions";
+import { refundBadge } from "@/lib/fulfillment/derive";
 
 /**
  * Order Management — `/admin/orders`. The COMMERCIAL view of orders: status,
@@ -18,9 +19,9 @@ const STATUS_LABEL: Record<string, string> = {
   shipped: "Shipped", delivered: "Delivered", cancelled: "Cancelled", returned: "Returned", rto: "RTO",
 };
 
-function paymentBadge(paymentStatus: string, isCod: boolean): { label: string; tone: string } {
-  if (paymentStatus === "refunded") return { label: "Refunded", tone: "refunded" };
-  if (paymentStatus === "partially_refunded") return { label: "Part. Refunded", tone: "refunded" };
+function paymentBadge(paymentStatus: string, isCod: boolean, latestRefundStatus: string | null): { label: string; tone: string } {
+  const rb = refundBadge(paymentStatus, latestRefundStatus);
+  if (rb) return rb;
   if (paymentStatus === "paid") return { label: "Paid", tone: "paid" };
   if (paymentStatus === "failed") return { label: "Failed", tone: "failed" };
   return { label: isCod ? "COD" : "Pending", tone: "pending" };
@@ -58,7 +59,7 @@ export default async function OrdersPage() {
           </thead>
           <tbody>
             {orders.map((o) => {
-              const badge = paymentBadge(o.paymentStatus, o.isCod);
+              const badge = paymentBadge(o.paymentStatus, o.isCod, o.latestRefundStatus);
               return (
                 <tr key={o.orderNumber}>
                   <td className="admin__mono">{o.orderNumber}</td>

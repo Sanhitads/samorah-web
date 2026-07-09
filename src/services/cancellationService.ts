@@ -15,9 +15,12 @@ import { callRpc } from "@/lib/supabase/rpc";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { CancellationEmailInput } from "@/lib/email";
 
+export type CancellationType = "customer" | "warehouse_exception" | "fraud" | "admin";
+
 export interface CancelOrderInput {
   orderNumber: string;
   reason?: string;
+  cancellationType?: CancellationType; // the typed cause (review point 1)
   releaseInventory?: boolean;
   issueRefund?: boolean;
   refundAmount?: number; // rupees; defaults to the full remaining balance
@@ -56,6 +59,7 @@ export async function cancelOrder(input: CancelOrderInput): Promise<CancelOrderR
     p: {
       order_id: o.id,
       reason: input.reason ?? null,
+      cancellation_type: input.cancellationType ?? "admin",
       actor_id: input.actorId ?? null,
       release_inventory: Boolean(input.releaseInventory),
     },
@@ -74,7 +78,7 @@ export async function cancelOrder(input: CancelOrderInput): Promise<CancelOrderR
     previousState: cancel.previous_status,
     newState: "cancelled",
     notes: input.reason ?? undefined,
-    metadata: { restocked: cancel.restocked ?? 0, releaseInventory: Boolean(input.releaseInventory) },
+    metadata: { restocked: cancel.restocked ?? 0, releaseInventory: Boolean(input.releaseInventory), cancellationType: input.cancellationType ?? "admin" },
   });
 
   // Optional, explicit refund — only for orders that actually took money.

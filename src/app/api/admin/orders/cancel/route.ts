@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireStaff } from "@/lib/auth/requireStaff";
-import { cancelOrder } from "@/services/cancellationService";
+import { cancelOrder, type CancellationType } from "@/services/cancellationService";
 
 /**
  * POST /api/admin/orders/cancel — business cancellation (SLP principle 7).
@@ -16,6 +16,7 @@ export async function POST(request: Request) {
   let body: {
     orderNumber?: string;
     reason?: string;
+    cancellationType?: CancellationType;
     releaseInventory?: boolean;
     issueRefund?: boolean;
     refundAmount?: number;
@@ -30,6 +31,7 @@ export async function POST(request: Request) {
   const result = await cancelOrder({
     orderNumber: body.orderNumber,
     reason: body.reason,
+    cancellationType: body.cancellationType,
     releaseInventory: body.releaseInventory,
     issueRefund: body.issueRefund,
     refundAmount: body.refundAmount,

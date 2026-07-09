@@ -180,12 +180,15 @@ Management** = cancellations + commercial/financial · **Shipping** = courier ·
 | 9 | Dedicated cancellation email (order#, reason, refund amount/status/timeline, support) | ✅ `buildCancellationEmail` — order#, reason, conditional refund block (amount + gateway/manual timeline), support line; unit-tested |
 | 10 | Shipment workflow provider-independent; manual dispatches immediately; couriers via webhook | ✅ Manual; courier webhook ⬜ |
 | 11 | Row context columns (Priority/Item Count/Tags/Assigned To/SLA/Payment Badge/Next Action) | ✅ board rows now carry Priority · Order+ItemCount · Tags · Customer · Fulfillment+Inventory · Payment · Age · Owner · Actions(Next) |
-| 12 | Priority (Normal/High/Urgent/VIP) | ✅ `orders.priority` (checked enum) editable via `PriorityControl`; board sorts VIP→Urgent→High→Normal then newest |
+| 12 | Priority (Normal/High/Urgent/VIP) | ✅ manual `orders.priority` (editable) + computed **Effective Priority** (Critical/High/Normal) = max(manual, SLA/Express/Replacement/Complaint); board sorts on effective |
 | 13 | Tags (Gift/Fragile/COD/Express/Replacement/Wholesale) | ✅ Gift/COD derived from is_gift/is_cod; Fragile/Express/Replacement/Wholesale editable via `TagsControl` → `ops_tags` |
 | 14 | SLA indicators (order age + colour) | ✅ age from `placed_at`, colour ok(<24h)/warn(≥24h)/over(≥48h) |
 | 15 | Customer notes inline (Gift Wrap/Leave at Reception/Call Before) | ✅ gift note + occasion + warehouse `ops_note` shown inline (📝); checkout-captured delivery instructions are a future storefront enhancement |
 | 16 | Payment badge (Paid/COD/Refund Pending/Refunded) | ✅ badge from payment_status + is_cod (Paid/COD/Part. Refund/Refunded/Failed) + refund amount |
-| 17 | Inventory status (Reserved/Allocated/Missing Stock) | ✅ paid = Allocated; negative variant stock = Missing Stock (flagged); Reserved shows pre-payment (off this board) |
+| 17 | Inventory status (Reserved/Allocated/Missing Stock) | ✅ Reserved (pre-pay) · Allocated (paid) · Picking (in progress) · Missing (oversold, flagged) · Backordered (modelled, dormant until pre-orders) |
+| 11b | Next Action (explicit, not inferred) | ✅ `nextActionLabel` shows the single next step per row ("→ Create shipment"/"→ Dispatch"/"→ Resume") — review point 2 |
+| 12b | Refund payment sub-states | ✅ Refund Initiated / Refund Processing / Part. Refunded / Refunded from the ledger — review point 4 |
+| 10b | Work queues (derived) | ✅ Ready to Pick / Pack / Ship · Exceptions · On Hold as queue tabs (predicates over state, no new storage) — review point 10 |
 | 18 | Immutable analytics event log (Picking Started…Refund Completed) | ✅ `audit_events` (append-only, RLS, service-role only) captures order/fulfillment/shipment events; cancellation/refund events land when Order Mgmt ships |
 | 19 | Customer notifications (Confirmation/Dispatch/Delivery/Cancellation/Refund) | 🟡 Confirmation+Dispatch+Cancellation ✅; standalone Refund email + Delivery ⬜ |
 | 20 | Role-based permissions (Warehouse/CS/Finance/Admin) | 🟡 RBAC roles + board gate (editor+); per-action role split ⬜ |
@@ -198,6 +201,14 @@ Management** = cancellations + commercial/financial · **Shipping** = courier ·
 2. ~~**Order Management module** (7, 8, 9)~~ ✅ **DONE** — `/admin/orders` (manager+; editors view-only) with confirm-dialog cancellation (reason, optional restock), a `refunds` ledger with a DB over-refund guard + async status, Razorpay-REST refunds with a manual fallback, and a dedicated cancellation email. Cancel ≠ refund (separate actions, separate audit events). Standalone refund email deferred to the notifications pass.
 3. ~~**Board context columns** (11–17)~~ ✅ **DONE** — every board row now carries priority (editable, drives sort), item count, tags (Gift/COD derived + editable ops tags), assignee (assign-to-me), SLA age+colour, payment badge, gift/warehouse notes, and inventory status (Allocated/Missing). New `orders.priority/assigned_to/ops_tags/ops_note`; all edits audit-logged via the event stream.
 4. 🟡 **Admin shell + nav** (21) — ✅ shell (`/admin/layout.tsx`) + module-map sidebar + Dashboard landing with KPI tiles; Dashboard/Orders/Fulfillment live, remaining modules render "soon". Still to build: Shipments, Returns, Settings/Rules/Warehouses/Packaging/Providers, Catalog, Analytics screens.
-5. **Fine-grained roles** (20) — warehouse vs CS vs finance action gating.
-6. **Delivery + courier webhook** (10, 19) — POD, delivery notification (needs adapter).
-7. **Colour palette + simplified visible flow polish** (2, 23).
+5. ~~**Board/order refinements** (review points 1–5, 10, 12)~~ ✅ **DONE** — Commercial Cancellation + `cancellation_type` taxonomy; explicit Next Action; Effective Priority; refund payment sub-states; extended inventory states; derived work-queue tabs; Dashboard operational metrics (avg pick/pack, oldest waiting). See [`SLP_DOMAIN_MODEL.md`](./SLP_DOMAIN_MODEL.md).
+
+**Adopted build order (review point 14 — cross-cutting capabilities first):**
+6. **Permission System** (7/20) — capability-based access (`hasCapability`/`requireCapability`); roles become capability groups.
+7. **Notification Engine** (8/e/19) — centralized event → subscriptions → per-channel template → provider (email now; WhatsApp/SMS/push later). Stops per-email growth.
+8. **Returns Module** (new) — the integrative business module: return lifecycle + reverse shipping + refund + restock + notifications.
+9. **Shipment Management** UI · 10. **Settings/Business Rules** UI · 11. **Packaging** UI · 12. **Warehouses** UI · 13. **Analytics** (builds on §9 metrics).
+14. **Delivery + courier webhook** (10, 19) — POD + delivery notification (needs adapter).
+15. **Colour palette + simplified visible flow polish** (2, 23).
+
+> Full reference architecture (entities · states · events · capabilities · rules · module boundaries · queue model · bulk-ops design): [`SLP_DOMAIN_MODEL.md`](./SLP_DOMAIN_MODEL.md).

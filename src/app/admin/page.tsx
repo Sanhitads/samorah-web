@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireStaff } from "@/lib/auth/requireStaff";
-import { getDashboardStats } from "@/services/orderAdminService";
+import { getDashboardStats, getOperationalMetrics } from "@/services/orderAdminService";
 
 /**
  * Admin Dashboard — `/admin`. The landing module (SLP principle 21): headline
@@ -13,7 +13,9 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminDashboard() {
   const staff = await requireStaff("editor");
-  const stats = await getDashboardStats();
+  const [stats, metrics] = await Promise.all([getDashboardStats(), getOperationalMetrics()]);
+  const dur = (m: number | null) => (m == null ? "—" : m < 60 ? `${m}m` : `${Math.round((m / 60) * 10) / 10}h`);
+  const age = (h: number | null) => (h == null ? "—" : h < 24 ? `${h}h` : `${Math.round((h / 24) * 10) / 10}d`);
 
   const tiles: { label: string; value: number; href?: string; tone?: string }[] = [
     { label: "Awaiting fulfillment", value: stats.awaitingFulfillment, href: "/admin/fulfillment" },
@@ -47,6 +49,18 @@ export default async function AdminDashboard() {
           );
         })}
       </div>
+
+      <section className="ash-metrics">
+        <h2 className="ash-jump__title">Operational metrics</h2>
+        <div className="ash-metrics__row">
+          <div className="ash-metric"><span className="ash-metric__v">{dur(metrics.avgPickMinutes)}</span><span className="ash-metric__l">Avg pick time</span></div>
+          <div className="ash-metric"><span className="ash-metric__v">{dur(metrics.avgPackMinutes)}</span><span className="ash-metric__l">Avg pack time</span></div>
+          <div className="ash-metric"><span className="ash-metric__v" data-tone={metrics.oldestWaitingHours != null && metrics.oldestWaitingHours >= 48 ? "warn" : "plain"}>{age(metrics.oldestWaitingHours)}</span><span className="ash-metric__l">Oldest waiting</span></div>
+          <div className="ash-metric"><span className="ash-metric__v">{metrics.ordersWaiting}</span><span className="ash-metric__l">Orders waiting</span></div>
+          <div className="ash-metric"><span className="ash-metric__v" data-tone={metrics.ordersOnHold ? "warn" : "plain"}>{metrics.ordersOnHold}</span><span className="ash-metric__l">On hold</span></div>
+          <div className="ash-metric"><span className="ash-metric__v" data-tone={metrics.refundQueue ? "warn" : "plain"}>{metrics.refundQueue}</span><span className="ash-metric__l">Refund queue</span></div>
+        </div>
+      </section>
 
       <section className="ash-jump">
         <h2 className="ash-jump__title">Modules</h2>
