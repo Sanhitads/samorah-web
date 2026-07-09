@@ -33,7 +33,7 @@ const NAV: NavGroup[] = [
     title: "Configuration",
     items: [
       { label: "Warehouses", icon: "⌂" },
-      { label: "Packaging", icon: "▧" },
+      { label: "Packaging", href: "/admin/packaging", icon: "▧" },
       { label: "Rules", href: "/admin/rules", icon: "≡" },
       { label: "Settings", href: "/admin/settings", icon: "⚙" },
     ],

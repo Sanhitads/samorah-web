@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { getDashboardStats, getOperationalMetrics } from "@/services/orderAdminService";
+import { getReorderList } from "@/services/packagingService";
 
 /**
  * Admin Dashboard — `/admin`. The landing module (SLP principle 21): headline
@@ -13,7 +14,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminDashboard() {
   const staff = await requireStaff("editor");
-  const [stats, metrics] = await Promise.all([getDashboardStats(), getOperationalMetrics()]);
+  const [stats, metrics, reorder] = await Promise.all([getDashboardStats(), getOperationalMetrics(), getReorderList()]);
   const dur = (m: number | null) => (m == null ? "—" : m < 60 ? `${m}m` : `${Math.round((m / 60) * 10) / 10}h`);
   const age = (h: number | null) => (h == null ? "—" : h < 24 ? `${h}h` : `${Math.round((h / 24) * 10) / 10}d`);
 
@@ -23,6 +24,7 @@ export default async function AdminDashboard() {
     { label: "On hold", value: stats.onHold, href: "/admin/fulfillment", tone: stats.onHold ? "warn" : undefined },
     { label: "In transit", value: stats.shippedActive, href: "/admin/orders" },
     { label: "Refunds pending", value: stats.refundsPending, href: "/admin/orders", tone: stats.refundsPending ? "warn" : undefined },
+    { label: "Packaging to reorder", value: reorder.length, href: "/admin/packaging", tone: reorder.length ? "warn" : undefined },
     { label: "Total orders", value: stats.totalOrders, href: "/admin/orders" },
   ];
 

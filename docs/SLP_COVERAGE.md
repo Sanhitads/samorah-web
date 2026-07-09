@@ -97,8 +97,13 @@ reasons (damaged/wrong_item/not_as_described/changed_mind/defective) ✅. Lost s
 modelled) ⬜, **RTO ↔ return linkage** 🟡, manufacturing-defect vs courier-damage
 routing ⬜.
 
-### L. Packaging Database — four separate things ✅
+### L. Packaging Database — four separate things ✅ (+ admin UI + live catalog)
 Packaging Assets ✅ · Packaging Profiles ✅ · Packaging Rules ✅ · Packaging Inventory ✅
+**Admin UI at `/admin/packaging`** (Assets/Profiles/Rules tabs, stock adjust, low-stock
+flags, dashboard reorder KPI). The engine now packs against the **DB catalog**
+(`getPackagingCatalog`), falling back to config only while unseeded — so entered
+measurements drive real parcel weights/dims/cost. FK-restrict blocks deleting an
+in-use asset. Seed measurements still ⬜ (DATA from Samorah).
 (all distinct entities). Inventory LEVELS are data ⬜.
 
 ### M. Shipping Workflow (18 steps) 🟡
@@ -212,7 +217,8 @@ Management** = cancellations + commercial/financial · **Shipping** = courier ·
 8. ~~**Returns Module**~~ ✅ **DONE** — `/admin/returns` + `returnService`: RMA lifecycle over the existing state machine, `return_items` (partial + restock flags), and the integrative ties — on settle it **restocks** inventory (`restock_return_items`, skipping damaged/defective) and issues a **refund** (via the ledger, once), writing every transition to the **audit** stream. Capability split: operate (warehouse) vs approve/refund (finance). Reverse-shipment scheduling + customer return emails plug into the shipment/notification engines next.
 9. ~~**Shipment Management**~~ ✅ **DONE** — `/admin/shipments` post-dispatch lifecycle (in-transit → OFD → delivered w/ POD → `delivery.completed` email; exception/NDR w/ reason + reattempt; RTO w/ order sync; cancel; label). Provider-agnostic courier **webhook** `/api/webhooks/shipping/[provider]` (shared secret) maps raw→unified status and drives the same lifecycle. Real courier adapter + reverse-pickup shipment for returns are the remaining deferrals.
 10. ~~**Settings/Business Rules** UI~~ ✅ **DONE** — `/admin/settings` (shipping singleton: provider/strategy/auto-assign/thresholds/fragile/volumetric/warehouse/working-days/holidays, with hard+soft guardrails + audit) & providers overview; `/admin/rules` (business-rule CRUD, typed-value coercion, active toggle, priority, **dry-run tester** against a sample order). Gated shipping.configure / rules.manage.
-11. **Packaging** UI · 12. **Warehouses** UI · 13. **Analytics** (builds on §9 metrics).
+11. ~~**Packaging** UI~~ ✅ **DONE** — `/admin/packaging` (Assets/Profiles/Rules CRUD + inventory: stock adjust, low-stock flags, dashboard reorder KPI); engine reads the DB catalog (config fallback until seeded); FK-restrict guard on in-use assets. Seed measurements still ⬜ (DATA).
+12. **Warehouses** UI · 13. **Analytics** (builds on §9 metrics).
 14. **Delivery + courier webhook** (10, 19) — POD + delivery notification (needs adapter).
 15. **Colour palette + simplified visible flow polish** (2, 23).
 

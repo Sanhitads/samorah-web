@@ -16,7 +16,7 @@ complete (§14).
 |---|---|---|
 | Inventory | stock, reservations, availability, oversell guard | [BUILT] reservations; [PLANNED] warehouse-level stock |
 | **Fulfillment** (umbrella — §13) | picking, packing, **packaging**, QC, dispatch handoff, warehouse workflow | [PARTIAL] |
-| ↳ Packaging (sub-engine) | assets, profiles, rules, weight/volumetric calc | [BUILT] structure |
+| ↳ Packaging (sub-engine) | assets, profiles, rules, weight/volumetric calc | [BUILT] structure + admin UI (/admin/packaging) + live DB catalog drives packing |
 | Shipping | provider interface, create/cancel/track/label/pickup/estimate, courier decision | [BUILT] Manual; [PLANNED] adapters + decision |
 | Tracking | provider status → unified timeline, POD, RTO, exceptions | [BUILT] timeline |
 | Notification | event → email/WhatsApp/SMS/push | [BUILT] email; [PLANNED] multi-channel + triggers |

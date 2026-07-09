@@ -23,6 +23,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { packOrder } from "@/lib/packaging/engine";
 import type { PackContext, PackedParcel } from "@/lib/packaging/types";
 import { EXAMPLE_PACKAGING_CATALOG } from "@/config/packaging";
+import { getPackagingCatalog } from "@/services/packagingService";
 import { computeLogisticsCost } from "@/lib/logistics/cost";
 import { getShippingSettings } from "@/lib/settings/shippingSettings";
 import { loadBusinessRules } from "@/services/logisticsService";
@@ -151,8 +152,10 @@ export async function createShipmentForOrder(orderId: string, opts?: { actorId?:
     }
   }
 
-  // §3/§6 packaging → parcel (weights/dims/packaging cost) from the current catalog.
-  const parcel = packOrder(buildPackContext(order), EXAMPLE_PACKAGING_CATALOG);
+  // §3/§6 packaging → parcel (weights/dims/packaging cost). Uses the ADMIN-managed
+  // catalog from the DB (falls back to the config example until it's seeded).
+  const catalog = await getPackagingCatalog();
+  const parcel = packOrder(buildPackContext(order), catalog);
   const req = buildShipmentRequest(order, parcel);
 
   // §12 business rules → actions (e.g. add_insurance, set_courier).
