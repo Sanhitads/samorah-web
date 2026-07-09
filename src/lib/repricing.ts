@@ -9,6 +9,7 @@ import { getProductBySlug } from "@/services/productService";
 import { getHourBySlug, airProductType } from "@/config/theHours";
 import { effectivePrice } from "@/lib/pricing";
 import { computeOrderTotals, type CommerceLine, type OrderTotals } from "@/lib/commerce";
+import { loadCouponRegistry } from "@/services/couponService";
 import { BUNDLE_SIZE } from "@/lib/bundle";
 import { COMMERCE } from "@/config/commerce";
 
@@ -153,6 +154,9 @@ export async function repriceCart(items: ClientCartLine[], state?: string, coupo
     }
   }
 
-  const totals = computeOrderTotals(lines, { state, couponCode });
+  // DB-driven coupon registry (active · in-window · under-limit). A code only
+  // discounts if it resolves here — never a hardcoded array.
+  const couponRegistry = couponCode ? await loadCouponRegistry() : undefined;
+  const totals = computeOrderTotals(lines, { state, couponCode, couponRegistry });
   return { valid: true, lines, details, totals };
 }

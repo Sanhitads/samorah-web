@@ -26,6 +26,7 @@ const NAV: NavGroup[] = [
     title: "Catalog",
     items: [
       { label: "Products", icon: "❧" },
+      { label: "Coupons", href: "/admin/coupons", icon: "%" },
       { label: "Inventory", icon: "▣" },
     ],
   },

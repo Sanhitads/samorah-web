@@ -17,6 +17,7 @@ import { COMMERCE } from "@/config/commerce";
 import { validateRazorpayPayment } from "@/lib/razorpayApi";
 import { signOrderToken } from "@/lib/orderToken";
 import { logEvent } from "@/services/auditService";
+import { incrementCouponUsage } from "@/services/couponService";
 import type { RepriceResult } from "@/lib/repricing";
 
 export interface OrderAddress {
@@ -323,6 +324,14 @@ export async function persistOrder(input: {
       }
     }
     await enqueueFulfillment(data.order_id);
+    // Count the coupon redemption once (first finalizer only) so usage limits hold.
+    try {
+      const db = createAdminClient();
+      const { data: o } = await db.from("orders").select("coupon_code").eq("id", data.order_id).maybeSingle();
+      await incrementCouponUsage((o as { coupon_code?: string | null } | null)?.coupon_code);
+    } catch (e) {
+      console.error("coupon usage increment failed", e);
+    }
     await logEvent({
       orderId: data.order_id,
       entityType: "order",

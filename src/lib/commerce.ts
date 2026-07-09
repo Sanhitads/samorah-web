@@ -22,7 +22,7 @@ import {
   estimateShipping,
 } from "@/config/commerce";
 import { toPaise, extractPaise } from "@/lib/money";
-import { computePromotions, type PromotionSnapshot, type PromoLine } from "@/lib/promotions";
+import { computePromotions, type PromotionSnapshot, type PromoLine, type Coupon } from "@/lib/promotions";
 
 const norm = (s: string) => s.trim().toLowerCase();
 
@@ -95,6 +95,7 @@ export interface ComputeOpts {
   state?: string;
   giftCard?: number; // paise
   couponCode?: string;
+  couponRegistry?: Coupon[]; // server injects DB-loaded active coupons; defaults to config
 }
 
 /** The full GST-compliant order totals (paise) for a set of lines. */
@@ -105,7 +106,7 @@ export function computeOrderTotals(lines: CommerceLine[], opts: ComputeOpts = {}
     qty: l.qty,
     compositionId: l.compositionId,
   }));
-  const promo = computePromotions(promoLines, opts.couponCode); // byLine in paise
+  const promo = computePromotions(promoLines, opts.couponCode, opts.couponRegistry); // byLine in paise
 
   // Per line: discount → net → GST extraction at the line's own rate (paise).
   const breakdown: LineBreakdown[] = lines.map((l) => {

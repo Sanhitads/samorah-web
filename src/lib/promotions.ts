@@ -69,6 +69,7 @@ export interface Coupon extends PromotionMeta {
   type: Exclude<PromotionKind, "composition">;
   value: number; // % for percentage, ₹ for fixed
   minSubtotal?: number; // rupees
+  maxDiscount?: number; // rupees — cap for percentage coupons (0/undefined = no cap)
   active: boolean;
 }
 export const COUPONS: Coupon[] = [
@@ -111,8 +112,9 @@ interface Candidate {
   apply: (byLine: Record<string, number>) => { amount: number; freeShipping?: boolean };
 }
 
-/** Compute all promotions deterministically with stacking rules. */
-export function computePromotions(lines: PromoLine[], couponCode?: string): PromotionResult {
+/** Compute all promotions deterministically with stacking rules. `coupons` is the
+ *  active registry — the server injects the DB-loaded set; defaults to config. */
+export function computePromotions(lines: PromoLine[], couponCode?: string, coupons: Coupon[] = COUPONS): PromotionResult {
   const candidates: Candidate[] = [];
 
   // Composition candidate — 15% per complete set, per line.
@@ -142,7 +144,7 @@ export function computePromotions(lines: PromoLine[], couponCode?: string): Prom
   }
 
   // Optional coupon candidate.
-  const coupon = couponCode ? COUPONS.find((c) => c.active && c.code === couponCode.toUpperCase()) : undefined;
+  const coupon = couponCode ? coupons.find((c) => c.active && c.code === couponCode.toUpperCase()) : undefined;
   if (coupon) {
     const subtotal = lines.reduce((s, l) => s + linePaise(l), 0);
     const eligible = !coupon.minSubtotal || subtotal >= toPaise(coupon.minSubtotal);
@@ -154,7 +156,9 @@ export function computePromotions(lines: PromoLine[], couponCode?: string): Prom
           if (coupon.type === "free_shipping") return { amount: 0, freeShipping: true };
           const already = Object.values(byLine).reduce((s, v) => s + v, 0);
           const base = subtotal - already;
-          const amt = coupon.type === "percentage" ? Math.round((base * coupon.value) / 100) : Math.min(toPaise(coupon.value), base);
+          let amt = coupon.type === "percentage" ? Math.round((base * coupon.value) / 100) : Math.min(toPaise(coupon.value), base);
+          // Percentage cap (e.g. "20% up to ₹500").
+          if (coupon.type === "percentage" && coupon.maxDiscount) amt = Math.min(amt, toPaise(coupon.maxDiscount));
           if (amt > 0) allocatePro(amt, lines, byLine);
           return { amount: amt };
         },
