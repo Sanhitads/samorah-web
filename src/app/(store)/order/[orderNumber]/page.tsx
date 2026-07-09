@@ -1,3 +1,4 @@
+import { TrackEvent } from "@/components/analytics/TrackEvent";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getOrderByNumber } from "@/services/orderService";
@@ -122,6 +123,7 @@ export default async function OrderConfirmationPage({
 
   return (
     <main className="order-page">
+      <TrackEvent event="purchase" params={{ transaction_id: order.order_number, value: Number(order.total_amount), currency: "INR", coupon: order.coupon_code ?? undefined }} />
       <div className="order-conf">
         <header className="order-conf__head">
           <p className="order-conf__eyebrow">Order Confirmed</p>

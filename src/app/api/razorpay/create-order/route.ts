@@ -1,3 +1,4 @@
+import { rateLimit, tooManyRequests } from "@/lib/rateLimit";
 import { NextResponse } from "next/server";
 import crypto from "node:crypto";
 import { RAZORPAY, COMMERCE } from "@/config/commerce";
@@ -50,6 +51,10 @@ interface Body {
 }
 
 export async function POST(request: Request) {
+  // Rate limit — starting a payment is expensive (reprice + reserve + Razorpay).
+  const rl = rateLimit(request, { bucket: "create-order", limit: 12, windowMs: 60_000 });
+  if (!rl.ok) return tooManyRequests(rl.retryAfterSec);
+
   if (!RAZORPAY.configured) {
     return NextResponse.json({ error: "Payments are not configured yet." }, { status: 503 });
   }

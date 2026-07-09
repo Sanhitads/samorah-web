@@ -5,6 +5,8 @@ import { getProductBySlug, getProducts, getRelatedProducts } from "@/services/pr
 import { buildProductPage, type ProductInput } from "@/lib/productPage";
 import { buildCandleEditorial, type RelatedProductInput } from "@/lib/productEditorial";
 import { chapterTheme } from "@/lib/chapterPage";
+import { productLd } from "@/lib/seo/productLd";
+import { TrackEvent } from "@/components/analytics/TrackEvent";
 import { getEditionMap } from "@/services/collectionService";
 import { getArtist } from "@/config/artist";
 import { ProductPurchasePanel } from "@/components/product/ProductPurchasePanel";
@@ -103,9 +105,12 @@ export default async function ProductRoute({
   )) as unknown as RelatedProductInput[];
   const editorial = buildCandleEditorial({ view: p, artist: getArtist(null), related });
   const palette = chapterTheme(p.chapterSlug);
+  const ld = productLd({ name: p.name, slug: p.slug, description: p.tagline, gallery: p.gallery, priceLabel: p.priceLabel, variants: p.variants });
 
   return (
     <main className="pdp" data-theme="warm-ivory">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld) }} />
+      <TrackEvent event="view_item" params={{ item_id: p.slug, item_name: p.name, price: p.variants[0]?.price }} />
       <div className="pdp__head">
         <nav className="pdp__breadcrumb" aria-label="Breadcrumb">
           {p.breadcrumb.map((c, i) => (

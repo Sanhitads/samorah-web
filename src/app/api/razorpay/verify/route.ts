@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { RAZORPAY } from "@/config/commerce";
 import { verifyPaymentSignature } from "@/lib/razorpaySignature";
 import { persistOrder } from "@/services/orderService";
+import { rateLimit, tooManyRequests } from "@/lib/rateLimit";
 
 /**
  * POST /api/razorpay/verify — the fast client path. The Checkout success handler
@@ -19,6 +20,9 @@ interface Body {
 }
 
 export async function POST(request: Request) {
+  const rl = rateLimit(request, { bucket: "verify", limit: 20, windowMs: 60_000 });
+  if (!rl.ok) return tooManyRequests(rl.retryAfterSec);
+
   if (!RAZORPAY.configured) {
     return NextResponse.json({ error: "Payments are not configured yet." }, { status: 503 });
   }

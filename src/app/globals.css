@@ -4910,3 +4910,19 @@ video.asset-image {
 /* Component-specific styles live alongside their components, in the dedicated
    src/styles/ layer (imported by the root layout) — not appended here. This
    file holds global tokens, base/reset, typography and shared chrome. */
+
+/* ── System pages (404 / error) ── */
+.sys-page {
+  min-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  text-align: center;
+  padding: clamp(48px, 10vh, 120px) 24px;
+}
+.sys-page__eyebrow { font-family: var(--font-sans, sans-serif); font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold, #c9a96e); margin: 0; }
+.sys-page__title { font-family: var(--font-serif, Georgia, serif); font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 400; margin: 0; color: var(--ink, #1f1a16); }
+.sys-page__body { font-family: var(--font-sans, sans-serif); font-size: 15px; color: var(--smoke, #6b6259); max-width: 460px; line-height: 1.7; margin: 0; }
+.sys-page__actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 10px; }

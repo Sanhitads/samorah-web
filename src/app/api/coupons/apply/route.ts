@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { validateCoupon } from "@/services/couponService";
+import { rateLimit, tooManyRequests } from "@/lib/rateLimit";
 
 /**
  * POST /api/coupons/apply { code, subtotalPaise } — validate a coupon against the
@@ -10,6 +11,10 @@ import { validateCoupon } from "@/services/couponService";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  // Rate limit — prevents coupon-code brute-forcing / enumeration.
+  const rl = rateLimit(request, { bucket: "coupon-apply", limit: 20, windowMs: 60_000 });
+  if (!rl.ok) return tooManyRequests(rl.retryAfterSec);
+
   let body: { code?: string; subtotalPaise?: number };
   try {
     body = (await request.json()) as typeof body;
