@@ -135,3 +135,49 @@
 .om-check { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 10px; font-family: var(--font-sans); font-size: 12px; color: var(--ink, #1f1a16); line-height: 1.4; }
 .om-check input { margin-top: 2px; }
 .om-modal__actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+
+/* ── Fulfillment Board context (principles 11–17) ── */
+.admin__table--board { min-width: 1080px; }
+.admin__table--board tbody td { vertical-align: top; }
+.bc-order { display: flex; gap: 8px; align-items: baseline; }
+.bc-note { font-family: var(--font-sans); font-size: 11px; color: var(--smoke, #6b6259); margin-top: 4px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Priority */
+.bc-pop { position: relative; display: inline-block; }
+.bc-prio { display: inline-block; padding: 3px 9px; border-radius: 999px; font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; border: 1px solid transparent; cursor: pointer; }
+.bc-prio[data-p="normal"] { background: rgba(107, 98, 89, 0.12); color: #6b6259; }
+.bc-prio[data-p="high"]   { background: rgba(201, 169, 110, 0.22); color: #8a6d3b; }
+.bc-prio[data-p="urgent"] { background: rgba(168, 68, 58, 0.14); color: #8a3d2f; }
+.bc-prio[data-p="vip"]    { background: #1f1a16; color: #f0d9a8; }
+.bc-prio:disabled { cursor: default; opacity: 0.6; }
+
+.bc-menu { position: absolute; top: calc(100% + 4px); left: 0; z-index: 40; background: #fff; border: 1px solid var(--ad-hair); border-radius: 5px; box-shadow: 0 12px 30px rgba(31,26,22,0.16); padding: 4px; min-width: 130px; }
+.bc-menu--tags { min-width: 150px; }
+.bc-menu__item { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; padding: 6px 8px; background: none; border: none; cursor: pointer; font-family: var(--font-sans); font-size: 12px; border-radius: 3px; }
+.bc-menu__item:hover { background: var(--soft-beige, #efe9e0); }
+.bc-check { display: inline-block; width: 12px; color: #2f6b3c; }
+
+/* Tags */
+.bc-tags { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-top: 6px; position: relative; }
+.bc-tag { display: inline-block; padding: 2px 7px; border-radius: 3px; font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.03em; background: rgba(201, 169, 110, 0.16); color: #8a6d3b; }
+.bc-tag[data-derived="1"] { background: rgba(31, 26, 22, 0.06); color: #6b6259; }
+.bc-tag-add { padding: 1px 5px; border: 1px dashed var(--ad-hair); background: none; border-radius: 3px; cursor: pointer; color: var(--smoke, #6b6259); font-size: 11px; line-height: 1.4; }
+.bc-tag-add:disabled { opacity: 0.5; cursor: default; }
+
+/* SLA + inventory */
+.bc-sla { display: inline-block; padding: 2px 8px; border-radius: 999px; font-family: var(--font-sans); font-size: 11px; }
+.bc-sla[data-tone="ok"]   { background: rgba(60, 120, 70, 0.12); color: #2f6b3c; }
+.bc-sla[data-tone="warn"] { background: rgba(201, 169, 110, 0.22); color: #8a6d3b; }
+.bc-sla[data-tone="over"] { background: rgba(168, 68, 58, 0.14); color: #8a3d2f; }
+.bc-inv { font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.04em; margin-top: 4px; }
+.bc-inv[data-inv="allocated"] { color: #2f6b3c; }
+.bc-inv[data-inv="missing"] { color: #8a3d2f; font-weight: 600; }
+.bc-inv[data-inv="unknown"] { color: var(--smoke, #6b6259); }
+
+/* Owner / assignee */
+.bc-owner { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-sans); font-size: 12px; }
+.bc-owner__name { max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bc-owner__clear { background: none; border: none; cursor: pointer; color: var(--smoke, #6b6259); font-size: 14px; line-height: 1; padding: 0 2px; }
+.bc-assign { padding: 4px 9px; font-family: var(--font-sans); font-size: 11px; background: none; border: 1px solid var(--ad-hair); border-radius: 3px; cursor: pointer; color: var(--ink, #1f1a16); white-space: nowrap; }
+.bc-assign:hover:not(:disabled) { background: var(--soft-beige, #efe9e0); }
+.bc-assign:disabled { opacity: 0.5; cursor: default; }

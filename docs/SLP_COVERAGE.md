@@ -179,13 +179,13 @@ Management** = cancellations + commercial/financial · **Shipping** = courier ·
 | 8 | Refund workflow (Razorpay refund, async failures, cancel≠refund) | ✅ `refunds` ledger + `begin_refund`/`settle_refund` (DB over-refund guard, async status initiated→processing→processed/failed); Razorpay REST + manual fallback; cancel and refund are separate actions/events |
 | 9 | Dedicated cancellation email (order#, reason, refund amount/status/timeline, support) | ✅ `buildCancellationEmail` — order#, reason, conditional refund block (amount + gateway/manual timeline), support line; unit-tested |
 | 10 | Shipment workflow provider-independent; manual dispatches immediately; couriers via webhook | ✅ Manual; courier webhook ⬜ |
-| 11 | Row context columns (Priority/Item Count/Tags/Assigned To/SLA/Payment Badge/Next Action) | 🟡 Order/Customer/Stage/Shipment/Next ✅; Priority/Items/Tags/Assignee/SLA/Payment ⬜ |
-| 12 | Priority (Normal/High/Urgent/VIP) | ⬜ |
-| 13 | Tags (Gift/Fragile/COD/Express/Replacement/Wholesale) | ⬜ |
-| 14 | SLA indicators (order age + colour) | ⬜ (placed_at ready) |
-| 15 | Customer notes inline (Gift Wrap/Leave at Reception/Call Before) | 🟡 internal_notes stored; not shown on board |
-| 16 | Payment badge (Paid/COD/Refund Pending/Refunded) | ⬜ (payment_status ready) |
-| 17 | Inventory status (Reserved/Allocated/Missing Stock) | ⬜ (reservations exist) |
+| 11 | Row context columns (Priority/Item Count/Tags/Assigned To/SLA/Payment Badge/Next Action) | ✅ board rows now carry Priority · Order+ItemCount · Tags · Customer · Fulfillment+Inventory · Payment · Age · Owner · Actions(Next) |
+| 12 | Priority (Normal/High/Urgent/VIP) | ✅ `orders.priority` (checked enum) editable via `PriorityControl`; board sorts VIP→Urgent→High→Normal then newest |
+| 13 | Tags (Gift/Fragile/COD/Express/Replacement/Wholesale) | ✅ Gift/COD derived from is_gift/is_cod; Fragile/Express/Replacement/Wholesale editable via `TagsControl` → `ops_tags` |
+| 14 | SLA indicators (order age + colour) | ✅ age from `placed_at`, colour ok(<24h)/warn(≥24h)/over(≥48h) |
+| 15 | Customer notes inline (Gift Wrap/Leave at Reception/Call Before) | ✅ gift note + occasion + warehouse `ops_note` shown inline (📝); checkout-captured delivery instructions are a future storefront enhancement |
+| 16 | Payment badge (Paid/COD/Refund Pending/Refunded) | ✅ badge from payment_status + is_cod (Paid/COD/Part. Refund/Refunded/Failed) + refund amount |
+| 17 | Inventory status (Reserved/Allocated/Missing Stock) | ✅ paid = Allocated; negative variant stock = Missing Stock (flagged); Reserved shows pre-payment (off this board) |
 | 18 | Immutable analytics event log (Picking Started…Refund Completed) | ✅ `audit_events` (append-only, RLS, service-role only) captures order/fulfillment/shipment events; cancellation/refund events land when Order Mgmt ships |
 | 19 | Customer notifications (Confirmation/Dispatch/Delivery/Cancellation/Refund) | 🟡 Confirmation+Dispatch+Cancellation ✅; standalone Refund email + Delivery ⬜ |
 | 20 | Role-based permissions (Warehouse/CS/Finance/Admin) | 🟡 RBAC roles + board gate (editor+); per-action role split ⬜ |
@@ -196,7 +196,7 @@ Management** = cancellations + commercial/financial · **Shipping** = courier ·
 ### Build queue implied by v2 (priority order)
 1. ~~**Audit-event log** (d, 18, 22)~~ ✅ **DONE** — `audit_events` table + `record_audit_event` RPC + `auditService.logEvent`/`getOrderTimeline`; wired into order confirm, fulfillment advance/hold/resume, shipment create/dispatch, with staff actor attribution. Non-blocking (never breaks the business action). Cancellation/refund events attach when Order Mgmt ships.
 2. ~~**Order Management module** (7, 8, 9)~~ ✅ **DONE** — `/admin/orders` (manager+; editors view-only) with confirm-dialog cancellation (reason, optional restock), a `refunds` ledger with a DB over-refund guard + async status, Razorpay-REST refunds with a manual fallback, and a dedicated cancellation email. Cancel ≠ refund (separate actions, separate audit events). Standalone refund email deferred to the notifications pass.
-3. **Board context columns** (11–17) — priority, tags, SLA age+colour, payment badge, notes, item count, inventory status.
+3. ~~**Board context columns** (11–17)~~ ✅ **DONE** — every board row now carries priority (editable, drives sort), item count, tags (Gift/COD derived + editable ops tags), assignee (assign-to-me), SLA age+colour, payment badge, gift/warehouse notes, and inventory status (Allocated/Missing). New `orders.priority/assigned_to/ops_tags/ops_note`; all edits audit-logged via the event stream.
 4. **Admin shell + nav** (21) — real /admin area; then Orders, Shipments, Returns, Settings/Rules/Warehouses/Packaging/Providers screens.
 5. **Fine-grained roles** (20) — warehouse vs CS vs finance action gating.
 6. **Delivery + courier webhook** (10, 19) — POD, delivery notification (needs adapter).
