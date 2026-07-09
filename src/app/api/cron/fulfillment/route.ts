@@ -3,6 +3,7 @@ import { cronAuthorized } from "@/lib/cronAuth";
 import { claimFulfillmentJobs, completeFulfillmentJob, getOrderById } from "@/services/orderService";
 import { emailConfigured, sendEmail, buildOrderConfirmationEmail, buildDispatchNotificationEmail, type EmailOrder } from "@/lib/email";
 import { createShipmentForOrder, getDispatchInfo } from "@/services/shipmentService";
+import { getShippingSettings } from "@/lib/settings/shippingSettings";
 
 /**
  * POST /api/cron/fulfillment — drains the fulfillment_jobs queue. Processes:
@@ -31,12 +32,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
-  const result = { emailConfigured: emailConfigured(), emailsSent: 0, emailsFailed: 0, shipmentsCreated: 0, shipmentsFailed: 0, dispatchEmailsSent: 0 };
+  const result = { emailConfigured: emailConfigured(), autoAssign: false, emailsSent: 0, emailsFailed: 0, shipmentsCreated: 0, shipmentsSkipped: 0, shipmentsFailed: 0, dispatchEmailsSent: 0 };
 
   try {
-    // ── Shipping jobs — always processed (Manual provider needs no creds) ──
+    // ── Shipping jobs ──
+    // Manual mode (auto_assign = false): the shipment is created by staff via the
+    // Fulfillment Dashboard at "Ready for Dispatch", so the worker SKIPS these jobs.
+    // Auto mode (auto_assign = true): create the shipment on payment (hands-off).
+    const settings = await getShippingSettings();
+    result.autoAssign = settings.autoAssign;
     const shipJobs = await claimFulfillmentJobs("shipping", 20);
     for (const j of shipJobs) {
+      if (!settings.autoAssign) {
+        await safeComplete(j.id, "done", "manual mode: shipment created via dashboard");
+        result.shipmentsSkipped++;
+        continue;
+      }
       try {
         const res = await createShipmentForOrder(j.orderId);
         if (res.ok) {

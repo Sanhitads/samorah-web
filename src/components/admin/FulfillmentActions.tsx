@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { FulfillmentStatus } from "@/lib/fulfillment/state";
 
@@ -16,6 +16,7 @@ const ACTION_LABEL: Record<string, string> = {
   cancelled: "Cancel",
 };
 const SHIPMENT_DRIVEN = new Set<FulfillmentStatus>(["courier_assigned", "picked_up", "shipped"]);
+const DISPATCHED = new Set(["picked_up", "in_transit", "out_for_delivery", "delivered", "shipped"]);
 
 export function FulfillmentActions({
   orderNumber,
@@ -29,8 +30,10 @@ export function FulfillmentActions({
   shipmentStatus: string | null;
 }) {
   const router = useRouter();
+  const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState("");
+  const disabled = busy !== null || pending;
 
   const post = async (url: string, body: Record<string, unknown>, key: string) => {
     setBusy(key);
@@ -43,7 +46,7 @@ export function FulfillmentActions({
         setBusy(null);
         return;
       }
-      router.refresh();
+      startTransition(() => router.refresh()); // keeps row disabled until the new state renders
     } catch {
       setErr("Network error");
     }
@@ -55,24 +58,27 @@ export function FulfillmentActions({
   const dispatch = () => post("/api/admin/fulfillment/dispatch", { orderNumber }, "dispatch");
 
   const manualNext = nextStates.filter((s) => !SHIPMENT_DRIVEN.has(s));
+  const canCreateShipment = fulfillmentStatus === "ready_for_dispatch" && !shipmentStatus;
 
   return (
     <div className="ff-actions">
       {manualNext.map((s) => (
-        <button key={s} type="button" disabled={busy !== null} onClick={() => advance(s)} className={`ff-btn${s === "cancelled" ? " ff-btn--danger" : ""}`}>
+        <button key={s} type="button" disabled={disabled} onClick={() => advance(s)} className={`ff-btn${s === "cancelled" ? " ff-btn--danger" : ""}`}>
           {busy === s ? "…" : ACTION_LABEL[s] ?? s}
         </button>
       ))}
-      {fulfillmentStatus === "ready_for_dispatch" && !shipmentStatus ? (
-        <button type="button" disabled={busy !== null} onClick={createShipment} className="ff-btn ff-btn--primary">
+      {canCreateShipment ? (
+        <button type="button" disabled={disabled} onClick={createShipment} className="ff-btn ff-btn--primary">
           {busy === "ship" ? "…" : "Create Shipment"}
         </button>
       ) : null}
       {shipmentStatus === "courier_assigned" ? (
-        <button type="button" disabled={busy !== null} onClick={dispatch} className="ff-btn ff-btn--primary">
+        <button type="button" disabled={disabled} onClick={dispatch} className="ff-btn ff-btn--primary">
           {busy === "dispatch" ? "…" : "Dispatch"}
         </button>
       ) : null}
+      {shipmentStatus && DISPATCHED.has(shipmentStatus) ? <span className="ff-done">✓ Dispatched</span> : null}
+      {pending ? <span className="ff-refreshing">updating…</span> : null}
       {err ? <span className="ff-err">{err}</span> : null}
     </div>
   );

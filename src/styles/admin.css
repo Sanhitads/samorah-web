@@ -65,3 +65,5 @@
 .ff-btn--primary:hover:not(:disabled) { background: #1f1a16; }
 .ff-btn--danger { color: #8a3d2f; border-color: rgba(138, 61, 47, 0.4); }
 .ff-err { font-family: var(--font-sans); font-size: 11px; color: #8a3d2f; }
+.ff-done { font-family: var(--font-sans); font-size: 11px; color: #2f6b3c; letter-spacing: 0.04em; }
+.ff-refreshing { font-family: var(--font-sans); font-size: 10px; color: var(--smoke, #6b6259); font-style: italic; }
