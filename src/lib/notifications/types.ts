@@ -8,15 +8,21 @@
 export type NotificationEvent =
   | "order.confirmed"
   | "order.dispatched"
-  | "order.cancelled";
-// Future events (refund.processed, delivery.completed, return.*) add here + a
-// template in each channel — no new bespoke send path.
+  | "order.cancelled"
+  | "return.requested"
+  | "return.approved"
+  | "return.rejected"
+  | "return.refunded";
+// Future events (refund.processed, delivery.completed) add here + a template in
+// each channel — no new bespoke send path.
 
 export type ChannelKey = "email" | "whatsapp" | "sms" | "push";
 
-/** Minimal context — a channel fetches whatever its template needs from the order. */
+/** Minimal context — a channel fetches whatever its template needs. `returnId` is
+ *  present for return.* events; it also disambiguates the dispatch-log dedup key. */
 export interface NotificationContext {
   orderId: string;
+  returnId?: string;
 }
 
 export interface ChannelDispatchResult {

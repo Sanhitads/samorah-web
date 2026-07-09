@@ -9,4 +9,8 @@ export const EVENT_CHANNELS: Record<NotificationEvent, ChannelKey[]> = {
   "order.confirmed": ["email"],
   "order.dispatched": ["email"],
   "order.cancelled": ["email"],
+  "return.requested": ["email"],
+  "return.approved": ["email"],
+  "return.rejected": ["email"],
+  "return.refunded": ["email"],
 };

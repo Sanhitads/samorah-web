@@ -10,6 +10,7 @@ import type { NotificationEvent, ChannelKey } from "@/lib/notifications/types";
 
 export interface RecordNotificationInput {
   orderId?: string;
+  entityRef?: string; // e.g. return id — disambiguates the dedup key
   event: NotificationEvent;
   channel: ChannelKey;
   recipient: string;
@@ -22,6 +23,7 @@ export async function recordNotification(input: RecordNotificationInput): Promis
   await callRpc<{ ok: boolean }>("record_notification", {
     p: {
       order_id: input.orderId ?? null,
+      entity_ref: input.entityRef ?? "",
       event: input.event,
       channel: input.channel,
       recipient: input.recipient,

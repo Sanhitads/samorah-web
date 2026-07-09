@@ -89,7 +89,7 @@ Two related streams. **Audit events** record *what happened* (immutable history)
 | `order.cancelled` | cancellationService | ✅ | ✅ cancellation |
 | `refund.initiated/processed/failed` | refundService | ✅ | ⬜ (refund email — via engine) |
 | `delivery.completed` *(planned)* | courier webhook | ✅ | ✅ delivery |
-| `return.requested/approved/received/closed` *(planned)* | returnService | ✅ | ✅ return updates |
+| `return.requested/approved/rejected/refunded` | returnService | ✅ | ✅ via engine |
 | `fulfillment.*` (picking…shipped, on_hold, resumed, priority_set, assigned, tagged) | fulfillmentService | ✅ | ⬜ internal |
 
 **Rule:** business services emit events; they never call an email builder directly. The

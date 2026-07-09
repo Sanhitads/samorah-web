@@ -12,9 +12,24 @@ import { getOrderByNumber } from "@/services/orderService";
 import { issueRefund } from "@/services/refundService";
 import { logEvent } from "@/services/auditService";
 import { assertReturnTransition, isTerminalReturn, nextReturnStates, type ReturnStatus, type ReturnReason } from "@/lib/returns/state";
+import type { NotificationEvent } from "@/lib/notifications/types";
 
 function loose() {
   return createAdminClient() as unknown as { from: (t: string) => any };
+}
+
+/**
+ * Fire a return notification through the engine. Lazy import breaks the module
+ * cycle (returnService → engine → email channel → returnService) and keeps
+ * notification failures from ever breaking the return transition.
+ */
+async function emitReturnEvent(event: NotificationEvent, orderId: string, returnId: string): Promise<void> {
+  try {
+    const { notify } = await import("@/lib/notifications/engine");
+    await notify(event, { orderId, returnId });
+  } catch (e) {
+    console.error("return notify failed", e);
+  }
 }
 
 // Reasons where the item should NOT go back to sellable stock by default.
@@ -112,6 +127,7 @@ export async function createReturn(input: CreateReturnInput): Promise<{ ok: bool
     metadata: { rma, returnType: input.returnType ?? "refund", refundAmount, items: items.length },
   });
 
+  await emitReturnEvent("return.requested", o.id, returnId);
   return { ok: true, returnId, rma };
 }
 
@@ -176,6 +192,15 @@ export async function advanceReturn(
     metadata: to === "refund" ? { restocked, refundId } : undefined,
   });
 
+  // Notify the customer on the meaningful transitions (fan-out via the engine).
+  const NOTIFY: Partial<Record<ReturnStatus, NotificationEvent>> = {
+    approved: "return.approved",
+    rejected: "return.rejected",
+    refund: "return.refunded",
+  };
+  const ev = NOTIFY[to];
+  if (ev) await emitReturnEvent(ev, ret.order_id, returnId);
+
   return { ok: true, from, to };
 }
 
@@ -190,6 +215,37 @@ export interface ReturnRow {
   itemCount: number;
   nextStates: ReturnStatus[];
   createdAt: string;
+}
+
+export interface ReturnEmailContext {
+  order_number: string;
+  rma: string;
+  ship_full_name: string | null;
+  email: string;
+  reason: string | null;
+  return_type: string | null;
+  refund_amount: number | null;
+}
+
+/** Assemble the email context for a return (joins the order for name + email). */
+export async function getReturnInfo(returnId: string): Promise<ReturnEmailContext | null> {
+  const db = loose();
+  const { data } = await db
+    .from("returns")
+    .select("rma_number,order_number,reason,return_type,refund_amount,orders(email,ship_full_name)")
+    .eq("id", returnId)
+    .maybeSingle();
+  if (!data) return null;
+  const o = Array.isArray(data.orders) ? data.orders[0] : data.orders;
+  return {
+    order_number: data.order_number,
+    rma: data.rma_number,
+    ship_full_name: o?.ship_full_name ?? null,
+    email: o?.email ?? "",
+    reason: data.reason ?? null,
+    return_type: data.return_type ?? null,
+    refund_amount: data.refund_amount != null ? Number(data.refund_amount) : null,
+  };
 }
 
 /** Open + recent returns for the admin module. */

@@ -41,6 +41,7 @@ export async function notify(
     try {
       await recordNotification({
         orderId: ctx.orderId,
+        entityRef: ctx.returnId,
         event,
         channel: key,
         recipient: res.recipient ?? "",
