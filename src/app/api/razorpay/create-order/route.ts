@@ -43,6 +43,8 @@ interface Body {
   email?: string;
   couponCode?: string;
   address?: OrderAddress;
+  billing?: OrderAddress; // separate billing address (optional)
+  business?: { companyName?: string; gstin?: string }; // B2B GST invoice (optional)
   notes?: string;
   utm?: Utm;
 }
@@ -150,6 +152,8 @@ export async function POST(request: Request) {
     cartHash,
     reservationSession, // links the holds made above to this order
     utm: body.utm,
+    business: body.business,
+    billing: body.billing,
   });
   if (!payload) {
     return NextResponse.json({ error: "Your bag could not be validated." }, { status: 422 });

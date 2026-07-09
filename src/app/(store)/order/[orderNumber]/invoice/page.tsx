@@ -81,6 +81,13 @@ export default async function InvoicePage({
   }
 
   const items = (order.order_items ?? []) as unknown as Item[];
+  // Invoice-completeness snapshot columns aren't in the generated types yet.
+  const inv = order as typeof order & {
+    buyer_gstin?: string | null; buyer_company?: string | null;
+    bill_full_name?: string | null; bill_line1?: string | null; bill_line2?: string | null;
+    bill_city?: string | null; bill_state?: string | null; bill_pincode?: string | null;
+    promotions?: { label?: string; code?: string; amount?: number }[] | null;
+  };
   const interState = num(order.igst_amount) > 0;
   const cols = interState ? 8 : 9;
   const addr = COMMERCE.registeredAddress;
@@ -149,12 +156,35 @@ export default async function InvoicePage({
             <p className="inv__gstin">{COMMERCE.gstin}</p>
           </div>
           <div className="inv__party">
-            <p className="inv__party-title">Delivered To</p>
-            <p className="inv__party-name">{order.ship_full_name}</p>
-            <p>{order.ship_line1}{order.ship_line2 ? `, ${order.ship_line2}` : ""}</p>
-            <p>{order.ship_city}, {order.ship_state} {order.ship_pincode}</p>
-            {order.ship_phone ? <p>Mobile: {order.ship_phone}</p> : null}
-            <p className="inv__party-sub">Place of supply: {order.ship_state}</p>
+            {(() => {
+              const hasBilling = Boolean(inv.bill_line1);
+              const billName = inv.bill_full_name || order.ship_full_name;
+              const billLine1 = hasBilling ? inv.bill_line1 : order.ship_line1;
+              const billLine2 = hasBilling ? inv.bill_line2 : order.ship_line2;
+              const billCity = hasBilling ? inv.bill_city : order.ship_city;
+              const billState = hasBilling ? inv.bill_state : order.ship_state;
+              const billPin = hasBilling ? inv.bill_pincode : order.ship_pincode;
+              return (
+                <>
+                  <p className="inv__party-title">{hasBilling ? "Billed To" : "Billed & Delivered To"}</p>
+                  {inv.buyer_company ? <p className="inv__party-name">{inv.buyer_company}</p> : null}
+                  <p className="inv__party-name">{billName}</p>
+                  <p>{billLine1}{billLine2 ? `, ${billLine2}` : ""}</p>
+                  <p>{billCity}, {billState} {billPin}</p>
+                  {inv.buyer_gstin ? (
+                    <>
+                      <p className="inv__gstin-label">Buyer GSTIN</p>
+                      <p className="inv__gstin">{inv.buyer_gstin}</p>
+                    </>
+                  ) : null}
+                  {hasBilling ? (
+                    <p className="inv__party-sub">Ship to: {order.ship_full_name}, {order.ship_city}, {order.ship_state} {order.ship_pincode}</p>
+                  ) : null}
+                  {order.ship_phone ? <p>Mobile: {order.ship_phone}</p> : null}
+                  <p className="inv__party-sub">Place of supply: {order.ship_state}</p>
+                </>
+              );
+            })()}
           </div>
         </section>
 
@@ -230,9 +260,20 @@ export default async function InvoicePage({
           {num(order.shipping_amount) > 0 ? (
             <div className="inv__t-row"><span>Shipping</span><span>{inr(order.shipping_amount)}</span></div>
           ) : null}
-          {num(order.discount_amount) > 0 ? (
-            <div className="inv__t-row inv__t-row--discount"><span>Discovery Composition Savings (15%)</span><span>−{inr(order.discount_amount)}</span></div>
-          ) : null}
+          {(() => {
+            // Per-promotion lines from the persisted snapshot (amounts in paise);
+            // fall back to a single discount line for legacy orders without it.
+            const promos = (Array.isArray(inv.promotions) ? inv.promotions : []) as { label?: string; code?: string; amount?: number }[];
+            const priced = promos.filter((p) => (p.amount ?? 0) > 0);
+            if (priced.length) {
+              return priced.map((p, i) => (
+                <div key={p.code ?? i} className="inv__t-row inv__t-row--discount"><span>{p.label ?? p.code ?? "Discount"}</span><span>−{inr((p.amount as number) / 100)}</span></div>
+              ));
+            }
+            return num(order.discount_amount) > 0 ? (
+              <div className="inv__t-row inv__t-row--discount"><span>Discount</span><span>−{inr(order.discount_amount)}</span></div>
+            ) : null;
+          })()}
           <div className="inv__t-row inv__t-row--grand"><span>Grand Total</span><span>{inr(order.total_amount)}</span></div>
         </div>
 

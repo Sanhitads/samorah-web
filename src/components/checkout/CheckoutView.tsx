@@ -148,10 +148,15 @@ export function CheckoutView() {
         state: ship.state,
         pincode: ship.pincode,
       };
+      // Optional separate billing address + B2B GST invoice — validated above.
+      const billing = billSame
+        ? undefined
+        : { fullName: bill.fullName, phone: bill.phone, line1: bill.line1, line2: bill.line2, city: bill.city, state: bill.state, pincode: bill.pincode };
+      const business = wantGst && biz.gstin ? { companyName: biz.companyName, gstin: biz.gstin } : undefined;
       const res = await fetch("/api/razorpay/create-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: payload, email: ship.email, address, notes: notes || undefined, couponCode: couponCode || undefined, utm: readStoredUtm() }),
+        body: JSON.stringify({ items: payload, email: ship.email, address, billing, business, notes: notes || undefined, couponCode: couponCode || undefined, utm: readStoredUtm() }),
       });
       const data = await res.json();
       if (!res.ok) {

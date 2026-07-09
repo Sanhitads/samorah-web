@@ -93,6 +93,8 @@ export function buildPendingPayload(
     cartHash?: string;
     reservationSession?: string;
     utm?: UtmParams;
+    business?: { companyName?: string; gstin?: string };
+    billing?: OrderAddress;
   },
 ): Record<string, unknown> | null {
   const t = reprice.totals;
@@ -155,6 +157,19 @@ export function buildPendingPayload(
     ship_city: ctx.address.city,
     ship_state: ctx.address.state,
     ship_pincode: ctx.address.pincode,
+    // B2B tax invoice (buyer GSTIN) — persisted so a business gets a valid invoice.
+    buyer_gstin: ctx.business?.gstin ?? "",
+    buyer_company: ctx.business?.companyName ?? "",
+    // Separate billing address snapshot (invoice "Billed To" ≠ "Delivered To").
+    bill_full_name: ctx.billing?.fullName ?? "",
+    bill_phone: ctx.billing?.phone ?? "",
+    bill_line1: ctx.billing?.line1 ?? "",
+    bill_line2: ctx.billing?.line2 ?? "",
+    bill_city: ctx.billing?.city ?? "",
+    bill_state: ctx.billing?.state ?? "",
+    bill_pincode: ctx.billing?.pincode ?? "",
+    // Full promotion snapshot — per-promotion forensic record (why ₹X was taken).
+    promotions: t.promotions ?? [],
     internal_notes: ctx.notes ?? "",
     razorpay_order_id: ctx.razorpayOrderId,
     // version + shipping snapshot (order is self-describing)
