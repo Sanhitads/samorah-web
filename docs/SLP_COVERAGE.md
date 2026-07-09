@@ -147,3 +147,57 @@ config values, packaging inventory levels.
 
 **Awaiting CREDENTIALS:** Shiprocket/Delhivery/India Post adapters, courier tracking
 webhooks, WhatsApp/SMS/push senders.
+
+---
+
+## Design Principles v2 (23) — module separation & operational UX
+Ownership (do not blur): **Fulfillment** = warehouse execution only · **Order
+Management** = cancellations + commercial/financial · **Shipping** = courier ·
+**Returns** = reverse logistics · **Analytics** = consumes events from all.
+
+**Cross-cutting rules**
+| # | Rule | Status |
+|---|---|---|
+| a | Fulfillment Board is a warehouse tool, not order management | ✅ (Cancel removed from board) |
+| b | All providers implement one Shipping Provider Interface | ✅ |
+| c | Warehouse staff never perform financial operations | ✅ (no Cancel/refund on board) |
+| d | Every business action generates an audit event | 🟡 (audit_logs partial; fulfillment transitions not logged) |
+| e | Every customer notification is event-driven | 🟡 (triggers exist; confirmation+dispatch only) |
+| f | Business rules configurable, not hardcoded | ✅ (rule + packaging engines) |
+| g | All logistics modules provider-independent | ✅ |
+
+**Numbered principles**
+| # | Principle | Status / gap |
+|---|---|---|
+| 1 | Board answers only "what's next for the warehouse" | ✅ (no order-mgmt/finance/analytics on board) |
+| 2 | Simple visible flow, detailed internal state machine | 🟡 internal ✅; visible still shows granular labels (Start Picking/Mark Picked) |
+| 3 | One primary action per row | ✅ (forward primary; Fail QC + Hold in ⋯) |
+| 4 | ⋯ More: Hold/Resume/Report Exception/Request Cancellation/Reassign/Print slip/Print label/View Timeline | 🟡 Hold/Resume/Fail-QC ✅; the rest ⬜ |
+| 5 | Hold: optional reason, resume to prior, no notify, no financial impact | ✅ (preset reasons ⬜) |
+| 6 | Exception workflow (operational, pauses work, no payment impact) | 🟡 entity+SM exist (§7); board "Report Exception" + type alignment ⬜ |
+| 7 | Business cancellation: Admin/CS only, confirm dialog, reason, optional release-inventory/refund/email | ⬜ (Order Management module) |
+| 8 | Refund workflow (Razorpay refund, async failures, cancel≠refund) | ⬜ |
+| 9 | Dedicated cancellation email (order#, reason, refund amount/status/timeline, support) | ⬜ |
+| 10 | Shipment workflow provider-independent; manual dispatches immediately; couriers via webhook | ✅ Manual; courier webhook ⬜ |
+| 11 | Row context columns (Priority/Item Count/Tags/Assigned To/SLA/Payment Badge/Next Action) | 🟡 Order/Customer/Stage/Shipment/Next ✅; Priority/Items/Tags/Assignee/SLA/Payment ⬜ |
+| 12 | Priority (Normal/High/Urgent/VIP) | ⬜ |
+| 13 | Tags (Gift/Fragile/COD/Express/Replacement/Wholesale) | ⬜ |
+| 14 | SLA indicators (order age + colour) | ⬜ (placed_at ready) |
+| 15 | Customer notes inline (Gift Wrap/Leave at Reception/Call Before) | 🟡 internal_notes stored; not shown on board |
+| 16 | Payment badge (Paid/COD/Refund Pending/Refunded) | ⬜ (payment_status ready) |
+| 17 | Inventory status (Reserved/Allocated/Missing Stock) | ⬜ (reservations exist) |
+| 18 | Immutable analytics event log (Picking Started…Refund Completed) | 🟡 audit_logs + shipment_events partial; fulfillment events ⬜ |
+| 19 | Customer notifications (Confirmation/Dispatch/Delivery/Cancellation/Refund) | 🟡 Confirmation+Dispatch ✅; Delivery/Cancellation/Refund ⬜ |
+| 20 | Role-based permissions (Warehouse/CS/Finance/Admin) | 🟡 RBAC roles + board gate (editor+); per-action role split ⬜ |
+| 21 | Separate admin modules + nav (Dashboard/Orders/Fulfillment/Shipments/Returns/Customers/Catalog/Warehouses/Packaging/Rules/Providers/Settings/Analytics) | ⬜ (only Fulfillment; no shell/nav) |
+| 22 | Audit trail per transition/action (timestamp/user/prev/new/action/notes) | 🟡 audit_logs exists; not comprehensive; no user attribution on fulfillment |
+| 23 | Colour coding (Reserved 🟦/Picking 🟨/Packing 🟧/Ready 🟩/Exception 🟥/Cancelled ⚫) | 🟡 some status colours; not the exact semantic palette |
+
+### Build queue implied by v2 (priority order)
+1. **Audit-event log** (d, 18, 22) — one immutable stream every action writes to (unblocks Analytics).
+2. **Order Management module** (7, 8, 9) — cancellation (role-gated, confirm, reason) → refund workflow (Razorpay) → cancellation/refund emails.
+3. **Board context columns** (11–17) — priority, tags, SLA age+colour, payment badge, notes, item count, inventory status.
+4. **Admin shell + nav** (21) — real /admin area; then Orders, Shipments, Returns, Settings/Rules/Warehouses/Packaging/Providers screens.
+5. **Fine-grained roles** (20) — warehouse vs CS vs finance action gating.
+6. **Delivery + courier webhook** (10, 19) — POD, delivery notification (needs adapter).
+7. **Colour palette + simplified visible flow polish** (2, 23).

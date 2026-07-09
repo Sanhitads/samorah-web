@@ -62,7 +62,8 @@ export function FulfillmentActions({
   const dispatch = () => post("/api/admin/fulfillment/dispatch", { orderNumber }, "dispatch");
   const resume = () => post("/api/admin/fulfillment/hold", { orderNumber, resume: true }, "resume");
   const confirmHold = () => post("/api/admin/fulfillment/hold", { orderNumber, reason }, "hold");
-  const cancel = () => post("/api/admin/fulfillment/advance", { orderNumber, to: "cancelled" }, "cancelled");
+  // No Cancel here — cancellation is a commercial action owned by Order Management
+  // (Admin/CS), not the warehouse board (Design Principles 1, 4, 7).
 
   // ── On Hold view — badge + reason + a single Resume ──
   if (fulfillmentStatus === "on_hold") {
@@ -78,10 +79,11 @@ export function FulfillmentActions({
     );
   }
 
-  const forwardNext = nextStates.filter((s) => !SHIPMENT_DRIVEN.has(s) && !SECONDARY.has(s));
+  // Happy path stays primary; QC failure is a secondary (⋯) action, not a competing button.
+  const forwardNext = nextStates.filter((s) => !SHIPMENT_DRIVEN.has(s) && !SECONDARY.has(s) && s !== "qc_failed");
   const canCreateShipment = fulfillmentStatus === "ready_for_dispatch" && !shipmentStatus;
   const canHold = nextStates.includes("on_hold");
-  const canCancel = nextStates.includes("cancelled");
+  const canFailQc = nextStates.includes("qc_failed");
 
   return (
     <div className="ff-actions">
@@ -102,7 +104,7 @@ export function FulfillmentActions({
       ) : null}
       {shipmentStatus && DISPATCHED.has(shipmentStatus) ? <span className="ff-done">✓ Dispatched</span> : null}
 
-      {canHold || canCancel ? (
+      {canHold || canFailQc ? (
         <button type="button" className="ff-more-toggle" disabled={disabled} aria-label="More actions" onClick={() => { setMore((m) => !m); setHoldInput(false); }}>
           ⋯
         </button>
@@ -127,9 +129,9 @@ export function FulfillmentActions({
               </button>
             </span>
           ) : null}
-          {canCancel ? (
-            <button type="button" className="ff-more__item ff-more__item--danger" disabled={disabled} onClick={() => { cancel(); setMore(false); }}>
-              Cancel Order
+          {canFailQc ? (
+            <button type="button" className="ff-more__item ff-more__item--danger" disabled={disabled} onClick={() => { advance("qc_failed"); setMore(false); }}>
+              Fail QC (rework)
             </button>
           ) : null}
         </div>
