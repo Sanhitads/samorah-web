@@ -66,7 +66,7 @@ export default async function OrdersPage() {
               const badge = paymentBadge(o.paymentStatus, o.isCod, o.latestRefundStatus);
               return (
                 <tr key={o.orderNumber}>
-                  <td className="admin__mono">{o.orderNumber}</td>
+                  <td className="admin__mono"><a href={`/admin/orders/${o.orderNumber}`} className="od-link">{o.orderNumber}</a></td>
                   <td>{o.customerName}</td>
                   <td><span className="ff-status" data-s={o.status}>{STATUS_LABEL[o.status] ?? o.status}</span></td>
                   <td>

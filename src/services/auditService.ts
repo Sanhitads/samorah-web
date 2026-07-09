@@ -58,6 +58,44 @@ export interface AuditEvent {
   created_at: string;
 }
 
+export interface AuditFeedRow extends AuditEvent {
+  orderNumber: string | null;
+  actorName: string | null;
+}
+
+/** Recent audit events across the platform (newest first) — the activity feed.
+ *  Resolves order numbers + staff names so the feed reads in plain language. */
+export async function getRecentAuditEvents(opts: { limit?: number; event?: string } = {}): Promise<AuditFeedRow[]> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = createAdminClient() as any;
+    let q = db.from("audit_events").select("*").order("created_at", { ascending: false }).limit(opts.limit ?? 100);
+    if (opts.event) q = q.eq("event", opts.event);
+    const { data } = await q;
+    const events = (data ?? []) as AuditEvent[] & { order_id?: string | null }[];
+
+    const orderIds = [...new Set(events.map((e) => (e as { order_id?: string }).order_id).filter(Boolean))];
+    const actorIds = [...new Set(events.map((e) => e.actor_id).filter(Boolean))];
+    const orderMap = new Map<string, string>();
+    const actorMap = new Map<string, string>();
+    if (orderIds.length) {
+      const { data: os } = await db.from("orders").select("id,order_number").in("id", orderIds);
+      for (const o of os ?? []) orderMap.set(o.id, o.order_number);
+    }
+    if (actorIds.length) {
+      const { data: us } = await db.from("users").select("id,full_name").in("id", actorIds);
+      for (const u of us ?? []) actorMap.set(u.id, u.full_name ?? "");
+    }
+    return events.map((e) => ({
+      ...e,
+      orderNumber: (e as { order_id?: string }).order_id ? orderMap.get((e as { order_id?: string }).order_id as string) ?? null : null,
+      actorName: e.actor_id ? actorMap.get(e.actor_id) ?? null : null,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 /** An order's event timeline, oldest first. */
 export async function getOrderTimeline(orderId: string): Promise<AuditEvent[]> {
   try {

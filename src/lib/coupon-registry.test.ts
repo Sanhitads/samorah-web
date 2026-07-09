@@ -9,7 +9,7 @@ const WELCOME: Coupon = {
   stackable: true, exclusive: false, combinableWith: ["FREE_SHIPPING"],
   type: "percentage", value: 10, minSubtotal: 999, maxDiscount: 200, active: true,
 };
-const line = (unitPrice: number, qty = 1) => ({ key: `k${unitPrice}`, unitPrice, qty, hsnRate: 12 });
+const line = (unitPrice: number, qty = 1) => ({ key: `k${unitPrice}`, name: "Candle", unitPrice, qty, taxClass: "candle" });
 
 describe("DB-driven coupon registry (injected into the engine)", () => {
   it("a code only discounts when it's in the injected registry", () => {
