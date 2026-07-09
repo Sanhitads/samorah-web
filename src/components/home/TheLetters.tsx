@@ -47,8 +47,16 @@ export function TheLetters({
       return;
     }
     setError(false);
-    setDone(true);
-    // NOTE: backend (newsletter table · double opt-in · Resend) lands in Phase 14.
+    setDone(true); // optimistic — the invitation is quiet either way
+    // Persist to the newsletter table (idempotent by email). Fire-and-forget;
+    // a failure never disrupts the editorial moment. (Double opt-in + Resend later.)
+    void fetch("/api/newsletter", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email.trim().toLowerCase(), source: "homepage" }),
+    }).then(() => {
+      import("@/lib/analytics/track").then(({ track }) => track("newsletter_signup", { source: "homepage" }));
+    }).catch(() => {});
   };
 
   return (
