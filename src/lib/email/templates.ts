@@ -76,10 +76,16 @@ export function sectionActions(orderUrl: string, invoiceUrl: string | null): str
   </td></tr>`;
 }
 
-export function sectionSupport(): string {
+/** `dispatchNotice` (default true) shows the "you'll get a dispatch email" line —
+ *  correct for the confirmation email, but omitted for the dispatch email itself. */
+export function sectionSupport(opts?: { dispatchNotice?: boolean }): string {
+  const notice =
+    opts?.dispatchNotice === false
+      ? ""
+      : `<div style="font:400 12px/1.6 ${serif};color:${C.smoke};">You'll receive another email the moment your order is dispatched.</div>`;
   return `<tr><td style="padding:20px 40px 4px;text-align:center;">
-    <div style="font:400 12px/1.6 ${serif};color:${C.smoke};">You'll receive another email the moment your order is dispatched.</div>
-    <div style="font:400 12px/1.6 ${serif};color:${C.smoke};margin-top:8px;">Questions? Simply reply to this email — a real person will help.</div>
+    ${notice}
+    <div style="font:400 12px/1.6 ${serif};color:${C.smoke};margin-top:${notice ? "8px" : "0"};">Questions? Simply reply to this email — a real person will help.</div>
   </td></tr>`;
 }
 

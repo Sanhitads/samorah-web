@@ -16,6 +16,9 @@ describe("ORDER_DISPATCHED email", () => {
     expect(html).toContain("Track Shipment");
     expect(html).toMatch(/https:\/\/samorahstudio\.com\/order\/SAM-2026-000009\/track\?t=/);
     expect(html).not.toContain("localhost");
+    // The dispatch email must NOT promise a future dispatch email (it IS that email).
+    expect(html).not.toMatch(/receive another email the moment your order is dispatched/i);
+    expect(html).toContain("Questions? Simply reply"); // support line stays
     // multipart plain-text alternative present + clean
     expect(text).toContain("On Its Way");
     expect(text).toContain("MANUAL-SAM-2026-000009");

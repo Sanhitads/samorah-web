@@ -39,7 +39,7 @@ export function buildDispatchNotificationEmail(input: DispatchEmailInput): { sub
       `<tr><td style="padding:14px 40px 4px;text-align:center;">
         <a href="${trackUrl}" style="display:inline-block;padding:14px 30px;background:${C.ink};color:${C.ivory};font:400 11px/1 ${sans};letter-spacing:2px;text-transform:uppercase;text-decoration:none;">Track Shipment</a>
       </td></tr>` +
-      sectionSupport() +
+      sectionSupport({ dispatchNotice: false }) +
       sectionFooter(),
   );
 
