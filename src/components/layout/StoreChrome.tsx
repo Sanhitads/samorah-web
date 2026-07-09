@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Header } from "./Header";
 import { MegaMenu } from "./MegaMenu";
 import { SearchOverlay } from "./SearchOverlay";
@@ -36,6 +36,7 @@ export function StoreChrome() {
   // The homepage hero is a dark cinematic ground → the Header floats transparent
   // (light tone) over it and warms to ivory glass on scroll (Pending P1).
   const isHome = usePathname() === "/";
+  const router = useRouter();
 
   return (
     <>
@@ -46,6 +47,7 @@ export function StoreChrome() {
         onMenuClick={openMenu}
         onSearchClick={openSearch}
         onCartClick={openCart}
+        onAccountClick={() => router.push("/account")}
         cartCount={cartCount}
       />
       <MegaMenu open={menuOpen} onClose={closeMenu} />

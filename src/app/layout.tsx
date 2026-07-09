@@ -12,6 +12,7 @@ import "@/styles/shop.css";
 import "@/styles/cart.css";
 import "@/styles/checkout.css";
 import "@/styles/order.css";
+import "@/styles/account.css";
 import "@/styles/invoice.css";
 import "@/styles/admin.css";
 import { AuthProvider } from "@/components/auth/AuthProvider";
