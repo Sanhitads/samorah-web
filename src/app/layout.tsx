@@ -13,6 +13,7 @@ import "@/styles/cart.css";
 import "@/styles/checkout.css";
 import "@/styles/order.css";
 import "@/styles/invoice.css";
+import "@/styles/admin.css";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { UtmCapture } from "@/components/analytics/UtmCapture";
 import { canonicalOrigin } from "@/config/site";

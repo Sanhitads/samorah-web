@@ -28,8 +28,8 @@ the codebase. Keep in sync as slices land. Legend: ✅ built · 🟡 partial · 
 ### Engine 3 — Fulfillment (doesn't know which courier ✅)
 | Responsibility | Status | Where / pending |
 |---|---|---|
-| Picking | 🟡 | states in `fulfillment/state.ts`; no workflow/UI |
-| Packing | 🟡 | states + packaging engine; no workflow/UI |
+| Picking | ✅ | dashboard drives `reserved→picking→picked` (`/admin/fulfillment`) |
+| Packing | ✅ | dashboard drives `packing→packed→QC→ready` |
 | Dispatch | ✅ | `markShipmentDispatched` + endpoint |
 | Warehouse workflow | 🟡 | warehouse model ✅; routing/workflow ⬜ |
 
@@ -112,7 +112,8 @@ skipping pick/pack/QC/weight-verify. Needs the Packing Workflow + full §14 gate
 
 ## Modules 1–6 (summary)
 - **M1 Fulfillment Core:** Order/Shipment/Fulfillment state machines ✅; Dispatch ✅;
-  **Dashboard ⬜ (NEXT)**; **Packing Workflow 🟡**.
+  **Dashboard ✅** (`/admin/fulfillment`, staff-gated); **Packing Workflow ✅**
+  (pick→pack→QC→ready→create-shipment→dispatch, order status auto-synced).
 - **M2 Packaging:** assets/profiles/rules/weight/dimension/volumetric/cost ✅;
   **Multi-box ⬜**.
 - **M3 Shipping:** interface ✅, Manual ✅, factory ✅; **Shiprocket/Delhivery/India
@@ -127,8 +128,9 @@ skipping pick/pack/QC/weight-verify. Needs the Packing Workflow + full §14 gate
 
 ## Consolidated gap list (build queue)
 **Logic/engine gaps (no external blocker):**
-1. Fulfillment Dashboard + auth (NEXT) · Packing Workflow (drive pick→pack→QC→ready)
-2. Full Shipping Workflow orchestration + §14 gate (point M)
+1. ✅ DONE — Fulfillment Dashboard + auth · Packing Workflow (drive pick→pack→QC→ready→dispatch)
+2. Full auto-gated Shipping Workflow (point M) — dashboard drives it manually today;
+   enabling `auto_create_after_fulfillment` for hands-off gating is the remaining bit
 3. Multi-box packing (Engine 1 / M2)
 4. Net-weight sub-components: wax/jar/lid/label per variant (point D)
 5. Order → warehouse routing (point G)
