@@ -3,9 +3,9 @@
  * email template and delivery via the existing email provider. Adding WhatsApp is
  * a sibling file implementing the same NotificationChannel interface.
  */
-import { emailConfigured, sendEmail, buildOrderConfirmationEmail, buildDispatchNotificationEmail, buildCancellationEmail, buildReturnEmail, type EmailOrder, type ReturnEmailEvent } from "@/lib/email";
+import { emailConfigured, sendEmail, buildOrderConfirmationEmail, buildDispatchNotificationEmail, buildCancellationEmail, buildReturnEmail, buildDeliveryEmail, type EmailOrder, type ReturnEmailEvent } from "@/lib/email";
 import { getOrderById } from "@/services/orderService";
-import { getDispatchInfo } from "@/services/shipmentService";
+import { getDispatchInfo, getDeliveryInfo } from "@/services/shipmentService";
 import { getCancellationInfo } from "@/services/cancellationService";
 import { getReturnInfo } from "@/services/returnService";
 import type { NotificationChannel, NotificationEvent, NotificationContext, ChannelDispatchResult } from "../types";
@@ -28,6 +28,11 @@ async function render(event: NotificationEvent, ctx: NotificationContext): Promi
       const info = await getCancellationInfo(ctx.orderId);
       if (!info) return null;
       return { to: info.email, ...buildCancellationEmail(info) };
+    }
+    case "delivery.completed": {
+      const info = await getDeliveryInfo(ctx.orderId);
+      if (!info || !info.email) return null;
+      return { to: info.email, ...buildDeliveryEmail(info) };
     }
     case "return.requested":
     case "return.approved":

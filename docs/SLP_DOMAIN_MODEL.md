@@ -88,7 +88,8 @@ Two related streams. **Audit events** record *what happened* (immutable history)
 | `order.dispatched` / `shipment.dispatched` | shipmentService | ✅ | ✅ dispatch |
 | `order.cancelled` | cancellationService | ✅ | ✅ cancellation |
 | `refund.initiated/processed/failed` | refundService | ✅ | ⬜ (refund email — via engine) |
-| `delivery.completed` *(planned)* | courier webhook | ✅ | ✅ delivery |
+| `delivery.completed` | shipmentService (admin or courier webhook) | ✅ | ✅ delivery email |
+| `shipment.*` (in_transit/out_for_delivery/delivered/exception/rto/cancelled) | shipmentService | ✅ | ⬜ internal (delivery notifies) |
 | `return.requested/approved/rejected/refunded` | returnService | ✅ | ✅ via engine |
 | `fulfillment.*` (picking…shipped, on_hold, resumed, priority_set, assigned, tagged) | fulfillmentService | ✅ | ⬜ internal |
 
@@ -193,8 +194,8 @@ Cross-cutting capabilities first, so later modules don't duplicate logic:
 1. ~~**Permission System** — capability-based (§5)~~ ✅
 2. ~~**Notification Engine** — centralized event fan-out (§4)~~ ✅
 3. ~~**Returns Module** — the integrative business module (§3)~~ ✅
-4. **Shipment Management** — read/label/track surface  ← next
-5. **Settings / Business Rules** UI
+4. ~~**Shipment Management** — post-dispatch lifecycle + POD + webhook~~ ✅
+5. **Settings / Business Rules** UI  ← next
 6. **Packaging Management** UI
 7. **Warehouses** UI
 8. **Analytics** (builds on the metrics in §9)

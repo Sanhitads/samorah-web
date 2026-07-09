@@ -271,3 +271,11 @@
 .ff-status[data-s="approved"], .ff-status[data-s="pickup_scheduled"], .ff-status[data-s="received"], .ff-status[data-s="qc"] { background: rgba(201, 169, 110, 0.2); color: #8a6d3b; }
 .ff-status[data-s="refund"] { background: rgba(60, 120, 70, 0.14); color: #2f6b3c; }
 .ff-status[data-s="rejected"] { background: rgba(168, 68, 58, 0.12); color: #8a3d2f; }
+
+/* ── Shipment Management: status colours ── */
+.ff-status[data-s="picked_up"], .ff-status[data-s="in_transit"] { background: rgba(201, 169, 110, 0.2); color: #8a6d3b; }
+.ff-status[data-s="out_for_delivery"] { background: rgba(90, 130, 180, 0.16); color: #3d5a80; }
+.ff-status[data-s="delivered"] { background: rgba(60, 120, 70, 0.14); color: #2f6b3c; }
+.ff-status[data-s="exception"] { background: rgba(168, 68, 58, 0.14); color: #8a3d2f; }
+.ff-status[data-s="rto"], .ff-status[data-s="cancelled"] { background: rgba(107, 98, 89, 0.14); color: #6b6259; }
+.ff-status[data-s="pending"], .ff-status[data-s="ready_to_ship"], .ff-status[data-s="shipment_created"], .ff-status[data-s="courier_assigned"], .ff-status[data-s="label_generated"], .ff-status[data-s="pickup_scheduled"] { background: rgba(107, 98, 89, 0.1); color: #6b6259; }

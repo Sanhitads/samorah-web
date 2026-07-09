@@ -11,6 +11,7 @@ export { buildOrderConfirmationEmail, type EmailOrder, type EmailItem } from "./
 export { buildDispatchNotificationEmail, type DispatchEmailInput } from "./dispatchNotification";
 export { buildCancellationEmail, type CancellationEmailInput, type CancellationEmailRefund } from "./cancellationNotification";
 export { buildReturnEmail, type ReturnEmailInput, type ReturnEmailEvent } from "./returnNotification";
+export { buildDeliveryEmail, type DeliveryEmailInput } from "./deliveryNotification";
 export { emailFrom, emailReplyTo } from "./config";
 
 /** True when the active provider has credentials — the worker gates on this. */

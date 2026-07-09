@@ -9,12 +9,13 @@ export type NotificationEvent =
   | "order.confirmed"
   | "order.dispatched"
   | "order.cancelled"
+  | "delivery.completed"
   | "return.requested"
   | "return.approved"
   | "return.rejected"
   | "return.refunded";
-// Future events (refund.processed, delivery.completed) add here + a template in
-// each channel — no new bespoke send path.
+// Future events (refund.processed) add here + a template in each channel — no new
+// bespoke send path.
 
 export type ChannelKey = "email" | "whatsapp" | "sms" | "push";
 

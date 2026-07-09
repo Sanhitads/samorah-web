@@ -21,9 +21,9 @@ the codebase. Keep in sync as slices land. Legend: ✅ built · 🟡 partial · 
 |---|---|---|
 | Creating shipments | ✅ | `provider.createShipment` + `create_shipment` |
 | Selecting provider | ✅ | settings + `getShippingProvider` + Decision Engine |
-| Tracking | 🟡 | timeline ✅; live courier tracking ⬜ (webhook/adapter) |
-| Labels | 🟡 | interface method ✅; real label generation ⬜ (adapter) |
-| Courier status | 🟡 | `trackShipment` interface ✅; real feed ⬜ |
+| Tracking | ✅ | timeline + admin lifecycle (in-transit→OFD→delivered/exception/RTO); provider-agnostic **webhook** `/api/webhooks/shipping/[provider]` maps raw→unified. Real courier adapter still ⬜ |
+| Labels | 🟡 | interface + `regenerateLabel` (provider.generateLabel) wired; real label images need an adapter ⬜ |
+| Courier status | ✅ | webhook ingest + `mapProviderStatus`; live feed needs a real courier adapter ⬜ |
 
 ### Engine 3 — Fulfillment (doesn't know which courier ✅)
 | Responsibility | Status | Where / pending |
@@ -120,8 +120,10 @@ skipping pick/pack/QC/weight-verify. Needs the Packing Workflow + full §14 gate
   Post ⬜**.
 - **M4 Courier Decision:** cheapest/fastest/preferred/luxury/insurance/fragile/COD/
   serviceability logic ✅; **capability + segment-priority DATA ⬜**.
-- **M5 Tracking:** manual updates ✅, customer timeline ✅, exceptions ✅; **webhook ⬜,
-  delivery proof (POD) ⬜, RTO workflow 🟡**.
+- **M5 Tracking:** manual updates ✅, customer timeline ✅, exceptions ✅, **webhook ✅
+  (provider-agnostic ingest + status map), POD ✅ (delivered_to/pod_note + delivery
+  email), RTO ✅ (order→rto sync)**. Real courier adapter ⬜; reverse-pickup shipment
+  for returns ⬜.
 - **M6 Analytics:** all 11 metrics ⬜ (every metric's DATA foundation exists).
 
 ---
@@ -208,7 +210,8 @@ Management** = cancellations + commercial/financial · **Shipping** = courier ·
 6. ~~**Permission System** (7/20)~~ ✅ **DONE** — `lib/auth/capabilities.ts` (12 capabilities, role→bundle map) + `requireCapability` guard; all admin routes gate on capabilities; UI hides uncapable controls; cancel-flow refund re-checks order.refund. Unit-tested.
 7. ~~**Notification Engine** (8/e/19)~~ ✅ **DONE** — `lib/notifications/` (types, subscriptions, channels, engine) + `notification_dispatches` idempotent log; the fulfillment worker now emits `order.confirmed/dispatched/cancelled` events through `notify()` instead of building emails; new channels (WhatsApp/SMS/push) register without touching services. Refund/delivery/return templates plug in as events are added.
 8. ~~**Returns Module**~~ ✅ **DONE** — `/admin/returns` + `returnService`: RMA lifecycle over the existing state machine, `return_items` (partial + restock flags), and the integrative ties — on settle it **restocks** inventory (`restock_return_items`, skipping damaged/defective) and issues a **refund** (via the ledger, once), writing every transition to the **audit** stream. Capability split: operate (warehouse) vs approve/refund (finance). Reverse-shipment scheduling + customer return emails plug into the shipment/notification engines next.
-9. **Shipment Management** UI · 10. **Settings/Business Rules** UI · 11. **Packaging** UI · 12. **Warehouses** UI · 13. **Analytics** (builds on §9 metrics).
+9. ~~**Shipment Management**~~ ✅ **DONE** — `/admin/shipments` post-dispatch lifecycle (in-transit → OFD → delivered w/ POD → `delivery.completed` email; exception/NDR w/ reason + reattempt; RTO w/ order sync; cancel; label). Provider-agnostic courier **webhook** `/api/webhooks/shipping/[provider]` (shared secret) maps raw→unified status and drives the same lifecycle. Real courier adapter + reverse-pickup shipment for returns are the remaining deferrals.
+10. **Settings/Business Rules** UI · 11. **Packaging** UI · 12. **Warehouses** UI · 13. **Analytics** (builds on §9 metrics).
 14. **Delivery + courier webhook** (10, 19) — POD + delivery notification (needs adapter).
 15. **Colour palette + simplified visible flow polish** (2, 23).
 

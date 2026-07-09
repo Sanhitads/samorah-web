@@ -19,7 +19,7 @@ const NAV: NavGroup[] = [
       { label: "Orders", href: "/admin/orders", icon: "▤" },
       { label: "Fulfillment", href: "/admin/fulfillment", icon: "▦" },
       { label: "Returns", href: "/admin/returns", icon: "↩" },
-      { label: "Shipments", icon: "➜" },
+      { label: "Shipments", href: "/admin/shipments", icon: "➜" },
     ],
   },
   {
