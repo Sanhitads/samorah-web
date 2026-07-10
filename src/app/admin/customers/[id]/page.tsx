@@ -1,0 +1,81 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { redirect, notFound } from "next/navigation";
+import { requireStaff } from "@/lib/auth/requireStaff";
+import { hasCapability } from "@/lib/auth/capabilities";
+import { getCustomer360 } from "@/services/customerAdminService";
+import { CustomerMeta } from "@/components/admin/CustomerMeta";
+
+export const metadata: Metadata = { title: "Customer", robots: { index: false } };
+export const dynamic = "force-dynamic";
+
+const money = (v: number) => `₹${v.toLocaleString("en-IN")}`;
+const fmt = (v: string) => new Date(v).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+const SEG_TONE: Record<string, string> = { vip: "gold", repeat: "paid", new: "pending" };
+
+export default async function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const staff = await requireStaff("editor");
+  if (!staff.ok) redirect("/login");
+  if (!hasCapability(staff.role, "analytics.view")) redirect("/admin");
+  const { id } = await params;
+
+  const c = await getCustomer360(id);
+  if (!c) notFound();
+
+  return (
+    <main className="admin">
+      <header className="admin__head">
+        <p className="admin__eyebrow"><Link href="/admin/customers" className="od-back">← Customers</Link></p>
+        <h1 className="admin__title">{c.name}</h1>
+        <p className="admin__count">
+          <span className="om-pay" data-tone={SEG_TONE[c.segment]}>{c.segment}</span>
+          <span className="admin__muted"> · {c.email}{c.phone ? ` · ${c.phone}` : ""}{c.marketingConsent ? " · opted in" : ""}</span>
+        </p>
+      </header>
+
+      {/* KPIs */}
+      <div className="ash-metrics__row" style={{ marginBottom: 14 }}>
+        <div className="ash-metric"><span className="ash-metric__v">{money(c.ltv)}</span><span className="ash-metric__l">Lifetime value</span></div>
+        <div className="ash-metric"><span className="ash-metric__v">{c.orderCount}</span><span className="ash-metric__l">Paid orders</span></div>
+        <div className="ash-metric"><span className="ash-metric__v">{money(c.aov)}</span><span className="ash-metric__l">Avg order</span></div>
+        <div className="ash-metric"><span className="ash-metric__v">{c.loyaltyPoints}</span><span className="ash-metric__l">Loyalty pts · {c.loyaltyTier}</span></div>
+      </div>
+
+      <div className="od-grid">
+        {/* Orders */}
+        <section className="od-card">
+          <h2 className="od-card__title">Orders ({c.orders.length})</h2>
+          {c.orders.length ? c.orders.slice(0, 12).map((o) => (
+            <div key={o.orderNumber} className="od-line">
+              <Link href={`/admin/orders/${o.orderNumber}`} className="admin__mono od-link">{o.orderNumber}</Link>
+              <span className="ff-status" data-s={o.status}>{o.status}</span>
+              <span className="admin__muted">{fmt(o.placedAt)}</span>
+              <span className="admin__mono">{money(o.total)}</span>
+            </div>
+          )) : <p className="admin__muted">No orders.</p>}
+        </section>
+
+        {/* CRM notes + tags */}
+        <CustomerMeta id={c.id} notes={c.notes} tags={c.tags} />
+      </div>
+
+      <div className="od-grid">
+        {/* Addresses */}
+        <section className="od-card">
+          <h2 className="od-card__title">Addresses ({c.addresses.length})</h2>
+          {c.addresses.length ? c.addresses.map((a, i) => (
+            <p key={i} className="acc__addr" style={{ marginBottom: 10 }}>{a.isDefault ? "★ " : ""}{a.line1}{a.line2 ? `, ${a.line2}` : ""}, {a.city}, {a.state} {a.pincode}</p>
+          )) : <p className="admin__muted">No saved addresses.</p>}
+        </section>
+
+        {/* Returns */}
+        <section className="od-card">
+          <h2 className="od-card__title">Returns ({c.returns.length})</h2>
+          {c.returns.length ? c.returns.map((r) => (
+            <div key={r.rma} className="od-line"><span className="admin__mono">{r.rma}</span><span className="ff-status" data-s={r.status}>{r.status}</span><span className="admin__muted">{r.reason ?? ""}</span></div>
+          )) : <p className="admin__muted">No returns.</p>}
+        </section>
+      </div>
+    </main>
+  );
+}
