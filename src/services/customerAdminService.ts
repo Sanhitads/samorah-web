@@ -68,6 +68,10 @@ export interface Customer360 {
   addresses: { line1: string; line2: string | null; city: string; state: string; pincode: string; isDefault: boolean }[];
   returns: { rma: string; status: string; reason: string | null; createdAt: string }[];
   ltv: number; aov: number; orderCount: number;
+  // CRM additions (R13)
+  favouriteFragrance: string | null;                                  // most-purchased family across paid orders
+  acquisition: { source: string; medium: string; campaign: string } | null; // first order's UTMs (how they arrived)
+  wishlist: { product: string; fragrance: string | null; addedAt: string }[];
 }
 
 export async function getCustomer360(id: string): Promise<Customer360 | null> {
@@ -75,16 +79,40 @@ export async function getCustomer360(id: string): Promise<Customer360 | null> {
   const { data: u } = await db.from("users").select("*").eq("id", id).maybeSingle();
   if (!u) return null;
 
-  const [ordersRes, addrRes, retRes] = await Promise.all([
-    db.from("orders").select("id,order_number,status,total_amount,payment_status,placed_at").eq("user_id", id).order("placed_at", { ascending: false }),
+  const [ordersRes, addrRes, retRes, itemsRes, wishRes] = await Promise.all([
+    db.from("orders").select("id,order_number,status,total_amount,payment_status,placed_at,utm_source,utm_medium,utm_campaign").eq("user_id", id).order("placed_at", { ascending: false }),
     db.from("addresses").select("line1,line2,city,state,pincode,is_default").eq("user_id", id).order("is_default", { ascending: false }),
     db.from("returns").select("rma_number,status,reason,created_at,order_id,orders!inner(user_id)").eq("orders.user_id", id).order("created_at", { ascending: false }),
+    db.from("order_items").select("product_id,quantity,orders!inner(user_id,payment_status)").eq("orders.user_id", id).in("orders.payment_status", PAID),
+    db.from("wishlists").select("product_id,created_at,products(name,fragrance_family)").eq("user_id", id).order("created_at", { ascending: false }),
   ]);
 
   const orders = (ordersRes.data ?? []) as any[];
   const paid = orders.filter((o) => PAID.includes(o.payment_status));
   const ltv = Math.round(paid.reduce((s, o) => s + Number(o.total_amount ?? 0), 0));
   const aov = paid.length ? Math.round(ltv / paid.length) : 0;
+
+  // Acquisition = the earliest order's UTMs (orders are desc, so the last is oldest).
+  const firstOrder = orders.length ? orders[orders.length - 1] : null;
+  const acquisition = firstOrder && (firstOrder.utm_source || firstOrder.utm_medium || firstOrder.utm_campaign)
+    ? { source: firstOrder.utm_source || "direct", medium: firstOrder.utm_medium || "—", campaign: firstOrder.utm_campaign || "—" }
+    : null;
+
+  // Favourite fragrance — most-purchased family across paid lines.
+  const items = (itemsRes.data ?? []) as any[];
+  let favouriteFragrance: string | null = null;
+  if (items.length) {
+    const pids = [...new Set(items.map((it) => it.product_id).filter(Boolean))];
+    const famOf = new Map<string, string>();
+    if (pids.length) { const { data: prods } = await db.from("products").select("id,fragrance_family").in("id", pids); for (const p of prods ?? []) famOf.set(p.id, p.fragrance_family || "Unclassified"); }
+    const tally = new Map<string, number>();
+    for (const it of items) { const f = famOf.get(it.product_id); if (f) tally.set(f, (tally.get(f) ?? 0) + Number(it.quantity ?? 0)); }
+    favouriteFragrance = [...tally.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  }
+
+  const wishlist = ((wishRes.data ?? []) as any[]).map((w) => ({
+    product: w.products?.name ?? "—", fragrance: w.products?.fragrance_family ?? null, addedAt: w.created_at,
+  }));
 
   return {
     id: u.id, name: u.full_name ?? u.email, email: u.email, phone: u.phone,
@@ -94,6 +122,7 @@ export async function getCustomer360(id: string): Promise<Customer360 | null> {
     addresses: (addrRes.data ?? []).map((a: any) => ({ line1: a.line1, line2: a.line2, city: a.city, state: a.state, pincode: a.pincode, isDefault: Boolean(a.is_default) })),
     returns: (retRes.data ?? []).map((r: any) => ({ rma: r.rma_number, status: r.status, reason: r.reason, createdAt: r.created_at })),
     ltv, aov, orderCount: paid.length,
+    favouriteFragrance, acquisition, wishlist,
   };
 }
 

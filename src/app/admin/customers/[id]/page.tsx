@@ -41,6 +41,25 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
         <div className="ash-metric"><span className="ash-metric__v">{c.loyaltyPoints}</span><span className="ash-metric__l">Loyalty pts · {c.loyaltyTier}</span></div>
       </div>
 
+      {/* CRM insight (R13) */}
+      <div className="od-grid">
+        <section className="od-card">
+          <h2 className="od-card__title">Profile insight</h2>
+          <div className="od-line"><span className="admin__muted">Favourite fragrance</span><span>{c.favouriteFragrance ?? "—"}</span></div>
+          <div className="od-line"><span className="admin__muted">Acquisition source</span><span>{c.acquisition ? c.acquisition.source : "direct / unknown"}</span></div>
+          {c.acquisition ? <div className="od-line"><span className="admin__muted">Channel</span><span>{c.acquisition.medium}{c.acquisition.campaign !== "—" ? ` · ${c.acquisition.campaign}` : ""}</span></div> : null}
+          <div className="od-line"><span className="admin__muted">Last viewed</span><span className="admin__muted">needs storefront view-tracking (planned)</span></div>
+        </section>
+
+        {/* Wishlist */}
+        <section className="od-card">
+          <h2 className="od-card__title">Wishlist ({c.wishlist.length})</h2>
+          {c.wishlist.length ? c.wishlist.slice(0, 12).map((w, i) => (
+            <div key={i} className="od-line"><span>{w.product}</span>{w.fragrance ? <span className="admin__muted">{w.fragrance}</span> : null}<span className="admin__muted">{fmt(w.addedAt)}</span></div>
+          )) : <p className="admin__muted">Nothing saved yet.</p>}
+        </section>
+      </div>
+
       <div className="od-grid">
         {/* Orders */}
         <section className="od-card">
