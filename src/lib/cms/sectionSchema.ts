@@ -9,7 +9,9 @@
  * and a per-schema cross-field validate() hook.
  */
 
-export type FieldType = "text" | "textarea" | "url" | "media" | "boolean" | "select" | "number" | "align" | "color" | "blocks";
+export type FieldType =
+  | "text" | "textarea" | "richtext" | "url" | "email" | "media" | "boolean" | "select"
+  | "number" | "align" | "color" | "icon" | "date" | "datetime" | "reference" | "blocks";
 
 export interface FieldDef {
   key: string;
@@ -18,24 +20,41 @@ export interface FieldDef {
   default?: unknown;
   required?: boolean;
   options?: { value: string; label: string }[]; // select / align
+
+  // ── editor help (review point 7) ──
   help?: string;
   placeholder?: string;
+  description?: string;       // longer guidance shown under the label
+  tooltip?: string;          // hover hint
+  recommendedSize?: string;  // media, e.g. "1600×900"
 
-  // ── field-level validation (point 1) ──
+  // ── field-level validation (point 6) ──
   maxLength?: number;
   minLength?: number;
   pattern?: string;          // regex source
-  patternMessage?: string;   // shown when pattern fails
+  patternMessage?: string;
   min?: number;              // number
-  max?: number;              // number
+  max?: number;
   minWidth?: number;         // image (enforced when dimensions are known)
   minHeight?: number;
+  aspectRatio?: string;      // image, e.g. "16:9" (enforced when dimensions known)
+  allowedMime?: string[];    // media, e.g. ["image/jpeg","image/webp"]
+  unique?: boolean;          // within a blocks list, this field must be unique
 
-  // ── conditional visibility (point 2) ── show this field only when the condition holds
+  // ── conditional visibility (point 2) ──
   showIf?: { field: string; equals?: unknown; truthy?: boolean };
 
-  // ── repeatable blocks (point 3) ── value is an array of records shaped by blockFields
-  blockLabel?: string;       // e.g. "Testimonial"
+  // ── references (point 5) ── value is { entity, id } (stores the ID, not a slug)
+  refEntity?: "page" | "chapter" | "collection" | "product" | "blog" | "media" | "author";
+
+  // ── localisation (point 10) ── when true, the value is stored locale-keyed
+  //    ({ en: "…", hi: "…" }) and read via resolveLocalized(); cheap seam today.
+  localized?: boolean;
+
+  // ── repeatable blocks (point 1/3, nestable) ── value is a list of sub-records;
+  //    blockFields may themselves contain `blocks`, giving nested repeaters (FAQ,
+  //    timeline…). The form + validator recurse.
+  blockLabel?: string;
   blockFields?: FieldDef[];
   minBlocks?: number;
   maxBlocks?: number;
@@ -72,6 +91,20 @@ export function isFieldVisible(f: FieldDef, content: Record<string, unknown>): b
 
 const isBlankStr = (v: unknown) => typeof v === "string" && !v.trim();
 const looksLikeUrl = (v: string) => /^https?:\/\//.test(v) || v.startsWith("/") || v.startsWith("#") || v.startsWith("gradient:");
+const isEmail = (v: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v);
+
+// ── Localisation seam (point 10) ── field values may be plain OR locale-keyed maps.
+export const DEFAULT_LOCALE = "en";
+export const LOCALES = ["en"] as const; // extend when locales ship; the data model is ready today
+/** Read a possibly-localised value for a locale (falls back to default → any). */
+export function resolveLocalized(value: unknown, locale = DEFAULT_LOCALE): unknown {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const m = value as Record<string, unknown>;
+    if (locale in m) return m[locale];
+    if (DEFAULT_LOCALE in m) return m[DEFAULT_LOCALE];
+  }
+  return value;
+}
 
 /** Validate one field's value; returns error strings (prefixed by the caller). */
 function validateField(f: FieldDef, content: Record<string, unknown>, prefix: string): string[] {
@@ -82,26 +115,40 @@ function validateField(f: FieldDef, content: Record<string, unknown>, prefix: st
   if (f.required && (v === undefined || v === null || isBlankStr(v) || (f.type === "blocks" && (!Array.isArray(v) || !v.length)))) {
     e.push(`${prefix}"${f.label}" is required`); return e;
   }
-  if (typeof v === "string" && v.trim()) {
-    if (f.maxLength && v.length > f.maxLength) e.push(`${prefix}"${f.label}" must be ≤ ${f.maxLength} characters (is ${v.length})`);
-    if (f.minLength && v.length < f.minLength) e.push(`${prefix}"${f.label}" must be ≥ ${f.minLength} characters`);
-    if (f.pattern && !new RegExp(f.pattern).test(v)) e.push(`${prefix}${f.patternMessage ?? `"${f.label}" has an invalid format`}`);
-    if (f.type === "url" && !looksLikeUrl(v)) e.push(`${prefix}"${f.label}" must be a URL, path, or anchor`);
+  const raw = f.localized ? resolveLocalized(v) : v;
+  if (typeof raw === "string" && raw.trim()) {
+    if (f.maxLength && raw.length > f.maxLength) e.push(`${prefix}"${f.label}" must be ≤ ${f.maxLength} characters (is ${raw.length})`);
+    if (f.minLength && raw.length < f.minLength) e.push(`${prefix}"${f.label}" must be ≥ ${f.minLength} characters`);
+    if (f.pattern && !new RegExp(f.pattern).test(raw)) e.push(`${prefix}${f.patternMessage ?? `"${f.label}" has an invalid format`}`);
+    if (f.type === "url" && !looksLikeUrl(raw)) e.push(`${prefix}"${f.label}" must be a URL, path, or anchor`);
+    if (f.type === "email" && !isEmail(raw)) e.push(`${prefix}"${f.label}" must be a valid email`);
   }
   if (f.type === "number" && typeof v === "number") {
     if (f.min !== undefined && v < f.min) e.push(`${prefix}"${f.label}" must be ≥ ${f.min}`);
     if (f.max !== undefined && v > f.max) e.push(`${prefix}"${f.label}" must be ≤ ${f.max}`);
   }
-  // Image constraints — enforced when a dimensions sidecar (<key>__w/__h) is present.
-  if (f.type === "media" && (f.minWidth || f.minHeight)) {
-    const w = Number(content[`${f.key}__w`]); const h = Number(content[`${f.key}__h`]);
+  if (f.type === "reference" && f.required && !(v && typeof v === "object" && (v as any).id)) {
+    e.push(`${prefix}"${f.label}" must reference a ${f.refEntity ?? "record"}`);
+  }
+  // Media constraints — enforced when a metadata sidecar (<key>__w/__h/__mime) is present.
+  if (f.type === "media") {
+    const w = Number(content[`${f.key}__w`]); const h = Number(content[`${f.key}__h`]); const mime = content[`${f.key}__mime`] as string | undefined;
     if (w && f.minWidth && w < f.minWidth) e.push(`${prefix}"${f.label}" is ${w}px wide — needs ≥ ${f.minWidth}px`);
     if (h && f.minHeight && h < f.minHeight) e.push(`${prefix}"${f.label}" is ${h}px tall — needs ≥ ${f.minHeight}px`);
+    if (w && h && f.aspectRatio) {
+      const [aw, ah] = f.aspectRatio.split(":").map(Number);
+      if (aw && ah && Math.abs(w / h - aw / ah) > 0.02) e.push(`${prefix}"${f.label}" should be ${f.aspectRatio} (is ${(w / h).toFixed(2)}:1)`);
+    }
+    if (mime && f.allowedMime && !f.allowedMime.includes(mime)) e.push(`${prefix}"${f.label}" must be one of ${f.allowedMime.join(", ")}`);
   }
-  // Repeatable blocks (point 3) — validate each block against blockFields.
+  // Repeatable blocks (nestable) — validate each block against blockFields, + uniqueness.
   if (f.type === "blocks" && Array.isArray(v)) {
     if (f.maxBlocks && v.length > f.maxBlocks) e.push(`${prefix}"${f.label}" allows at most ${f.maxBlocks} items`);
     if (f.minBlocks && v.length < f.minBlocks) e.push(`${prefix}"${f.label}" needs at least ${f.minBlocks} items`);
+    for (const uf of (f.blockFields ?? []).filter((bf) => bf.unique)) {
+      const seen = new Set<string>();
+      v.forEach((b: any) => { const val = String(b?.[uf.key] ?? "").trim(); if (val) { if (seen.has(val)) e.push(`${prefix}"${uf.label}" must be unique across ${f.blockLabel ?? "items"} ("${val}" repeats)`); seen.add(val); } });
+    }
     v.forEach((block: any, i) => { for (const bf of f.blockFields ?? []) e.push(...validateField(bf, block ?? {}, `${prefix}${f.blockLabel ?? "Item"} ${i + 1} · `)); });
   }
   return e;
