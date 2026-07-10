@@ -1,13 +1,14 @@
 import Script from "next/script";
+import { getSiteSettings } from "@/services/siteSettingsService";
 
 /**
- * GA4 loader — renders ONLY when NEXT_PUBLIC_GA_ID is set, so the site runs
- * cleanly with no analytics account today and lights up the moment the ID lands
- * (no code change). track() (lib/analytics/track) routes events to gtag once this
- * is present.
+ * GA4 loader — renders ONLY when a measurement ID exists (admin Site Settings, or
+ * NEXT_PUBLIC_GA_ID as fallback), so analytics lights up the moment the ID is set
+ * in the admin — no code change. track() routes events to gtag once this is present.
  */
-export function GoogleAnalytics() {
-  const id = process.env.NEXT_PUBLIC_GA_ID;
+export async function GoogleAnalytics() {
+  const settings = await getSiteSettings();
+  const id = settings.analytics.gaId || process.env.NEXT_PUBLIC_GA_ID;
   if (!id) return null;
   return (
     <>

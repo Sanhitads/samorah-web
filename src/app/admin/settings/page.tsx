@@ -3,7 +3,10 @@ import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { hasCapability } from "@/lib/auth/capabilities";
 import { getSettingsAdminView } from "@/services/settingsService";
+import { getSiteSettings } from "@/services/siteSettingsService";
 import { ShippingSettingsForm } from "@/components/admin/ShippingSettingsForm";
+import { SiteSettingsForm } from "@/components/admin/SiteSettingsForm";
+import { COMMERCE } from "@/config/commerce";
 
 /**
  * Settings — `/admin/settings`. Admin-editable shipping config (the engines read
@@ -18,15 +21,34 @@ export default async function SettingsPage() {
   if (!staff.ok) redirect("/login");
   const canConfigure = hasCapability(staff.role, "shipping.configure");
 
-  const { settings, providers, warehouses } = await getSettingsAdminView();
+  const [{ settings, providers, warehouses }, site] = await Promise.all([getSettingsAdminView(), getSiteSettings()]);
 
   return (
     <main className="admin">
       <header className="admin__head">
         <p className="admin__eyebrow">Configuration · {staff.role}</p>
         <h1 className="admin__title">Settings</h1>
-        <p className="admin__count">Shipping & logistics {canConfigure ? "" : "· read-only (needs shipping.configure)"}</p>
+        <p className="admin__count">Brand, support, SEO & logistics {canConfigure ? "" : "· read-only (needs shipping.configure)"}</p>
       </header>
+
+      {canConfigure ? (
+        <section className="cfg-section">
+          <h2 className="cfg-section__title">General</h2>
+          <SiteSettingsForm settings={site} />
+        </section>
+      ) : null}
+
+      {/* Money-critical config stays in code (money-engine source of truth) — shown read-only. */}
+      <section className="cfg-section">
+        <h2 className="cfg-section__title">Tax & legal (code-managed)</h2>
+        <dl className="cfg-readonly">
+          <div><dt>GSTIN</dt><dd>{COMMERCE.gstin}</dd></div>
+          <div><dt>Legal name</dt><dd>{COMMERCE.legalName}</dd></div>
+          <div><dt>Store state</dt><dd>{COMMERCE.registeredAddress.state}</dd></div>
+          <div><dt>Currency</dt><dd>{COMMERCE.currency}</dd></div>
+        </dl>
+        <p className="cfg-hint">These drive GST/invoicing and live in <code>config/commerce.ts</code> — changed by a developer, not here, to keep the money engine's single source of truth.</p>
+      </section>
 
       <section className="cfg-section">
         <h2 className="cfg-section__title">Shipping</h2>
