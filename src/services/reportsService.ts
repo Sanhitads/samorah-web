@@ -7,6 +7,7 @@
  */
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSiteSettings } from "@/services/siteSettingsService";
+import { channelOf, type Channel } from "@/lib/marketing/channel";
 
 const PAID = ["paid", "partially_refunded", "refunded"];
 const r1 = (n: number) => Math.round(n * 10) / 10;
@@ -198,6 +199,38 @@ export async function getFragranceReport(windowDays: number | null = 90): Promis
 
   return [...map.values()].map((r) => ({
     ...r, revenue: r0(r.revenue), returnRate: r.units > 0 ? r1((r.returned / r.units) * 100) : 0,
+  })).sort((a, b) => b.revenue - a.revenue);
+}
+
+// ── Acquisition channels (R11 companion) ─────────────────────────────────────
+export interface ChannelRow { channel: Channel; orders: number; revenue: number; aov: number; share: number }
+
+/**
+ * Revenue + orders by acquisition channel, from each paid order's UTMs normalised
+ * to a clean channel (Instagram/Google/Email/Referral/Organic/Direct). Attributes
+ * each order to its own UTM — the standard revenue-by-channel view that answers
+ * "where is money actually coming from?" `share` is % of window revenue.
+ */
+export async function getChannelReport(windowDays: number | null = 90): Promise<ChannelRow[]> {
+  const db = createAdminClient() as any;
+  const cutoff = windowDays ? new Date(Date.now() - windowDays * 86400000).toISOString() : null;
+  let q = db.from("orders").select("total_amount,utm_source,utm_medium,placed_at").in("payment_status", PAID);
+  if (cutoff) q = q.gte("placed_at", cutoff);
+  const { data } = await q;
+  const orders = (data ?? []) as any[];
+
+  const map = new Map<Channel, { orders: number; revenue: number }>();
+  let totalRev = 0;
+  for (const o of orders) {
+    const ch = channelOf(o.utm_source, o.utm_medium);
+    const rev = Number(o.total_amount ?? 0);
+    const r = map.get(ch) ?? { orders: 0, revenue: 0 };
+    r.orders++; r.revenue += rev; map.set(ch, r);
+    totalRev += rev;
+  }
+  return [...map.entries()].map(([channel, v]) => ({
+    channel, orders: v.orders, revenue: r0(v.revenue), aov: v.orders ? r0(v.revenue / v.orders) : 0,
+    share: totalRev > 0 ? r1((v.revenue / totalRev) * 100) : 0,
   })).sort((a, b) => b.revenue - a.revenue);
 }
 

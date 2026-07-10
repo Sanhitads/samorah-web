@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { hasCapability } from "@/lib/auth/capabilities";
-import { getReports, getProfitReport, getFragranceReport, getCohortReport } from "@/services/reportsService";
+import { getReports, getProfitReport, getFragranceReport, getCohortReport, getChannelReport } from "@/services/reportsService";
 
 /**
  * Reports — `/admin/reports`. Business & filing reports (GST by state, top
@@ -26,8 +26,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const sp = await searchParams;
   const win = ["30", "90", "365", "all"].includes(sp.window ?? "") ? (sp.window as string) : "30";
   const windowDays = win === "all" ? null : Number(win);
-  const [r, profit, fragrances, cohorts] = await Promise.all([
-    getReports(windowDays), getProfitReport(windowDays), getFragranceReport(windowDays), getCohortReport(6),
+  const [r, profit, fragrances, cohorts, channels] = await Promise.all([
+    getReports(windowDays), getProfitReport(windowDays), getFragranceReport(windowDays), getCohortReport(6), getChannelReport(windowDays),
   ]);
   const canExport = hasCapability(staff.role, "data.export");
   const bestFrag = fragrances[0]; const worstFrag = fragrances.length > 1 ? fragrances[fragrances.length - 1] : undefined;
@@ -157,6 +157,24 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
             </div>
           </>
         ) : <p className="admin__empty">No sales in window.</p>}
+      </section>
+
+      {/* Acquisition channels */}
+      <section className="ash-metrics">
+        <div className="ash-activity__head"><h2 className="ash-jump__title">Acquisition channels</h2><span className="admin__muted">revenue by normalised UTM channel</span></div>
+        {channels.length ? (
+          <div className="admin__table-wrap">
+            <table className="admin__table">
+              <thead><tr><th>Channel</th><th>Orders</th><th>Revenue</th><th>AOV</th><th>Share</th></tr></thead>
+              <tbody>
+                {channels.map((c) => (
+                  <tr key={c.channel}><td>{c.channel}</td><td className="admin__mono">{c.orders}</td><td className="admin__mono">{inr(c.revenue)}</td><td className="admin__mono">{inr(c.aov)}</td><td className="admin__mono">{c.share}%</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : <p className="admin__empty">No orders in window.</p>}
+        <p className="cfg-hint">Orders with no UTMs count as “Direct”. Attribution is per-order (last touch).</p>
       </section>
 
       {/* Retention cohorts (R11) */}
