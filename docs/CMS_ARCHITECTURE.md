@@ -10,14 +10,15 @@
 — never by copied URL.**
 
 ```
-                          ┌───────────────┐
-                          │     media     │   ← single source of truth for every asset
-                          │  id (uuid)    │      (image / video / og-image / email hero)
-                          │  storage_path │   ← the ONLY place a URL/path is stored
-                          │  alt, width,  │
-                          │  height, kind │
-                          │  folder, tags │
-                          └───────▲───────┘
+                          ┌────────────────────┐
+                          │       media        │ ← single source of truth for every asset
+                          │  id (uuid)         │   (image / video / og-image / email hero)
+                          │  provider+public_id│ ← storage ref (Cloudinary default;
+                          │  url               │   provider-agnostic → swappable)
+                          │  alt, width, height│
+                          │  kind, role, focal │
+                          │  folder, tags      │
+                          └─────────▲──────────┘
                                   │ media_id (FK)  — reference, NOT a copied URL
       ┌───────────────┬───────────┼───────────────┬──────────────────┐
       │               │           │               │                  │
@@ -53,7 +54,7 @@ reverse lookup (below); replacing the file updates everywhere at once.
 
 | Entity | Holds | References |
 |---|---|---|
-| **media** | the file (storage_path), alt, kind, dimensions, folder, tags | — (root) |
+| **media** ✅ | the asset (provider + public_id + url), alt, kind, role, dimensions, focal point, folder, tags — persists the platform `Asset` model | — (root) |
 | **cms_pages** ✅ | slug, title, eyebrow, intro, `sections[]`, `seo{}`, schedule, status | `media_id` inside section blocks + `seo.ogImageId` |
 | **homepage_sections** | ordered composable sections (hero, featured, editorial, grid) | `media_id` per section |
 | **navigation** | header/footer/mega-menu link tree (label, href, order, visibility) | optional `media_id` (menu imagery) · may link to `cms_pages.slug` |
@@ -85,7 +86,8 @@ don't cache a count that lies.**
 
 ## Read/write data flow
 
-**Write (admin):** editor uploads → one `media` row (Supabase Storage path). Page/
+**Write (admin):** editor uploads → provider stores bytes (Cloudinary) → one `media`
+row (`provider` + `public_id` + `url`); or register-by-URL for an existing asset. Page/
 homepage/nav/email editors pick from the Media Library and store the chosen
 `media_id`. Saving a page snapshots a revision (`cms_page_revisions`, R3).
 

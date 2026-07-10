@@ -424,3 +424,11 @@
 .au-actor[data-actor="webhook"] { color: #8a6d3b; }
 .au-actor[data-actor="customer"] { color: #2f6b3c; }
 .gs-mark { background: rgba(201, 169, 110, 0.32); color: inherit; border-radius: 2px; padding: 0 1px; }
+.media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
+.media-card { border: 1px solid var(--ad-hair); border-radius: 6px; overflow: hidden; background: #fff; display: flex; flex-direction: column; }
+.media-card__img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: rgba(31,26,22,0.04); }
+.media-card__cap { padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
+.media-card__title { font-family: var(--font-sans); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.media-card__actions { display: flex; gap: 4px; padding: 0 10px 10px; }
+.media-card__actions .ff-btn { flex: 1; font-size: 11px; padding: 4px 6px; }
+.media-edit__preview { width: 100%; max-height: 220px; object-fit: contain; background: rgba(31,26,22,0.04); border-radius: 5px; margin-bottom: 10px; }
