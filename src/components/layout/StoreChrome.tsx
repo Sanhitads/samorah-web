@@ -12,6 +12,7 @@ import {
   selectCartCount,
   useCartStore,
 } from "@/store/useCartStore";
+import type { NavBranch } from "@/services/navigationService";
 
 /**
  * Client chrome coordinator (Phase 6).
@@ -20,7 +21,7 @@ import {
  * couple to each other. The cart badge count is read hydration-safely (the cart
  * store is persisted to localStorage).
  */
-export function StoreChrome() {
+export function StoreChrome({ branches }: { branches?: NavBranch[] }) {
   const menuOpen = useUIStore((s) => s.menuOpen);
   const openMenu = useUIStore((s) => s.openMenu);
   const closeMenu = useUIStore((s) => s.closeMenu);
@@ -50,7 +51,7 @@ export function StoreChrome() {
         onAccountClick={() => router.push("/account")}
         cartCount={cartCount}
       />
-      <MegaMenu open={menuOpen} onClose={closeMenu} />
+      <MegaMenu open={menuOpen} onClose={closeMenu} branches={branches} />
       <SearchOverlay open={searchOpen} onClose={closeSearch} />
       <CartDrawer open={cartOpen} onClose={closeCart} />
     </>

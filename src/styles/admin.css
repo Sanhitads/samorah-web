@@ -432,3 +432,7 @@
 .media-card__actions { display: flex; gap: 4px; padding: 0 10px 10px; }
 .media-card__actions .ff-btn { flex: 1; font-size: 11px; padding: 4px 6px; }
 .media-edit__preview { width: 100%; max-height: 220px; object-fit: contain; background: rgba(31,26,22,0.04); border-radius: 5px; margin-bottom: 10px; }
+.nav-branch { border: 1px solid var(--ad-hair); border-radius: 6px; padding: 14px; margin-bottom: 12px; }
+.nav-branch__head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.nav-branch__label { flex: 1; padding: 8px 10px; font-family: var(--font-sans); font-size: 14px; border: 1px solid var(--ad-hair); border-radius: 4px; box-sizing: border-box; }
+.nav-branch__id { width: 120px; padding: 8px 10px; font-family: ui-monospace, monospace; font-size: 12px; border: 1px solid var(--ad-hair); border-radius: 4px; box-sizing: border-box; }

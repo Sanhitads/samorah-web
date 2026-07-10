@@ -2,6 +2,7 @@ import { AnnouncementBar } from "@/components/layout/AnnouncementBar";
 import { StoreChrome } from "@/components/layout/StoreChrome";
 import { Footer } from "@/components/layout/Footer";
 import { getSiteSettings } from "@/services/siteSettingsService";
+import { getNavigation } from "@/services/navigationService";
 
 /**
  * Storefront chrome wrapper (Phase 6 — Layout Chrome, complete).
@@ -18,6 +19,7 @@ export default async function StoreLayout({
   const settings = await getSiteSettings();
 
   // Maintenance mode (R14) — storefront-only lockout; admin remains accessible.
+  // (Fetch nav only when the store actually renders — skip it during a lockout.)
   if (settings.maintenance.enabled) {
     return (
       <main className="sys-page">
@@ -28,15 +30,17 @@ export default async function StoreLayout({
     );
   }
 
+  const nav = await getNavigation();
+
   return (
     <>
       {settings.storeNotice.active && settings.storeNotice.text ? (
         <div className="store-notice" role="status">{settings.storeNotice.text}</div>
       ) : null}
       <AnnouncementBar />
-      <StoreChrome />
+      <StoreChrome branches={nav.branches} />
       {children}
-      <Footer />
+      <Footer sections={nav.footer} />
     </>
   );
 }

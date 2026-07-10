@@ -4,11 +4,8 @@ import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import {
-  DEFAULT_BRANCH_ID,
-  MENU_BRANCHES,
-  type MenuBranch,
-} from "@/config/navigation";
+import { MENU_BRANCHES } from "@/config/navigation";
+import type { NavBranch } from "@/services/navigationService";
 import { useOverlay } from "@/hooks/useOverlay";
 
 /**
@@ -25,24 +22,27 @@ import { useOverlay } from "@/hooks/useOverlay";
 export interface MegaMenuProps {
   open: boolean;
   onClose: () => void;
+  /** DB-driven mega-menu branches; falls back to the code config. */
+  branches?: NavBranch[];
 }
 
 const EASE_LUXURY = [0.25, 0.1, 0.25, 1] as const;
 const EASE_OUT = [0, 0, 0.2, 1] as const;
 
-export function MegaMenu({ open, onClose }: MegaMenuProps) {
+export function MegaMenu({ open, onClose, branches }: MegaMenuProps) {
   const reduceMotion = useReducedMotion();
-  const [activeId, setActiveId] = useState<MenuBranch["id"]>(DEFAULT_BRANCH_ID);
+  const menu = branches && branches.length ? branches : (MENU_BRANCHES as NavBranch[]);
+  const defaultId = menu[0]?.id;
+  const [activeId, setActiveId] = useState<string>(defaultId);
   // Shared overlay behaviour: scroll lock · focus trap · ESC · return focus.
   const dialogRef = useOverlay(open, onClose);
 
-  const active =
-    MENU_BRANCHES.find((b) => b.id === activeId) ?? MENU_BRANCHES[0];
+  const active = menu.find((b) => b.id === activeId) ?? menu[0];
 
-  // Open on SHOP — never an empty state.
+  // Open on the first branch — never an empty state.
   useEffect(() => {
-    if (open) setActiveId(DEFAULT_BRANCH_ID);
-  }, [open]);
+    if (open) setActiveId(defaultId);
+  }, [open, defaultId]);
 
   // Close when the negative space (overlay root) is clicked — not the content.
   const onBackdrop = useCallback(
@@ -111,7 +111,7 @@ export function MegaMenu({ open, onClose }: MegaMenuProps) {
           <div className="mega__inner">
             {/* LEFT — primary branches */}
             <nav className="mega__branches" aria-label="Sections">
-              {MENU_BRANCHES.map((branch) => (
+              {menu.map((branch) => (
                 <button
                   key={branch.id}
                   type="button"
@@ -156,6 +156,7 @@ export function MegaMenu({ open, onClose }: MegaMenuProps) {
               <Link
                 href={active.campaign.href}
                 className={`mega__campaign ${active.campaign.gradient}`}
+                style={active.campaign.image ? { backgroundImage: `url(${active.campaign.image})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
                 onClick={onClose}
               >
                 <span className="mega__campaign-overlay" aria-hidden="true" />

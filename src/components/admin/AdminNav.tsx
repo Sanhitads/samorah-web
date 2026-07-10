@@ -32,6 +32,7 @@ const NAV: NavGroup[] = [
       { label: "Coupons", href: "/admin/coupons", icon: "%" },
       { label: "Content", href: "/admin/content", icon: "❡" },
       { label: "Media", href: "/admin/media", icon: "▨" },
+      { label: "Navigation", href: "/admin/navigation", icon: "❰" },
       { label: "Inventory", icon: "▣" },
     ],
   },

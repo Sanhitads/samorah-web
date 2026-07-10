@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { FOOTER_SECTIONS } from "@/config/navigation";
+import type { FooterSection } from "@/services/navigationService";
 
 /**
  * Editorial Footer (Phase 6 · Component 6) — the quiet closing note.
@@ -15,7 +16,8 @@ import { FOOTER_SECTIONS } from "@/config/navigation";
  */
 const POETIC_LINE = "Fragrance designed to linger beyond the flame.";
 
-export function Footer() {
+export function Footer({ sections }: { sections?: FooterSection[] }) {
+  const cols = sections && sections.length ? sections : (FOOTER_SECTIONS as FooterSection[]);
   return (
     <footer className="site-footer">
       <div className="site-footer__inner">
@@ -24,7 +26,7 @@ export function Footer() {
         </div>
 
         <div className="site-footer__columns">
-          {FOOTER_SECTIONS.map((section) => (
+          {cols.map((section) => (
             <div className="site-footer__col" key={section.title}>
               <h2 className="site-footer__col-title">{section.title}</h2>
               <ul className="site-footer__links">
