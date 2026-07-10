@@ -158,3 +158,14 @@ registerPageType({
     letters: SECTION_DEFS.letters,
   },
 });
+
+// Consumer #3 — Journal. Same section definitions, a different subset + order.
+registerPageType({
+  key: "journal", label: "Journal",
+  sections: {
+    hero: SECTION_DEFS.hero,
+    words: SECTION_DEFS.words,
+    testimonials: SECTION_DEFS.testimonials,
+    letters: SECTION_DEFS.letters,
+  },
+});

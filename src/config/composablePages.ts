@@ -6,6 +6,7 @@
 import "@/config/homepageSchemas"; // side-effect: registers homepage + about in the page registry
 import { HOMEPAGE_CFG, SECTION_META as HOMEPAGE_META } from "@/services/homepageService";
 import { ABOUT_CFG, ABOUT_META } from "@/services/aboutService";
+import { JOURNAL_CFG, JOURNAL_META } from "@/services/journalService";
 import { getActiveCampaign } from "@/config/campaigns";
 import { getPageType, schemasOf } from "@/lib/cms/pageRegistry";
 import { resolveContent } from "@/lib/cms/sectionSchema";
@@ -20,6 +21,7 @@ export interface ComposablePage {
 export const COMPOSABLE_PAGES: Record<string, ComposablePage> = {
   homepage: { key: "homepage", label: "Homepage", cfg: HOMEPAGE_CFG, meta: HOMEPAGE_META, previewPath: "/", previewCookie: "hp_preview" },
   about: { key: "about", label: "About", cfg: ABOUT_CFG, meta: ABOUT_META, previewPath: "/about", previewCookie: "ab_preview" },
+  journal: { key: "journal", label: "Journal", cfg: JOURNAL_CFG, meta: JOURNAL_META, previewPath: "/journal", previewCookie: "jn_preview" },
 };
 
 /** Effective settings per section (config defaults ⊕ saved) so admin forms show current content. */
