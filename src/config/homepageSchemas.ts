@@ -14,6 +14,7 @@ import { getActiveCampaign } from "@/config/campaigns";
 import { getBrandStory } from "@/config/brandStory";
 import { getEditorialVoice } from "@/config/voices";
 import { getLettersInvitation } from "@/config/letters";
+import { getHomeInvitations } from "@/config/invitations";
 
 const sourced = (type: SectionType, label: string, note: string): SectionDefinition => ({
   schema: { type, label, note, fields: [], sourced: true },
@@ -108,9 +109,29 @@ export const SECTION_DEFS: Record<SectionType, SectionDefinition> = {
       ],
     }),
   },
+  // Authored via repeatable blocks (converted from sourced) — the two editorial
+  // plates are now DB-editable. Atmosphere/Editorial-World follow the same pattern.
+  invitations: {
+    schema: {
+      type: "invitations", label: "Living with Fragrance", note: "Two editorial plates — edit each",
+      fields: [
+        {
+          key: "items", label: "Plates", type: "blocks", blockLabel: "Plate", minBlocks: 2, maxBlocks: 2,
+          blockFields: [
+            { key: "title", label: "Title", type: "text", required: true, maxLength: 60 },
+            { key: "line", label: "Caption line", type: "textarea", maxLength: 200 },
+            { key: "image", label: "Image", type: "media", help: "Media URL or gradient:name" },
+            { key: "imageAlt", label: "Image alt", type: "text", maxLength: 120 },
+            { key: "ctaLabel", label: "Link label", type: "text", maxLength: 24 },
+            { key: "ctaHref", label: "Link URL", type: "url" },
+          ],
+        },
+      ],
+    },
+    defaults: (cid) => ({ items: getHomeInvitations(cid) }),
+  },
   chapters: sourced("chapters", "Signature Chapters", "Chapter rail — items from the chapters catalogue"),
   atmosphere: sourced("atmosphere", "The Atmosphere", "Fragrance-worlds — items from experiences config"),
-  invitations: sourced("invitations", "Living with Fragrance", "Two ways of living — from invitations config"),
   "editorial-world": sourced("editorial-world", "Editorial World", "Magazine spread — from editorial config"),
 };
 

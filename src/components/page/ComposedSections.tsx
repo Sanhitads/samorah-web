@@ -12,7 +12,7 @@ import { getActiveCampaign, type HeroCampaign } from "@/config/campaigns";
 import { getVisibleChapters } from "@/config/chapters";
 import { getBrandStory, type BrandStory as BrandStoryType } from "@/config/brandStory";
 import { getFeaturedExperiences } from "@/config/experiences";
-import { getHomeInvitations } from "@/config/invitations";
+import { getHomeInvitations, type HomeInvitation } from "@/config/invitations";
 import { getEditorialVoice, type EditorialVoice } from "@/config/voices";
 import { getEditorialWorld } from "@/config/editorialWorld";
 import { getLettersInvitation, type LettersInvitation } from "@/config/letters";
@@ -34,7 +34,10 @@ export function ComposedSections({ sections }: { sections: ComposedSection[] }) 
     chapters: () => <SignatureChapters chapters={getVisibleChapters()} />,
     "brand-story": (s) => <BrandStory story={merged(getBrandStory(), s) as BrandStoryType} />,
     atmosphere: () => <Atmosphere experiences={getFeaturedExperiences(campaign.id)} />,
-    invitations: () => <Invitations invitations={getHomeInvitations(campaign.id)} />,
+    invitations: (s) => {
+      const items = Array.isArray(s.settings?.items) && (s.settings.items as unknown[]).length ? (s.settings.items as HomeInvitation[]) : getHomeInvitations(campaign.id);
+      return <Invitations invitations={items} />;
+    },
     words: (s) => (voice ? <Words voice={merged(voice, s) as EditorialVoice} /> : null),
     "editorial-world": () => <EditorialWorld stories={getEditorialWorld(campaign.id)} />,
     letters: (s) => <TheLetters invitation={merged(getLettersInvitation(campaign.id), s) as LettersInvitation} />,
