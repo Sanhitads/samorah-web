@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { AdminNav } from "@/components/admin/AdminNav";
+import { getAlertCount } from "@/services/notificationCenterService";
 
 /**
  * Admin shell (SLP principle 21) — the persistent frame every /admin module
@@ -15,11 +16,12 @@ export const metadata: Metadata = { title: { default: "Admin", template: "%s · 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const staff = await requireStaff("editor");
   if (!staff.ok) redirect("/login");
+  const alertCount = await getAlertCount();
 
   return (
     <div className="ash">
       <aside className="ash__sidebar">
-        <AdminNav role={staff.role} />
+        <AdminNav role={staff.role} alertCount={alertCount} />
       </aside>
       <div className="ash__main">{children}</div>
     </div>

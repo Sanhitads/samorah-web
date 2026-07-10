@@ -413,3 +413,4 @@
 .health-item__status { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--smoke, #6b6259); }
 .health-item[data-s="down"] { background: rgba(168,68,58,0.04); }
 .health-item[data-s="warn"] { background: rgba(201,169,110,0.05); }
+.ash-alert { margin-left: auto; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: #8a3d2f; color: #fff; font-size: 10px; display: inline-flex; align-items: center; justify-content: center; }

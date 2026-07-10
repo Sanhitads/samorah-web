@@ -17,6 +17,7 @@ const NAV: NavGroup[] = [
     title: "Operations",
     items: [
       { label: "Dashboard", href: "/admin", icon: "◆" },
+      { label: "Notifications", href: "/admin/notifications", icon: "◔" },
       { label: "Orders", href: "/admin/orders", icon: "▤" },
       { label: "Fulfillment", href: "/admin/fulfillment", icon: "▦" },
       { label: "Returns", href: "/admin/returns", icon: "↩" },
@@ -53,7 +54,7 @@ const NAV: NavGroup[] = [
   },
 ];
 
-export function AdminNav({ role }: { role: string | null }) {
+export function AdminNav({ role, alertCount = 0 }: { role: string | null; alertCount?: number }) {
   const pathname = usePathname();
   const isActive = (href?: string) =>
     href ? (href === "/admin" ? pathname === "/admin" : pathname.startsWith(href)) : false;
@@ -77,6 +78,7 @@ export function AdminNav({ role }: { role: string | null }) {
                   <Link href={item.href} className="ash-item" data-active={isActive(item.href) ? "1" : "0"}>
                     <span className="ash-item__icon" aria-hidden>{item.icon}</span>
                     {item.label}
+                    {item.href === "/admin/notifications" && alertCount > 0 ? <span className="ash-alert">{alertCount}</span> : null}
                   </Link>
                 </li>
               ) : (
