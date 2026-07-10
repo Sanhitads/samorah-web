@@ -377,3 +377,12 @@
 .adm-badge[data-b="gift"] { background: rgba(168,68,58,0.1); color: #8a3d2f; }
 .adm-badge[data-b="cod"] { background: rgba(60,120,70,0.12); color: #2f6b3c; }
 .om-meta-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+
+/* ── Activity colour coding (OS Point 18) ── */
+.au-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 7px; vertical-align: middle; background: #6b6259; }
+.au-dot[data-sev="created"] { background: #3d5a80; }
+.au-dot[data-sev="updated"] { background: #2f6b3c; }
+.au-dot[data-sev="deleted"] { background: #8a3d2f; }
+.au-dot[data-sev="warning"] { background: #c9a96e; }
+.od-timeline--feed .od-tl[data-sev="deleted"] { background: rgba(168,68,58,0.03); }
+.od-timeline--feed .od-tl[data-sev="warning"] { background: rgba(201,169,110,0.05); }
