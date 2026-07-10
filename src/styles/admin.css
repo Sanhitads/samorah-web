@@ -414,3 +414,7 @@
 .health-item[data-s="down"] { background: rgba(168,68,58,0.04); }
 .health-item[data-s="warn"] { background: rgba(201,169,110,0.05); }
 .ash-alert { margin-left: auto; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: #8a3d2f; color: #fff; font-size: 10px; display: inline-flex; align-items: center; justify-content: center; }
+.rev-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.rev-item { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border: 1px solid var(--ad-hair); border-radius: 4px; }
+.rev-item__when { font-family: var(--font-sans); font-size: 13px; }
+.rev-item__meta { font-size: 12px; margin-right: auto; }

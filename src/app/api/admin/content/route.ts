@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireCapability } from "@/lib/auth/requireStaff";
-import { upsertPage, deletePage, getPageForEdit, type PageInput } from "@/services/cmsService";
+import { upsertPage, deletePage, getPageForEdit, listRevisions, restoreRevision, type PageInput } from "@/services/cmsService";
 
 /** POST /api/admin/content { action, ... } — CMS page CRUD. catalog.manage. */
 export const runtime = "nodejs";
@@ -21,6 +21,10 @@ export async function POST(request: Request) {
     switch (body.action) {
       case "get": return NextResponse.json({ ok: true, page: await getPageForEdit(body.slug) });
       case "save": return NextResponse.json(await upsertPage(body.page as PageInput, a));
+      case "revisions": return NextResponse.json({ ok: true, revisions: await listRevisions(body.slug) });
+      case "restore":
+        if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
+        return NextResponse.json(await restoreRevision(body.id, a));
       case "delete":
         if (!body.slug) return NextResponse.json({ error: "slug required" }, { status: 400 });
         return NextResponse.json(await deletePage(body.slug, a));
