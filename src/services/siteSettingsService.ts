@@ -23,6 +23,9 @@ export interface SiteSettings {
   features: Record<FeatureKey, boolean>;
   maintenance: { enabled: boolean; message: string };
   storeNotice: { text: string; active: boolean };
+  // Operating costs (R10) — inputs the Profit report needs but that aren't
+  // derivable from orders. Editable here so margin config lives in the CMS, not code.
+  costs: { packagingPerOrder: number; paymentFeePercent: number; shippingCostPerOrder: number };
 }
 
 function defaults(): SiteSettings {
@@ -36,6 +39,7 @@ function defaults(): SiteSettings {
     features: Object.fromEntries(FEATURE_KEYS.map((k) => [k, false])) as Record<FeatureKey, boolean>,
     maintenance: { enabled: false, message: "We're making a few improvements. Back very soon." },
     storeNotice: { text: "", active: false },
+    costs: { packagingPerOrder: 0, paymentFeePercent: 2, shippingCostPerOrder: 0 },
   };
 }
 
@@ -56,6 +60,7 @@ export async function getSiteSettings(): Promise<SiteSettings> {
       features: { ...d.features, ...s.features },
       maintenance: { ...d.maintenance, ...s.maintenance },
       storeNotice: { ...d.storeNotice, ...s.storeNotice },
+      costs: { ...d.costs, ...s.costs },
     };
   } catch {
     return d;

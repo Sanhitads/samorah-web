@@ -80,6 +80,14 @@ export function SiteSettingsForm({ settings }: { settings: SiteSettings }) {
       <label className="om-check"><input type="checkbox" checked={s.storeNotice.active} onChange={(e) => g("storeNotice", "active", e.target.checked)} /><span>Show store notice banner</span></label>
       <label className="cfg-field"><span>Store notice text</span><input value={s.storeNotice.text} onChange={(e) => g("storeNotice", "text", e.target.value)} placeholder="Dispatch paused 12–15 Aug for a short break" /></label>
 
+      <p className="cfg-sub">Operating costs (feed the Profit report)</p>
+      <div className="cfg-grid">
+        <label className="cfg-field"><span>Packaging cost / order (₹)</span><input type="number" value={s.costs.packagingPerOrder} onChange={(e) => setS((p) => ({ ...p, costs: { ...p.costs, packagingPerOrder: Number(e.target.value) } }))} /></label>
+        <label className="cfg-field"><span>Courier cost / order (₹)</span><input type="number" value={s.costs.shippingCostPerOrder} onChange={(e) => setS((p) => ({ ...p, costs: { ...p.costs, shippingCostPerOrder: Number(e.target.value) } }))} /></label>
+        <label className="cfg-field"><span>Payment gateway fee (%)</span><input type="number" step="0.1" value={s.costs.paymentFeePercent} onChange={(e) => setS((p) => ({ ...p, costs: { ...p.costs, paymentFeePercent: Number(e.target.value) } }))} /></label>
+      </div>
+      <p className="cfg-hint">Per-unit product cost (COGS) is set on each variant under Products; these are the flat per-order and gateway costs the orders can’t tell us.</p>
+
       <p className="cfg-sub">Announcement bar</p>
       <label className="cfg-field"><span>Text</span><input value={s.announcement.text} onChange={(e) => g("announcement", "text", e.target.value)} placeholder="Complimentary shipping over ₹1,499" /></label>
       <div className="cfg-grid">

@@ -46,7 +46,7 @@ export async function listProductsAdmin(): Promise<ProductRow[]> {
 
 export interface VariantRow {
   id: string; sku: string; variantName: string | null; vesselType: VesselType | null;
-  sizeLabel: string | null; price: number; salePrice: number | null; stock: number; isActive: boolean; sortOrder: number;
+  sizeLabel: string | null; price: number; salePrice: number | null; costPrice: number; stock: number; isActive: boolean; sortOrder: number;
 }
 
 export async function getProductForEdit(id: string): Promise<{ product: any; variants: VariantRow[] } | null> {
@@ -56,7 +56,7 @@ export async function getProductForEdit(id: string): Promise<{ product: any; var
   const { data: vs } = await db.from("variants").select("*").eq("product_id", id).order("sort_order");
   const variants: VariantRow[] = (vs ?? []).map((v: any) => ({
     id: v.id, sku: v.sku, variantName: v.variant_name, vesselType: v.vessel_type, sizeLabel: v.size_label,
-    price: Number(v.price), salePrice: v.sale_price != null ? Number(v.sale_price) : null, stock: Number(v.stock ?? 0),
+    price: Number(v.price), salePrice: v.sale_price != null ? Number(v.sale_price) : null, costPrice: Number(v.cost_price ?? 0), stock: Number(v.stock ?? 0),
     isActive: Boolean(v.is_active), sortOrder: Number(v.sort_order ?? 0),
   }));
   return { product, variants };
@@ -138,7 +138,7 @@ export async function createProduct(input: CreateProductInput, actorId?: string)
 // ── Variants ─────────────────────────────────────────────────────────────────
 export interface VariantInput {
   id?: string; productId: string; sku: string; variantName?: string; vesselType?: VesselType | null;
-  sizeLabel?: string; price: number; salePrice?: number | null; stock?: number; isActive?: boolean; sortOrder?: number;
+  sizeLabel?: string; price: number; salePrice?: number | null; costPrice?: number; stock?: number; isActive?: boolean; sortOrder?: number;
 }
 export async function upsertVariant(input: VariantInput, actorId?: string) {
   if (!input.sku?.trim()) return { ok: false, reason: "SKU required" };
@@ -146,7 +146,7 @@ export async function upsertVariant(input: VariantInput, actorId?: string) {
   const row = {
     product_id: input.productId, sku: input.sku.trim().toUpperCase(), variant_name: input.variantName || null,
     vessel_type: input.vesselType || null, size_label: input.sizeLabel || null, price: input.price,
-    sale_price: input.salePrice ?? null, stock: input.stock ?? 0, is_active: input.isActive ?? true,
+    sale_price: input.salePrice ?? null, cost_price: input.costPrice ?? 0, stock: input.stock ?? 0, is_active: input.isActive ?? true,
     sort_order: input.sortOrder ?? 0, updated_at: new Date().toISOString(),
   };
   const { error } = input.id

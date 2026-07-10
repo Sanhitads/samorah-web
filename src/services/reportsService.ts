@@ -6,9 +6,11 @@
  * and orders-by-state. All derived from paid orders in a window.
  */
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getSiteSettings } from "@/services/siteSettingsService";
 
 const PAID = ["paid", "partially_refunded", "refunded"];
 const r1 = (n: number) => Math.round(n * 10) / 10;
+const r0 = (n: number) => Math.round(n);
 
 export interface GstByState { state: string; orders: number; taxable: number; cgst: number; sgst: number; igst: number; total: number }
 export interface Reports {
@@ -74,4 +76,77 @@ export async function getReports(windowDays: number | null = 30): Promise<Report
   const ordersByState = [...revByState.entries()].map(([state, v]) => ({ state, orders: v.orders, revenue: r1(v.revenue) })).sort((a, b) => b.revenue - a.revenue);
 
   return { windowDays, gst, topProducts, coupons, customers, ordersByState };
+}
+
+// ── Profit report (R10) ──────────────────────────────────────────────────────
+export interface ProfitReport {
+  windowDays: number | null;
+  orders: number;
+  goodsRevenue: number;      // Σ taxable_amount — goods, ex-GST, post-discount (the true top line)
+  shippingCollected: number; // Σ shipping charged to customers (income)
+  gstCollected: number;      // pass-through — collected & remitted, not profit (shown as a memo)
+  cogs: number;              // Σ variant cost × qty
+  packaging: number;         // orders × packagingPerOrder
+  shippingCost: number;      // orders × shippingCostPerOrder (what we pay couriers)
+  paymentFees: number;       // grossCollected × paymentFeePercent%
+  profit: number;            // goodsRevenue + shippingCollected − cogs − packaging − shippingCost − paymentFees
+  margin: number;            // profit / goodsRevenue %
+  variantsMissingCost: number; // sold variants with cost 0 → profit is optimistic until filled
+}
+
+/**
+ * P&L for a window. Revenue + shipping-collected are income; COGS (from per-variant
+ * cost) + packaging + courier cost + payment-gateway fee are expenses; GST is a
+ * pass-through memo, not profit. Cost inputs that orders can't tell us (packaging,
+ * payment fee %, courier cost) come from editable site settings. Variants sold with
+ * a zero cost are counted so the founder knows the profit is optimistic until costs
+ * are entered — we never silently overstate margin.
+ */
+export async function getProfitReport(windowDays: number | null = 30): Promise<ProfitReport> {
+  const db = createAdminClient() as any;
+  const cutoff = windowDays ? new Date(Date.now() - windowDays * 86400000).toISOString() : null;
+  const settings = await getSiteSettings();
+  const { packagingPerOrder, paymentFeePercent, shippingCostPerOrder } = settings.costs;
+
+  let oq = db.from("orders").select("id,total_amount,taxable_amount,shipping_amount,cgst_amount,sgst_amount,igst_amount,placed_at,order_items(variant_id,quantity)").in("payment_status", PAID);
+  if (cutoff) oq = oq.gte("placed_at", cutoff);
+  const { data } = await oq;
+  const orders = (data ?? []) as any[];
+
+  // Cost lookup for every variant that sold in the window.
+  const variantIds = [...new Set(orders.flatMap((o) => (o.order_items ?? []).map((it: any) => it.variant_id).filter(Boolean)))];
+  const costMap = new Map<string, number>();
+  if (variantIds.length) {
+    const { data: vs } = await db.from("variants").select("id,cost_price").in("id", variantIds);
+    for (const v of vs ?? []) costMap.set(v.id, Number(v.cost_price ?? 0));
+  }
+
+  let goodsRevenue = 0, shippingCollected = 0, gstCollected = 0, grossCollected = 0, cogs = 0;
+  const missing = new Set<string>();
+  for (const o of orders) {
+    goodsRevenue += Number(o.taxable_amount ?? 0);
+    shippingCollected += Number(o.shipping_amount ?? 0);
+    gstCollected += Number(o.cgst_amount ?? 0) + Number(o.sgst_amount ?? 0) + Number(o.igst_amount ?? 0);
+    grossCollected += Number(o.total_amount ?? 0);
+    for (const it of o.order_items ?? []) {
+      if (!it.variant_id) continue;
+      const c = costMap.get(it.variant_id);
+      cogs += (c ?? 0) * Number(it.quantity ?? 0);
+      if (!c) missing.add(it.variant_id);
+    }
+  }
+
+  const n = orders.length;
+  const packaging = n * packagingPerOrder;
+  const shippingCost = n * shippingCostPerOrder;
+  const paymentFees = grossCollected * (paymentFeePercent / 100);
+  const profit = goodsRevenue + shippingCollected - cogs - packaging - shippingCost - paymentFees;
+  const margin = goodsRevenue > 0 ? r1((profit / goodsRevenue) * 100) : 0;
+
+  return {
+    windowDays, orders: n,
+    goodsRevenue: r0(goodsRevenue), shippingCollected: r0(shippingCollected), gstCollected: r0(gstCollected),
+    cogs: r0(cogs), packaging: r0(packaging), shippingCost: r0(shippingCost), paymentFees: r0(paymentFees),
+    profit: r0(profit), margin, variantsMissingCost: missing.size,
+  };
 }

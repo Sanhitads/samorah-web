@@ -53,11 +53,11 @@ export function ProductsManager({ products, categories }: { products: ProductRow
   };
   const saveVariant = async (v: VariantRow) => {
     if (!editId) return;
-    const d = await post({ action: "variant.upsert", variant: { id: v.id || undefined, productId: editId, sku: v.sku, variantName: v.variantName, vesselType: v.vesselType, sizeLabel: v.sizeLabel, price: v.price, salePrice: v.salePrice, stock: v.stock, isActive: v.isActive, sortOrder: v.sortOrder } });
+    const d = await post({ action: "variant.upsert", variant: { id: v.id || undefined, productId: editId, sku: v.sku, variantName: v.variantName, vesselType: v.vesselType, sizeLabel: v.sizeLabel, price: v.price, salePrice: v.salePrice, costPrice: v.costPrice, stock: v.stock, isActive: v.isActive, sortOrder: v.sortOrder } });
     if (d) { await openEdit(editId); refresh(); }
   };
   const delVariant = async (v: VariantRow) => { if (v.id && editId && await post({ action: "variant.delete", id: v.id, productId: editId })) { await openEdit(editId); refresh(); } };
-  const addVariant = () => setVariants((vs) => [...vs, { id: "", sku: "", variantName: "", vesselType: null, sizeLabel: "", price: core?.price ?? 0, salePrice: null, stock: 0, isActive: true, sortOrder: vs.length }]);
+  const addVariant = () => setVariants((vs) => [...vs, { id: "", sku: "", variantName: "", vesselType: null, sizeLabel: "", price: core?.price ?? 0, salePrice: null, costPrice: 0, stock: 0, isActive: true, sortOrder: vs.length }]);
   const setV = (i: number, patch: Partial<VariantRow>) => setVariants((vs) => vs.map((v, j) => (j === i ? { ...v, ...patch } : v)));
 
   return (
@@ -117,11 +117,12 @@ export function ProductsManager({ products, categories }: { products: ProductRow
 
             <p className="cfg-sub">Variants</p>
             {variants.map((v, i) => (
-              <div key={v.id || `new${i}`} className="cfg-row" style={{ gridTemplateColumns: "1.3fr 0.9fr 0.7fr 0.7fr 0.7fr auto auto" }}>
+              <div key={v.id || `new${i}`} className="cfg-row" style={{ gridTemplateColumns: "1.2fr 0.8fr 0.6fr 0.6fr 0.6fr 0.6fr auto auto" }}>
                 <input value={v.sku} onChange={(e) => setV(i, { sku: e.target.value })} placeholder="SKU" />
                 <select value={v.vesselType ?? ""} onChange={(e) => setV(i, { vesselType: (e.target.value || null) as VesselType | null })}><option value="">vessel</option>{VESSELS.map((x) => <option key={x} value={x}>{x}</option>)}</select>
                 <input value={v.sizeLabel ?? ""} onChange={(e) => setV(i, { sizeLabel: e.target.value })} placeholder="size" />
-                <input type="number" value={v.price} onChange={(e) => setV(i, { price: Number(e.target.value) })} placeholder="₹" />
+                <input type="number" value={v.price} onChange={(e) => setV(i, { price: Number(e.target.value) })} placeholder="price ₹" title="Selling price" />
+                <input type="number" value={v.costPrice} onChange={(e) => setV(i, { costPrice: Number(e.target.value) })} placeholder="cost ₹" title="Unit cost (COGS)" />
                 <input type="number" value={v.stock} onChange={(e) => setV(i, { stock: Number(e.target.value) })} placeholder="stock" />
                 <button type="button" className="cfg-toggle" data-on={v.isActive ? "1" : "0"} onClick={() => setV(i, { isActive: !v.isActive })}>{v.isActive ? "On" : "Off"}</button>
                 <span className="ff-actions"><button type="button" className="ff-btn" disabled={busy} onClick={() => saveVariant(v)}>Save</button>{v.id ? <button type="button" className="ff-btn ff-btn--danger" disabled={busy} onClick={() => delVariant(v)}>×</button> : null}</span>

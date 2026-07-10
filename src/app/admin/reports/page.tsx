@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { hasCapability } from "@/lib/auth/capabilities";
-import { getReports } from "@/services/reportsService";
+import { getReports, getProfitReport } from "@/services/reportsService";
 
 /**
  * Reports — `/admin/reports`. Business & filing reports (GST by state, top
@@ -25,7 +25,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
   const sp = await searchParams;
   const win = ["30", "90", "365", "all"].includes(sp.window ?? "") ? (sp.window as string) : "30";
-  const r = await getReports(win === "all" ? null : Number(win));
+  const windowDays = win === "all" ? null : Number(win);
+  const [r, profit] = await Promise.all([getReports(windowDays), getProfitReport(windowDays)]);
   const canExport = hasCapability(staff.role, "data.export");
 
   return (
@@ -38,6 +39,35 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       <nav className="ff-queues" aria-label="Window">
         {WINDOWS.map((w) => <Link key={w.k} href={`/admin/reports?window=${w.k}`} className="ff-queue" data-active={win === w.k ? "1" : "0"}>{w.l}</Link>)}
       </nav>
+
+      {/* Profit / P&L (R10) */}
+      <section className="ash-metrics">
+        <div className="ash-activity__head">
+          <h2 className="ash-jump__title">Profit &amp; loss</h2>
+          <span className="admin__muted">{profit.orders} paid orders · margin on goods revenue</span>
+        </div>
+        <div className="ash-metrics__row" style={{ marginBottom: 12 }}>
+          <div className="ash-metric"><span className="ash-metric__v">{inr(profit.profit)}</span><span className="ash-metric__l">Operating profit</span></div>
+          <div className="ash-metric"><span className="ash-metric__v">{profit.margin}%</span><span className="ash-metric__l">Margin</span></div>
+          <div className="ash-metric"><span className="ash-metric__v">{inr(profit.goodsRevenue)}</span><span className="ash-metric__l">Goods revenue (ex-GST)</span></div>
+          <div className="ash-metric"><span className="ash-metric__v">{inr(profit.cogs)}</span><span className="ash-metric__l">COGS</span></div>
+        </div>
+        <div className="admin__table-wrap">
+          <table className="admin__table">
+            <tbody>
+              <tr><td>Goods revenue (ex-GST, post-discount)</td><td className="admin__mono">{inr(profit.goodsRevenue)}</td></tr>
+              <tr><td>+ Shipping collected</td><td className="admin__mono">{inr(profit.shippingCollected)}</td></tr>
+              <tr><td>− COGS (unit cost × qty)</td><td className="admin__mono">−{inr(profit.cogs)}</td></tr>
+              <tr><td>− Packaging</td><td className="admin__mono">−{inr(profit.packaging)}</td></tr>
+              <tr><td>− Shipping cost (courier)</td><td className="admin__mono">−{inr(profit.shippingCost)}</td></tr>
+              <tr><td>− Payment gateway fees</td><td className="admin__mono">−{inr(profit.paymentFees)}</td></tr>
+              <tr style={{ fontWeight: 600 }}><td>= Operating profit</td><td className="admin__mono">{inr(profit.profit)}</td></tr>
+              <tr><td className="admin__muted">GST collected (pass-through, remitted — not profit)</td><td className="admin__mono admin__muted">{inr(profit.gstCollected)}</td></tr>
+            </tbody>
+          </table>
+        </div>
+        {profit.variantsMissingCost > 0 ? <p className="cfg-hint">⚠ {profit.variantsMissingCost} sold variant{profit.variantsMissingCost === 1 ? " has" : "s have"} no cost set — profit is optimistic until cost is entered on those variants (Products → edit → variant “cost ₹”). Packaging, courier cost and payment-fee % come from Settings → Operating costs.</p> : <p className="cfg-hint">Packaging, courier cost and payment-fee % come from Settings → Operating costs.</p>}
+      </section>
 
       {/* GST report */}
       <section className="ash-metrics">
