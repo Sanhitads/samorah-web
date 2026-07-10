@@ -3,6 +3,8 @@ import Link from "next/link";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { getDashboardStats, getOperationalMetrics } from "@/services/orderAdminService";
 import { getReorderList } from "@/services/packagingService";
+import { getBusinessDashboard } from "@/services/dashboardService";
+import { getRecentAuditEvents } from "@/services/auditService";
 
 /**
  * Admin Dashboard — `/admin`. The landing module (SLP principle 21): headline
@@ -12,9 +14,21 @@ import { getReorderList } from "@/services/packagingService";
 export const metadata: Metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
 
+const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+const EVENT_LABEL = (e: string) => e.replace(/[._]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+function ago(iso: string): string {
+  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  return `${Math.floor(s / 86400)}d ago`;
+}
+
 export default async function AdminDashboard() {
   const staff = await requireStaff("editor");
-  const [stats, metrics, reorder] = await Promise.all([getDashboardStats(), getOperationalMetrics(), getReorderList()]);
+  const [stats, metrics, reorder, biz, activity] = await Promise.all([
+    getDashboardStats(), getOperationalMetrics(), getReorderList(), getBusinessDashboard(), getRecentAuditEvents({ limit: 8 }),
+  ]);
   const dur = (m: number | null) => (m == null ? "—" : m < 60 ? `${m}m` : `${Math.round((m / 60) * 10) / 10}h`);
   const age = (h: number | null) => (h == null ? "—" : h < 24 ? `${h}h` : `${Math.round((h / 24) * 10) / 10}d`);
 
@@ -33,8 +47,22 @@ export default async function AdminDashboard() {
       <header className="admin__head">
         <p className="admin__eyebrow">Operations · {staff.role}</p>
         <h1 className="admin__title">Dashboard</h1>
-        <p className="admin__count">At-a-glance operational state</p>
+        <p className="admin__count">At-a-glance business & operational state</p>
       </header>
+
+      {/* Business KPIs (today) */}
+      <section className="ash-metrics">
+        <h2 className="ash-jump__title">Today</h2>
+        <div className="ash-metrics__row">
+          <div className="ash-metric"><span className="ash-metric__v">{inr(biz.todayRevenue)}</span><span className="ash-metric__l">Revenue today</span></div>
+          <div className="ash-metric"><span className="ash-metric__v">{biz.todayOrders}</span><span className="ash-metric__l">Orders today</span></div>
+          <div className="ash-metric"><span className="ash-metric__v">{inr(biz.aov)}</span><span className="ash-metric__l">Avg order (30d)</span></div>
+          <Link href="/admin/products" className="ash-metric ash-tile--link"><span className="ash-metric__v" style={{ fontSize: "1rem" }}>{biz.topProduct?.name ?? "—"}</span><span className="ash-metric__l">Top seller{biz.topProduct ? ` · ${biz.topProduct.units}u` : ""}</span></Link>
+          <Link href="/admin/products" className="ash-metric ash-tile--link"><span className="ash-metric__v" data-tone={biz.lowStockVariants ? "warn" : "plain"}>{biz.lowStockVariants}</span><span className="ash-metric__l">Low-stock variants</span></Link>
+          <div className="ash-metric"><span className="ash-metric__v" data-tone={biz.pendingEmails ? "warn" : "plain"}>{biz.pendingEmails}</span><span className="ash-metric__l">Pending emails</span></div>
+          <Link href="/admin/orders" className="ash-metric ash-tile--link"><span className="ash-metric__v" data-tone={biz.failedPayments ? "warn" : "plain"}>{biz.failedPayments}</span><span className="ash-metric__l">Failed payments (30d)</span></Link>
+        </div>
+      </section>
 
       <div className="ash-tiles">
         {tiles.map((t) => {
@@ -62,6 +90,23 @@ export default async function AdminDashboard() {
           <div className="ash-metric"><span className="ash-metric__v" data-tone={metrics.ordersOnHold ? "warn" : "plain"}>{metrics.ordersOnHold}</span><span className="ash-metric__l">On hold</span></div>
           <div className="ash-metric"><span className="ash-metric__v" data-tone={metrics.refundQueue ? "warn" : "plain"}>{metrics.refundQueue}</span><span className="ash-metric__l">Refund queue</span></div>
         </div>
+      </section>
+
+      {/* Recent activity timeline */}
+      <section className="ash-activity">
+        <div className="ash-activity__head">
+          <h2 className="ash-jump__title">Recent activity</h2>
+          <Link href="/admin/audit" className="text-link">View all</Link>
+        </div>
+        <ol className="ash-activity__list">
+          {activity.map((e) => (
+            <li key={e.id} className="ash-activity__item">
+              <span className="ash-activity__time">{ago(e.created_at)}</span>
+              <span className="ash-activity__event">{EVENT_LABEL(e.event)}{e.orderNumber ? <> · <Link href={`/admin/orders/${e.orderNumber}`} className="admin__mono">{e.orderNumber}</Link></> : null}</span>
+            </li>
+          ))}
+          {activity.length === 0 ? <li className="admin__muted">No activity yet.</li> : null}
+        </ol>
       </section>
 
       <section className="ash-jump">

@@ -126,7 +126,7 @@
 .om-pay[data-tone="failed"] { background: rgba(168, 68, 58, 0.12); color: #8a3d2f; }
 
 .om-modal { position: fixed; inset: 0; background: rgba(31, 26, 22, 0.42); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 60; }
-.om-modal__card { background: #fff; border: 1px solid var(--ad-hair); border-radius: 6px; padding: 24px; width: 100%; max-width: 440px; box-shadow: 0 24px 60px rgba(31, 26, 22, 0.2); text-align: left; }
+.om-modal__card { background: #fff; border: 1px solid var(--ad-hair); border-radius: 6px; padding: 24px; width: 100%; max-width: 440px; max-height: calc(100vh - 40px); overflow-y: auto; box-shadow: 0 24px 60px rgba(31, 26, 22, 0.2); text-align: left; }
 .om-modal__title { font-family: var(--font-serif); font-size: 1.15rem; margin-bottom: 8px; }
 .om-modal__note { font-family: var(--font-sans); font-size: 12px; color: var(--smoke, #6b6259); line-height: 1.5; margin-bottom: 14px; }
 .om-field { display: block; margin-bottom: 12px; }
@@ -313,7 +313,10 @@
 .cfg-test-out { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .cfg-test-out li { font-family: var(--font-sans); font-size: 13px; padding: 6px 10px; border-radius: 4px; }
 .cfg-test-out li[data-match="1"] { background: rgba(60, 120, 70, 0.1); }
-.om-modal__card--wide { max-width: 620px; }
+.om-modal__card--wide { max-width: 760px; }
+/* Product-editor variant rows: let them scroll horizontally rather than crush. */
+.om-modal__card--wide .cfg-row { min-width: 0; }
+.om-modal__card--wide .cfg-row input, .om-modal__card--wide .cfg-row select { min-width: 0; }
 
 /* ── Analytics: return-reason bars ── */
 .an-bars { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; max-width: 560px; }
@@ -352,3 +355,12 @@
 .au-entity[data-e="refunded"] { background: rgba(168,68,58,0.12); color: #8a3d2f; }
 .au-entity[data-e="refundprog"] { background: rgba(201,169,110,0.2); color: #8a6d3b; }
 @media (max-width: 640px) { .od-tl { grid-template-columns: 1fr; gap: 2px; } .od-tl__actor { text-align: left; } }
+
+/* ── Dashboard activity timeline ── */
+.ash-activity { margin-top: 32px; }
+.ash-activity__head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+.ash-activity__list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--ad-hair); border-radius: 6px; overflow: hidden; }
+.ash-activity__item { display: grid; grid-template-columns: 110px 1fr; gap: 12px; padding: 11px 16px; border-bottom: 1px solid var(--ad-hair); font-family: var(--font-sans); font-size: 13px; align-items: baseline; }
+.ash-activity__item:last-child { border-bottom: none; }
+.ash-activity__time { font-family: ui-monospace, monospace; font-size: 11px; color: var(--smoke, #6b6259); }
+.ash-activity__event { color: var(--ink, #1f1a16); }
