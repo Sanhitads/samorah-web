@@ -16,6 +16,7 @@ export async function GET(request: Request) {
   const events = await getRecentAuditEvents({
     limit: 5000,
     entityType: p.get("entity") ?? undefined,
+    actorType: p.get("actor") ?? undefined,
     search: p.get("search") ?? undefined,
     since: p.get("since") ? new Date(p.get("since") as string).toISOString() : undefined,
   });

@@ -66,13 +66,14 @@ export interface AuditFeedRow extends AuditEvent {
 /** Recent audit events across the platform (newest first) — the activity feed.
  *  Resolves order numbers + staff names so the feed reads in plain language.
  *  Filterable by entity type, event, free-text (notes/event), and a since-date. */
-export async function getRecentAuditEvents(opts: { limit?: number; event?: string; entityType?: string; search?: string; since?: string } = {}): Promise<AuditFeedRow[]> {
+export async function getRecentAuditEvents(opts: { limit?: number; event?: string; entityType?: string; actorType?: string; search?: string; since?: string } = {}): Promise<AuditFeedRow[]> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const db = createAdminClient() as any;
     let q = db.from("audit_events").select("*").order("created_at", { ascending: false }).limit(opts.limit ?? 100);
     if (opts.event) q = q.eq("event", opts.event);
     if (opts.entityType) q = q.eq("entity_type", opts.entityType);
+    if (opts.actorType) q = q.eq("actor_type", opts.actorType);
     if (opts.since) q = q.gte("created_at", opts.since);
     if (opts.search) {
       const s = opts.search.trim().replace(/[%,]/g, "");

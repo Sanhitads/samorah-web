@@ -418,3 +418,8 @@
 .rev-item { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border: 1px solid var(--ad-hair); border-radius: 4px; }
 .rev-item__when { font-family: var(--font-sans); font-size: 13px; }
 .rev-item__meta { font-size: 12px; margin-right: auto; }
+.au-actor { font-family: var(--font-sans); font-size: 12px; font-weight: 600; color: var(--ink, #1f1a16); }
+.au-actor[data-actor="staff"] { color: #3d5a80; }
+.au-actor[data-actor="system"] { color: #6b6259; font-weight: 500; }
+.au-actor[data-actor="webhook"] { color: #8a6d3b; }
+.au-actor[data-actor="customer"] { color: #2f6b3c; }

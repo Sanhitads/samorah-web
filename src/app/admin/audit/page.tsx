@@ -16,16 +16,17 @@ export const dynamic = "force-dynamic";
 const dt = (v: string) => new Date(v).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 const EVENT_LABEL = (e: string) => e.replace(/[._]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 const ENTITIES = ["order", "shipment", "fulfillment", "return", "payment", "product", "settings", "rule"];
+const ACTORS = ["staff", "system", "webhook", "customer"];
 
-export default async function AuditPage({ searchParams }: { searchParams: Promise<{ entity?: string; search?: string; since?: string }> }) {
+export default async function AuditPage({ searchParams }: { searchParams: Promise<{ entity?: string; actor?: string; search?: string; since?: string }> }) {
   const staff = await requireStaff("editor");
   if (!staff.ok) redirect("/login");
   const canExport = hasCapability(staff.role, "data.export");
 
   const sp = await searchParams;
   const since = sp.since ? new Date(sp.since).toISOString() : undefined;
-  const events = await getRecentAuditEvents({ limit: 300, entityType: sp.entity, search: sp.search, since });
-  const qs = new URLSearchParams(Object.entries({ entity: sp.entity, search: sp.search, since: sp.since }).filter(([, v]) => v) as [string, string][]).toString();
+  const events = await getRecentAuditEvents({ limit: 300, entityType: sp.entity, actorType: sp.actor, search: sp.search, since });
+  const qs = new URLSearchParams(Object.entries({ entity: sp.entity, actor: sp.actor, search: sp.search, since: sp.since }).filter(([, v]) => v) as [string, string][]).toString();
 
   return (
     <main className="admin">
@@ -41,9 +42,13 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
           <option value="">All modules</option>
           {ENTITIES.map((e) => <option key={e} value={e}>{e}</option>)}
         </select>
+        <select name="actor" defaultValue={sp.actor ?? ""}>
+          <option value="">Any actor</option>
+          {ACTORS.map((a) => <option key={a} value={a}>{a}</option>)}
+        </select>
         <input type="date" name="since" defaultValue={sp.since ?? ""} />
         <button type="submit" className="ff-btn ff-btn--primary">Apply</button>
-        {sp.entity || sp.search || sp.since ? <a href="/admin/audit" className="ff-btn">Clear</a> : null}
+        {sp.entity || sp.actor || sp.search || sp.since ? <a href="/admin/audit" className="ff-btn">Clear</a> : null}
         {canExport ? <a className="ff-btn adm-filters__export" href={`/api/admin/audit/export${qs ? `?${qs}` : ""}`}>Export CSV</a> : null}
       </form>
 
@@ -56,7 +61,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
               {e.previous_state && e.new_state ? <span className="admin__muted"> · {e.previous_state}→{e.new_state}</span> : null}
               {e.orderNumber ? <> · <Link href={`/admin/orders/${e.orderNumber}`} className="admin__mono">{e.orderNumber}</Link></> : null}
             </span>
-            <span className="od-tl__actor admin__muted">{e.actorName ?? e.actor_type}{e.notes ? ` · ${e.notes}` : ""}</span>
+            <span className="od-tl__actor"><span className="au-actor" data-actor={e.actor_type}>{e.actorName ?? e.actor_type}</span>{e.notes ? <span className="admin__muted"> · {e.notes}</span> : null}</span>
           </li>
         ))}
         {events.length === 0 ? <li className="admin__muted" style={{ padding: 16 }}>No activity matches.</li> : null}
