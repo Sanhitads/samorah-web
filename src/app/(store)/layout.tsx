@@ -1,8 +1,10 @@
+import { cookies } from "next/headers";
 import { AnnouncementBar } from "@/components/layout/AnnouncementBar";
 import { StoreChrome } from "@/components/layout/StoreChrome";
 import { Footer } from "@/components/layout/Footer";
 import { getSiteSettings } from "@/services/siteSettingsService";
 import { getNavigation } from "@/services/navigationService";
+import { requireStaff } from "@/lib/auth/requireStaff";
 
 /**
  * Storefront chrome wrapper (Phase 6 — Layout Chrome, complete).
@@ -30,10 +32,16 @@ export default async function StoreLayout({
     );
   }
 
-  const nav = await getNavigation();
+  // Draft navigation preview (review point 3) — staff-only, gated by a short-lived
+  // cookie set from the Navigation admin. Bypasses the nav cache to show the draft.
+  let preview = false;
+  const jar = await cookies();
+  if (jar.get("nav_preview")) preview = (await requireStaff("editor")).ok;
+  const nav = await getNavigation({ preview });
 
   return (
     <>
+      {preview ? <div className="store-notice" role="status" style={{ background: "#8a3d2f", color: "#fff" }}>Previewing draft navigation — not live. Publish from the admin to go live.</div> : null}
       {settings.storeNotice.active && settings.storeNotice.text ? (
         <div className="store-notice" role="status">{settings.storeNotice.text}</div>
       ) : null}

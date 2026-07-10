@@ -2,12 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import type { NavBranch, NavItem, FooterSection, FooterLink } from "@/services/navigationService";
+import type { NavBranch, NavItem, FooterSection, MenuAdminView } from "@/services/navigationService";
+import type { Revision } from "@/services/cms/revisions";
 
 const TIERS = ["", "parent", "child", "cta"];
 const GRADS = ["grad-chai", "grad-gajar", "grad-air", "grad-smoke", "grad-story"];
 
-/** Move item i of arr in a direction (−1 up / +1 down), returning a new array. */
 function move<T>(arr: T[], i: number, dir: number): T[] {
   const j = i + dir;
   if (j < 0 || j >= arr.length) return arr;
@@ -15,32 +15,53 @@ function move<T>(arr: T[], i: number, dir: number): T[] {
   [next[i], next[j]] = [next[j], next[i]];
   return next;
 }
+const toLocal = (iso?: string | null) => {
+  if (!iso) return "";
+  const d = new Date(iso); const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+};
+const fromLocal = (v: string) => (v ? new Date(v).toISOString() : null);
 
-export function NavigationManager({ branches, footer, headerSource, footerSource }: {
-  branches: NavBranch[]; footer: FooterSection[]; headerSource: string; footerSource: string;
-}) {
+export function NavigationManager({ header, footer }: { header: MenuAdminView; footer: MenuAdminView }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [tab, setTab] = useState<"header" | "footer">("header");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: string; text: string } | null>(null);
-  const [hdr, setHdr] = useState<NavBranch[]>(branches);
-  const [ftr, setFtr] = useState<FooterSection[]>(footer);
+  const [warnings, setWarnings] = useState<string[]>([]);
+  const [hdr, setHdr] = useState<NavBranch[]>(header.draft as NavBranch[]);
+  const [ftr, setFtr] = useState<FooterSection[]>(footer.draft as FooterSection[]);
+  const [pubAt, setPubAt] = useState("");
+  const [unpubAt, setUnpubAt] = useState("");
+  const [revs, setRevs] = useState<Revision[] | null>(null);
+
+  const view = tab === "header" ? header : footer;
+  const data = tab === "header" ? hdr : ftr;
 
   const post = async (body: Record<string, unknown>) => {
-    setBusy(true); setMsg(null);
+    setBusy(true); setMsg(null); setWarnings([]);
     try {
-      const res = await fetch("/api/admin/navigation", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const res = await fetch("/api/admin/navigation", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ menu: tab, ...body }) });
       const d = await res.json(); setBusy(false);
-      if (!res.ok || d.ok === false) { setMsg({ tone: "err", text: d.error ?? d.reason ?? "Failed" }); return false; }
-      setMsg({ tone: "ok", text: "Saved." }); startTransition(() => router.refresh()); return true;
-    } catch { setBusy(false); setMsg({ tone: "err", text: "Network error" }); return false; }
+      if (Array.isArray(d.warnings)) setWarnings(d.warnings);
+      if (!res.ok || d.ok === false) { setMsg({ tone: "err", text: d.error ?? d.reason ?? "Failed" }); return d; }
+      startTransition(() => router.refresh());
+      return d;
+    } catch { setBusy(false); setMsg({ tone: "err", text: "Network error" }); return null; }
   };
-  const saveHeader = () => post({ action: "save", menu: "header", data: hdr });
-  const saveFooter = () => post({ action: "save", menu: "footer", data: ftr });
-  const reset = (menu: "header" | "footer") => post({ action: "reset", menu });
 
-  // ── header mutators ──
+  const saveDraft = async () => { const d = await post({ action: "save", data }); if (d?.ok) setMsg({ tone: "ok", text: "Draft saved." }); };
+  const publish = async () => { const d = await post({ action: "publish", data, publishAt: fromLocal(pubAt), unpublishAt: fromLocal(unpubAt) }); if (d?.ok) setMsg({ tone: "ok", text: pubAt ? "Scheduled." : "Published live." }); };
+  const reset = async () => { const d = await post({ action: "reset" }); if (d?.ok) setMsg({ tone: "ok", text: "Reset to default." }); };
+  const openRevs = async () => { const d = await post({ action: "revisions" }); if (d?.revisions) setRevs(d.revisions); };
+  const restore = async (id: string) => { const d = await post({ action: "restore", id }); if (d?.ok) { setRevs(null); setMsg({ tone: "ok", text: "Restored into draft — review, then publish." }); } };
+  const preview = async () => {
+    await post({ action: "save", data });          // preview the latest edits
+    document.cookie = "nav_preview=1; path=/; max-age=300";
+    window.open("/", "_blank", "noopener");
+  };
+
+  // header mutators
   const setBranch = (bi: number, patch: Partial<NavBranch>) => setHdr((h) => h.map((b, i) => (i === bi ? { ...b, ...patch } : b)));
   const setItem = (bi: number, ii: number, patch: Partial<NavItem>) => setHdr((h) => h.map((b, i) => (i === bi ? { ...b, items: b.items.map((it, j) => (j === ii ? { ...it, ...patch } : it)) } : b)));
   const setCampaign = (bi: number, patch: Partial<NavBranch["campaign"]>) => setHdr((h) => h.map((b, i) => (i === bi ? { ...b, campaign: { ...b.campaign, ...patch } } : b)));
@@ -50,6 +71,7 @@ export function NavigationManager({ branches, footer, headerSource, footerSource
       <nav className="ff-queues" aria-label="Menu">
         <button type="button" className="ff-queue" data-active={tab === "header" ? "1" : "0"} onClick={() => setTab("header")}>Header · mega-menu</button>
         <button type="button" className="ff-queue" data-active={tab === "footer" ? "1" : "0"} onClick={() => setTab("footer")}>Footer</button>
+        <span className="adm-badge" style={{ marginLeft: "auto" }}>{view.state}</span>
       </nav>
 
       {tab === "header" ? (
@@ -65,7 +87,6 @@ export function NavigationManager({ branches, footer, headerSource, footerSource
                   <button type="button" className="ff-btn ff-btn--danger" onClick={() => setHdr((h) => h.filter((_, i) => i !== bi))}>Remove branch</button>
                 </span>
               </div>
-
               {b.items.map((it, ii) => (
                 <div key={ii} className="cfg-row" style={{ gridTemplateColumns: "1.4fr 1.4fr 0.8fr auto auto auto auto" }}>
                   <input value={it.label} onChange={(e) => setItem(bi, ii, { label: e.target.value })} placeholder="Label" />
@@ -78,7 +99,6 @@ export function NavigationManager({ branches, footer, headerSource, footerSource
                 </div>
               ))}
               <button type="button" className="ff-btn" onClick={() => setBranch(bi, { items: [...b.items, { label: "New link", href: "/" }] })}>+ link</button>
-
               <p className="cfg-sub" style={{ marginTop: 12 }}>Campaign panel</p>
               <div className="cfg-grid">
                 <label className="cfg-field"><span>Eyebrow</span><input value={b.campaign.eyebrow} onChange={(e) => setCampaign(bi, { eyebrow: e.target.value })} /></label>
@@ -91,12 +111,6 @@ export function NavigationManager({ branches, footer, headerSource, footerSource
             </div>
           ))}
           <button type="button" className="ff-btn" onClick={() => setHdr((h) => [...h, { id: `branch-${h.length + 1}`, label: "New branch", items: [{ label: "Link", href: "/" }], campaign: { eyebrow: "Featured", title: "Title", description: "", href: "/", gradient: "grad-chai" } }])}>+ branch</button>
-
-          <div className="cfg-actions">
-            <button type="button" className="ff-btn ff-btn--primary" disabled={busy || pending} onClick={saveHeader}>{busy ? "Saving…" : "Save header"}</button>
-            {headerSource === "db" ? <button type="button" className="ff-btn" disabled={busy} onClick={() => reset("header")}>Reset to default</button> : null}
-            {msg ? <span className={`cfg-msg cfg-msg--${msg.tone}`}>{msg.text}</span> : null}
-          </div>
         </div>
       ) : (
         <div>
@@ -124,14 +138,43 @@ export function NavigationManager({ branches, footer, headerSource, footerSource
             </div>
           ))}
           <button type="button" className="ff-btn" onClick={() => setFtr((f) => [...f, { title: "New column", links: [{ label: "Link", href: "/" }] }])}>+ column</button>
-
-          <div className="cfg-actions">
-            <button type="button" className="ff-btn ff-btn--primary" disabled={busy || pending} onClick={saveFooter}>{busy ? "Saving…" : "Save footer"}</button>
-            {footerSource === "db" ? <button type="button" className="ff-btn" disabled={busy} onClick={() => reset("footer")}>Reset to default</button> : null}
-            {msg ? <span className={`cfg-msg cfg-msg--${msg.tone}`}>{msg.text}</span> : null}
-          </div>
         </div>
       )}
+
+      {warnings.length ? <ul className="nav-warn">{warnings.map((w, i) => <li key={i}>⚠ {w}</li>)}</ul> : null}
+
+      <div className="nav-publish">
+        <div className="cfg-grid">
+          <label className="cfg-field"><span>Publish at (optional — schedule)</span><input type="datetime-local" value={pubAt} onChange={(e) => setPubAt(e.target.value)} /></label>
+          <label className="cfg-field"><span>Unpublish at (optional)</span><input type="datetime-local" value={unpubAt} onChange={(e) => setUnpubAt(e.target.value)} /></label>
+        </div>
+        <div className="cfg-actions">
+          <button type="button" className="ff-btn" disabled={busy || pending} onClick={saveDraft}>Save draft</button>
+          <button type="button" className="ff-btn" disabled={busy} onClick={preview}>Preview</button>
+          <button type="button" className="ff-btn ff-btn--primary" disabled={busy} onClick={publish}>{pubAt ? "Schedule" : "Publish"}</button>
+          <button type="button" className="ff-btn" disabled={busy} onClick={openRevs}>History</button>
+          {view.source === "db" ? <button type="button" className="ff-btn ff-btn--danger" disabled={busy} onClick={reset}>Reset to default</button> : null}
+          {msg ? <span className={`cfg-msg cfg-msg--${msg.tone}`}>{msg.text}</span> : null}
+        </div>
+      </div>
+
+      {revs ? (
+        <div className="om-modal" role="dialog" aria-modal="true" onClick={() => setRevs(null)}>
+          <div className="om-modal__card" onClick={(e) => e.stopPropagation()}>
+            <h2 className="om-modal__title">History · {tab}</h2>
+            {revs.length ? (
+              <ul className="rev-list">{revs.map((r) => (
+                <li key={r.id} className="rev-item">
+                  <span className="rev-item__when">{new Date(r.createdAt).toLocaleString()}</span>
+                  <span className="rev-item__meta admin__muted">{r.label ?? "published"}</span>
+                  <button type="button" className="ff-btn" disabled={busy} onClick={() => restore(r.id)}>Restore to draft</button>
+                </li>
+              ))}</ul>
+            ) : <p className="admin__empty">No published versions yet.</p>}
+            <div className="om-modal__actions"><button type="button" className="ff-btn" onClick={() => setRevs(null)}>Close</button></div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

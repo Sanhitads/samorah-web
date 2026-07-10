@@ -8,6 +8,8 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logEvent } from "@/services/auditService";
 import { LEGAL } from "@/config/legalContent";
+import { isLive } from "@/lib/cms/publishable";
+import { snapshotRevision as snapshotCmsRevision, listRevisions as listCmsRevisions, getRevisionSnapshot } from "@/services/cms/revisions";
 
 export interface PageSection { heading?: string; body: string[] }
 export type PageStatus = "draft" | "scheduled" | "published";
@@ -33,12 +35,7 @@ export interface CmsPage {
  *   draft     → never live
  */
 export function isPageLive(row: { status: string; publish_at?: string | null; unpublish_at?: string | null }, now = Date.now()): boolean {
-  const pub = row.publish_at ? Date.parse(row.publish_at) : null;
-  const unpub = row.unpublish_at ? Date.parse(row.unpublish_at) : null;
-  if (unpub !== null && now >= unpub) return false;
-  if (row.status === "published") return pub === null || now >= pub;
-  if (row.status === "scheduled") return pub !== null && now >= pub;
-  return false;
+  return isLive(row, now); // delegates to the shared Publishable rule (point 14)
 }
 
 function mapRow(data: any): CmsPage {
@@ -116,51 +113,31 @@ export async function upsertPage(input: PageInput, actorId?: string): Promise<{ 
   };
   const { error } = await db.from("cms_pages").upsert(row, { onConflict: "slug" });
   if (error) return { ok: false, reason: error.message };
-  await snapshotRevision(row, actorId);
+  await snapshotCmsRevision("page", row.slug, row, actorId); // shared revision store (point 14)
   await logEvent({ entityType: "settings", event: "cms.page_saved", actorType: actorId ? "staff" : "system", actorId, notes: input.slug });
   return { ok: true };
 }
 
-/** Snapshot a committed version into the revision log (R3). Non-blocking on failure. */
-async function snapshotRevision(row: any, actorId?: string): Promise<void> {
-  try {
-    const db = createAdminClient() as any;
-    await db.from("cms_page_revisions").insert({
-      slug: row.slug, title: row.title, eyebrow: row.eyebrow, intro: row.intro,
-      sections: row.sections, seo: row.seo, status: row.status,
-      publish_at: row.publish_at ?? null, unpublish_at: row.unpublish_at ?? null, actor_id: actorId ?? null,
-    });
-  } catch { /* history is best-effort; never block a save */ }
-}
-
 export interface PageRevision {
-  id: string; slug: string; title: string; eyebrow: string; intro: string;
-  sections: PageSection[]; seo: CmsPage["seo"]; status: PageStatus;
-  publishAt?: string | null; unpublishAt?: string | null; actorId?: string | null; createdAt: string;
+  id: string; slug: string; title: string; status: PageStatus; actorId?: string | null; createdAt: string;
 }
 
-/** Admin: revision history for a page, newest first. */
+/** Admin: revision history for a page, newest first (from the shared cms_revisions store). */
 export async function listRevisions(slug: string, limit = 30): Promise<PageRevision[]> {
-  const db = createAdminClient() as any;
-  const { data } = await db.from("cms_page_revisions").select("*").eq("slug", slug).order("created_at", { ascending: false }).limit(limit);
-  return (data ?? []).map((r: any) => ({
-    id: r.id, slug: r.slug, title: r.title, eyebrow: r.eyebrow ?? "", intro: r.intro ?? "",
-    sections: Array.isArray(r.sections) ? r.sections : [], seo: r.seo ?? {}, status: r.status,
-    publishAt: r.publish_at ?? null, unpublishAt: r.unpublish_at ?? null, actorId: r.actor_id ?? null, createdAt: r.created_at,
-  }));
+  const revs = await listCmsRevisions("page", slug, limit);
+  return revs.map((r) => ({ id: r.id, slug, title: r.snapshot?.title ?? slug, status: r.snapshot?.status ?? "published", actorId: r.actorId, createdAt: r.createdAt }));
 }
 
-/** Admin: restore a past revision — writes its content back as a new current version. */
+/** Admin: restore a past revision — writes its snapshot back as a new current version. */
 export async function restoreRevision(revisionId: string, actorId?: string): Promise<{ ok: boolean; reason?: string }> {
-  const db = createAdminClient() as any;
-  const { data: rev } = await db.from("cms_page_revisions").select("*").eq("id", revisionId).maybeSingle();
-  if (!rev) return { ok: false, reason: "revision not found" };
+  const snap = await getRevisionSnapshot(revisionId);
+  if (!snap) return { ok: false, reason: "revision not found" };
   const res = await upsertPage({
-    slug: rev.slug, title: rev.title, eyebrow: rev.eyebrow ?? "", intro: rev.intro ?? "",
-    sections: Array.isArray(rev.sections) ? rev.sections : [], seo: rev.seo ?? {}, status: rev.status,
-    publishAt: rev.publish_at ?? null, unpublishAt: rev.unpublish_at ?? null,
+    slug: snap.slug, title: snap.title, eyebrow: snap.eyebrow ?? "", intro: snap.intro ?? "",
+    sections: Array.isArray(snap.sections) ? snap.sections : [], seo: snap.seo ?? {}, status: snap.status,
+    publishAt: snap.publish_at ?? null, unpublishAt: snap.unpublish_at ?? null,
   }, actorId);
-  if (res.ok) await logEvent({ entityType: "settings", event: "cms.page_restored", actorType: actorId ? "staff" : "system", actorId, notes: `${rev.slug} ← ${revisionId}` });
+  if (res.ok) await logEvent({ entityType: "settings", event: "cms.page_restored", actorType: actorId ? "staff" : "system", actorId, notes: `${snap.slug} ← ${revisionId}` });
   return res;
 }
 
