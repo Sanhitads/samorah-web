@@ -9,6 +9,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { logEvent } from "@/services/auditService";
 import { COMMERCE } from "@/config/commerce";
 
+/** Module toggles (R5). Default false — these gate not-yet-live/optional features. */
+export const FEATURE_KEYS = ["reviews", "wishlist", "rewards", "blog", "wholesale", "referral", "subscription", "aiSearch"] as const;
+export type FeatureKey = (typeof FEATURE_KEYS)[number];
+
 export interface SiteSettings {
   brand: { name: string; tagline: string };
   support: { email: string; phone: string; hours: string };
@@ -16,6 +20,9 @@ export interface SiteSettings {
   seo: { titleSuffix: string; defaultDescription: string; ogImageUrl: string };
   analytics: { gaId: string };
   announcement: { text: string; active: boolean; link: string };
+  features: Record<FeatureKey, boolean>;
+  maintenance: { enabled: boolean; message: string };
+  storeNotice: { text: string; active: boolean };
 }
 
 function defaults(): SiteSettings {
@@ -26,6 +33,9 @@ function defaults(): SiteSettings {
     seo: { titleSuffix: ` · ${COMMERCE.brandName}`, defaultDescription: "", ogImageUrl: "" },
     analytics: { gaId: process.env.NEXT_PUBLIC_GA_ID ?? "" },
     announcement: { text: "", active: false, link: "" },
+    features: Object.fromEntries(FEATURE_KEYS.map((k) => [k, false])) as Record<FeatureKey, boolean>,
+    maintenance: { enabled: false, message: "We're making a few improvements. Back very soon." },
+    storeNotice: { text: "", active: false },
   };
 }
 
@@ -43,6 +53,9 @@ export async function getSiteSettings(): Promise<SiteSettings> {
       seo: { ...d.seo, ...s.seo },
       analytics: { ...d.analytics, ...s.analytics },
       announcement: { ...d.announcement, ...s.announcement },
+      features: { ...d.features, ...s.features },
+      maintenance: { ...d.maintenance, ...s.maintenance },
+      storeNotice: { ...d.storeNotice, ...s.storeNotice },
     };
   } catch {
     return d;
@@ -64,4 +77,10 @@ export async function updateSiteSettings(patch: Partial<SiteSettings>, actorId?:
   } catch (e) {
     return { ok: false, reason: e instanceof Error ? e.message : "failed" };
   }
+}
+
+/** Is an optional module enabled? Reads the feature flags (R5). Safe no-op default (false). */
+export async function isFeatureEnabled(key: FeatureKey): Promise<boolean> {
+  const s = await getSiteSettings();
+  return Boolean(s.features[key]);
 }

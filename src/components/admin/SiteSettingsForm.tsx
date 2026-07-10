@@ -4,6 +4,11 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { SiteSettings } from "@/services/siteSettingsService";
 
+const FEATURE_LABELS: Record<string, string> = {
+  reviews: "Reviews", wishlist: "Wishlist", rewards: "Rewards / Loyalty", blog: "Journal / Blog",
+  wholesale: "Wholesale", referral: "Referral", subscription: "Subscriptions", aiSearch: "AI Search",
+};
+
 /** General site settings editor (brand · support · social · SEO · analytics · announcement). */
 export function SiteSettingsForm({ settings }: { settings: SiteSettings }) {
   const router = useRouter();
@@ -61,6 +66,19 @@ export function SiteSettingsForm({ settings }: { settings: SiteSettings }) {
       <div className="cfg-grid">
         <label className="cfg-field"><span>GA4 Measurement ID</span><input value={s.analytics.gaId} onChange={(e) => g("analytics", "gaId", e.target.value)} placeholder="G-XXXXXXX" /></label>
       </div>
+
+      <p className="cfg-sub">Feature flags (toggle modules — no deploy)</p>
+      <div className="cfg-checks" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
+        {Object.keys(s.features).map((k) => (
+          <label key={k} className="om-check"><input type="checkbox" checked={s.features[k as keyof typeof s.features]} onChange={(e) => setS((p) => ({ ...p, features: { ...p.features, [k]: e.target.checked } }))} /><span>{FEATURE_LABELS[k] ?? k}</span></label>
+        ))}
+      </div>
+
+      <p className="cfg-sub">Maintenance & store notice</p>
+      <label className="om-check"><input type="checkbox" checked={s.maintenance.enabled} onChange={(e) => g("maintenance", "enabled", e.target.checked)} /><span>Maintenance mode (storefront lockout — admin stays open)</span></label>
+      <label className="cfg-field"><span>Maintenance message</span><input value={s.maintenance.message} onChange={(e) => g("maintenance", "message", e.target.value)} /></label>
+      <label className="om-check"><input type="checkbox" checked={s.storeNotice.active} onChange={(e) => g("storeNotice", "active", e.target.checked)} /><span>Show store notice banner</span></label>
+      <label className="cfg-field"><span>Store notice text</span><input value={s.storeNotice.text} onChange={(e) => g("storeNotice", "text", e.target.value)} placeholder="Dispatch paused 12–15 Aug for a short break" /></label>
 
       <p className="cfg-sub">Announcement bar</p>
       <label className="cfg-field"><span>Text</span><input value={s.announcement.text} onChange={(e) => g("announcement", "text", e.target.value)} placeholder="Complimentary shipping over ₹1,499" /></label>
