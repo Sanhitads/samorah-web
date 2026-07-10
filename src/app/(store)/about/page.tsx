@@ -3,14 +3,25 @@ import { cookies } from "next/headers";
 import { getAboutSections } from "@/services/aboutService";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { ComposedSections } from "@/components/page/ComposedSections";
+import { getRouteSeo } from "@/services/seoRedirectService";
 
 /**
  * About — consumer #2 of the Composable Page framework. Same engine, same shared
  * <ComposedSections> renderer, same reusable section types as the homepage — only
  * the page key and default composition differ. A new editorial page is a config.
  */
-export const metadata: Metadata = { title: "About" };
 export const dynamic = "force-dynamic";
+
+/** Metadata reads DB SEO overrides (slice 6) layered over global defaults. */
+export async function generateMetadata(): Promise<Metadata> {
+  const seo = await getRouteSeo("/about");
+  return {
+    title: seo.title || "About",
+    description: seo.description,
+    openGraph: seo.ogImage ? { images: [seo.ogImage] } : undefined,
+    robots: seo.robots || undefined,
+  };
+}
 
 export default async function AboutPage() {
   let preview = false;
