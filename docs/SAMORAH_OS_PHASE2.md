@@ -56,5 +56,23 @@ This maps each point to reality so we **enhance, not rebuild**.
 7. **Enhance existing** (Fulfillment batch, Returns/Shipments fields, Product tabs, Rules triggers, Packaging cost-history, Warehouse cutoffs, Coupons advanced)
 8. **Inventory WMS** (post-launch volume)
 
-## Log
-- **P1 Dashboard** — business KPIs + inline activity timeline · _in progress_
+## Log (this Phase-2 program)
+- ✅ **UI fix** — product-edit modal overflow (max-height + scroll)
+- ✅ **P1 Dashboard** — business KPIs (today revenue/orders/AOV, top seller, low-stock, pending emails, failed payments) + inline activity timeline
+- ✅ **Phase 1 Orders** — search, status/payment filters, CSV export, row badges (High-value/GST/Gift/COD/tags), internal note + tags + resend-email on detail
+- ✅ **Phase 1 Activity** — filters (module/search/since), colour coding (severity), CSV export
+- ✅ **Phase 1 Bulk** — batch fulfillment (create-shipments-for-all-ready, dispatch-all-assigned)
+- ✅ **Phase 2 Settings** — general site settings → DB (brand/support/social/SEO/analytics/announcement), tax/legal shown read-only; GA reads its ID from settings
+- ✅ **Phase 3 CRM** — Customer 360 (list + detail: LTV/AOV/orders/addresses/returns/loyalty/consent + notes/tags + derived segment)
+- ✅ **Phase 4 Reports** — GST report (CGST/SGST/IGST by state + CSV, for filing), top products, coupon usage, repeat rate, orders-by-state
+- ✅ **Phase 5 CMS (slice 1) Pages** — cms_pages content model + `/admin/content` editor + storefront reads DB→config fallback (policy/info pages editable, per-page SEO)
+
+### Remaining CMS + later phases
+- **CMS slice 2** — Navigation Manager (header/footer/mega-menu links → DB)
+- **CMS slice 3** — Media Library (Supabase Storage: upload/alt/folders/usage)
+- **CMS slice 4** — Email Template Manager (subject/blocks → DB)
+- **CMS slice 5** — Homepage Builder (section composition → DB) · **SEO Manager** (per-page, mostly in cms_pages.seo already)
+- **Phase 6 Managers** — Blog/Journal, Collections editor, Homepage banners, Newsletter admin (list/export subscribers)
+- **Enhance existing** — Rules-engine execution (event→rules dispatcher, more actions), Product editor tabs, Returns/Shipments extra fields, Packaging cost-history + assembly + barcode, Warehouse cutoff/summary, Coupons advanced (analytics/segments/product-specific)
+- **Phase 7 Optimization** — security (CSP), a11y (skip-link, focus), performance, more tests
+- **Inventory/ERP** — deferred (per user)
