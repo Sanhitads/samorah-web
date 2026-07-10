@@ -117,6 +117,7 @@ export interface MediaUsage { usedBy: { type: string; id: string; context?: stri
 export async function getMediaUsage(id: string): Promise<MediaUsage> {
   const db = createAdminClient() as any;
   const usedBy: MediaUsage["usedBy"] = [];
+  // Pages — sections + seo reference media ids.
   try {
     const { data: pages } = await db.from("cms_pages").select("slug,title,sections,seo");
     for (const p of pages ?? []) {
@@ -124,6 +125,18 @@ export async function getMediaUsage(id: string): Promise<MediaUsage> {
       if (blob.includes(id)) usedBy.push({ type: "page", id: p.slug, context: p.title });
     }
   } catch { /* cms_pages optional */ }
+  // Navigation — mega-menu campaign imagery references media ids.
+  try {
+    const { data: menus } = await db.from("navigation_menus").select("id,draft,published");
+    for (const m of menus ?? []) {
+      if ((JSON.stringify(m.published ?? "") + JSON.stringify(m.draft ?? "")).includes(id)) usedBy.push({ type: "navigation", id: m.id, context: `${m.id} menu` });
+    }
+  } catch { /* navigation optional */ }
+  // Homepage — section settings reference media ids (review point 10).
+  try {
+    const { data: hp } = await db.from("homepage").select("draft,published").eq("id", true).maybeSingle();
+    if (hp && (JSON.stringify(hp.published ?? "") + JSON.stringify(hp.draft ?? "")).includes(id)) usedBy.push({ type: "homepage", id: "homepage", context: "Homepage section" });
+  } catch { /* homepage optional */ }
   return { usedBy };
 }
 
