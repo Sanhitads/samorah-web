@@ -391,3 +391,5 @@
 .board-bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; padding: 10px 14px; border: 1px dashed var(--ad-hair); border-radius: 6px; background: #fbf9f5; }
 .board-bulk__label { font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--smoke, #6b6259); }
 .om-pay[data-tone="gold"] { background: rgba(201,169,110,0.24); color: #8a6d3b; }
+.cms-section { border: 1px solid var(--ad-hair); border-radius: 5px; padding: 12px; margin-bottom: 8px; display: flex; flex-direction: column; gap: 8px; }
+.cms-section input, .cms-section textarea { width: 100%; padding: 8px 10px; font-family: var(--font-sans); font-size: 13px; border: 1px solid var(--ad-hair); border-radius: 3px; box-sizing: border-box; }
