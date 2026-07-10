@@ -4,6 +4,7 @@ import { getAirVolume, getAirVolumes } from "@/config/theHours";
 import { buildAirVolumePage } from "@/lib/airPage";
 import { isPagePublished } from "@/platform/pageResolver";
 import { PageView, buildPageMetadata } from "@/components/page";
+import { withRouteSeo } from "@/services/seoRedirectService";
 
 /**
  * Air Chapters / The Hours (Experience B) — `/collections/[slug]`. The route
@@ -24,7 +25,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const vol = getAirVolume(slug);
-  return vol ? buildPageMetadata(buildAirVolumePage(vol)) : {};
+  return withRouteSeo(`/collections/${slug}`, vol ? buildPageMetadata(buildAirVolumePage(vol)) : {});
 }
 
 export default async function CollectionRoute({

@@ -4,6 +4,7 @@
  * 301/302s (applied in middleware); SEO overrides layer per-route meta/canonical/OG/
  * robots over the global defaults (site_settings.seo), read by generateMetadata.
  */
+import type { Metadata } from "next";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logEvent } from "@/services/auditService";
 import { getSiteSettings } from "@/services/siteSettingsService";
@@ -41,19 +42,20 @@ export async function deleteRedirect(id: string, actorId?: string): Promise<{ ok
 }
 
 // ── SEO overrides ──────────────────────────────────────────────────────────
-export interface SeoOverrideRow { path: string; title: string; description: string; ogImage: string; robots: string }
+export interface SeoOverrideRow { path: string; title: string; description: string; ogImage: string; robots: string; canonical: string; sitemapPriority: string; changeFreq: string }
 
 export async function listSeoOverrides(): Promise<SeoOverrideRow[]> {
   const db = createAdminClient() as any;
   const { data } = await db.from("seo_overrides").select("*").order("path");
-  return (data ?? []).map((r: any) => ({ path: r.path, title: r.title ?? "", description: r.description ?? "", ogImage: r.og_image ?? "", robots: r.robots ?? "" }));
+  return (data ?? []).map((r: any) => ({ path: r.path, title: r.title ?? "", description: r.description ?? "", ogImage: r.og_image ?? "", robots: r.robots ?? "", canonical: r.canonical ?? "", sitemapPriority: r.sitemap_priority != null ? String(r.sitemap_priority) : "", changeFreq: r.change_freq ?? "" }));
 }
 
-export async function upsertSeoOverride(input: { path: string; title?: string; description?: string; ogImage?: string; robots?: string }, actorId?: string): Promise<{ ok: boolean; reason?: string }> {
+export async function upsertSeoOverride(input: { path: string; title?: string; description?: string; ogImage?: string; robots?: string; canonical?: string; sitemapPriority?: string; changeFreq?: string }, actorId?: string): Promise<{ ok: boolean; reason?: string }> {
   const path = cleanPath(input.path);
   if (!path) return { ok: false, reason: "path required" };
   const db = createAdminClient() as any;
-  const { error } = await db.from("seo_overrides").upsert({ path, title: input.title || null, description: input.description || null, og_image: input.ogImage || null, robots: input.robots || null, updated_at: new Date().toISOString() }, { onConflict: "path" });
+  const prio = input.sitemapPriority && !Number.isNaN(Number(input.sitemapPriority)) ? Number(input.sitemapPriority) : null;
+  const { error } = await db.from("seo_overrides").upsert({ path, title: input.title || null, description: input.description || null, og_image: input.ogImage || null, robots: input.robots || null, canonical: input.canonical || null, sitemap_priority: prio, change_freq: input.changeFreq || null, updated_at: new Date().toISOString() }, { onConflict: "path" });
   if (error) return { ok: false, reason: error.message };
   await logEvent({ entityType: "settings", event: "seo.saved", actorType: actorId ? "staff" : "system", actorId, notes: path });
   return { ok: true };
@@ -68,14 +70,28 @@ export async function deleteSeoOverride(path: string, actorId?: string): Promise
 }
 
 /** Resolved SEO for a route — per-path override layered over global defaults. */
-export interface RouteSeo { title?: string; description?: string; ogImage?: string; robots?: string }
+export interface RouteSeo { title?: string; description?: string; ogImage?: string; robots?: string; canonical?: string; sitemapPriority?: number; changeFreq?: string }
 export async function getRouteSeo(path: string): Promise<RouteSeo> {
   const settings = await getSiteSettings();
   const base: RouteSeo = { description: settings.seo.defaultDescription || undefined, ogImage: settings.seo.ogImageUrl || undefined };
   try {
     const db = createAdminClient() as any;
     const { data } = await db.from("seo_overrides").select("*").eq("path", cleanPath(path)).maybeSingle();
-    if (data) return { title: data.title || base.title, description: data.description || base.description, ogImage: data.og_image || base.ogImage, robots: data.robots || undefined };
+    if (data) return { title: data.title || base.title, description: data.description || base.description, ogImage: data.og_image || base.ogImage, robots: data.robots || undefined, canonical: data.canonical || undefined, sitemapPriority: data.sitemap_priority ?? undefined, changeFreq: data.change_freq || undefined };
   } catch { /* fall back to defaults */ }
   return base;
+}
+
+/** Overlay a route's DB SEO override onto its natural metadata (override wins). One
+ *  line per route: `return withRouteSeo("/shop/"+slug, base)` in generateMetadata. */
+export async function withRouteSeo(path: string, base: Metadata = {}): Promise<Metadata> {
+  const s = await getRouteSeo(path);
+  return {
+    ...base,
+    title: s.title || base.title,
+    description: s.description || (base.description as string | undefined),
+    alternates: s.canonical ? { ...(base.alternates ?? {}), canonical: s.canonical } : base.alternates,
+    openGraph: s.ogImage ? { ...(base.openGraph ?? {}), images: [s.ogImage] } : base.openGraph,
+    robots: s.robots || base.robots,
+  };
 }

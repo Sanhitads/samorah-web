@@ -1,7 +1,9 @@
+import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { getHomepageSections } from "@/services/homepageService";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { ComposedSections } from "@/components/page/ComposedSections";
+import { withRouteSeo } from "@/services/seoRedirectService";
 
 /**
  * Homepage — consumer #1 of the Composable Page framework. Composition + content are
@@ -9,6 +11,11 @@ import { ComposedSections } from "@/components/page/ComposedSections";
  * typed section list (config fallback). Staff-gated draft preview via cookie.
  */
 export const dynamic = "force-dynamic";
+
+/** Homepage metadata reads DB SEO overrides (path "/") over the site defaults. */
+export function generateMetadata(): Promise<Metadata> {
+  return withRouteSeo("/", {});
+}
 
 export default async function HomePage() {
   let preview = false;

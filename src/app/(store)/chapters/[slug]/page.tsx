@@ -4,6 +4,7 @@ import { getCollectionBySlug, getCollections } from "@/services/collectionServic
 import { buildChapterPage, type ChapterInput, type ChapterSummary } from "@/lib/chapterPage";
 import { isPagePublished } from "@/platform/pageResolver";
 import { PageView, buildPageMetadata } from "@/components/page";
+import { withRouteSeo } from "@/services/seoRedirectService";
 
 /**
  * Chapter page (Phase 8, step 9, Beat 3) — `/chapters/[slug]`. The route does
@@ -40,7 +41,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const page = await loadChapterPage(slug);
-  return page ? buildPageMetadata(page) : {};
+  return withRouteSeo(`/chapters/${slug}`, page ? buildPageMetadata(page) : {});
 }
 
 export default async function ChapterRoute({

@@ -11,7 +11,7 @@ export function SeoRedirectsManager({ redirects, seo }: { redirects: RedirectRow
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: string; text: string } | null>(null);
   const [nr, setNr] = useState({ fromPath: "", toPath: "", code: 301 });
-  const [ns, setNs] = useState({ path: "", title: "", description: "", ogImage: "", robots: "" });
+  const [ns, setNs] = useState({ path: "", title: "", description: "", ogImage: "", robots: "", canonical: "", sitemapPriority: "", changeFreq: "" });
 
   const post = async (body: Record<string, unknown>) => {
     setBusy(true); setMsg(null);
@@ -26,7 +26,7 @@ export function SeoRedirectsManager({ redirects, seo }: { redirects: RedirectRow
   const addRedirect = async () => { if (await post({ action: "redirect.save", redirect: nr })) { setNr({ fromPath: "", toPath: "", code: 301 }); setMsg({ tone: "ok", text: "Redirect saved." }); } };
   const toggleRedirect = (r: RedirectRow) => post({ action: "redirect.save", redirect: { id: r.id, fromPath: r.fromPath, toPath: r.toPath, code: r.code, enabled: !r.enabled } });
   const delRedirect = (id: string) => post({ action: "redirect.delete", id });
-  const addSeo = async () => { if (await post({ action: "seo.save", seo: ns })) { setNs({ path: "", title: "", description: "", ogImage: "", robots: "" }); setMsg({ tone: "ok", text: "SEO override saved." }); } };
+  const addSeo = async () => { if (await post({ action: "seo.save", seo: ns })) { setNs({ path: "", title: "", description: "", ogImage: "", robots: "", canonical: "", sitemapPriority: "", changeFreq: "" }); setMsg({ tone: "ok", text: "SEO override saved." }); } };
   const delSeo = (path: string) => post({ action: "seo.delete", path });
 
   return (
@@ -68,6 +68,9 @@ export function SeoRedirectsManager({ redirects, seo }: { redirects: RedirectRow
             <label className="cfg-field"><span>Meta description</span><input value={ns.description} onChange={(e) => setNs({ ...ns, description: e.target.value })} /></label>
             <label className="cfg-field"><span>OG image URL</span><input value={ns.ogImage} onChange={(e) => setNs({ ...ns, ogImage: e.target.value })} /></label>
             <label className="cfg-field"><span>Robots</span><input value={ns.robots} onChange={(e) => setNs({ ...ns, robots: e.target.value })} placeholder="noindex,nofollow" /></label>
+            <label className="cfg-field"><span>Canonical URL</span><input value={ns.canonical} onChange={(e) => setNs({ ...ns, canonical: e.target.value })} placeholder="https://…" /></label>
+            <label className="cfg-field"><span>Sitemap priority (0–1)</span><input value={ns.sitemapPriority} onChange={(e) => setNs({ ...ns, sitemapPriority: e.target.value })} placeholder="0.8" /></label>
+            <label className="cfg-field"><span>Change frequency</span><input value={ns.changeFreq} onChange={(e) => setNs({ ...ns, changeFreq: e.target.value })} placeholder="weekly" /></label>
             <div style={{ display: "flex", alignItems: "flex-end" }}><button type="button" className="ff-btn ff-btn--primary" disabled={busy} onClick={addSeo}>Save</button></div>
           </div>
           <table className="admin__table admin__table--board" style={{ marginTop: 10 }}>

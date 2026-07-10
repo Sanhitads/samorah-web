@@ -5,6 +5,7 @@ import { buildShopPage, canonicalShopUrl, type ShopProductInput } from "@/lib/sh
 import type { ProductEdition } from "@/services/collectionService";
 import { ProductCard } from "@/components/ui/ProductCard";
 import { ShopToolbar } from "@/components/shop/ShopToolbar";
+import { withRouteSeo } from "@/services/seoRedirectService";
 
 /**
  * Shop PLP (Template C) — `/shop`. The functional browse grid across EVERY
@@ -20,14 +21,14 @@ export async function generateMetadata({
   searchParams: Promise<{ type?: string; chapter?: string; vessel?: string; sort?: string }>;
 }): Promise<Metadata> {
   const params = await searchParams;
-  return {
+  return withRouteSeo("/shop", {
     title: "Shop",
     description:
       "Every Samorah fragrance — scented candles, room and linen sprays, across our chapters. Filter by type, chapter and vessel.",
     // Friendly aliases resolve to the canonical slug URL for SEO.
     alternates: { canonical: canonicalShopUrl(params) },
     openGraph: { title: "Shop · Samorah", description: "Every Samorah fragrance, across our chapters.", type: "website" },
-  };
+  });
 }
 
 export default async function ShopRoute({

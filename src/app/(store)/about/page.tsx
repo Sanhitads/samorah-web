@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { getAboutSections } from "@/services/aboutService";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { ComposedSections } from "@/components/page/ComposedSections";
-import { getRouteSeo } from "@/services/seoRedirectService";
+import { withRouteSeo } from "@/services/seoRedirectService";
 
 /**
  * About — consumer #2 of the Composable Page framework. Same engine, same shared
@@ -12,15 +12,9 @@ import { getRouteSeo } from "@/services/seoRedirectService";
  */
 export const dynamic = "force-dynamic";
 
-/** Metadata reads DB SEO overrides (slice 6) layered over global defaults. */
+/** Metadata reads DB SEO overrides (slice 6) layered over the natural defaults. */
 export async function generateMetadata(): Promise<Metadata> {
-  const seo = await getRouteSeo("/about");
-  return {
-    title: seo.title || "About",
-    description: seo.description,
-    openGraph: seo.ogImage ? { images: [seo.ogImage] } : undefined,
-    robots: seo.robots || undefined,
-  };
+  return withRouteSeo("/about", { title: "About" });
 }
 
 export default async function AboutPage() {

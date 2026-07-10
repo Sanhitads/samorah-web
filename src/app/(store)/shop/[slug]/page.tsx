@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { withRouteSeo } from "@/services/seoRedirectService";
 import { getProductBySlug, getProducts, getRelatedProducts } from "@/services/productService";
 import { buildProductPage, type ProductInput } from "@/lib/productPage";
 import { buildCandleEditorial, type RelatedProductInput } from "@/lib/productEditorial";
@@ -50,21 +51,21 @@ export async function generateMetadata({
   const { slug } = await params;
   const p = await load(slug);
   if (p) {
-    return {
+    return withRouteSeo(`/shop/${slug}`, {
       title: `${p.name} · Samorah`,
       description: p.tagline ?? `${p.name} — a Samorah scented candle.`,
       openGraph: { title: `${p.name} · Samorah`, description: p.tagline ?? "", type: "website" },
-    };
+    });
   }
   const air = getHourBySlug(slug);
   if (air) {
-    return {
+    return withRouteSeo(`/shop/${slug}`, {
       title: `${air.hour.name} · The Hours · Samorah`,
       description: air.hour.story,
       openGraph: { title: `${air.hour.name} · Samorah`, description: air.hour.story, type: "website" },
-    };
+    });
   }
-  return {};
+  return withRouteSeo(`/shop/${slug}`, {});
 }
 
 export default async function ProductRoute({
