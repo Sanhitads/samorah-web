@@ -105,6 +105,36 @@ the source of truth; flag gaps, never fake them.**
   Redirect). Media moves ahead of Nav because pages/homepage editors want an asset picker.
 - 📝 **R15** Inventory/ERP — **deferral confirmed** (ERP-sized; must not gate launch). Stays Phase 8.
 
+## Future-proofing wave (post-review, pre-Media-Library)
+The user reviewed the 14 refinements and raised 4 forward-looking additions + a search
+question + an architecture concern. Handled:
+
+- ✅ **CMS Architecture doc** ([`CMS_ARCHITECTURE.md`](./CMS_ARCHITECTURE.md)) — the governing
+  rule for every remaining slice: **one `media` row per asset, referenced by `media_id`
+  everywhere** (no copied URLs), usage tracking as a reverse lookup. Prevents the
+  Hero-URL-in-three-tables anti-pattern.
+- ✅ **Search backend swappable** — `globalSearch()` now delegates to a `SearchProvider`
+  interface (env-selected registry). UI already depended only on the result shape, so moving
+  to PG full-text or Meilisearch/OpenSearch = a new provider object + env flag, **zero UI
+  change**. ILIKE is the default provider.
+- ✅ **CRM marketing signals** — favourite collection · preferred jar size · favourite price
+  band (quantity-weighted mode of paid lines; all derivable, no new capture). "Marketing gold"
+  for segmentation.
+- ✅ **Acquisition channel** — shared `channelOf()` normaliser (Instagram/Google/Email/Referral/
+  Organic/Direct) on the CRM profile + a **revenue-by-channel** Reports breakdown. Full
+  cohort-by-channel grid deferred until volume justifies it.
+- ✅ **Notification Center — two classes** — kept the derived **Operational** class and added the
+  **Event** class (`admin_notifications` + `emitNotification()` producer API). Designed in now so
+  it's not retrofitted; dormant until producers ship (wholesale form → `wholesale.enquiry`,
+  newsletter import → `newsletter.import_done`, media pipeline → `media.failed`, support →
+  `customer.replied`).
+- 📝 **Health Dashboard — monitoring roadmap** (deferred, needs real traffic + external APIs):
+  **Last successful backup** (Supabase Mgmt API / pg_dump heartbeat), **Disk & Storage usage**
+  (Mgmt API), **Supabase quota**, **Resend quota** (Resend API). These require management-API
+  credentials + a polling job, not derivable signals — so they land as a monitoring integration
+  once traffic makes them meaningful. `getSystemHealth()` structure already accommodates new
+  `HealthCheck` rows with no refactor.
+
 ### Remaining CMS + later phases (R9 reorder adopted)
 - **CMS slice 2** — **Media Library** (Supabase Storage: upload/crop/alt/folders/tags + **usage
   tracking R4** built in from the start)
