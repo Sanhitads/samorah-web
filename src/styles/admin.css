@@ -386,3 +386,7 @@
 .au-dot[data-sev="warning"] { background: #c9a96e; }
 .od-timeline--feed .od-tl[data-sev="deleted"] { background: rgba(168,68,58,0.03); }
 .od-timeline--feed .od-tl[data-sev="warning"] { background: rgba(201,169,110,0.05); }
+
+/* ── Board batch bar ── */
+.board-bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; padding: 10px 14px; border: 1px dashed var(--ad-hair); border-radius: 6px; background: #fbf9f5; }
+.board-bulk__label { font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--smoke, #6b6259); }

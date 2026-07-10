@@ -5,6 +5,7 @@ import { requireStaff } from "@/lib/auth/requireStaff";
 import { getFulfillmentQueue, getQueueCounts } from "@/services/fulfillmentService";
 import { FulfillmentActions } from "@/components/admin/FulfillmentActions";
 import { PriorityControl, AssigneeControl, TagsControl } from "@/components/admin/BoardControls";
+import { BoardBulk } from "@/components/admin/BoardBulk";
 import { WORK_QUEUES, refundBadge, type WorkQueue, type EffectivePriority } from "@/lib/fulfillment/derive";
 import type { FulfillmentStatus } from "@/lib/fulfillment/state";
 
@@ -50,6 +51,10 @@ export default async function FulfillmentDashboard({ searchParams }: { searchPar
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const now = Date.now();
 
+  // Batch-eligible sets (the "select many → dispatch" productivity win).
+  const readyToShip = rows.filter((r) => r.fulfillmentStatus === "ready_for_dispatch" && !r.shipmentStatus).map((r) => r.orderNumber);
+  const dispatchable = rows.filter((r) => r.shipmentStatus === "courier_assigned").map((r) => r.orderNumber);
+
   return (
     <main className="admin">
       <header className="admin__head">
@@ -66,6 +71,8 @@ export default async function FulfillmentDashboard({ searchParams }: { searchPar
           </Link>
         ))}
       </nav>
+
+      <BoardBulk readyToShip={readyToShip} dispatchable={dispatchable} />
 
       <div className="admin__table-wrap">
         <table className="admin__table admin__table--board">
