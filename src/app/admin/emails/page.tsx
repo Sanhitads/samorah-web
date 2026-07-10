@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { hasCapability } from "@/lib/auth/capabilities";
 import { listEmailTemplates } from "@/services/emailTemplateService";
+import { EMAIL_TEMPLATE_SCHEMA } from "@/lib/email/blocks";
+import { listMedia } from "@/services/media/mediaService";
 import { EmailTemplatesManager } from "@/components/admin/EmailTemplatesManager";
 
 /**
@@ -18,6 +20,7 @@ export default async function EmailsPage() {
   if (!staff.ok) redirect("/login");
   const canManage = hasCapability(staff.role, "catalog.manage");
   const templates = await listEmailTemplates();
+  const media = (await listMedia({ limit: 60 })).map((m) => ({ id: m.id, url: m.url, title: m.title || m.url }));
 
   return (
     <main className="admin">
@@ -27,7 +30,7 @@ export default async function EmailsPage() {
         <p className="admin__count">{templates.length} transactional emails{canManage ? "" : " · read-only (needs catalog.manage)"}</p>
       </header>
       {canManage ? (
-        <EmailTemplatesManager templates={templates} />
+        <EmailTemplatesManager templates={templates} fields={EMAIL_TEMPLATE_SCHEMA.fields} media={media} />
       ) : (
         <div className="admin__table-wrap"><table className="admin__table admin__table--board"><thead><tr><th>Email</th><th>Subject</th><th>Source</th></tr></thead>
           <tbody>{templates.map((t) => <tr key={t.key}><td>{t.def.label}</td><td className="admin__muted">{t.subject}</td><td>{t.source}</td></tr>)}</tbody></table></div>

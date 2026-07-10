@@ -8,6 +8,7 @@
  */
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logEvent } from "@/services/auditService";
+import { renderEmailBlocks, interpolate as interpBlocks, type EmailBlock } from "@/lib/email/blocks";
 
 export interface EmailTemplateDef { key: string; label: string; vars: string[]; sample: Record<string, string>; defaultSubject: string }
 
@@ -23,7 +24,7 @@ export const EMAIL_TEMPLATE_DEFS: EmailTemplateDef[] = [
 
 const DEF_BY_KEY = new Map(EMAIL_TEMPLATE_DEFS.map((d) => [d.key, d]));
 
-export interface EmailTemplate { key: string; subject: string; preheader: string; intro: string; signoff: string; enabled: boolean; source: "db" | "default"; def: EmailTemplateDef }
+export interface EmailTemplate { key: string; subject: string; preheader: string; intro: string; signoff: string; eyebrow: string; heading: string; blocks: EmailBlock[]; enabled: boolean; source: "db" | "default"; def: EmailTemplateDef }
 
 /** Interpolate {{token}} against vars; unknown tokens are left visible (never blank). */
 export function interpolate(str: string, vars: Record<string, string>): string {
@@ -39,6 +40,7 @@ export async function getEmailTemplate(key: string): Promise<EmailTemplate | nul
   return {
     key, def, source: row ? "db" : "default",
     subject: row?.subject || def.defaultSubject, preheader: row?.preheader ?? "", intro: row?.intro ?? "", signoff: row?.signoff ?? "",
+    eyebrow: row?.eyebrow ?? "", heading: row?.heading ?? "", blocks: Array.isArray(row?.blocks) ? row.blocks : [],
     enabled: row ? row.enabled !== false : true,
   };
 }
@@ -49,15 +51,16 @@ export async function listEmailTemplates(): Promise<EmailTemplate[]> {
   const byKey = new Map(rows.map((r) => [r.key, r]));
   return EMAIL_TEMPLATE_DEFS.map((def) => {
     const row = byKey.get(def.key);
-    return { key: def.key, def, source: (row ? "db" : "default") as "db" | "default", subject: row?.subject || def.defaultSubject, preheader: row?.preheader ?? "", intro: row?.intro ?? "", signoff: row?.signoff ?? "", enabled: row ? row.enabled !== false : true };
+    return { key: def.key, def, source: (row ? "db" : "default") as "db" | "default", subject: row?.subject || def.defaultSubject, preheader: row?.preheader ?? "", intro: row?.intro ?? "", signoff: row?.signoff ?? "", eyebrow: row?.eyebrow ?? "", heading: row?.heading ?? "", blocks: Array.isArray(row?.blocks) ? row.blocks : [], enabled: row ? row.enabled !== false : true };
   });
 }
 
-export async function saveEmailTemplate(key: string, patch: { subject?: string; preheader?: string; intro?: string; signoff?: string; enabled?: boolean }, actorId?: string): Promise<{ ok: boolean; reason?: string }> {
+export async function saveEmailTemplate(key: string, patch: { subject?: string; preheader?: string; intro?: string; signoff?: string; eyebrow?: string; heading?: string; blocks?: EmailBlock[]; enabled?: boolean }, actorId?: string): Promise<{ ok: boolean; reason?: string }> {
   if (!DEF_BY_KEY.has(key)) return { ok: false, reason: "unknown template" };
   const db = createAdminClient() as any;
   const row: any = { key, updated_at: new Date().toISOString() };
-  for (const k of ["subject", "preheader", "intro", "signoff"] as const) if (patch[k] !== undefined) row[k] = patch[k] || null;
+  for (const k of ["subject", "preheader", "intro", "signoff", "eyebrow", "heading"] as const) if (patch[k] !== undefined) row[k] = patch[k] || null;
+  if (patch.blocks !== undefined) row.blocks = Array.isArray(patch.blocks) ? patch.blocks : [];
   if (patch.enabled !== undefined) row.enabled = patch.enabled;
   const { error } = await db.from("email_templates").upsert(row, { onConflict: "key" });
   if (error) return { ok: false, reason: error.message };
@@ -75,4 +78,19 @@ export async function resolveSubject(key: string, fallback: string, vars: Record
     if (t && t.enabled && t.source === "db" && t.subject) return interpolate(t.subject, vars);
   } catch { /* ignore */ }
   return fallback;
+}
+
+/**
+ * If a template has an AUTHORED block body, render the full email from it (subject +
+ * block-composed HTML). Returns null when no blocks are authored — the caller then
+ * uses the hardcoded builder (no regression). `vars.details` may hold transactional
+ * HTML (an order table) for a "details" block to inject.
+ */
+export async function renderAuthoredEmail(key: string, vars: Record<string, string>): Promise<{ subject: string; html: string; text: string } | null> {
+  try {
+    const t = await getEmailTemplate(key);
+    if (!t || !t.enabled || !t.blocks?.length) return null;
+    const { html, text } = renderEmailBlocks({ subject: t.subject, preheader: t.preheader, eyebrow: t.eyebrow, heading: t.heading, blocks: t.blocks }, vars);
+    return { subject: interpBlocks(t.subject, vars), html, text };
+  } catch { return null; }
 }

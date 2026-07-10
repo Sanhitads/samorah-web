@@ -8,11 +8,18 @@ import { getOrderById } from "@/services/orderService";
 import { getDispatchInfo, getDeliveryInfo } from "@/services/shipmentService";
 import { getCancellationInfo } from "@/services/cancellationService";
 import { getReturnInfo } from "@/services/returnService";
-import { resolveSubject } from "@/services/emailTemplateService";
+import { resolveSubject, renderAuthoredEmail } from "@/services/emailTemplateService";
 import type { NotificationChannel, NotificationEvent, NotificationContext, ChannelDispatchResult } from "../types";
 
-/** Apply an admin subject override (Email Template Manager) over the built default. */
-async function withSubject(event: string, msg: { to: string; subject: string; html: string; text: string }, vars: Record<string, string>): Promise<typeof msg> {
+/**
+ * Compose the final email: if the admin has AUTHORED a block body for this event, use
+ * it (subject + block HTML); otherwise keep the hardcoded builder and just apply a
+ * subject override. `details` carries the builder's HTML for a "details" block to
+ * inject, so an authored email can still include the order table.
+ */
+async function compose(event: string, msg: { to: string; subject: string; html: string; text: string }, vars: Record<string, string>): Promise<typeof msg> {
+  const authored = await renderAuthoredEmail(event, { ...vars, details: msg.html });
+  if (authored) return { to: msg.to, ...authored };
   return { ...msg, subject: await resolveSubject(event, msg.subject, vars) };
 }
 
@@ -23,22 +30,22 @@ async function render(event: NotificationEvent, ctx: NotificationContext): Promi
       const order = await getOrderById(ctx.orderId) as any;
       if (!order) return null;
       const built = buildOrderConfirmationEmail(order as unknown as EmailOrder);
-      return withSubject(event, { to: order.email, ...built }, { orderNumber: order.order_number ?? order.orderNumber ?? "", name: order.ship_full_name ?? "", total: String(order.total_amount ?? "") });
+      return compose(event, { to: order.email, ...built }, { orderNumber: order.order_number ?? order.orderNumber ?? "", name: order.ship_full_name ?? "", total: String(order.total_amount ?? "") });
     }
     case "order.dispatched": {
       const info = await getDispatchInfo(ctx.orderId) as any;
       if (!info) return null;
-      return withSubject(event, { to: info.email, ...buildDispatchNotificationEmail(info) }, { orderNumber: info.orderNumber ?? "", name: info.name ?? "", courier: info.courier ?? "", awb: info.awb ?? "" });
+      return compose(event, { to: info.email, ...buildDispatchNotificationEmail(info) }, { orderNumber: info.orderNumber ?? "", name: info.name ?? "", courier: info.courier ?? "", awb: info.awb ?? "" });
     }
     case "order.cancelled": {
       const info = await getCancellationInfo(ctx.orderId) as any;
       if (!info) return null;
-      return withSubject(event, { to: info.email, ...buildCancellationEmail(info) }, { orderNumber: info.orderNumber ?? "", name: info.name ?? "" });
+      return compose(event, { to: info.email, ...buildCancellationEmail(info) }, { orderNumber: info.orderNumber ?? "", name: info.name ?? "" });
     }
     case "delivery.completed": {
       const info = await getDeliveryInfo(ctx.orderId) as any;
       if (!info || !info.email) return null;
-      return withSubject(event, { to: info.email, ...buildDeliveryEmail(info) }, { orderNumber: info.orderNumber ?? "", name: info.name ?? "" });
+      return compose(event, { to: info.email, ...buildDeliveryEmail(info) }, { orderNumber: info.orderNumber ?? "", name: info.name ?? "" });
     }
     case "return.requested":
     case "return.approved":
@@ -47,7 +54,7 @@ async function render(event: NotificationEvent, ctx: NotificationContext): Promi
       if (!ctx.returnId) return null;
       const info = await getReturnInfo(ctx.returnId) as any;
       if (!info || !info.email) return null;
-      return withSubject(event, { to: info.email, ...buildReturnEmail(event as ReturnEmailEvent, info) }, { rmaNumber: info.rmaNumber ?? "", orderNumber: info.orderNumber ?? "" });
+      return compose(event, { to: info.email, ...buildReturnEmail(event as ReturnEmailEvent, info) }, { rmaNumber: info.rmaNumber ?? "", orderNumber: info.orderNumber ?? "" });
     }
     default:
       return null;
