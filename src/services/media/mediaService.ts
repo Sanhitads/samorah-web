@@ -132,11 +132,13 @@ export async function getMediaUsage(id: string): Promise<MediaUsage> {
       if ((JSON.stringify(m.published ?? "") + JSON.stringify(m.draft ?? "")).includes(id)) usedBy.push({ type: "navigation", id: m.id, context: `${m.id} menu` });
     }
   } catch { /* navigation optional */ }
-  // Homepage — section settings reference media ids (review point 10).
+  // Composed pages (homepage, about…) — section settings reference media ids (point 10).
   try {
-    const { data: hp } = await db.from("homepage").select("draft,published").eq("id", true).maybeSingle();
-    if (hp && (JSON.stringify(hp.published ?? "") + JSON.stringify(hp.draft ?? "")).includes(id)) usedBy.push({ type: "homepage", id: "homepage", context: "Homepage section" });
-  } catch { /* homepage optional */ }
+    const { data: pages } = await db.from("composed_pages").select("page_key,draft,published");
+    for (const p of pages ?? []) {
+      if ((JSON.stringify(p.published ?? "") + JSON.stringify(p.draft ?? "")).includes(id)) usedBy.push({ type: "page", id: p.page_key, context: `${p.page_key} section` });
+    }
+  } catch { /* composed pages optional */ }
   return { usedBy };
 }
 

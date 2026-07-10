@@ -124,3 +124,16 @@ export const SECTION_SCHEMAS = Object.fromEntries(Object.entries(SECTION_DEFS).m
 
 // Register Homepage as consumer #1 of the Composable Page Registry (point 6).
 registerPageType({ key: "homepage", label: "Homepage", sections: SECTION_DEFS });
+
+// Register About as consumer #2 — the SAME section definitions, a different subset.
+// A new page type is a registration, not new code.
+registerPageType({
+  key: "about", label: "About",
+  sections: {
+    hero: SECTION_DEFS.hero,
+    "brand-story": SECTION_DEFS["brand-story"],
+    words: SECTION_DEFS.words,
+    testimonials: SECTION_DEFS.testimonials,
+    letters: SECTION_DEFS.letters,
+  },
+});

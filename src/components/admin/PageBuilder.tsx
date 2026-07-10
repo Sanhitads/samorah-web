@@ -2,12 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import type { HomepageAdminView, HomeSection, SectionType } from "@/services/homepageService";
+import type { PageAdminView, ComposedSection } from "@/services/pageComposerService";
 import type { Revision } from "@/services/cms/revisions";
 import type { SectionSchema } from "@/lib/cms/sectionSchema";
 import { SchemaForm, type MediaOption } from "./SchemaForm";
 
-type Meta = { type: SectionType; label: string; note: string };
+type Meta = { type: string; label: string; note: string };
 const DEVICES = [{ k: "desktop", label: "Desktop", w: "100%" }, { k: "tablet", label: "Tablet", w: "820px" }, { k: "mobile", label: "Mobile", w: "390px" }] as const;
 const toLocal = (iso?: string | null) => {
   if (!iso) return "";
@@ -20,15 +20,18 @@ function move<T>(arr: T[], i: number, dir: number): T[] {
   const next = [...arr]; [next[i], next[j]] = [next[j], next[i]]; return next;
 }
 
-export function HomepageManager({ view, sectionMeta, schemas, media }: { view: HomepageAdminView; sectionMeta: Meta[]; schemas: Record<string, SectionSchema>; media: MediaOption[] }) {
+export function PageBuilder({ pageKey, label, view, sectionMeta, schemas, media, previewPath, previewCookie }: {
+  pageKey: string; label: string; view: PageAdminView; sectionMeta: Meta[]; schemas: Record<string, SectionSchema>; media: MediaOption[]; previewPath: string; previewCookie: string;
+}) {
   const router = useRouter();
+  const apiBase = `/api/admin/pages/${pageKey}`;
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: string; text: string } | null>(null);
-  const [sections, setSections] = useState<HomeSection[]>(view.draft);
+  const [sections, setSections] = useState<ComposedSection[]>(view.draft);
   const [pubAt, setPubAt] = useState(toLocal(view.publishAt));
   const [unpubAt, setUnpubAt] = useState(toLocal(view.unpublishAt));
-  const [addType, setAddType] = useState<SectionType>(sectionMeta[0].type);
+  const [addType, setAddType] = useState<string>(sectionMeta[0].type);
   const [openSettings, setOpenSettings] = useState<string | null>(null);
   const [revs, setRevs] = useState<Revision[] | null>(null);
   const [device, setDevice] = useState<string | null>(null);
@@ -41,7 +44,7 @@ export function HomepageManager({ view, sectionMeta, schemas, media }: { view: H
   const post = async (body: Record<string, unknown>) => {
     setBusy(true); setMsg(null);
     try {
-      const res = await fetch("/api/admin/homepage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const res = await fetch(apiBase, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const d = await res.json(); setBusy(false);
       if (!res.ok || d.ok === false) { setMsg({ tone: "err", text: d.error ?? d.reason ?? "Failed" }); return d; }
       startTransition(() => router.refresh()); return d;
@@ -63,12 +66,12 @@ export function HomepageManager({ view, sectionMeta, schemas, media }: { view: H
   const [previewKey, setPreviewKey] = useState(0);
   const previewAt = async (deviceKey: string) => {
     await post({ action: "save", sections: withOrder() });
-    document.cookie = "hp_preview=1; path=/; max-age=600";
+    document.cookie = `${previewCookie}=1; path=/; max-age=600`;
     setDevice(deviceKey); setPreviewKey((k) => k + 1);
   };
-  const previewNewTab = async () => { await post({ action: "save", sections: withOrder() }); document.cookie = "hp_preview=1; path=/; max-age=600"; window.open("/", "_blank", "noopener"); };
+  const previewNewTab = async () => { await post({ action: "save", sections: withOrder() }); document.cookie = `${previewCookie}=1; path=/; max-age=600`; window.open(previewPath, "_blank", "noopener"); };
 
-  const setSection = (i: number, patch: Partial<HomeSection>) => setSections((s) => s.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  const setSection = (i: number, patch: Partial<ComposedSection>) => setSections((s) => s.map((x, j) => (j === i ? { ...x, ...patch } : x)));
   const addSection = () => setSections((s) => [...s, { id: `${addType}-${s.length}`, type: addType, enabled: true, sortOrder: s.length, settings: {} }]);
 
   return (
@@ -98,7 +101,7 @@ export function HomepageManager({ view, sectionMeta, schemas, media }: { view: H
       </ol>
 
       <div className="cfg-actions" style={{ marginTop: 10 }}>
-        <select value={addType} onChange={(e) => setAddType(e.target.value as SectionType)}>{sectionMeta.map((m) => <option key={m.type} value={m.type}>{m.label}</option>)}</select>
+        <select value={addType} onChange={(e) => setAddType(e.target.value)}>{sectionMeta.map((m) => <option key={m.type} value={m.type}>{m.label}</option>)}</select>
         <button type="button" className="ff-btn" onClick={addSection}>+ Add section</button>
       </div>
 
@@ -128,7 +131,7 @@ export function HomepageManager({ view, sectionMeta, schemas, media }: { view: H
             <button type="button" className="ff-btn" onClick={() => setDevice(null)}>Close</button>
           </div>
           <div className="hp-preview__stage">
-            <iframe key={previewKey} title="Homepage preview" src="/" className="hp-preview__frame" style={{ width: DEVICES.find((d) => d.k === device)?.w, maxWidth: "100%" }} />
+            <iframe key={previewKey} title={`${label} preview`} src={previewPath} className="hp-preview__frame" style={{ width: DEVICES.find((d) => d.k === device)?.w, maxWidth: "100%" }} />
           </div>
         </div>
       ) : null}
@@ -136,7 +139,7 @@ export function HomepageManager({ view, sectionMeta, schemas, media }: { view: H
       {revs ? (
         <div className="om-modal" role="dialog" aria-modal="true" onClick={() => setRevs(null)}>
           <div className="om-modal__card" onClick={(e) => e.stopPropagation()}>
-            <h2 className="om-modal__title">History · homepage</h2>
+            <h2 className="om-modal__title">History · {label}</h2>
             {revs.length ? (
               <ul className="rev-list">{revs.map((r) => (
                 <li key={r.id} className="rev-item">

@@ -34,6 +34,7 @@ const NAV: NavGroup[] = [
       { label: "Media", href: "/admin/media", icon: "▨" },
       { label: "Navigation", href: "/admin/navigation", icon: "❰" },
       { label: "Homepage", href: "/admin/homepage", icon: "⌗" },
+      { label: "About", href: "/admin/about", icon: "❦" },
       { label: "Inventory", icon: "▣" },
     ],
   },
