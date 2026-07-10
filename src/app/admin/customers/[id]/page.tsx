@@ -46,8 +46,11 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
         <section className="od-card">
           <h2 className="od-card__title">Profile insight</h2>
           <div className="od-line"><span className="admin__muted">Favourite fragrance</span><span>{c.favouriteFragrance ?? "—"}</span></div>
-          <div className="od-line"><span className="admin__muted">Acquisition source</span><span>{c.acquisition ? c.acquisition.source : "direct / unknown"}</span></div>
-          {c.acquisition ? <div className="od-line"><span className="admin__muted">Channel</span><span>{c.acquisition.medium}{c.acquisition.campaign !== "—" ? ` · ${c.acquisition.campaign}` : ""}</span></div> : null}
+          <div className="od-line"><span className="admin__muted">Favourite collection</span><span>{c.favouriteCollection ?? "—"}</span></div>
+          <div className="od-line"><span className="admin__muted">Preferred jar size</span><span>{c.preferredJarSize ?? "—"}</span></div>
+          <div className="od-line"><span className="admin__muted">Price range</span><span>{c.favouritePriceRange ?? "—"}</span></div>
+          <div className="od-line"><span className="admin__muted">Acquisition channel</span><span>{c.acquisition ? c.acquisition.channel : "Direct / unknown"}</span></div>
+          {c.acquisition ? <div className="od-line"><span className="admin__muted">Source detail</span><span>{c.acquisition.source}{c.acquisition.campaign !== "—" ? ` · ${c.acquisition.campaign}` : ""}</span></div> : null}
           <div className="od-line"><span className="admin__muted">Last viewed</span><span className="admin__muted">needs storefront view-tracking (planned)</span></div>
         </section>
 

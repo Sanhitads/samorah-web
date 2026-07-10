@@ -7,6 +7,7 @@
  */
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logEvent } from "@/services/auditService";
+import { channelOf } from "@/lib/marketing/channel";
 
 const PAID = ["paid", "partially_refunded", "refunded"];
 const VIP_LTV = 15000;
@@ -70,8 +71,12 @@ export interface Customer360 {
   ltv: number; aov: number; orderCount: number;
   // CRM additions (R13)
   favouriteFragrance: string | null;                                  // most-purchased family across paid orders
-  acquisition: { source: string; medium: string; campaign: string } | null; // first order's UTMs (how they arrived)
+  acquisition: { source: string; medium: string; campaign: string; channel: string } | null; // first order's UTMs, normalised to a channel
   wishlist: { product: string; fragrance: string | null; addedAt: string }[];
+  // Marketing insight (derived from order lines)
+  favouriteCollection: string | null;   // most-purchased collection
+  favouritePriceRange: string | null;   // price band they buy in most
+  preferredJarSize: string | null;      // size they buy most
 }
 
 export async function getCustomer360(id: string): Promise<Customer360 | null> {
@@ -83,7 +88,7 @@ export async function getCustomer360(id: string): Promise<Customer360 | null> {
     db.from("orders").select("id,order_number,status,total_amount,payment_status,placed_at,utm_source,utm_medium,utm_campaign").eq("user_id", id).order("placed_at", { ascending: false }),
     db.from("addresses").select("line1,line2,city,state,pincode,is_default").eq("user_id", id).order("is_default", { ascending: false }),
     db.from("returns").select("rma_number,status,reason,created_at,order_id,orders!inner(user_id)").eq("orders.user_id", id).order("created_at", { ascending: false }),
-    db.from("order_items").select("product_id,quantity,orders!inner(user_id,payment_status)").eq("orders.user_id", id).in("orders.payment_status", PAID),
+    db.from("order_items").select("product_id,quantity,unit_price,collection_name,size,orders!inner(user_id,payment_status)").eq("orders.user_id", id).in("orders.payment_status", PAID),
     db.from("wishlists").select("product_id,created_at,products(name,fragrance_family)").eq("user_id", id).order("created_at", { ascending: false }),
   ]);
 
@@ -95,20 +100,29 @@ export async function getCustomer360(id: string): Promise<Customer360 | null> {
   // Acquisition = the earliest order's UTMs (orders are desc, so the last is oldest).
   const firstOrder = orders.length ? orders[orders.length - 1] : null;
   const acquisition = firstOrder && (firstOrder.utm_source || firstOrder.utm_medium || firstOrder.utm_campaign)
-    ? { source: firstOrder.utm_source || "direct", medium: firstOrder.utm_medium || "—", campaign: firstOrder.utm_campaign || "—" }
+    ? { source: firstOrder.utm_source || "direct", medium: firstOrder.utm_medium || "—", campaign: firstOrder.utm_campaign || "—", channel: channelOf(firstOrder.utm_source, firstOrder.utm_medium) }
     : null;
 
-  // Favourite fragrance — most-purchased family across paid lines.
+  // Most-frequent value of a field across paid lines, weighted by quantity (mode).
   const items = (itemsRes.data ?? []) as any[];
+  const modeBy = (pick: (it: any) => string | null | undefined): string | null => {
+    const t = new Map<string, number>();
+    for (const it of items) { const k = pick(it); if (k) t.set(k, (t.get(k) ?? 0) + Number(it.quantity ?? 0)); }
+    return [...t.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  };
+
+  // Favourite fragrance — needs a product→family lookup; the rest read straight off the line.
   let favouriteFragrance: string | null = null;
   if (items.length) {
     const pids = [...new Set(items.map((it) => it.product_id).filter(Boolean))];
     const famOf = new Map<string, string>();
     if (pids.length) { const { data: prods } = await db.from("products").select("id,fragrance_family").in("id", pids); for (const p of prods ?? []) famOf.set(p.id, p.fragrance_family || "Unclassified"); }
-    const tally = new Map<string, number>();
-    for (const it of items) { const f = famOf.get(it.product_id); if (f) tally.set(f, (tally.get(f) ?? 0) + Number(it.quantity ?? 0)); }
-    favouriteFragrance = [...tally.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+    favouriteFragrance = modeBy((it) => famOf.get(it.product_id));
   }
+
+  const favouriteCollection = modeBy((it) => it.collection_name);
+  const preferredJarSize = modeBy((it) => it.size);
+  const favouritePriceRange = modeBy((it) => priceBand(Number(it.unit_price ?? 0)));
 
   const wishlist = ((wishRes.data ?? []) as any[]).map((w) => ({
     product: w.products?.name ?? "—", fragrance: w.products?.fragrance_family ?? null, addedAt: w.created_at,
@@ -123,7 +137,17 @@ export async function getCustomer360(id: string): Promise<Customer360 | null> {
     returns: (retRes.data ?? []).map((r: any) => ({ rma: r.rma_number, status: r.status, reason: r.reason, createdAt: r.created_at })),
     ltv, aov, orderCount: paid.length,
     favouriteFragrance, acquisition, wishlist,
+    favouriteCollection, favouritePriceRange, preferredJarSize,
   };
+}
+
+/** Price bands for the "favourite price range" insight (₹, per-unit). */
+function priceBand(unit: number): string | null {
+  if (!unit || unit <= 0) return null;
+  if (unit < 800) return "Under ₹800";
+  if (unit < 1500) return "₹800–1,499";
+  if (unit < 2500) return "₹1,500–2,499";
+  return "₹2,500+";
 }
 
 export async function setCustomerNotes(id: string, notes: string, actorId?: string) {
