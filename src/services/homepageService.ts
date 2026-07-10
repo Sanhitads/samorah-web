@@ -12,8 +12,10 @@ import { logEvent } from "@/services/auditService";
 import { isLive, publishState, type PublishStatus } from "@/lib/cms/publishable";
 import { snapshotRevision, listRevisions as listCmsRevisions, getRevisionSnapshot, type Revision } from "@/services/cms/revisions";
 
-/** The section types the storefront knows how to render (the registry lives in the page). */
-export const SECTION_TYPES = ["hero", "chapters", "brand-story", "atmosphere", "invitations", "words", "editorial-world", "letters"] as const;
+/** The sections that compose the DEFAULT homepage (the current hand-built order). */
+export const DEFAULT_ORDER = ["hero", "chapters", "brand-story", "atmosphere", "invitations", "words", "editorial-world", "letters"] as const;
+/** All section types the storefront can render (default set + optional add-ons). */
+export const SECTION_TYPES = [...DEFAULT_ORDER, "testimonials"] as const;
 export type SectionType = (typeof SECTION_TYPES)[number];
 
 export const SECTION_META: Record<SectionType, { label: string; note: string }> = {
@@ -25,13 +27,14 @@ export const SECTION_META: Record<SectionType, { label: string; note: string }> 
   words: { label: "Words", note: "One literary sentence" },
   "editorial-world": { label: "Editorial World", note: "The final magazine spread" },
   letters: { label: "The Letters", note: "Quiet editorial close" },
+  testimonials: { label: "Testimonials", note: "Reader voices — repeatable blocks" },
 };
 
 export interface HomeSection { id: string; type: SectionType; enabled: boolean; sortOrder: number; settings: Record<string, unknown> }
 
-/** Default composition (the current hand-built homepage order) — the config fallback. */
+/** Default composition — the 8 editorial sections (Testimonials is opt-in via Add). */
 export function defaultSections(): HomeSection[] {
-  return SECTION_TYPES.map((type, i) => ({ id: type, type, enabled: true, sortOrder: i, settings: {} }));
+  return DEFAULT_ORDER.map((type, i) => ({ id: type, type, enabled: true, sortOrder: i, settings: {} }));
 }
 
 const NAV_TAG = "homepage";

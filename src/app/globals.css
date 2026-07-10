@@ -4942,3 +4942,13 @@ video.asset-image {
 
 /* ── Store notice banner ── */
 .store-notice { background: var(--ink, #1f1a16); color: var(--ivory, #faf7f2); text-align: center; padding: 8px 16px; font-family: var(--font-sans, sans-serif); font-size: 12px; letter-spacing: 0.02em; }
+
+/* Homepage Testimonials (CMS repeatable-blocks section) */
+.home-testi { padding: clamp(4rem, 9vw, 8rem) 1.5rem; background: var(--bg-primary, #f5f2ed); }
+.home-testi__inner { max-width: 1100px; margin: 0 auto; text-align: center; }
+.home-testi__heading { font-family: var(--font-serif, "Cormorant Garamond", serif); font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 300; margin-bottom: clamp(2rem, 5vw, 3.5rem); color: var(--ink, #1f1a16); }
+.home-testi__grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: clamp(1.5rem, 4vw, 3rem); }
+.home-testi__quote { font-family: var(--font-serif, "Cormorant Garamond", serif); font-size: 1.35rem; font-weight: 300; font-style: italic; line-height: 1.5; color: var(--ink, #1f1a16); }
+.home-testi__by { margin-top: 1rem; font-family: var(--font-sans, "DM Sans", sans-serif); font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--smoke, #6b6259); }
+.home-testi__role { text-transform: none; letter-spacing: 0; }
+.home-testi__cta { margin-top: clamp(2rem, 5vw, 3.5rem); }

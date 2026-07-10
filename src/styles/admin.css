@@ -457,3 +457,8 @@
 .hp-preview__bar .ff-btn { margin-left: 0; }
 .hp-preview__stage { display: flex; justify-content: center; padding: 16px; background: #ece7df; max-height: 70vh; overflow: auto; }
 .hp-preview__frame { height: 68vh; border: 1px solid var(--ad-hair); border-radius: 4px; background: #fff; transition: width 0.2s ease; }
+.sf-block { border: 1px solid var(--ad-hair); border-radius: 5px; padding: 10px; margin: 6px 0; background: rgba(31,26,22,0.02); }
+.sf-block__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 12px; }
+.sf-counter { font-size: 11px; color: var(--smoke, #6b6259); }
+.sf-counter[data-over="1"] { color: #a8443a; }
+.sf-err { color: #a8443a; font-size: 11px; }

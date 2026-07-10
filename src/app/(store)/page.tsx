@@ -8,6 +8,7 @@ import { Invitations } from "@/components/home/Invitations";
 import { Words } from "@/components/home/Words";
 import { EditorialWorld } from "@/components/home/EditorialWorld";
 import { TheLetters } from "@/components/home/TheLetters";
+import { Testimonials, type TestimonialsContent } from "@/components/home/Testimonials";
 import { getActiveCampaign } from "@/config/campaigns";
 import { getVisibleChapters } from "@/config/chapters";
 import { getBrandStory } from "@/config/brandStory";
@@ -49,6 +50,7 @@ export default async function HomePage() {
     words: (s) => (voice ? <Words voice={merged(voice, s) as EditorialVoice} /> : null),
     "editorial-world": () => <EditorialWorld stories={getEditorialWorld(campaign.id)} />,
     letters: (s) => <TheLetters invitation={merged(getLettersInvitation(campaign.id), s) as LettersInvitation} />,
+    testimonials: (s) => <Testimonials content={(s.settings ?? {}) as TestimonialsContent} />,
   };
 
   // Staff-gated draft preview (review point 3, same pattern as navigation).
