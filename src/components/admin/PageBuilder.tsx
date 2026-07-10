@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { PageAdminView, ComposedSection } from "@/services/pageComposerService";
 import type { Revision } from "@/services/cms/revisions";
@@ -35,11 +35,44 @@ export function PageBuilder({ pageKey, label, view, sectionMeta, schemas, media,
   const [openSettings, setOpenSettings] = useState<string | null>(null);
   const [revs, setRevs] = useState<Revision[] | null>(null);
   const [device, setDevice] = useState<string | null>(null);
+  const [lockedBy, setLockedBy] = useState<string | null>(null);
+  const [autosavedAt, setAutosavedAt] = useState<string | null>(null);
   const labelOf = (t: string) => sectionMeta.find((m) => m.type === t)?.label ?? t;
   const setField = (i: number, key: string, value: unknown) => setSections((s) => s.map((x, j) => (j === i ? { ...x, settings: { ...x.settings, [key]: value } } : x)));
 
   // Renumber sortOrder from current array order before sending.
   const withOrder = () => sections.map((s, i) => ({ ...s, sortOrder: i }));
+
+  const sectionsRef = useRef(sections);
+  useEffect(() => { sectionsRef.current = sections; }, [sections]);
+  const lastSaved = useRef(JSON.stringify(view.draft.map((s, i) => ({ ...s, sortOrder: i }))));
+  const snapshot = () => JSON.stringify(sectionsRef.current.map((s, i) => ({ ...s, sortOrder: i })));
+
+  // Content lock (heartbeat) + autosave — both on a 30s tick (review points 8, 9).
+  const resource = `page:${pageKey}`;
+  useEffect(() => {
+    let alive = true;
+    const lock = async () => {
+      try {
+        const r = await (await fetch("/api/admin/locks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ resource }) })).json();
+        if (alive) setLockedBy(r.ok ? null : r.heldBy ?? "another editor");
+      } catch { /* ignore */ }
+    };
+    const autosave = async () => {
+      const cur = snapshot();
+      if (cur === lastSaved.current) return; // nothing changed since last save
+      try {
+        const d = await (await fetch(apiBase, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "save", sections: JSON.parse(cur) }) })).json();
+        if (alive && d.ok !== false) { lastSaved.current = cur; setAutosavedAt(new Date().toLocaleTimeString()); }
+      } catch { /* retry next tick */ }
+    };
+    lock();
+    const t = setInterval(() => { lock(); autosave(); }, 30_000);
+    const release = () => { navigator.sendBeacon?.("/api/admin/locks", new Blob([JSON.stringify({ action: "release", resource })], { type: "application/json" })); };
+    window.addEventListener("beforeunload", release);
+    return () => { alive = false; clearInterval(t); release(); window.removeEventListener("beforeunload", release); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiBase, resource]);
 
   const post = async (body: Record<string, unknown>) => {
     setBusy(true); setMsg(null);
@@ -51,7 +84,7 @@ export function PageBuilder({ pageKey, label, view, sectionMeta, schemas, media,
     } catch { setBusy(false); setMsg({ tone: "err", text: "Network error" }); return null; }
   };
 
-  const save = async () => { const d = await post({ action: "save", sections: withOrder() }); if (d?.ok) setMsg({ tone: "ok", text: "Draft saved." }); };
+  const save = async () => { const d = await post({ action: "save", sections: withOrder() }); if (d?.ok) { lastSaved.current = snapshot(); setMsg({ tone: "ok", text: "Draft saved." }); } };
   const [warns, setWarns] = useState<string[]>([]);
   const publish = async () => {
     setWarns([]);
@@ -76,6 +109,8 @@ export function PageBuilder({ pageKey, label, view, sectionMeta, schemas, media,
 
   return (
     <div className="cfg">
+      {lockedBy ? <div className="nav-warn" style={{ borderColor: "#8a3d2f", background: "rgba(138,61,47,0.08)", color: "#8a3d2f" }}>⚠ Currently edited by {lockedBy}. Your changes may overwrite theirs — coordinate before publishing.</div> : null}
+      {autosavedAt ? <p className="admin__muted" style={{ margin: "0 0 8px", fontSize: 12 }}>Autosaved at {autosavedAt}</p> : null}
       <ol className="hp-list">
         {sections.map((s, i) => (
           <li key={s.id} className="hp-section" data-off={s.enabled ? "0" : "1"}>
