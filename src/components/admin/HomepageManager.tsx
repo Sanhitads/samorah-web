@@ -4,8 +4,11 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { HomepageAdminView, HomeSection, SectionType } from "@/services/homepageService";
 import type { Revision } from "@/services/cms/revisions";
+import type { SectionSchema } from "@/lib/cms/sectionSchema";
+import { SchemaForm, type MediaOption } from "./SchemaForm";
 
 type Meta = { type: SectionType; label: string; note: string };
+const DEVICES = [{ k: "desktop", label: "Desktop", w: "100%" }, { k: "tablet", label: "Tablet", w: "820px" }, { k: "mobile", label: "Mobile", w: "390px" }] as const;
 const toLocal = (iso?: string | null) => {
   if (!iso) return "";
   const d = new Date(iso); const p = (n: number) => String(n).padStart(2, "0");
@@ -17,7 +20,7 @@ function move<T>(arr: T[], i: number, dir: number): T[] {
   const next = [...arr]; [next[i], next[j]] = [next[j], next[i]]; return next;
 }
 
-export function HomepageManager({ view, sectionMeta }: { view: HomepageAdminView; sectionMeta: Meta[] }) {
+export function HomepageManager({ view, sectionMeta, schemas, media }: { view: HomepageAdminView; sectionMeta: Meta[]; schemas: Record<string, SectionSchema>; media: MediaOption[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState(false);
@@ -28,7 +31,9 @@ export function HomepageManager({ view, sectionMeta }: { view: HomepageAdminView
   const [addType, setAddType] = useState<SectionType>(sectionMeta[0].type);
   const [openSettings, setOpenSettings] = useState<string | null>(null);
   const [revs, setRevs] = useState<Revision[] | null>(null);
+  const [device, setDevice] = useState<string | null>(null);
   const labelOf = (t: string) => sectionMeta.find((m) => m.type === t)?.label ?? t;
+  const setField = (i: number, key: string, value: unknown) => setSections((s) => s.map((x, j) => (j === i ? { ...x, settings: { ...x.settings, [key]: value } } : x)));
 
   // Renumber sortOrder from current array order before sending.
   const withOrder = () => sections.map((s, i) => ({ ...s, sortOrder: i }));
@@ -44,11 +49,24 @@ export function HomepageManager({ view, sectionMeta }: { view: HomepageAdminView
   };
 
   const save = async () => { const d = await post({ action: "save", sections: withOrder() }); if (d?.ok) setMsg({ tone: "ok", text: "Draft saved." }); };
-  const publish = async () => { const d = await post({ action: "publish", sections: withOrder(), publishAt: fromLocal(pubAt), unpublishAt: fromLocal(unpubAt) }); if (d?.ok) setMsg({ tone: "ok", text: pubAt ? "Scheduled." : "Published live." }); };
+  const [warns, setWarns] = useState<string[]>([]);
+  const publish = async () => {
+    setWarns([]);
+    const d = await post({ action: "publish", sections: withOrder(), publishAt: fromLocal(pubAt), unpublishAt: fromLocal(unpubAt) });
+    if (Array.isArray(d?.warnings)) setWarns(d.warnings);
+    if (d?.ok) setMsg({ tone: "ok", text: pubAt ? "Scheduled." : "Published live." });
+    else if (Array.isArray(d?.errors) && d.errors.length) setWarns(d.errors);
+  };
   const reset = async () => { const d = await post({ action: "reset" }); if (d?.ok) setMsg({ tone: "ok", text: "Reset to default." }); };
   const openRevs = async () => { const d = await post({ action: "revisions" }); if (d?.revisions) setRevs(d.revisions); };
   const restore = async (id: string) => { const d = await post({ action: "restore", id }); if (d?.ok) { setRevs(null); setMsg({ tone: "ok", text: "Restored into draft — review, then publish." }); } };
-  const preview = async () => { await post({ action: "save", sections: withOrder() }); document.cookie = "hp_preview=1; path=/; max-age=300"; window.open("/", "_blank", "noopener"); };
+  const [previewKey, setPreviewKey] = useState(0);
+  const previewAt = async (deviceKey: string) => {
+    await post({ action: "save", sections: withOrder() });
+    document.cookie = "hp_preview=1; path=/; max-age=600";
+    setDevice(deviceKey); setPreviewKey((k) => k + 1);
+  };
+  const previewNewTab = async () => { await post({ action: "save", sections: withOrder() }); document.cookie = "hp_preview=1; path=/; max-age=600"; window.open("/", "_blank", "noopener"); };
 
   const setSection = (i: number, patch: Partial<HomeSection>) => setSections((s) => s.map((x, j) => (j === i ? { ...x, ...patch } : x)));
   const addSection = () => setSections((s) => [...s, { id: `${addType}-${s.length}`, type: addType, enabled: true, sortOrder: s.length, settings: {} }]);
@@ -63,7 +81,7 @@ export function HomepageManager({ view, sectionMeta }: { view: HomepageAdminView
               <span className="hp-section__name">{labelOf(s.type)}<span className="admin__muted"> · {s.type}</span></span>
               <button type="button" className="cfg-toggle" data-on={s.enabled ? "1" : "0"} onClick={() => setSection(i, { enabled: !s.enabled })}>{s.enabled ? "Shown" : "Hidden"}</button>
               <span className="ff-actions">
-                <button type="button" className="ff-btn" onClick={() => setOpenSettings(openSettings === s.id ? null : s.id)}>Settings</button>
+                <button type="button" className="ff-btn" data-active={openSettings === s.id ? "1" : "0"} onClick={() => setOpenSettings(openSettings === s.id ? null : s.id)}>Edit content</button>
                 <button type="button" className="ff-btn" disabled={i === 0} onClick={() => setSections((x) => move(x, i, -1))}>↑</button>
                 <button type="button" className="ff-btn" disabled={i === sections.length - 1} onClick={() => setSections((x) => move(x, i, 1))}>↓</button>
                 <button type="button" className="ff-btn ff-btn--danger" onClick={() => setSections((x) => x.filter((_, j) => j !== i))}>Remove</button>
@@ -71,9 +89,8 @@ export function HomepageManager({ view, sectionMeta }: { view: HomepageAdminView
             </div>
             {openSettings === s.id ? (
               <div className="hp-settings">
-                <label className="cfg-field"><span>Advanced settings (JSON) — per-section overrides</span>
-                  <textarea rows={3} defaultValue={JSON.stringify(s.settings ?? {}, null, 2)} onBlur={(e) => { try { setSection(i, { settings: JSON.parse(e.target.value || "{}") }); setMsg(null); } catch { setMsg({ tone: "err", text: `Invalid JSON in ${labelOf(s.type)} settings` }); } }} />
-                </label>
+                <p className="cfg-hint">{sectionMeta.find((m) => m.type === s.type)?.note}</p>
+                <SchemaForm fields={schemas[s.type]?.fields ?? []} values={s.settings ?? {}} media={media} onChange={(k, v) => setField(i, k, v)} />
               </div>
             ) : null}
           </li>
@@ -85,6 +102,8 @@ export function HomepageManager({ view, sectionMeta }: { view: HomepageAdminView
         <button type="button" className="ff-btn" onClick={addSection}>+ Add section</button>
       </div>
 
+      {warns.length ? <ul className="nav-warn">{warns.map((w, i) => <li key={i}>⚠ {w}</li>)}</ul> : null}
+
       <div className="nav-publish">
         <div className="cfg-grid">
           <label className="cfg-field"><span>Publish at (optional — schedule)</span><input type="datetime-local" value={pubAt} onChange={(e) => setPubAt(e.target.value)} /></label>
@@ -92,13 +111,27 @@ export function HomepageManager({ view, sectionMeta }: { view: HomepageAdminView
         </div>
         <div className="cfg-actions">
           <button type="button" className="ff-btn" disabled={busy || pending} onClick={save}>Save draft</button>
-          <button type="button" className="ff-btn" disabled={busy} onClick={preview}>Preview</button>
+          {DEVICES.map((d) => <button key={d.k} type="button" className="ff-btn" data-active={device === d.k ? "1" : "0"} disabled={busy} onClick={() => previewAt(d.k)}>{d.label}</button>)}
+          <button type="button" className="ff-btn" disabled={busy} onClick={previewNewTab}>↗ tab</button>
           <button type="button" className="ff-btn ff-btn--primary" disabled={busy} onClick={publish}>{pubAt ? "Schedule" : "Publish"}</button>
           <button type="button" className="ff-btn" disabled={busy} onClick={openRevs}>History</button>
           {view.source === "db" ? <button type="button" className="ff-btn ff-btn--danger" disabled={busy} onClick={reset}>Reset to default</button> : null}
           {msg ? <span className={`cfg-msg cfg-msg--${msg.tone}`}>{msg.text}</span> : null}
         </div>
       </div>
+
+      {device ? (
+        <div className="hp-preview">
+          <div className="hp-preview__bar">
+            <span className="admin__muted">Draft preview · {DEVICES.find((d) => d.k === device)?.label}</span>
+            {DEVICES.map((d) => <button key={d.k} type="button" className="ff-btn" data-active={device === d.k ? "1" : "0"} onClick={() => setDevice(d.k)}>{d.label}</button>)}
+            <button type="button" className="ff-btn" onClick={() => setDevice(null)}>Close</button>
+          </div>
+          <div className="hp-preview__stage">
+            <iframe key={previewKey} title="Homepage preview" src="/" className="hp-preview__frame" style={{ width: DEVICES.find((d) => d.k === device)?.w, maxWidth: "100%" }} />
+          </div>
+        </div>
+      ) : null}
 
       {revs ? (
         <div className="om-modal" role="dialog" aria-modal="true" onClick={() => setRevs(null)}>

@@ -449,3 +449,11 @@
 .hp-section__name { flex: 1; font-family: var(--font-sans); font-size: 14px; }
 .hp-settings { margin-top: 10px; }
 .hp-settings textarea { width: 100%; font-family: ui-monospace, monospace; font-size: 12px; padding: 8px 10px; border: 1px solid var(--ad-hair); border-radius: 4px; box-sizing: border-box; }
+.cfg-field[data-wide="1"] { grid-column: 1 / -1; }
+.sf-media { display: flex; gap: 6px; }
+.sf-media input { flex: 1; }
+.hp-preview { margin-top: 16px; border: 1px solid var(--ad-hair); border-radius: 6px; overflow: hidden; }
+.hp-preview__bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--ad-hair); background: rgba(31,26,22,0.03); }
+.hp-preview__bar .ff-btn { margin-left: 0; }
+.hp-preview__stage { display: flex; justify-content: center; padding: 16px; background: #ece7df; max-height: 70vh; overflow: auto; }
+.hp-preview__frame { height: 68vh; border: 1px solid var(--ad-hair); border-radius: 4px; background: #fff; transition: width 0.2s ease; }

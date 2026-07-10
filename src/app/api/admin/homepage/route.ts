@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { requireCapability } from "@/lib/auth/requireStaff";
-import { saveHomepageDraft, publishHomepage, resetHomepage, listHomepageRevisions, restoreHomepageRevision, HOMEPAGE_CACHE_TAG } from "@/services/homepageService";
+import { saveHomepageDraft, publishHomepage, resetHomepage, listHomepageRevisions, restoreHomepageRevision, getHomepageAdmin, HOMEPAGE_CACHE_TAG } from "@/services/homepageService";
+import { validateHomepage } from "@/lib/cms/homepageValidation";
 
 /** POST /api/admin/homepage { action, ... } — Homepage Builder. catalog.manage. */
 export const runtime = "nodejs";
@@ -18,10 +19,13 @@ export async function POST(request: Request) {
   switch (body.action) {
     case "save": return NextResponse.json(await saveHomepageDraft(body.sections, actor));
     case "publish": {
+      const sections = body.sections ?? (await getHomepageAdmin()).draft;
+      const v = validateHomepage(sections);
+      if (v.errors.length) return NextResponse.json({ ok: false, reason: v.errors[0], errors: v.errors, warnings: v.warnings }, { status: 422 });
       if (body.sections) { const s = await saveHomepageDraft(body.sections, actor); if (!s.ok) return NextResponse.json(s, { status: 422 }); }
       const res = await publishHomepage({ publishAt: body.publishAt ?? null, unpublishAt: body.unpublishAt ?? null }, actor);
       if (res.ok) revalidateTag(HOMEPAGE_CACHE_TAG);
-      return NextResponse.json(res, { status: res.ok ? 200 : 422 });
+      return NextResponse.json({ ...res, warnings: v.warnings }, { status: res.ok ? 200 : 422 });
     }
     case "reset": {
       const res = await resetHomepage(actor);
