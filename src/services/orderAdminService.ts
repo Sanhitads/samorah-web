@@ -4,6 +4,7 @@
  * order — money, payment state, refunds — not the warehouse workflow.
  */
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logEvent } from "@/services/auditService";
 
 export interface OrderOverviewRow {
   id: string;
@@ -13,12 +14,24 @@ export interface OrderOverviewRow {
   status: string; // order_status
   paymentStatus: string; // payment_status
   isCod: boolean;
+  isGift: boolean;
+  hasGstin: boolean; // B2B tax invoice requested
+  tags: string[];
   total: number;
   refundAmount: number;
   latestRefundStatus: string | null; // ledger sub-state (review point 4)
   hasPayment: boolean; // a captured Razorpay payment exists (gateway refund possible)
   placedAt: string;
 }
+
+export interface OrderFilter {
+  search?: string; // order number or email
+  status?: string;
+  payment?: string;
+  limit?: number;
+}
+/** High-value threshold for the "High Value" badge (rupees). */
+export const HIGH_VALUE_THRESHOLD = 5000;
 
 export interface DashboardStats {
   awaitingFulfillment: number; // paid, not terminal, not yet shipped
@@ -121,18 +134,26 @@ export async function getOperationalMetrics(): Promise<OperationalMetrics> {
   };
 }
 
-/** Recent orders, newest first, for the management list. */
-export async function getOrdersOverview(limit = 100): Promise<OrderOverviewRow[]> {
+/** Recent orders, newest first, filtered + searched, for the management list. */
+export async function getOrdersOverview(filter: OrderFilter | number = {}): Promise<OrderOverviewRow[]> {
+  const f: OrderFilter = typeof filter === "number" ? { limit: filter } : filter;
   // Loose: refund_amount / refunds aren't in the generated types yet.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const loose = createAdminClient() as any;
-  const { data, error } = await loose
+  let q = loose
     .from("orders")
     .select(
-      "id,order_number,email,ship_full_name,status,payment_status,is_cod,total_amount,refund_amount,razorpay_payment_id,created_at",
+      "id,order_number,email,ship_full_name,status,payment_status,is_cod,is_gift,buyer_gstin,ops_tags,total_amount,refund_amount,razorpay_payment_id,created_at",
     )
     .order("created_at", { ascending: false })
-    .limit(limit);
+    .limit(f.limit ?? 100);
+  if (f.status) q = q.eq("status", f.status);
+  if (f.payment) q = q.eq("payment_status", f.payment);
+  if (f.search) {
+    const s = f.search.trim().replace(/[%,]/g, "");
+    q = q.or(`order_number.ilike.%${s}%,email.ilike.%${s}%,ship_full_name.ilike.%${s}%`);
+  }
+  const { data, error } = await q;
   if (error) throw error;
   const orders = (data ?? []) as { id: string }[];
 
@@ -158,6 +179,9 @@ export async function getOrdersOverview(limit = 100): Promise<OrderOverviewRow[]
       status: string;
       payment_status: string;
       is_cod: boolean;
+      is_gift: boolean;
+      buyer_gstin: string | null;
+      ops_tags: string[] | null;
       total_amount: number;
       refund_amount: number | null;
       razorpay_payment_id: string | null;
@@ -171,6 +195,9 @@ export async function getOrdersOverview(limit = 100): Promise<OrderOverviewRow[]
       status: r.status,
       paymentStatus: r.payment_status,
       isCod: r.is_cod,
+      isGift: Boolean(r.is_gift),
+      hasGstin: Boolean(r.buyer_gstin),
+      tags: Array.isArray(r.ops_tags) ? r.ops_tags : [],
       total: Number(r.total_amount),
       refundAmount: Number(r.refund_amount ?? 0),
       latestRefundStatus: refundStatus.get(r.id) ?? null,
@@ -178,4 +205,38 @@ export async function getOrdersOverview(limit = 100): Promise<OrderOverviewRow[]
       placedAt: r.created_at,
     };
   });
+}
+
+// ── Order annotations + resend (Phase 2 admin enhancements) ──────────────────
+/** Internal note on an order (ops_note is shared with the board). */
+export async function setOrderNote(id: string, note: string, actorId?: string): Promise<{ ok: boolean; reason?: string }> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = createAdminClient() as any;
+  const { error } = await db.from("orders").update({ ops_note: note || null, updated_at: new Date().toISOString() }).eq("id", id);
+  if (error) return { ok: false, reason: error.message };
+  await logEvent({ orderId: id, entityType: "order", entityId: id, event: "order.note_set", actorId, notes: note ? note.slice(0, 120) : "(cleared)" });
+  return { ok: true };
+}
+
+/** Operational tags on an order (Gift Wrap / Fragile / VIP / …). */
+export async function setOrderTags(id: string, tags: string[], actorId?: string): Promise<{ ok: boolean; reason?: string }> {
+  const clean = [...new Set((tags ?? []).map((t) => t.trim()).filter(Boolean))].slice(0, 12);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = createAdminClient() as any;
+  const { error } = await db.from("orders").update({ ops_tags: clean, updated_at: new Date().toISOString() }).eq("id", id);
+  if (error) return { ok: false, reason: error.message };
+  await logEvent({ orderId: id, entityType: "order", entityId: id, event: "order.tagged", actorId, notes: clean.join(", ") || "(cleared)" });
+  return { ok: true };
+}
+
+/** Re-send the order confirmation email (via the notification engine, inline). */
+export async function resendConfirmation(id: string, actorId?: string): Promise<{ ok: boolean; reason?: string }> {
+  try {
+    const { notify } = await import("@/lib/notifications/engine");
+    const { anyFailed } = await notify("order.confirmed", { orderId: id });
+    await logEvent({ orderId: id, entityType: "order", entityId: id, event: "order.email_resent", actorId, notes: "confirmation" });
+    return anyFailed ? { ok: false, reason: "email channel failed (is Resend configured?)" } : { ok: true };
+  } catch (e) {
+    return { ok: false, reason: e instanceof Error ? e.message : "failed" };
+  }
 }

@@ -364,3 +364,16 @@
 .ash-activity__item:last-child { border-bottom: none; }
 .ash-activity__time { font-family: ui-monospace, monospace; font-size: 11px; color: var(--smoke, #6b6259); }
 .ash-activity__event { color: var(--ink, #1f1a16); }
+
+/* ── Admin filters + badges (Phase 2 admin enhancements) ── */
+.adm-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 18px; }
+.adm-filters__search { flex: 1 1 260px; min-width: 200px; padding: 8px 12px; font-family: var(--font-sans); font-size: 13px; border: 1px solid var(--ad-hair); border-radius: 4px; }
+.adm-filters select { padding: 8px 10px; font-family: var(--font-sans); font-size: 13px; border: 1px solid var(--ad-hair); border-radius: 4px; background: #fff; }
+.adm-filters__export { margin-left: auto; }
+.adm-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+.adm-badge { display: inline-block; padding: 1px 7px; border-radius: 3px; font-family: var(--font-sans); font-size: 9px; letter-spacing: 0.04em; text-transform: uppercase; background: rgba(31,26,22,0.06); color: #6b6259; }
+.adm-badge[data-b="high"] { background: rgba(201,169,110,0.24); color: #8a6d3b; }
+.adm-badge[data-b="gst"] { background: rgba(90,130,180,0.16); color: #3d5a80; }
+.adm-badge[data-b="gift"] { background: rgba(168,68,58,0.1); color: #8a3d2f; }
+.adm-badge[data-b="cod"] { background: rgba(60,120,70,0.12); color: #2f6b3c; }
+.om-meta-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }

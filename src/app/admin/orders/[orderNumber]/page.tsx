@@ -6,6 +6,8 @@ import { getOrderByNumber } from "@/services/orderService";
 import { getOrderRefunds } from "@/services/refundService";
 import { getOrderNotifications } from "@/services/notificationService";
 import { getOrderTimeline } from "@/services/auditService";
+import { hasCapability } from "@/lib/auth/capabilities";
+import { OrderMeta } from "@/components/admin/OrderMeta";
 
 /**
  * Order detail — `/admin/orders/[orderNumber]`. The single pane of glass for one
@@ -100,6 +102,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
             <div key={r.id} className="od-line"><span>{inr(r.amount)} · {r.method}</span><span className="om-pay" data-tone={r.status === "processed" ? "paid" : r.status === "failed" ? "failed" : "refundprog"}>{r.status}</span><span className="admin__muted">{dt(r.created_at)}</span></div>
           )) : <p className="admin__muted">No refunds.</p>}
         </section>
+
+        {/* Internal: tags + note + resend */}
+        {hasCapability(staff.role, "fulfillment.triage") ? (
+          <OrderMeta orderId={order.id} note={order.ops_note ?? null} tags={Array.isArray(order.ops_tags) ? order.ops_tags : []} canResend={hasCapability(staff.role, "fulfillment.operate")} />
+        ) : null}
 
         {/* Notifications */}
         <section className="od-card">
