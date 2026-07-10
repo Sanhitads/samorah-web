@@ -44,6 +44,7 @@ const NAV: NavGroup[] = [
     title: "Insights",
     items: [
       { label: "Analytics", href: "/admin/analytics", icon: "▲" },
+      { label: "Reports", href: "/admin/reports", icon: "▦" },
       { label: "Activity", href: "/admin/audit", icon: "≋" },
     ],
   },
