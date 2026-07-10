@@ -404,3 +404,12 @@
 .gs-hit:hover { border-color: rgba(31,26,22,0.3); }
 .gs-hit__label { font-family: var(--font-sans); font-size: 14px; color: var(--ink, #1f1a16); }
 .gs-hit__sub { font-family: var(--font-sans); font-size: 12px; color: var(--smoke, #6b6259); }
+
+/* ── System health ── */
+.health-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--ad-hair); border-radius: 6px; overflow: hidden; }
+.health-item { display: grid; grid-template-columns: 24px 1.4fr 2fr auto; gap: 12px; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--ad-hair); font-family: var(--font-sans); font-size: 14px; }
+.health-item:last-child { border-bottom: none; }
+.health-item__name { color: var(--ink, #1f1a16); }
+.health-item__status { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--smoke, #6b6259); }
+.health-item[data-s="down"] { background: rgba(168,68,58,0.04); }
+.health-item[data-s="warn"] { background: rgba(201,169,110,0.05); }
