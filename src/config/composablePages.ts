@@ -9,7 +9,7 @@ import { ABOUT_CFG, ABOUT_META } from "@/services/aboutService";
 import { JOURNAL_CFG, JOURNAL_META } from "@/services/journalService";
 import { getActiveCampaign } from "@/config/campaigns";
 import { getPageType, schemasOf } from "@/lib/cms/pageRegistry";
-import { resolveContent } from "@/lib/cms/sectionSchema";
+import { resolveContent, type SectionSchema } from "@/lib/cms/sectionSchema";
 import type { PageConfig, ComposedSection } from "@/services/pageComposerService";
 
 export interface ComposablePage {
@@ -34,4 +34,15 @@ export function resolveAdminSections(pageKey: string, sections: ComposedSection[
   });
 }
 
-export const pageSchemas = (pageKey: string) => schemasOf(pageKey);
+/**
+ * Schemas for a page's sections, SERIALISABLE for the client Page Builder. The
+ * cross-field `validate()` hook is a function (used only server-side, in
+ * composedPageValidation) and can't cross the server→client boundary — so we strip
+ * it here; the client only needs the field definitions.
+ */
+export const pageSchemas = (pageKey: string): Record<string, SectionSchema> => {
+  const s = schemasOf(pageKey);
+  return Object.fromEntries(
+    Object.entries(s).map(([k, v]) => [k, { type: v.type, label: v.label, note: v.note, fields: v.fields, sourced: v.sourced }]),
+  );
+};
