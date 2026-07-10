@@ -67,12 +67,55 @@ This maps each point to reality so we **enhance, not rebuild**.
 - ✅ **Phase 4 Reports** — GST report (CGST/SGST/IGST by state + CSV, for filing), top products, coupon usage, repeat rate, orders-by-state
 - ✅ **Phase 5 CMS (slice 1) Pages** — cms_pages content model + `/admin/content` editor + storefront reads DB→config fallback (policy/info pages editable, per-page SEO)
 
-### Remaining CMS + later phases
-- **CMS slice 2** — Navigation Manager (header/footer/mega-menu links → DB)
-- **CMS slice 3** — Media Library (Supabase Storage: upload/alt/folders/usage)
-- **CMS slice 4** — Email Template Manager (subject/blocks → DB)
-- **CMS slice 5** — Homepage Builder (section composition → DB) · **SEO Manager** (per-page, mostly in cms_pages.seo already)
-- **Phase 6 Managers** — Blog/Journal, Collections editor, Homepage banners, Newsletter admin (list/export subscribers)
-- **Enhance existing** — Rules-engine execution (event→rules dispatcher, more actions), Product editor tabs, Returns/Shipments extra fields, Packaging cost-history + assembly + barcode, Warehouse cutoff/summary, Coupons advanced (analytics/segments/product-specific)
+## 14 Refinements wave (post-CMS-slice-1, pre-slice-2)
+The user reviewed the OS build and listed 14 refinements + 9 capabilities to weave in
+"naturally, not bolted on later." Each done end-to-end (impl · UI · TS · live-verify · commit),
+with a "why / is this the right approach" note. Guiding principle throughout: **derive from
+the source of truth; flag gaps, never fake them.**
+
+- ✅ **R5+R14** Feature flags + Maintenance mode + Store notice — live in the `site_settings`
+  singleton (integrated, not a new table); maintenance scoped to the `(store)` layout so admin
+  never locks out.
+- ✅ **R1** Global admin search — one `globalSearch()` seam firing parallel ILIKE queries per
+  resource; capability-aware (PII groups gated on `analytics.view`).
+- ✅ **R8** System health dashboard — `getSystemHealth()` probes DB/payments/email/cron/webhooks/
+  deliverability/queue; each check cheap + isolated (never throws).
+- ✅ **R6** Notification center — `getAdminAlerts()` **derived** from live signals (no push table →
+  always current), severity-ranked, deep-linked; nav badge via `getAlertCount()`.
+- ✅ **R7+R3** Scheduled publish/unpublish + Revision history — `cms_pages` gains
+  `publish_at`/`unpublish_at` + `scheduled` status; visibility computed at **read time**
+  (`isPageLive`, no cron). Every save snapshots `cms_page_revisions`; restore = re-commit
+  (non-destructive).
+- ✅ **R10** Profit & loss — `variants.cost_price` (COGS) + editable `costs` settings group
+  (packaging/courier/gateway %); GST shown as pass-through memo; zero-cost variants flagged so
+  margin is never silently overstated.
+- ✅ **R12** Fragrance performance — units/revenue/return-rate per family (return rate joins
+  `return_items → variant → product`); unclassified kept, not dropped.
+- ✅ **R11** Retention cohorts — by acquisition month, keyed by identity (user_id else email).
+- ✅ **R13** CRM additions — favourite fragrance (derived), acquisition source (first-order UTMs),
+  wishlist (existing table surfaced). **Last-viewed** stubbed with a note (needs storefront
+  view-tracking → pairs with a future analytics beacon).
+- ✅ **R2** Audit log — verified comprehensive (56 `logEvent` sites / 17 services); added
+  actor-type filter + emphasised, colour-coded actor (accountability = *who*, not just *what*).
+- 📝 **R4** Media usage tracking — **deferred to CMS slice 3 (Media Library)** by design: usage
+  tracking only means something once assets live in a `media` table. Plan: a `media_usage`
+  view/query resolving each asset → the pages/products/sections referencing it, blocking delete
+  when in use. Noted here so the Media Library is built usage-aware from day one, not retrofitted.
+- 📝 **R9** CMS phase reorder — **adopted** below (Pages → Media → Nav → Homepage → Email → SEO →
+  Redirect). Media moves ahead of Nav because pages/homepage editors want an asset picker.
+- 📝 **R15** Inventory/ERP — **deferral confirmed** (ERP-sized; must not gate launch). Stays Phase 8.
+
+### Remaining CMS + later phases (R9 reorder adopted)
+- **CMS slice 2** — **Media Library** (Supabase Storage: upload/crop/alt/folders/tags + **usage
+  tracking R4** built in from the start)
+- **CMS slice 3** — Navigation Manager (header/footer/mega-menu links → DB)
+- **CMS slice 4** — Homepage Builder (section composition → DB, uses the Media picker)
+- **CMS slice 5** — Email Template Manager (subject/blocks → DB)
+- **CMS slice 6** — SEO Manager (per-page; mostly in `cms_pages.seo` already) · Redirect Manager
+  (301/302 + 404 log)
+- **Phase 6 Managers** — Blog/Journal, Collections editor, Homepage banners, Newsletter admin
+- **Enhance existing** — Rules-engine execution (event→rules dispatcher, more actions), Product
+  editor tabs, Returns/Shipments extra fields, Packaging cost-history + assembly + barcode,
+  Warehouse cutoff/summary, Coupons advanced (analytics/segments/product-specific)
 - **Phase 7 Optimization** — security (CSP), a11y (skip-link, focus), performance, more tests
-- **Inventory/ERP** — deferred (per user)
+- **Phase 8 Inventory/ERP** — deferred (per user, R15)
