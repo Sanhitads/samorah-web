@@ -150,3 +150,98 @@ export async function getProfitReport(windowDays: number | null = 30): Promise<P
     profit: r0(profit), margin, variantsMissingCost: missing.size,
   };
 }
+
+// ── Fragrance report (R12) ───────────────────────────────────────────────────
+export interface FragranceRow { family: string; units: number; revenue: number; returned: number; returnRate: number }
+
+/**
+ * Performance by fragrance family — best/worst sellers by units + revenue, plus a
+ * return rate (returned units ÷ sold units). Fragrance lives on the product, so we
+ * map each sold line back to its product's family; lines whose product has no
+ * family fall under "Unclassified" rather than being dropped.
+ */
+export async function getFragranceReport(windowDays: number | null = 90): Promise<FragranceRow[]> {
+  const db = createAdminClient() as any;
+  const cutoff = windowDays ? new Date(Date.now() - windowDays * 86400000).toISOString() : null;
+
+  let oq = db.from("orders").select("id,placed_at,order_items(product_id,variant_id,quantity,line_total)").in("payment_status", PAID);
+  if (cutoff) oq = oq.gte("placed_at", cutoff);
+  const { data } = await oq;
+  const orders = (data ?? []) as any[];
+
+  // product → fragrance family, and variant → product (to attribute returns).
+  const productIds = [...new Set(orders.flatMap((o) => (o.order_items ?? []).map((it: any) => it.product_id).filter(Boolean)))];
+  const familyOfProduct = new Map<string, string>();
+  const familyOfVariant = new Map<string, string>();
+  if (productIds.length) {
+    const { data: prods } = await db.from("products").select("id,fragrance_family").in("id", productIds);
+    for (const p of prods ?? []) familyOfProduct.set(p.id, p.fragrance_family || "Unclassified");
+    const { data: vars } = await db.from("variants").select("id,product_id").in("product_id", productIds);
+    for (const v of vars ?? []) familyOfVariant.set(v.id, familyOfProduct.get(v.product_id) || "Unclassified");
+  }
+
+  const map = new Map<string, FragranceRow>();
+  const get = (fam: string) => { let r = map.get(fam); if (!r) { r = { family: fam, units: 0, revenue: 0, returned: 0, returnRate: 0 }; map.set(fam, r); } return r; };
+  for (const o of orders) for (const it of o.order_items ?? []) {
+    const fam = familyOfProduct.get(it.product_id) || "Unclassified";
+    const r = get(fam); r.units += Number(it.quantity ?? 0); r.revenue += Number(it.line_total ?? 0);
+  }
+
+  // Returned units by fragrance, over the same window (returns join to variant → product → family).
+  let rq = db.from("return_items").select("variant_id,quantity,returns!inner(created_at,status)");
+  if (cutoff) rq = rq.gte("returns.created_at", cutoff);
+  const { data: retItems } = await rq;
+  for (const ri of retItems ?? []) {
+    const fam = ri.variant_id ? familyOfVariant.get(ri.variant_id) : null;
+    if (fam && map.has(fam)) map.get(fam)!.returned += Number(ri.quantity ?? 0);
+  }
+
+  return [...map.values()].map((r) => ({
+    ...r, revenue: r0(r.revenue), returnRate: r.units > 0 ? r1((r.returned / r.units) * 100) : 0,
+  })).sort((a, b) => b.revenue - a.revenue);
+}
+
+// ── Cohort report (R11) ──────────────────────────────────────────────────────
+export interface CohortRow { cohort: string; size: number; retention: number[] }
+export interface CohortReport { months: number; cohorts: CohortRow[] }
+
+/**
+ * Retention cohorts by acquisition month. Each customer's cohort = the month of
+ * their FIRST paid order; retention[k] = how many of that cohort placed another
+ * order k months later. Keyed by user_id when present, else email, so guests still
+ * cohort by identity. Always computed over ALL history (cohorts are inherently
+ * historical); `months` bounds how many follow-up columns to show.
+ */
+export async function getCohortReport(months = 6): Promise<CohortReport> {
+  const db = createAdminClient() as any;
+  const { data } = await db.from("orders").select("user_id,email,placed_at").in("payment_status", PAID).order("placed_at");
+  const orders = (data ?? []) as any[];
+
+  const ym = (iso: string) => { const d = new Date(iso); return d.getUTCFullYear() * 12 + d.getUTCMonth(); }; // absolute month index
+  const label = (idx: number) => { const y = Math.floor(idx / 12); const m = idx % 12; return `${y}-${String(m + 1).padStart(2, "0")}`; };
+
+  // First-order month + the set of active months per customer.
+  const first = new Map<string, number>();
+  const active = new Map<string, Set<number>>();
+  for (const o of orders) {
+    const key = o.user_id || o.email; if (!key || !o.placed_at) continue;
+    const m = ym(o.placed_at);
+    if (!first.has(key) || m < first.get(key)!) first.set(key, m);
+    (active.get(key) ?? active.set(key, new Set()).get(key)!).add(m);
+  }
+
+  const cohortMap = new Map<number, { size: number; ret: number[] }>();
+  for (const [key, f] of first) {
+    const c = cohortMap.get(f) ?? { size: 0, ret: Array(months + 1).fill(0) };
+    c.size++;
+    const months_active = active.get(key)!;
+    for (let k = 0; k <= months; k++) if (months_active.has(f + k)) c.ret[k]++;
+    cohortMap.set(f, c);
+  }
+
+  const cohorts = [...cohortMap.entries()].sort((a, b) => b[0] - a[0]).map(([idx, c]) => ({
+    cohort: label(idx), size: c.size,
+    retention: c.ret.map((n) => (c.size > 0 ? r1((n / c.size) * 100) : 0)),
+  }));
+  return { months, cohorts };
+}

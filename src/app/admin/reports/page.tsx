@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { hasCapability } from "@/lib/auth/capabilities";
-import { getReports, getProfitReport } from "@/services/reportsService";
+import { getReports, getProfitReport, getFragranceReport, getCohortReport } from "@/services/reportsService";
 
 /**
  * Reports — `/admin/reports`. Business & filing reports (GST by state, top
@@ -26,8 +26,11 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const sp = await searchParams;
   const win = ["30", "90", "365", "all"].includes(sp.window ?? "") ? (sp.window as string) : "30";
   const windowDays = win === "all" ? null : Number(win);
-  const [r, profit] = await Promise.all([getReports(windowDays), getProfitReport(windowDays)]);
+  const [r, profit, fragrances, cohorts] = await Promise.all([
+    getReports(windowDays), getProfitReport(windowDays), getFragranceReport(windowDays), getCohortReport(6),
+  ]);
   const canExport = hasCapability(staff.role, "data.export");
+  const bestFrag = fragrances[0]; const worstFrag = fragrances.length > 1 ? fragrances[fragrances.length - 1] : undefined;
 
   return (
     <main className="admin">
@@ -132,6 +135,50 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           )) : <p className="admin__muted">No orders in window.</p>}
         </section>
       </div>
+
+      {/* Fragrance performance (R12) */}
+      <section className="ash-metrics">
+        <div className="ash-activity__head"><h2 className="ash-jump__title">Fragrance performance</h2><span className="admin__muted">by revenue · units · return rate</span></div>
+        {fragrances.length ? (
+          <>
+            <div className="ash-metrics__row" style={{ marginBottom: 12 }}>
+              {bestFrag ? <div className="ash-metric"><span className="ash-metric__v">{bestFrag.family}</span><span className="ash-metric__l">Best seller · {inr(bestFrag.revenue)}</span></div> : null}
+              {worstFrag ? <div className="ash-metric"><span className="ash-metric__v">{worstFrag.family}</span><span className="ash-metric__l">Weakest · {inr(worstFrag.revenue)}</span></div> : null}
+            </div>
+            <div className="admin__table-wrap">
+              <table className="admin__table">
+                <thead><tr><th>Fragrance family</th><th>Units</th><th>Revenue</th><th>Returned</th><th>Return rate</th></tr></thead>
+                <tbody>
+                  {fragrances.map((f) => (
+                    <tr key={f.family}><td>{f.family}</td><td className="admin__mono">{f.units}</td><td className="admin__mono">{inr(f.revenue)}</td><td className="admin__mono">{f.returned}</td><td className="admin__mono">{f.returnRate}%</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : <p className="admin__empty">No sales in window.</p>}
+      </section>
+
+      {/* Retention cohorts (R11) */}
+      <section className="ash-metrics">
+        <div className="ash-activity__head"><h2 className="ash-jump__title">Retention cohorts</h2><span className="admin__muted">% of each acquisition month that ordered again, by months since</span></div>
+        {cohorts.cohorts.length ? (
+          <div className="admin__table-wrap">
+            <table className="admin__table">
+              <thead><tr><th>Cohort</th><th>Buyers</th>{Array.from({ length: cohorts.months + 1 }, (_, k) => <th key={k}>M{k}</th>)}</tr></thead>
+              <tbody>
+                {cohorts.cohorts.map((c) => (
+                  <tr key={c.cohort}>
+                    <td className="admin__mono">{c.cohort}</td><td className="admin__mono">{c.size}</td>
+                    {c.retention.map((v, k) => <td key={k} className="admin__mono" style={{ background: v > 0 ? `rgba(140,61,47,${Math.min(v / 100, 1) * 0.28})` : undefined }}>{v > 0 ? `${v}%` : "—"}</td>)}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : <p className="admin__empty">No cohorts yet.</p>}
+        <p className="cfg-hint">M0 is always 100% (the acquisition month itself); M1+ shows repeat-purchase retention.</p>
+      </section>
     </main>
   );
 }
