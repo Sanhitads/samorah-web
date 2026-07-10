@@ -423,3 +423,4 @@
 .au-actor[data-actor="system"] { color: #6b6259; font-weight: 500; }
 .au-actor[data-actor="webhook"] { color: #8a6d3b; }
 .au-actor[data-actor="customer"] { color: #2f6b3c; }
+.gs-mark { background: rgba(201, 169, 110, 0.32); color: inherit; border-radius: 2px; padding: 0 1px; }

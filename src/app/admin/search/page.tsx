@@ -9,6 +9,12 @@ import { globalSearch, type SearchHit } from "@/services/searchService";
 export const metadata: Metadata = { title: "Search", robots: { index: false } };
 export const dynamic = "force-dynamic";
 
+function Label({ hit }: { hit: SearchHit }) {
+  if (!hit.highlight) return <span className="gs-hit__label">{hit.label}</span>;
+  const { pre, match, post } = hit.highlight;
+  return <span className="gs-hit__label">{pre}<mark className="gs-mark">{match}</mark>{post}</span>;
+}
+
 function Group({ title, hits }: { title: string; hits: SearchHit[] }) {
   if (!hits.length) return null;
   return (
@@ -16,7 +22,7 @@ function Group({ title, hits }: { title: string; hits: SearchHit[] }) {
       <h2 className="gs-group__title">{title} <span className="admin__muted">({hits.length})</span></h2>
       <ul className="gs-list">
         {hits.map((h, i) => (
-          <li key={i}><Link href={h.href} className="gs-hit"><span className="gs-hit__label">{h.label}</span>{h.sublabel ? <span className="gs-hit__sub">{h.sublabel}</span> : null}</Link></li>
+          <li key={i}><Link href={h.href} className="gs-hit"><Label hit={h} />{h.sublabel ? <span className="gs-hit__sub">{h.sublabel}</span> : null}</Link></li>
         ))}
       </ul>
     </section>
@@ -28,7 +34,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   if (!staff.ok) redirect("/login");
   const { q } = await searchParams;
   const query = (q ?? "").trim();
-  const results = await globalSearch(query, { pii: hasCapability(staff.role, "analytics.view") });
+  const results = await globalSearch(query, { pii: hasCapability(staff.role, "analytics.view"), actorId: staff.userId ?? undefined });
   const total = Object.values(results).reduce((a, b) => a + b.length, 0);
 
   return (
