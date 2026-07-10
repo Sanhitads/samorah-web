@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { GlobalSearchBox } from "./GlobalSearchBox";
 
 /**
  * Admin navigation (SLP principle 21) — the persistent module map. Live modules
@@ -62,6 +63,8 @@ export function AdminNav({ role }: { role: string | null }) {
         <span className="ash-brand__mark">SAMORAH</span>
         <span className="ash-brand__sub">Operations</span>
       </Link>
+
+      <GlobalSearchBox />
 
       {NAV.map((group) => (
         <div key={group.title} className="ash-group">
