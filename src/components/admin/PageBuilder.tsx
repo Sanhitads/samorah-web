@@ -96,13 +96,15 @@ export function PageBuilder({ pageKey, label, view, sectionMeta, schemas, media,
   const reset = async () => { const d = await post({ action: "reset" }); if (d?.ok) setMsg({ tone: "ok", text: "Reset to default." }); };
   const openRevs = async () => { const d = await post({ action: "revisions" }); if (d?.revisions) setRevs(d.revisions); };
   const restore = async (id: string) => { const d = await post({ action: "restore", id }); if (d?.ok) { setRevs(null); setMsg({ tone: "ok", text: "Restored into draft — review, then publish." }); } };
+  // Preview is URL-driven (?preview=1) — self-limiting, so the live URL is never
+  // "stuck" in preview. We save the draft first so the preview reflects the latest edits.
+  const previewUrl = `${previewPath}${previewPath.includes("?") ? "&" : "?"}preview=1`;
   const [previewKey, setPreviewKey] = useState(0);
   const previewAt = async (deviceKey: string) => {
     await post({ action: "save", sections: withOrder() });
-    document.cookie = `${previewCookie}=1; path=/; max-age=600`;
     setDevice(deviceKey); setPreviewKey((k) => k + 1);
   };
-  const previewNewTab = async () => { await post({ action: "save", sections: withOrder() }); document.cookie = `${previewCookie}=1; path=/; max-age=600`; window.open(previewPath, "_blank", "noopener"); };
+  const previewNewTab = async () => { await post({ action: "save", sections: withOrder() }); window.open(previewUrl, "_blank", "noopener"); };
 
   const setSection = (i: number, patch: Partial<ComposedSection>) => setSections((s) => s.map((x, j) => (j === i ? { ...x, ...patch } : x)));
   const addSection = () => setSections((s) => [...s, { id: `${addType}-${s.length}`, type: addType, enabled: true, sortOrder: s.length, settings: {} }]);
@@ -166,7 +168,7 @@ export function PageBuilder({ pageKey, label, view, sectionMeta, schemas, media,
             <button type="button" className="ff-btn" onClick={() => setDevice(null)}>Close</button>
           </div>
           <div className="hp-preview__stage">
-            <iframe key={previewKey} title={`${label} preview`} src={previewPath} className="hp-preview__frame" style={{ width: DEVICES.find((d) => d.k === device)?.w, maxWidth: "100%" }} />
+            <iframe key={previewKey} title={`${label} preview`} src={previewUrl} className="hp-preview__frame" style={{ width: DEVICES.find((d) => d.k === device)?.w, maxWidth: "100%" }} />
           </div>
         </div>
       ) : null}

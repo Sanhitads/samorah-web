@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
 import { getAboutSections } from "@/services/aboutService";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { ComposedSections } from "@/components/page/ComposedSections";
+import { PreviewBanner } from "@/components/page/PreviewBanner";
 import { withRouteSeo } from "@/services/seoRedirectService";
 
 /**
@@ -17,15 +17,14 @@ export async function generateMetadata(): Promise<Metadata> {
   return withRouteSeo("/about", { title: "About" });
 }
 
-export default async function AboutPage() {
-  let preview = false;
-  const jar = await cookies();
-  if (jar.get("ab_preview")) preview = (await requireStaff("editor")).ok;
+export default async function AboutPage({ searchParams }: { searchParams: Promise<{ preview?: string }> }) {
+  const sp = await searchParams;
+  const preview = sp.preview === "1" ? (await requireStaff("editor")).ok : false;
   const sections = await getAboutSections({ preview });
 
   return (
     <main>
-      {preview ? <div className="store-notice" role="status" style={{ background: "#8a3d2f", color: "#fff" }}>Previewing draft About page — not live.</div> : null}
+      {preview ? <PreviewBanner label="About page" livePath="/about" /> : null}
       <ComposedSections sections={sections} />
     </main>
   );

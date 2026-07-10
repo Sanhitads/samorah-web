@@ -5,6 +5,7 @@ import { Footer } from "@/components/layout/Footer";
 import { getSiteSettings } from "@/services/siteSettingsService";
 import { getNavigation } from "@/services/navigationService";
 import { requireStaff } from "@/lib/auth/requireStaff";
+import { ClearPreviewLink } from "@/components/page/ClearPreviewLink";
 
 /**
  * Storefront chrome wrapper (Phase 6 — Layout Chrome, complete).
@@ -41,7 +42,7 @@ export default async function StoreLayout({
 
   return (
     <>
-      {preview ? <div className="store-notice" role="status" style={{ background: "#8a3d2f", color: "#fff" }}>Previewing draft navigation — not live. Publish from the admin to go live.</div> : null}
+      {preview ? <div className="store-notice" role="status" style={{ background: "#8a3d2f", color: "#fff" }}>Previewing draft navigation — not live.{" "}<ClearPreviewLink cookie="nav_preview">Exit preview</ClearPreviewLink></div> : null}
       {settings.storeNotice.active && settings.storeNotice.text ? (
         <div className="store-notice" role="status">{settings.storeNotice.text}</div>
       ) : null}

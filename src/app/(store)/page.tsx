@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
 import { getHomepageSections } from "@/services/homepageService";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { ComposedSections } from "@/components/page/ComposedSections";
+import { PreviewBanner } from "@/components/page/PreviewBanner";
 import { withRouteSeo } from "@/services/seoRedirectService";
 
 /**
  * Homepage — consumer #1 of the Composable Page framework. Composition + content are
  * DB-driven via the Homepage Builder; the shared <ComposedSections> renders the
- * typed section list (config fallback). Staff-gated draft preview via cookie.
+ * typed section list (config fallback). Draft preview is opt-in via `?preview=1`
+ * (staff-gated) — self-limiting, so the plain URL is always the live page.
  */
 export const dynamic = "force-dynamic";
 
@@ -17,15 +18,14 @@ export function generateMetadata(): Promise<Metadata> {
   return withRouteSeo("/", {});
 }
 
-export default async function HomePage() {
-  let preview = false;
-  const jar = await cookies();
-  if (jar.get("hp_preview")) preview = (await requireStaff("editor")).ok;
+export default async function HomePage({ searchParams }: { searchParams: Promise<{ preview?: string }> }) {
+  const sp = await searchParams;
+  const preview = sp.preview === "1" ? (await requireStaff("editor")).ok : false;
   const sections = await getHomepageSections({ preview });
 
   return (
     <main>
-      {preview ? <div className="store-notice" role="status" style={{ background: "#8a3d2f", color: "#fff" }}>Previewing draft homepage — not live.</div> : null}
+      {preview ? <PreviewBanner label="homepage" livePath="/" /> : null}
       <ComposedSections sections={sections} />
     </main>
   );
