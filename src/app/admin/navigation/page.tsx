@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { hasCapability } from "@/lib/auth/capabilities";
-import { getNavigationAdmin } from "@/services/navigationService";
+import { getNavigationAdmin, listLinkableEntities } from "@/services/navigationService";
 import { NavigationManager } from "@/components/admin/NavigationManager";
 
 /**
@@ -18,7 +18,7 @@ export default async function NavigationPage() {
   const staff = await requireStaff("editor");
   if (!staff.ok) redirect("/login");
   const canManage = hasCapability(staff.role, "catalog.manage");
-  const { header, footer } = await getNavigationAdmin();
+  const [{ header, footer }, entities] = await Promise.all([getNavigationAdmin(), listLinkableEntities()]);
 
   return (
     <main className="admin">
@@ -28,7 +28,7 @@ export default async function NavigationPage() {
         <p className="admin__count">Header · {header.state} · Footer · {footer.state}{canManage ? "" : " · read-only (needs catalog.manage)"}</p>
       </header>
       {canManage ? (
-        <NavigationManager header={header} footer={footer} />
+        <NavigationManager header={header} footer={footer} entities={entities} />
       ) : (
         <p className="admin__empty">Editing navigation needs the catalog.manage capability.</p>
       )}

@@ -2,8 +2,32 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import type { NavBranch, NavItem, FooterSection, MenuAdminView } from "@/services/navigationService";
+import type { NavBranch, NavItem, FooterSection, MenuAdminView, LinkableEntities, EntityType, LinkAttrs } from "@/services/navigationService";
 import type { Revision } from "@/services/cms/revisions";
+
+const ENTITY_TYPES: EntityType[] = ["page", "chapter", "collection", "product"];
+
+/** Compact per-link editor for entity linking (pt 5) + SEO attrs (pt 11). */
+function LinkEditor({ link, entities, onChange }: { link: LinkAttrs & { href?: string }; entities: LinkableEntities; onChange: (patch: Partial<LinkAttrs>) => void }) {
+  const isEntity = link.linkType === "entity";
+  const et = link.entity?.type ?? "page";
+  return (
+    <div className="nav-linkedit">
+      <select value={link.linkType ?? "url"} onChange={(e) => onChange({ linkType: e.target.value as "url" | "entity", entity: e.target.value === "entity" ? (link.entity ?? { type: "page", id: entities.page[0]?.id ?? "" }) : undefined })}>
+        <option value="url">Manual URL</option>
+        <option value="entity">Link to entity</option>
+      </select>
+      {isEntity ? (
+        <>
+          <select value={et} onChange={(e) => { const t = e.target.value as EntityType; onChange({ entity: { type: t, id: entities[t][0]?.id ?? "" } }); }}>{ENTITY_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}</select>
+          <select value={link.entity?.id ?? ""} onChange={(e) => onChange({ entity: { type: et, id: e.target.value } })}>{(entities[et] ?? []).map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}</select>
+        </>
+      ) : null}
+      <label className="nav-linkedit__chk"><input type="checkbox" checked={link.target === "_blank"} onChange={(e) => onChange({ target: e.target.checked ? "_blank" : undefined })} /> new tab</label>
+      <label className="nav-linkedit__chk"><input type="checkbox" checked={!!link.nofollow} onChange={(e) => onChange({ nofollow: e.target.checked })} /> nofollow</label>
+    </div>
+  );
+}
 
 const TIERS = ["", "parent", "child", "cta"];
 const GRADS = ["grad-chai", "grad-gajar", "grad-air", "grad-smoke", "grad-story"];
@@ -22,10 +46,11 @@ const toLocal = (iso?: string | null) => {
 };
 const fromLocal = (v: string) => (v ? new Date(v).toISOString() : null);
 
-export function NavigationManager({ header, footer }: { header: MenuAdminView; footer: MenuAdminView }) {
+export function NavigationManager({ header, footer, entities }: { header: MenuAdminView; footer: MenuAdminView; entities: LinkableEntities }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [tab, setTab] = useState<"header" | "footer">("header");
+  const [openLink, setOpenLink] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: string; text: string } | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
@@ -65,6 +90,7 @@ export function NavigationManager({ header, footer }: { header: MenuAdminView; f
   const setBranch = (bi: number, patch: Partial<NavBranch>) => setHdr((h) => h.map((b, i) => (i === bi ? { ...b, ...patch } : b)));
   const setItem = (bi: number, ii: number, patch: Partial<NavItem>) => setHdr((h) => h.map((b, i) => (i === bi ? { ...b, items: b.items.map((it, j) => (j === ii ? { ...it, ...patch } : it)) } : b)));
   const setCampaign = (bi: number, patch: Partial<NavBranch["campaign"]>) => setHdr((h) => h.map((b, i) => (i === bi ? { ...b, campaign: { ...b.campaign, ...patch } } : b)));
+  const setFtrLink = (si: number, li: number, patch: Partial<FooterSection["links"][number]>) => setFtr((f) => f.map((x, i) => (i === si ? { ...x, links: x.links.map((y, j) => (j === li ? { ...y, ...patch } : y)) } : x)));
 
   return (
     <div className="cfg">
@@ -88,14 +114,18 @@ export function NavigationManager({ header, footer }: { header: MenuAdminView; f
                 </span>
               </div>
               {b.items.map((it, ii) => (
-                <div key={ii} className="cfg-row" style={{ gridTemplateColumns: "1.4fr 1.4fr 0.8fr auto auto auto auto" }}>
-                  <input value={it.label} onChange={(e) => setItem(bi, ii, { label: e.target.value })} placeholder="Label" />
-                  <input value={it.href} onChange={(e) => setItem(bi, ii, { href: e.target.value })} placeholder="/href" />
-                  <select value={it.tier ?? ""} onChange={(e) => setItem(bi, ii, { tier: (e.target.value || undefined) as NavItem["tier"] })}>{TIERS.map((t) => <option key={t} value={t}>{t || "flat"}</option>)}</select>
-                  <button type="button" className="cfg-toggle" data-on={it.isComingSoon ? "1" : "0"} onClick={() => setItem(bi, ii, { isComingSoon: !it.isComingSoon })}>{it.isComingSoon ? "Soon" : "Live"}</button>
-                  <button type="button" className="ff-btn" onClick={() => setBranch(bi, { items: move(b.items, ii, -1) })}>↑</button>
-                  <button type="button" className="ff-btn" onClick={() => setBranch(bi, { items: move(b.items, ii, 1) })}>↓</button>
-                  <button type="button" className="ff-btn ff-btn--danger" onClick={() => setBranch(bi, { items: b.items.filter((_, j) => j !== ii) })}>×</button>
+                <div key={ii}>
+                  <div className="cfg-row" style={{ gridTemplateColumns: "1.3fr 1.3fr 0.7fr auto auto auto auto auto" }}>
+                    <input value={it.label} onChange={(e) => setItem(bi, ii, { label: e.target.value })} placeholder="Label" />
+                    <input value={it.href ?? ""} onChange={(e) => setItem(bi, ii, { href: e.target.value })} placeholder={it.linkType === "entity" ? "(from entity)" : "/href"} disabled={it.linkType === "entity"} />
+                    <select value={it.tier ?? ""} onChange={(e) => setItem(bi, ii, { tier: (e.target.value || undefined) as NavItem["tier"] })}>{TIERS.map((t) => <option key={t} value={t}>{t || "flat"}</option>)}</select>
+                    <button type="button" className="cfg-toggle" data-on={it.isComingSoon ? "1" : "0"} onClick={() => setItem(bi, ii, { isComingSoon: !it.isComingSoon })}>{it.isComingSoon ? "Soon" : "Live"}</button>
+                    <button type="button" className="ff-btn" data-active={openLink === `h${bi}-${ii}` ? "1" : "0"} onClick={() => setOpenLink(openLink === `h${bi}-${ii}` ? null : `h${bi}-${ii}`)} title="Link & SEO">🔗</button>
+                    <button type="button" className="ff-btn" onClick={() => setBranch(bi, { items: move(b.items, ii, -1) })}>↑</button>
+                    <button type="button" className="ff-btn" onClick={() => setBranch(bi, { items: move(b.items, ii, 1) })}>↓</button>
+                    <button type="button" className="ff-btn ff-btn--danger" onClick={() => setBranch(bi, { items: b.items.filter((_, j) => j !== ii) })}>×</button>
+                  </div>
+                  {openLink === `h${bi}-${ii}` ? <LinkEditor link={it} entities={entities} onChange={(patch) => setItem(bi, ii, patch)} /> : null}
                 </div>
               ))}
               <button type="button" className="ff-btn" onClick={() => setBranch(bi, { items: [...b.items, { label: "New link", href: "/" }] })}>+ link</button>
@@ -125,13 +155,17 @@ export function NavigationManager({ header, footer }: { header: MenuAdminView; f
                 </span>
               </div>
               {s.links.map((l, li) => (
-                <div key={li} className="cfg-row" style={{ gridTemplateColumns: "1.4fr 1.6fr auto auto auto auto" }}>
-                  <input value={l.label} onChange={(e) => setFtr((f) => f.map((x, i) => (i === si ? { ...x, links: x.links.map((y, j) => (j === li ? { ...y, label: e.target.value } : y)) } : x)))} placeholder="Label" />
-                  <input value={l.href} onChange={(e) => setFtr((f) => f.map((x, i) => (i === si ? { ...x, links: x.links.map((y, j) => (j === li ? { ...y, href: e.target.value } : y)) } : x)))} placeholder="/href or https://" />
-                  <button type="button" className="cfg-toggle" data-on={l.external ? "1" : "0"} onClick={() => setFtr((f) => f.map((x, i) => (i === si ? { ...x, links: x.links.map((y, j) => (j === li ? { ...y, external: !y.external } : y)) } : x)))}>{l.external ? "External" : "Internal"}</button>
-                  <button type="button" className="ff-btn" onClick={() => setFtr((f) => f.map((x, i) => (i === si ? { ...x, links: move(x.links, li, -1) } : x)))}>↑</button>
-                  <button type="button" className="ff-btn" onClick={() => setFtr((f) => f.map((x, i) => (i === si ? { ...x, links: move(x.links, li, 1) } : x)))}>↓</button>
-                  <button type="button" className="ff-btn ff-btn--danger" onClick={() => setFtr((f) => f.map((x, i) => (i === si ? { ...x, links: x.links.filter((_, j) => j !== li) } : x)))}>×</button>
+                <div key={li}>
+                  <div className="cfg-row" style={{ gridTemplateColumns: "1.4fr 1.5fr auto auto auto auto auto" }}>
+                    <input value={l.label} onChange={(e) => setFtrLink(si, li, { label: e.target.value })} placeholder="Label" />
+                    <input value={l.href ?? ""} onChange={(e) => setFtrLink(si, li, { href: e.target.value })} placeholder={l.linkType === "entity" ? "(from entity)" : "/href or https://"} disabled={l.linkType === "entity"} />
+                    <button type="button" className="cfg-toggle" data-on={l.external ? "1" : "0"} onClick={() => setFtrLink(si, li, { external: !l.external })}>{l.external ? "External" : "Internal"}</button>
+                    <button type="button" className="ff-btn" data-active={openLink === `f${si}-${li}` ? "1" : "0"} onClick={() => setOpenLink(openLink === `f${si}-${li}` ? null : `f${si}-${li}`)} title="Link & SEO">🔗</button>
+                    <button type="button" className="ff-btn" onClick={() => setFtr((f) => f.map((x, i) => (i === si ? { ...x, links: move(x.links, li, -1) } : x)))}>↑</button>
+                    <button type="button" className="ff-btn" onClick={() => setFtr((f) => f.map((x, i) => (i === si ? { ...x, links: move(x.links, li, 1) } : x)))}>↓</button>
+                    <button type="button" className="ff-btn ff-btn--danger" onClick={() => setFtr((f) => f.map((x, i) => (i === si ? { ...x, links: x.links.filter((_, j) => j !== li) } : x)))}>×</button>
+                  </div>
+                  {openLink === `f${si}-${li}` ? <LinkEditor link={l} entities={entities} onChange={(patch) => setFtrLink(si, li, patch)} /> : null}
                 </div>
               ))}
               <button type="button" className="ff-btn" onClick={() => setFtr((f) => f.map((x, i) => (i === si ? { ...x, links: [...x.links, { label: "New link", href: "/" }] } : x)))}>+ link</button>

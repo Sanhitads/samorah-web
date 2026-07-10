@@ -5,7 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { MENU_BRANCHES } from "@/config/navigation";
-import type { NavBranch } from "@/services/navigationService";
+import { type NavBranch, relOf } from "@/services/navigationService";
 import { useOverlay } from "@/hooks/useOverlay";
 
 /**
@@ -143,9 +143,11 @@ export function MegaMenu({ open, onClose, branches }: MegaMenuProps) {
                   ) : (
                     <Link
                       key={item.label}
-                      href={item.href}
+                      href={item.href ?? "#"}
                       className={`mega__link${tier}`}
                       onClick={onClose}
+                      target={item.target}
+                      rel={relOf(item)}
                     >
                       {item.label}
                     </Link>

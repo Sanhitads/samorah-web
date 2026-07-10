@@ -29,7 +29,7 @@ function eachLink(clean: any[], visit: (o: { label?: string; href?: string }, se
   const out: { label: string; href: string }[] = [];
   const walk = (o: any, labelKey: string) => {
     if (o[labelKey] !== undefined) { const s = sanitizeLabel(o[labelKey]); o[labelKey] = s; }
-    if (o.href) { visit({ label: o[labelKey], href: o.href }, (v) => { o[labelKey] = v; }); out.push({ label: o[labelKey] ?? "", href: o.href }); }
+    if (o.href || o.linkType === "entity") { visit({ label: o[labelKey], href: o.href }, (v) => { o[labelKey] = v; }); out.push({ label: o[labelKey] ?? "", href: o.href ?? "" }); }
   };
   for (const node of clean) {
     if (Array.isArray(node.items)) { // header branch
@@ -77,15 +77,38 @@ export async function validateMenu(menu: "header" | "footer", data?: unknown, op
   for (const l of links) if (l.href) seen.set(l.href, (seen.get(l.href) ?? 0) + 1);
   for (const [href, n] of seen) if (n > 1) warnings.push(`${n} links point to the same URL (${href})`);
 
-  // Broken internal links.
+  // Broken links — entity links whose target is gone, or URL links to unknown routes.
   const slugs = await knownPageSlugs();
-  for (const l of links) {
-    const seg = firstSegment(l.href);
-    if (seg === null) continue; // external / anchor
-    if (!STATIC_ROUTES.has(seg) && !slugs.has(seg) && !slugs.has(l.href.replace(/^\//, ""))) {
-      warnings.push(`"${l.label}" → ${l.href} may be a broken link (no matching route or page)`);
+  let entities: Record<string, Set<string>> | null = null;
+  const loadEntities = async () => {
+    if (entities) return entities;
+    entities = {};
+    try {
+      const { listLinkableEntities } = await import("@/services/navigationService");
+      const e = await listLinkableEntities();
+      for (const [type, opts] of Object.entries(e)) entities[type] = new Set(opts.map((o) => o.id));
+    } catch { /* ignore */ }
+    return entities;
+  };
+
+  const walkForBroken = async (nodes: any[]) => {
+    for (const node of nodes) {
+      const items = node.items ?? node.links ?? [];
+      for (const it of items) {
+        if (it.linkType === "entity" && it.entity) {
+          const set = (await loadEntities())[it.entity.type];
+          if (set && !set.has(it.entity.id)) warnings.push(`"${it.label}" → ${it.entity.type}:${it.entity.id} no longer exists (broken entity link)`);
+          continue;
+        }
+        const seg = firstSegment(it.href ?? "");
+        if (seg === null) continue;
+        if (!STATIC_ROUTES.has(seg) && !slugs.has(seg) && !slugs.has((it.href ?? "").replace(/^\//, ""))) {
+          warnings.push(`"${it.label}" → ${it.href} may be a broken link (no matching route or page)`);
+        }
+      }
     }
-  }
+  };
+  await walkForBroken(clean);
 
   return { clean, errors, warnings };
 }

@@ -16,12 +16,51 @@ import { snapshotRevision, listRevisions as listCmsRevisions, getRevisionSnapsho
 /** Cache tag for the live navigation — invalidated via revalidateTag on publish/reset. */
 export const NAV_CACHE_TAG = "navigation";
 
-export interface NavItem { label: string; href: string; isComingSoon?: boolean; tier?: "parent" | "child" | "cta" }
+/** Entity-based link target (review point 5) — store what it POINTS TO, not a URL. */
+export type EntityType = "page" | "chapter" | "collection" | "product";
+export interface LinkEntity { type: EntityType; id: string; label?: string } // id = slug
+
+/** Shared link attributes across nav + footer: entity linking (5), SEO (11), i18n (7). */
+export interface LinkAttrs {
+  linkType?: "url" | "entity";
+  entity?: LinkEntity;
+  target?: "_blank";
+  nofollow?: boolean;
+  labelI18n?: Record<string, string>; // localisation-ready; empty today
+}
+export interface NavItem extends LinkAttrs { label: string; href?: string; isComingSoon?: boolean; tier?: "parent" | "child" | "cta" }
 export interface NavCampaign { eyebrow: string; title: string; description: string; href: string; gradient: string; mediaId?: string; image?: string }
 export interface NavBranch { id: string; label: string; items: NavItem[]; campaign: NavCampaign }
-export interface FooterLink { label: string; href: string; external?: boolean }
+export interface FooterLink extends LinkAttrs { label: string; href?: string; external?: boolean }
 export interface FooterSection { title: string; links: FooterLink[] }
 export interface Navigation { branches: NavBranch[]; footer: FooterSection[] }
+
+/** Route templates per entity type — the ONE place a section's URL shape lives, so
+ *  moving /collections → /chapters is a code change here, not a nav re-edit (pt 5). */
+export const ENTITY_ROUTE: Record<EntityType, (slug: string) => string> = {
+  page: (s) => `/${s}`,
+  chapter: (s) => `/chapters/${s}`,
+  collection: (s) => `/collections/${s}`,
+  product: (s) => `/shop/${s}`,
+};
+const DEFAULT_LOCALE = "en";
+
+/** Resolve a link's final href — entity links compute their URL from the route map. */
+export function resolveHref(o: LinkAttrs & { href?: string }): string {
+  if (o.linkType === "entity" && o.entity) return ENTITY_ROUTE[o.entity.type]?.(o.entity.id) ?? "#";
+  return o.href ?? "#";
+}
+/** Localisation-ready label accessor (pt 7) — no-op today, seam for later locales. */
+export function resolveLabel(o: { label: string; labelI18n?: Record<string, string> }, locale = DEFAULT_LOCALE): string {
+  return o.labelI18n?.[locale] ?? o.label;
+}
+/** SEO rel string (pt 11) — nofollow + safe rel for new-tab links. */
+export function relOf(o: LinkAttrs & { external?: boolean }): string | undefined {
+  const parts: string[] = [];
+  if (o.nofollow) parts.push("nofollow");
+  if (o.target === "_blank" || o.external) parts.push("noopener", "noreferrer");
+  return parts.length ? [...new Set(parts)].join(" ") : undefined;
+}
 
 export type MenuId = "header" | "footer";
 interface MenuRow { id: MenuId; draft: any; published: any; status: string; publish_at: string | null; unpublish_at: string | null }
@@ -64,15 +103,23 @@ async function resolveCampaignImages(branches: NavBranch[]): Promise<void> {
  * `preview: true` (staff-gated by the caller) returns the DRAFT instead, so staff
  * can see unpublished/seasonal menus before they go live (review point 3).
  */
+/** Compute final href + localised label for every link (entity resolution, i18n). */
+function resolveLinks(branches: NavBranch[], footer: FooterSection[]): void {
+  for (const b of branches) for (const it of b.items) { it.href = resolveHref(it); it.label = resolveLabel(it); }
+  for (const s of footer) for (const l of s.links) { l.href = resolveHref(l); l.label = resolveLabel(l); }
+}
+
 async function resolveNavigation(preview: boolean): Promise<Navigation> {
   const [header, footer] = await Promise.all([readRow("header"), readRow("footer")]);
   const pick = (row: MenuRow | null, fallback: any[]) => {
-    if (preview && row?.draft?.length) return row.draft;
-    return liveTree(row) ?? fallback;
+    const tree = (preview && row?.draft?.length) ? row.draft : (liveTree(row) ?? fallback);
+    return JSON.parse(JSON.stringify(tree)); // clone — never mutate config/cache in place
   };
   const branches = pick(header, MENU_BRANCHES as any) as NavBranch[];
+  const footerSections = pick(footer, FOOTER_SECTIONS as any) as FooterSection[];
+  resolveLinks(branches, footerSections);
   await resolveCampaignImages(branches);
-  return { branches, footer: pick(footer, FOOTER_SECTIONS as any) as FooterSection[] };
+  return { branches, footer: footerSections };
 }
 
 /**
@@ -89,6 +136,30 @@ const getLiveNavigation = unstable_cache(() => resolveNavigation(false), ["navig
  */
 export async function getNavigation(opts: { preview?: boolean } = {}): Promise<Navigation> {
   return opts.preview ? resolveNavigation(true) : getLiveNavigation();
+}
+
+// ── Linkable entities (for the entity-link picker, pt 5) ─────────────────────
+export interface EntityOption { id: string; label: string }
+export type LinkableEntities = Record<EntityType, EntityOption[]>;
+
+/** Entities an editor can point a link at — resolved to current slugs. */
+export async function listLinkableEntities(): Promise<LinkableEntities> {
+  const { HOME_CHAPTERS } = await import("@/config/chapters");
+  const { AIR_VOLUMES } = await import("@/config/theHours");
+  const { listPagesAdmin } = await import("@/services/cmsService");
+  const pages = await listPagesAdmin();
+  let products: EntityOption[] = [];
+  try {
+    const db = createAdminClient() as any;
+    const { data } = await db.from("products").select("slug,name,status").eq("status", "active").order("name").limit(200);
+    products = (data ?? []).map((p: any) => ({ id: p.slug, label: p.name }));
+  } catch { /* products optional */ }
+  return {
+    page: pages.map((p) => ({ id: p.slug, label: p.title })),
+    chapter: HOME_CHAPTERS.map((c: any) => ({ id: c.slug, label: c.title })),
+    collection: AIR_VOLUMES.map((v: any) => ({ id: v.slug, label: v.title })),
+    product: products,
+  };
 }
 
 // ── Admin ────────────────────────────────────────────────────────────────────
