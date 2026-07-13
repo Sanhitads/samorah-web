@@ -35,17 +35,17 @@ async function render(event: NotificationEvent, ctx: NotificationContext): Promi
     case "order.dispatched": {
       const info = await getDispatchInfo(ctx.orderId) as any;
       if (!info) return null;
-      return compose(event, { to: info.email, ...buildDispatchNotificationEmail(info) }, { orderNumber: info.orderNumber ?? "", name: info.name ?? "", courier: info.courier ?? "", awb: info.awb ?? "" });
+      return compose(event, { to: info.email, ...buildDispatchNotificationEmail(info) }, { orderNumber: info.order_number ?? "", name: info.ship_full_name ?? "", courier: info.courier_name ?? "", awb: info.awb ?? "" });
     }
     case "order.cancelled": {
       const info = await getCancellationInfo(ctx.orderId) as any;
       if (!info) return null;
-      return compose(event, { to: info.email, ...buildCancellationEmail(info) }, { orderNumber: info.orderNumber ?? "", name: info.name ?? "" });
+      return compose(event, { to: info.email, ...buildCancellationEmail(info) }, { orderNumber: info.order_number ?? "", name: info.ship_full_name ?? "" });
     }
     case "delivery.completed": {
       const info = await getDeliveryInfo(ctx.orderId) as any;
       if (!info || !info.email) return null;
-      return compose(event, { to: info.email, ...buildDeliveryEmail(info) }, { orderNumber: info.orderNumber ?? "", name: info.name ?? "" });
+      return compose(event, { to: info.email, ...buildDeliveryEmail(info) }, { orderNumber: info.order_number ?? "", name: info.ship_full_name ?? "" });
     }
     case "return.requested":
     case "return.approved":
@@ -54,7 +54,7 @@ async function render(event: NotificationEvent, ctx: NotificationContext): Promi
       if (!ctx.returnId) return null;
       const info = await getReturnInfo(ctx.returnId) as any;
       if (!info || !info.email) return null;
-      return compose(event, { to: info.email, ...buildReturnEmail(event as ReturnEmailEvent, info) }, { rmaNumber: info.rmaNumber ?? "", orderNumber: info.orderNumber ?? "" });
+      return compose(event, { to: info.email, ...buildReturnEmail(event as ReturnEmailEvent, info) }, { rmaNumber: info.rma ?? "", orderNumber: info.order_number ?? "" });
     }
     default:
       return null;

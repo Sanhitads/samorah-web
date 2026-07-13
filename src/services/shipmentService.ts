@@ -325,15 +325,17 @@ export async function getDispatchInfo(orderId: string): Promise<DispatchInfo | n
   };
 }
 
-/** Mark a shipment dispatched (picked up), advance the order → shipped, queue the
- *  dispatch email. Admin/manual action today; a provider webhook later. */
+/** Mark a shipment dispatched (picked up), advance the order → shipped, send the
+ *  dispatch ("shipped") email. Admin/manual action today; a provider webhook later.
+ *  The email is sent DIRECTLY (like the delivery + return emails) rather than queued
+ *  as a fulfillment job, so it doesn't depend on the fulfillment cron being scheduled. */
 export async function markShipmentDispatched(orderId: string, opts?: { actorId?: string }): Promise<{ ok: boolean; reason?: string }> {
   const db = adminLoose();
   const { data: shipment } = await db.from("shipments").select("id,status").eq("order_id", orderId).maybeSingle();
   if (!shipment) return { ok: false, reason: "no shipment for order" };
   await addShipmentEvent(shipment.id, "picked_up", { description: "Dispatched — parcel handed to courier", source: "admin" });
   await db.from("orders").update({ status: "shipped" }).eq("id", orderId);
-  await callRpc<void>("queue_fulfillment_job", { p_order_id: orderId, p_job_type: "dispatch_email" });
+  await emitShipmentEvent("order.dispatched", orderId); // "your order is on its way" email
   await logEvent({ orderId, entityType: "shipment", entityId: shipment.id, event: "shipment.dispatched", actorId: opts?.actorId, previousState: shipment.status, newState: "picked_up" });
   return { ok: true };
 }
@@ -341,7 +343,7 @@ export async function markShipmentDispatched(orderId: string, opts?: { actorId?:
 // ── Post-dispatch lifecycle (Shipment Management) ────────────────────────────
 
 /** Lazy notify (breaks the shipmentService → engine → channel → shipmentService cycle). */
-async function emitShipmentEvent(event: "delivery.completed", orderId: string): Promise<void> {
+async function emitShipmentEvent(event: "order.dispatched" | "delivery.completed", orderId: string): Promise<void> {
   try {
     const { notify } = await import("@/lib/notifications/engine");
     await notify(event, { orderId });
