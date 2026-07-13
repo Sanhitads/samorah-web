@@ -4,31 +4,17 @@ import { useEffect, useRef } from "react";
 import { useUserStore } from "@/store/useUserStore";
 import { useCartStore, type CartItem } from "@/store/useCartStore";
 import { useWishlistStore, type WishlistItem } from "@/store/useWishlistStore";
+import { mergeCart, mergeWishlist } from "@/lib/account/merge";
+import { track } from "@/lib/analytics/events";
 
 /**
  * Cross-device account sync (mount once in the storefront chrome). While signed in,
  * the cart + wishlist follow the user to any device: on sign-in we MERGE the local
- * (guest) state with the server state and hydrate both stores, then push every
- * subsequent change (debounced). Loyalty points + order history already live on the
- * user server-side, so they sync without any client work.
+ * (guest) state with the server state (last-write-wins per line) and adopt the server's
+ * merged result, then push every subsequent change (debounced; the server re-merges so
+ * concurrent devices converge). Loyalty points + order history already live on the user
+ * server-side, so they sync without any client work.
  */
-
-/** Cart merge — union by line key; on a clash keep the larger quantity (never doubles). */
-function mergeCart(local: CartItem[], remote: CartItem[]): CartItem[] {
-  const map = new Map<string, CartItem>();
-  for (const it of [...remote, ...local]) {
-    const prev = map.get(it.key);
-    map.set(it.key, prev ? { ...it, qty: Math.max(prev.qty, it.qty) } : it);
-  }
-  return [...map.values()];
-}
-/** Wishlist merge — union by product id. */
-function mergeWishlist(local: WishlistItem[], remote: WishlistItem[]): WishlistItem[] {
-  const map = new Map<string, WishlistItem>();
-  for (const it of [...remote, ...local]) map.set(it.productId, it);
-  return [...map.values()];
-}
-
 export function AccountSync() {
   const userId = useUserStore((s) => s.user?.id ?? null);
   const pushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -53,17 +39,27 @@ export function AccountSync() {
       pushTimer.current = setTimeout(push, 1500);
     };
 
-    // 1. Merge local ⊕ server on sign-in, then hydrate both stores + persist the merge.
+    // 1. Merge local ⊕ server on sign-in; adopt the server's authoritative merged result.
     (async () => {
       try {
+        const localCart = useCartStore.getState().items;
+        const localWish = useWishlistStore.getState().items;
         const res = await fetch("/api/account/sync");
         const remote = res.ok ? await res.json() : { cart: [], wishlist: [] };
         if (!alive) return;
-        const mergedCart = mergeCart(useCartStore.getState().items, remote.cart ?? []);
-        const mergedWish = mergeWishlist(useWishlistStore.getState().items, remote.wishlist ?? []);
-        useCartStore.getState().setItems(mergedCart);
-        useWishlistStore.getState().setItems(mergedWish);
-        await push();
+        // POST our local state; the server merges with stored and returns the result.
+        const posted = await fetch("/api/account/sync", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cart: localCart, wishlist: localWish }),
+        });
+        const merged = posted.ok ? await posted.json() : null;
+        if (!alive) return;
+        const cart = (merged?.cart ?? mergeCart(localCart as any, remote.cart ?? [])) as CartItem[]; // eslint-disable-line @typescript-eslint/no-explicit-any
+        const wish = (merged?.wishlist ?? mergeWishlist(localWish as any, remote.wishlist ?? [])) as WishlistItem[]; // eslint-disable-line @typescript-eslint/no-explicit-any
+        useCartStore.getState().setItems(cart);
+        useWishlistStore.getState().setItems(wish);
+        const gained = cart.length > localCart.length || wish.length > localWish.length;
+        if (gained) { track("cart_merge_occurred", { lines: cart.length }); track("wishlist_merge_occurred", { items: wish.length }); }
       } catch { /* leave local state intact on failure */ }
       finally { if (alive) ready.current = true; }
     })();

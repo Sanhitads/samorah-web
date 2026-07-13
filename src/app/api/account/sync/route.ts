@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { mergeCart, mergeWishlist, sanitizeCart, sanitizeWishlist, withinSize } from "@/lib/account/merge";
 
 /**
  * Cross-device account state (cart + wishlist). GET returns the signed-in user's
- * stored state; POST saves it. Auth is the user's own session (server client); data
- * writes use the admin client scoped to that verified user id. Wishlist product ids
- * are mirrored into the normalized `wishlists` table so the CRM stays accurate.
+ * stored state; POST MERGES the incoming state with what's stored (last-write-wins per
+ * line) and saves the result — so two devices syncing concurrently converge instead of
+ * clobbering (optimistic concurrency). Payloads are size- + shape-validated. Auth is the
+ * user's own session; writes use the admin client scoped to that verified user id.
  */
 export const runtime = "nodejs";
 
@@ -22,8 +24,8 @@ export async function GET() {
   const userId = await currentUserId();
   if (!userId) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   const db = createAdminClient() as any; // eslint-disable-line @typescript-eslint/no-explicit-any
-  const { data } = await db.from("account_state").select("cart,wishlist").eq("user_id", userId).maybeSingle();
-  return NextResponse.json({ cart: data?.cart ?? [], wishlist: data?.wishlist ?? [] });
+  const { data } = await db.from("account_state").select("cart,wishlist,prefs").eq("user_id", userId).maybeSingle();
+  return NextResponse.json({ cart: data?.cart ?? [], wishlist: data?.wishlist ?? [], prefs: data?.prefs ?? {} });
 }
 
 export async function POST(request: Request) {
@@ -32,19 +34,28 @@ export async function POST(request: Request) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let body: any;
   try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
-  const cart = Array.isArray(body.cart) ? body.cart : [];
-  const wishlist = Array.isArray(body.wishlist) ? body.wishlist : [];
+  if (!withinSize(body)) return NextResponse.json({ error: "Payload too large" }, { status: 413 });
+
+  const incomingCart = sanitizeCart(body.cart);
+  const incomingWish = sanitizeWishlist(body.wishlist);
+  const prefs = body.prefs && typeof body.prefs === "object" && withinSize(body.prefs) ? body.prefs : undefined;
 
   const db = createAdminClient() as any; // eslint-disable-line @typescript-eslint/no-explicit-any
-  const { error } = await db.from("account_state").upsert({ user_id: userId, cart, wishlist, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
+  // Read-merge-write: converge with any concurrent write instead of overwriting it.
+  const { data: current } = await db.from("account_state").select("cart,wishlist,prefs").eq("user_id", userId).maybeSingle();
+  const cart = mergeCart(incomingCart, sanitizeCart(current?.cart));
+  const wishlist = mergeWishlist(incomingWish, sanitizeWishlist(current?.wishlist));
+  const mergedPrefs = { ...(current?.prefs ?? {}), ...(prefs ?? {}) };
+
+  const { error } = await db.from("account_state").upsert({ user_id: userId, cart, wishlist, prefs: mergedPrefs, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
   if (error) return NextResponse.json({ ok: false, reason: error.message }, { status: 500 });
 
   // Mirror wishlist → normalized `wishlists` (source for the CRM Customer 360).
   try {
-    const ids = [...new Set(wishlist.map((w: any) => w.productId).filter(Boolean))];
+    const ids = [...new Set(wishlist.map((w: any) => w.productId).filter(Boolean))]; // eslint-disable-line @typescript-eslint/no-explicit-any
     await db.from("wishlists").delete().eq("user_id", userId);
-    if (ids.length) await db.from("wishlists").insert(ids.map((productId: any) => ({ user_id: userId, product_id: productId })));
-  } catch { /* mirror is best-effort; the jsonb state is the storefront source of truth */ }
+    if (ids.length) await db.from("wishlists").insert(ids.map((productId: any) => ({ user_id: userId, product_id: productId }))); // eslint-disable-line @typescript-eslint/no-explicit-any
+  } catch { /* best-effort; jsonb state is the storefront source of truth */ }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, cart, wishlist });
 }

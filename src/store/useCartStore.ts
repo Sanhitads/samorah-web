@@ -33,6 +33,8 @@ export interface CartItem {
   size: string;
   qty: number;
   compositionId?: string;
+  /** Epoch ms of the last change to this line — drives last-write-wins cross-device merge. */
+  updatedAt?: number;
 }
 
 export interface CartState {
@@ -67,8 +69,9 @@ export const useCartStore = create<CartState>()(
         set((state) => {
           const key = lineKey(product.id, vessel, size, product.compositionId);
           const existing = state.items.find((i) => i.key === key);
+          const now = Date.now();
           const items = existing
-            ? state.items.map((i) => (i.key === key ? { ...i, qty: i.qty + 1 } : i))
+            ? state.items.map((i) => (i.key === key ? { ...i, qty: i.qty + 1, updatedAt: now } : i))
             : [
                 ...state.items,
                 {
@@ -86,6 +89,7 @@ export const useCartStore = create<CartState>()(
                   size,
                   qty: 1,
                   compositionId: product.compositionId,
+                  updatedAt: now,
                 },
               ];
           return { items };
@@ -98,7 +102,7 @@ export const useCartStore = create<CartState>()(
       updateQty: (key, qty) =>
         set((state) => ({
           items: state.items
-            .map((i) => (i.key === key ? { ...i, qty } : i))
+            .map((i) => (i.key === key ? { ...i, qty, updatedAt: Date.now() } : i))
             .filter((i) => i.qty > 0),
         })),
 
