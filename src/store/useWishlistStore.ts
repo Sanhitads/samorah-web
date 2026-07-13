@@ -16,6 +16,8 @@ interface WishlistState {
   removeFromWishlist: (productId: string) => void;
   isWishlisted: (productId: string) => boolean;
   clearWishlist: () => void;
+  /** Replace the whole wishlist — used to hydrate from the cross-device account state. */
+  setItems: (items: WishlistItem[]) => void;
 }
 
 /**
@@ -44,6 +46,8 @@ export const useWishlistStore = create<WishlistState>()(
         get().items.some((i) => i.productId === productId),
 
       clearWishlist: () => set({ items: [] }),
+
+      setItems: (items) => set({ items }),
     }),
     {
       name: "samorah_wishlist",

@@ -41,6 +41,8 @@ export interface CartState {
   removeItem: (key: string) => void;
   updateQty: (key: string, qty: number) => void;
   clearCart: () => void;
+  /** Replace the whole cart — used to hydrate from the cross-device account state. */
+  setItems: (items: CartItem[]) => void;
 }
 
 const lineKey = (id: string, vessel: string, size: string, compositionId?: string) =>
@@ -101,6 +103,8 @@ export const useCartStore = create<CartState>()(
         })),
 
       clearCart: () => set({ items: [] }),
+
+      setItems: (items) => set({ items }),
     }),
     {
       name: "samorah_cart", // same localStorage key as the prototype

@@ -6,6 +6,7 @@ import { getSiteSettings } from "@/services/siteSettingsService";
 import { getNavigation } from "@/services/navigationService";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { ClearPreviewLink } from "@/components/page/ClearPreviewLink";
+import { AccountSync } from "@/components/account/AccountSync";
 
 /**
  * Storefront chrome wrapper (Phase 6 — Layout Chrome, complete).
@@ -47,6 +48,7 @@ export default async function StoreLayout({
         <div className="store-notice" role="status">{settings.storeNotice.text}</div>
       ) : null}
       <AnnouncementBar />
+      <AccountSync />
       <StoreChrome branches={nav.branches} />
       {children}
       <Footer sections={nav.footer} />
