@@ -1,116 +1,64 @@
 "use client";
 
-import { useState, type CSSProperties, type FormEvent } from "react";
+import { Suspense, useState, type FormEvent } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
-
-// Functional-only styling — no design system yet.
-const wrap: CSSProperties = {
-  maxWidth: 400,
-  margin: "80px auto",
-  padding: 24,
-  display: "flex",
-  flexDirection: "column",
-  gap: 12,
-};
-const input: CSSProperties = {
-  padding: "10px 12px",
-  border: "1px solid #ccc",
-  borderRadius: 4,
-  fontSize: 14,
-};
-const btn: CSSProperties = {
-  padding: "10px 12px",
-  border: "1px solid #222",
-  background: "#222",
-  color: "#fff",
-  borderRadius: 4,
-  cursor: "pointer",
-  fontSize: 13,
-};
+import { AuthLoader } from "@/components/auth/AuthFlame";
 
 type Status = { type: "error" | "info"; message: string } | null;
 
-export default function RegisterPage() {
+function RegisterInner() {
   const auth = useAuth();
+  const next = useSearchParams().get("next");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState<Status>(null);
   const [busy, setBusy] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    setBusy(true);
-    setStatus(null);
+    setBusy(true); setStatus(null);
     const { data, error } = await auth.signUp(email, password, fullName || undefined);
     setBusy(false);
-
-    if (error) {
-      setStatus({ type: "error", message: error.message });
-      return;
-    }
-    // With email confirmation on, there's a user but no active session yet.
-    setStatus({
-      type: "info",
-      message:
-        data.user && !data.session
-          ? "Account created — check your email to confirm."
-          : "Account created and signed in.",
-    });
+    if (error) { setStatus({ type: "error", message: error.message }); return; }
+    setStatus({ type: "info", message: data.user && !data.session ? "Account created — check your email to confirm." : "Account created and signed in." });
   }
 
   return (
-    <main style={wrap}>
-      <h1>Create account</h1>
+    <main className="auth-page">
+      <div className="auth-card">
+        {(busy || redirecting) && <AuthLoader label={redirecting ? "Redirecting to Google" : "Creating your account"} />}
 
-      <GoogleSignInButton label="Sign up with Google" />
-      <div style={{ display: "flex", alignItems: "center", gap: 10, color: "#999", fontSize: 12, margin: "4px 0" }}>
-        <span style={{ flex: 1, height: 1, background: "#eee" }} /> or <span style={{ flex: 1, height: 1, background: "#eee" }} />
+        <div className="auth-brand"><div className="auth-brand__mark">SAMORAH</div><div className="auth-brand__sub">Join us</div></div>
+        <h1 className="auth-title">Create your account</h1>
+        <p className="auth-sub">One account for your cart, wishlist, rewards and orders — on every device.</p>
+
+        <div className="auth-stack">
+          <GoogleSignInButton next={next} label="Sign up with Google" onBusy={setRedirecting} />
+        </div>
+
+        <div className="auth-divider">or</div>
+
+        <form onSubmit={onSubmit} className="auth-stack">
+          <input className="auth-field" type="text" placeholder="Full name" autoComplete="name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+          <input className="auth-field" type="email" placeholder="Email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <input className="auth-field" type="password" placeholder="Password (min 6 characters)" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
+          <button className="auth-btn auth-btn--primary" type="submit" disabled={busy}>Create account</button>
+        </form>
+
+        {status && <p className={`auth-msg auth-msg--${status.type}`}>{status.message}</p>}
+
+        <p className="auth-foot">Already have an account? <a href={`/login${next ? `?next=${encodeURIComponent(next)}` : ""}`}>Sign in</a></p>
       </div>
-
-      <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <input
-          style={input}
-          type="text"
-          placeholder="Full name"
-          autoComplete="name"
-          value={fullName}
-          onChange={(e) => setFullName(e.target.value)}
-        />
-        <input
-          style={input}
-          type="email"
-          placeholder="Email"
-          autoComplete="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
-        <input
-          style={input}
-          type="password"
-          placeholder="Password"
-          autoComplete="new-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          minLength={6}
-        />
-        <button style={btn} type="submit" disabled={busy}>
-          Create account
-        </button>
-      </form>
-
-      {status && (
-        <p style={{ color: status.type === "error" ? "crimson" : "green", fontSize: 13 }}>
-          {status.message}
-        </p>
-      )}
-
-      <p style={{ fontSize: 13 }}>
-        Already have an account? <a href="/login">Sign in</a>
-      </p>
     </main>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense><RegisterInner /></Suspense>
   );
 }

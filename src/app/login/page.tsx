@@ -1,42 +1,11 @@
 "use client";
 
-import {
-  Suspense,
-  useEffect,
-  useState,
-  type CSSProperties,
-  type FormEvent,
-} from "react";
+import { Suspense, useEffect, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserStore } from "@/store/useUserStore";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
-
-// Functional-only styling — no design system yet (Phase 5.5 SDD comes later).
-const wrap: CSSProperties = {
-  maxWidth: 400,
-  margin: "80px auto",
-  padding: 24,
-  display: "flex",
-  flexDirection: "column",
-  gap: 12,
-};
-const input: CSSProperties = {
-  padding: "10px 12px",
-  border: "1px solid #ccc",
-  borderRadius: 4,
-  fontSize: 14,
-};
-const btn: CSSProperties = {
-  padding: "10px 12px",
-  border: "1px solid #222",
-  background: "#222",
-  color: "#fff",
-  borderRadius: 4,
-  cursor: "pointer",
-  fontSize: 13,
-};
-const btnGhost: CSSProperties = { ...btn, background: "transparent", color: "#222" };
+import { AuthLoader } from "@/components/auth/AuthFlame";
 
 type Status = { type: "error" | "info"; message: string } | null;
 
@@ -49,122 +18,95 @@ function LoginInner() {
   const role = useUserStore((s) => s.role);
   const isLoggedIn = useUserStore((s) => s.isLoggedIn);
 
+  const [mode, setMode] = useState<"email" | "magic">("email");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState<Status>(null);
   const [busy, setBusy] = useState(false);
+  const [redirecting, setRedirecting] = useState(false); // OAuth redirect in flight
 
-  // Once authenticated, return to the path the middleware stashed in ?next=
-  // (relative paths only, to avoid open redirects).
   useEffect(() => {
-    if (isLoggedIn && next && next.startsWith("/")) {
-      router.replace(next);
-    }
+    if (isLoggedIn && next && next.startsWith("/")) router.replace(next);
   }, [isLoggedIn, next, router]);
 
-  async function run(
-    action: () => Promise<{ error: { message: string } | null }>,
-    ok?: string,
-  ) {
-    setBusy(true);
-    setStatus(null);
+  async function run(action: () => Promise<{ error: { message: string } | null }>, ok?: string) {
+    setBusy(true); setStatus(null);
     const { error } = await action();
     setBusy(false);
     if (error) setStatus({ type: "error", message: error.message });
     else if (ok) setStatus({ type: "info", message: ok });
   }
 
-  async function onPasswordSignIn(e: FormEvent) {
+  const onEmailSignIn = (e: FormEvent) => { e.preventDefault(); return run(() => auth.signInWithPassword(email, password), "Signed in."); };
+  const onMagicLink = (e: FormEvent) => {
     e.preventDefault();
-    await run(() => auth.signInWithPassword(email, password), "Signed in.");
-  }
-
-  function requireEmail(): boolean {
-    if (email) return true;
-    setStatus({ type: "error", message: "Enter your email first." });
-    return false;
-  }
+    if (!email) return setStatus({ type: "error", message: "Enter your email first." });
+    return run(() => auth.signInWithMagicLink(email), "Magic link sent — check your inbox to continue.");
+  };
 
   if (isLoggedIn && user) {
     return (
-      <main style={wrap}>
-        <h1>Account</h1>
-        <p>
-          Signed in as <strong>{user.email}</strong> ({role})
-        </p>
-        <button style={btn} disabled={busy} onClick={() => run(() => auth.signOut())}>
-          Sign out
-        </button>
+      <main className="auth-page">
+        <div className="auth-card">
+          <div className="auth-brand"><div className="auth-brand__mark">SAMORAH</div><div className="auth-brand__sub">Your account</div></div>
+          <p className="auth-sub">Signed in as <strong>{user.email}</strong> · {role}</p>
+          <button className="auth-btn auth-btn--ghost" disabled={busy} onClick={() => run(() => auth.signOut())}>Sign out</button>
+        </div>
       </main>
     );
   }
 
   return (
-    <main style={wrap}>
-      <h1>Sign in</h1>
+    <main className="auth-page">
+      <div className="auth-card">
+        {(busy || redirecting) && <AuthLoader label={redirecting ? "Redirecting to Google" : "One moment"} />}
 
-      <GoogleSignInButton next={next} />
-      <div style={{ display: "flex", alignItems: "center", gap: 10, color: "#999", fontSize: 12, margin: "4px 0" }}>
-        <span style={{ flex: 1, height: 1, background: "#eee" }} /> or <span style={{ flex: 1, height: 1, background: "#eee" }} />
-      </div>
+        <div className="auth-brand"><div className="auth-brand__mark">SAMORAH</div><div className="auth-brand__sub">Members</div></div>
+        <h1 className="auth-title">Welcome back</h1>
+        <p className="auth-sub">Sign in to your account — your cart, wishlist and rewards follow you.</p>
 
-      <form onSubmit={onPasswordSignIn} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <input
-          style={input}
-          type="email"
-          placeholder="Email"
-          autoComplete="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
-        <input
-          style={input}
-          type="password"
-          placeholder="Password"
-          autoComplete="current-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
-        <button style={btn} type="submit" disabled={busy}>
-          Sign in
-        </button>
-      </form>
+        <div className="auth-stack">
+          <GoogleSignInButton next={next} onBusy={setRedirecting} />
+        </div>
 
-      <button
-        style={btnGhost}
-        disabled={busy}
-        onClick={() => requireEmail() && run(() => auth.signInWithMagicLink(email), "Magic link sent — check your email.")}
-      >
-        Email me a magic link
-      </button>
+        <div className="auth-divider">or</div>
 
-      <button
-        style={btnGhost}
-        disabled={busy}
-        onClick={() => requireEmail() && run(() => auth.resetPassword(email), "Password reset email sent.")}
-      >
-        Forgot password?
-      </button>
+        {mode === "email" ? (
+          <form onSubmit={onEmailSignIn} className="auth-stack">
+            <input className="auth-field" type="email" placeholder="Email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <input className="auth-field" type="password" placeholder="Password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <button className="auth-btn auth-btn--primary" type="submit" disabled={busy}>Continue with Email</button>
+          </form>
+        ) : (
+          <form onSubmit={onMagicLink} className="auth-stack">
+            <input className="auth-field" type="email" placeholder="Email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <button className="auth-btn auth-btn--primary" type="submit" disabled={busy}>Email me a magic link</button>
+          </form>
+        )}
 
-      {status && (
-        <p style={{ color: status.type === "error" ? "crimson" : "green", fontSize: 13 }}>
-          {status.message}
+        <p className="auth-foot">
+          {mode === "email" ? (
+            <>Prefer no password? <button type="button" className="auth-link" onClick={() => { setMode("magic"); setStatus(null); }}>Use a magic link</button></>
+          ) : (
+            <>Have a password? <button type="button" className="auth-link" onClick={() => { setMode("email"); setStatus(null); }}>Sign in with password</button></>
+          )}
         </p>
-      )}
+        {mode === "email" ? (
+          <p className="auth-foot" style={{ marginTop: 6 }}>
+            <button type="button" className="auth-link" disabled={busy} onClick={() => email ? run(() => auth.resetPassword(email), "Password reset email sent.") : setStatus({ type: "error", message: "Enter your email first." })}>Forgot your password?</button>
+          </p>
+        ) : null}
 
-      <p style={{ fontSize: 13 }}>
-        No account? <a href="/register">Register</a>
-      </p>
+        {status && <p className={`auth-msg auth-msg--${status.type}`}>{status.message}</p>}
+
+        <p className="auth-foot">New to Samorah? <a href={`/register${next ? `?next=${encodeURIComponent(next)}` : ""}`}>Create an account</a></p>
+      </div>
     </main>
   );
 }
 
 export default function LoginPage() {
   return (
-    <Suspense>
-      <LoginInner />
-    </Suspense>
+    <Suspense><LoginInner /></Suspense>
   );
 }

@@ -1,13 +1,7 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-
-const btn: CSSProperties = {
-  display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-  padding: "10px 12px", border: "1px solid #ccc", background: "#fff", color: "#222",
-  borderRadius: 4, cursor: "pointer", fontSize: 14, fontWeight: 500, width: "100%",
-};
 
 /** The official multicolour Google "G". */
 function GoogleG() {
@@ -21,25 +15,26 @@ function GoogleG() {
   );
 }
 
-/** Google Sign-In button. Redirects to Google; on return the callback creates the
- *  session (and, for new users, the profile via the DB trigger). */
-export function GoogleSignInButton({ next, label = "Continue with Google" }: { next?: string | null; label?: string }) {
+/** Premium Google Sign-In button. Redirects to Google; the callback creates the
+ *  session (+ profile via the DB trigger on first sign-in). `onBusy` lets the parent
+ *  show the full-card flame loader while the OAuth redirect is in flight. */
+export function GoogleSignInButton({ next, label = "Continue with Google", onBusy }: { next?: string | null; label?: string; onBusy?: (b: boolean) => void }) {
   const auth = useAuth();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
   const onClick = async () => {
-    setBusy(true); setErr("");
+    setBusy(true); onBusy?.(true); setErr("");
     const { error } = await auth.signInWithGoogle(next && next.startsWith("/") ? next : undefined);
-    if (error) { setBusy(false); setErr(error.message); } // success → browser redirects to Google
+    if (error) { setBusy(false); onBusy?.(false); setErr(error.message); } // success → browser redirects to Google
   };
 
   return (
-    <div>
-      <button type="button" style={btn} onClick={onClick} disabled={busy} aria-label="Continue with Google">
-        <GoogleG /> {busy ? "Redirecting…" : label}
+    <>
+      <button type="button" className="auth-btn auth-btn--google" onClick={onClick} disabled={busy} aria-label="Continue with Google">
+        <GoogleG /> {label}
       </button>
-      {err ? <p style={{ color: "crimson", fontSize: 12, marginTop: 6 }}>{err}</p> : null}
-    </div>
+      {err ? <p className="auth-msg auth-msg--error">{err}</p> : null}
+    </>
   );
 }
