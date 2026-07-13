@@ -22,10 +22,14 @@ export default function UpdatePasswordPage() {
     setBusy(true); setStatus(null);
     const supabase = createClient();
     const { error } = await supabase.auth.updateUser({ password });
+    if (error) { setBusy(false); setStatus({ type: "error", message: error.message }); return; }
+    // Point 6 — invalidate OTHER sessions so every other device must re-authenticate;
+    // this session stays. Then audit the change (non-blocking).
+    try { await supabase.auth.signOut({ scope: "others" }); } catch { /* ignore */ }
+    try { await fetch("/api/account/audit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event: "password_change" }) }); } catch { /* ignore */ }
     setBusy(false);
-    if (error) { setStatus({ type: "error", message: error.message }); return; }
-    setStatus({ type: "info", message: "Password updated. Redirecting…" });
-    setTimeout(() => router.replace("/account"), 1200);
+    setStatus({ type: "info", message: "Password updated — other devices have been signed out. Redirecting…" });
+    setTimeout(() => router.replace("/account"), 1400);
   }
 
   return (

@@ -43,6 +43,35 @@ export function mergeWishlist(a: WishEntry[], b: WishEntry[]): WishEntry[] {
   return [...map.values()];
 }
 
+// ── Deletion sync via tombstones (review point 8) ──
+// A tombstone records WHEN a line/entry was removed. On merge, a line is dropped iff a
+// tombstone for its identity is NEWER than the line's own updatedAt (i.e. the deletion
+// is the latest write). Re-adding a line after deletion (newer updatedAt) revives it.
+// Preserves last-write-wins for quantity updates; adds correct deletion propagation.
+export interface Tombstones { cart?: Record<string, number>; wish?: Record<string, number> }
+const TOMBSTONE_TTL_MS = 30 * 86400000; // prune after 30 days
+
+/** Merge two tombstone maps: keep the latest deletion time per key; prune stale. */
+export function mergeTombMap(a: Record<string, number> = {}, b: Record<string, number> = {}, now = Date.now()): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [k, t] of [...Object.entries(a ?? {}), ...Object.entries(b ?? {})]) {
+    if (now - t > TOMBSTONE_TTL_MS) continue;
+    out[k] = Math.max(out[k] ?? 0, t);
+  }
+  return out;
+}
+export function mergeTombstones(a: Tombstones = {}, b: Tombstones = {}, now = Date.now()): Tombstones {
+  return { cart: mergeTombMap(a.cart, b.cart, now), wish: mergeTombMap(a.wish, b.wish, now) };
+}
+
+/** Drop cart lines that a tombstone deleted after their last update. */
+export function applyCartTombstones(items: CartLine[], tomb: Record<string, number> = {}): CartLine[] {
+  return (items ?? []).filter((it) => !((tomb[it.key] ?? 0) > (it.updatedAt ?? 0)));
+}
+export function applyWishTombstones(items: WishEntry[], tomb: Record<string, number> = {}): WishEntry[] {
+  return (items ?? []).filter((it) => !((tomb[it.productId] ?? 0) > (it.updatedAt ?? 0)));
+}
+
 // ── Validation (review point 12.2) — reject oversized / malformed sync payloads ──
 export const MAX_CART_LINES = 100;
 export const MAX_WISHLIST = 300;

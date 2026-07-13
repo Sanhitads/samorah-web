@@ -6,6 +6,8 @@
  */
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { logAccountEvent } from "@/services/accountAuditService";
+import { resolveAvatar } from "@/lib/account/avatar";
 
 function loose() {
   return createAdminClient() as unknown as { from: (t: string) => any };
@@ -15,19 +17,27 @@ export interface AccountProfile {
   fullName: string | null; email: string; avatarUrl: string | null;
   provider: string | null; emailVerified: boolean; lastLoginAt: string | null; lastLoginProvider: string | null;
   loyaltyPoints: number; loyaltyTier: string; marketingConsent: boolean; createdAt: string | null;
+  providers: string[];
+  devices: { deviceId: string; label: string | null; lastActiveAt: string }[];
   logins: { provider: string | null; device: string | null; browser: string | null; country: string | null; createdAt: string }[];
 }
 
-/** Full account profile + recent sign-in history (session/activity list). */
+/** Full account profile + connected providers + devices + recent sign-in history. */
 export async function getAccountProfile(userId: string): Promise<AccountProfile | null> {
   const db = loose();
-  const { data: u } = await db.from("users").select("full_name,email,avatar_url,provider,email_verified,last_login_at,last_login_provider,loyalty_points,loyalty_tier,marketing_consent,created_at").eq("id", userId).maybeSingle();
+  const { data: u } = await db.from("users").select("full_name,email,avatar_url,avatar_cached_url,provider,email_verified,last_login_at,last_login_provider,loyalty_points,loyalty_tier,marketing_consent,created_at").eq("id", userId).maybeSingle();
   if (!u) return null;
-  const { data: logins } = await db.from("login_history").select("provider,device,browser,country,created_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(6);
+  const [{ data: logins }, { data: provs }, { data: devs }] = await Promise.all([
+    db.from("login_history").select("provider,device,browser,country,created_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(6),
+    db.from("user_auth_providers").select("provider").eq("user_id", userId),
+    db.from("user_devices").select("device_id,label,last_active_at").eq("user_id", userId).order("last_active_at", { ascending: false }).limit(8),
+  ]);
   return {
-    fullName: u.full_name ?? null, email: u.email, avatarUrl: u.avatar_url ?? null,
+    fullName: u.full_name ?? null, email: u.email, avatarUrl: resolveAvatar({ avatarUrl: u.avatar_url, avatarCachedUrl: u.avatar_cached_url }),
     provider: u.provider ?? null, emailVerified: Boolean(u.email_verified), lastLoginAt: u.last_login_at ?? null, lastLoginProvider: u.last_login_provider ?? null,
     loyaltyPoints: Number(u.loyalty_points ?? 0), loyaltyTier: u.loyalty_tier ?? "bronze", marketingConsent: Boolean(u.marketing_consent), createdAt: u.created_at ?? null,
+    providers: [...new Set([...(provs ?? []).map((p: any) => p.provider), u.provider].filter(Boolean))] as string[],
+    devices: (devs ?? []).map((d: any) => ({ deviceId: d.device_id, label: d.label, lastActiveAt: d.last_active_at })),
     logins: (logins ?? []).map((l: any) => ({ provider: l.provider, device: l.device, browser: l.browser, country: l.country, createdAt: l.created_at })),
   };
 }
@@ -121,6 +131,7 @@ export async function createAddress(userId: string, input: AddressInput) {
   if (makeDefault) await clearOtherDefaults(db, userId);
   const { error } = await db.from("addresses").insert({ user_id: userId, ...addrRow(input), is_default: makeDefault });
   if (error) return { ok: false, reason: error.message };
+  await logAccountEvent(userId, "address_change", { metadata: { action: "add" } });
   return { ok: true };
 }
 export async function updateAddress(userId: string, id: string, input: AddressInput) {
@@ -129,12 +140,14 @@ export async function updateAddress(userId: string, id: string, input: AddressIn
   // user_id filter = ownership guard.
   const { error } = await db.from("addresses").update({ ...addrRow(input), is_default: input.isDefault ?? false }).eq("id", id).eq("user_id", userId);
   if (error) return { ok: false, reason: error.message };
+  await logAccountEvent(userId, "address_change", { metadata: { action: "update" } });
   return { ok: true };
 }
 export async function deleteAddress(userId: string, id: string) {
   const db = loose();
   const { error } = await db.from("addresses").delete().eq("id", id).eq("user_id", userId);
   if (error) return { ok: false, reason: error.message };
+  await logAccountEvent(userId, "address_change", { metadata: { action: "delete" } });
   return { ok: true };
 }
 export async function setDefaultAddress(userId: string, id: string) {

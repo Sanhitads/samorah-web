@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser, getMyOrders, getAccountProfile } from "@/services/accountService";
 import { AccountSettings } from "@/components/account/AccountSettings";
+import { DeviceSessions } from "@/components/account/DeviceSessions";
 
 /** Account center — the customer's home. Middleware gates /account (auth). */
 export const metadata: Metadata = { title: "Your Account", robots: { index: false } };
@@ -84,23 +85,40 @@ export default async function AccountPage() {
         <AccountSettings initialName={profile?.fullName ?? ""} initialConsent={profile?.marketingConsent ?? false} />
       </section>
 
-      {/* Security & sessions */}
+      {/* Connected accounts */}
       <section className="acc__section">
-        <div className="acc__section-head"><h2 className="acc__section-title">Security & sessions</h2></div>
+        <div className="acc__section-head"><h2 className="acc__section-title">Connected accounts</h2></div>
         <div className="acc-connected">
-          <div className="acc-connected__row"><span>Connected account</span><span className="acc-badge">{providerLabel}</span></div>
-          {profile?.provider === "email" ? <div className="acc-connected__row"><span>Password</span><Link href="/account/update-password" className="text-link">Change password</Link></div> : null}
+          {["google", "email"].map((p) => {
+            const linked = profile?.providers?.includes(p);
+            return (
+              <div key={p} className="acc-connected__row">
+                <span>{PROVIDER_LABEL[p] ?? p}</span>
+                {linked ? <span className="acc-badge acc-badge--ok">Connected</span> : <span className="acc-badge">Not linked</span>}
+              </div>
+            );
+          })}
+          {profile?.providers?.includes("email") ? <div className="acc-connected__row"><span>Password</span><Link href="/account/update-password" className="text-link">Change password</Link></div> : null}
         </div>
+      </section>
+
+      {/* Devices & sessions */}
+      <section className="acc__section">
+        <div className="acc__section-head"><h2 className="acc__section-title">Devices & sessions</h2></div>
+        <DeviceSessions devices={profile?.devices ?? []} />
         {profile?.logins?.length ? (
-          <ul className="acc-sessions">
-            {profile.logins.map((l, i) => (
-              <li key={i} className="acc-sessions__row">
-                <span className="acc-sessions__dev">{l.browser} · {l.device}{i === 0 ? <span className="acc-badge acc-badge--ok">This session</span> : null}</span>
-                <span className="acc-sessions__meta">{PROVIDER_LABEL[l.provider ?? ""] ?? "email"}{l.country ? ` · ${l.country}` : ""}</span>
-                <span className="acc-sessions__when">{ago(l.createdAt)}</span>
-              </li>
-            ))}
-          </ul>
+          <>
+            <p className="acc__note" style={{ marginTop: 16 }}>Recent sign-ins</p>
+            <ul className="acc-sessions">
+              {profile.logins.map((l, i) => (
+                <li key={i} className="acc-sessions__row">
+                  <span className="acc-sessions__dev">{l.browser} · {l.device}</span>
+                  <span className="acc-sessions__meta">{PROVIDER_LABEL[l.provider ?? ""] ?? "email"}{l.country ? ` · ${l.country}` : ""}</span>
+                  <span className="acc-sessions__when">{ago(l.createdAt)}</span>
+                </li>
+              ))}
+            </ul>
+          </>
         ) : null}
       </section>
     </main>

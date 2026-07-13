@@ -5,6 +5,7 @@ import type { Session } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { useUserStore } from "@/store/useUserStore";
 import { track } from "@/lib/analytics/events";
+import { getDeviceId } from "@/lib/account/device";
 
 /**
  * Keeps useUserStore in sync with the Supabase auth session.
@@ -62,7 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (event === "SIGNED_IN") {
         void (async () => {
           try {
-            const res = await fetch("/api/account/login-event", { method: "POST" });
+            const res = await fetch("/api/account/login-event", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deviceId: getDeviceId() }) });
             const d = res.ok ? await res.json() : {};
             const provider = d.provider ?? (session.user.app_metadata?.provider as string) ?? "email";
             track("login_success", { provider });

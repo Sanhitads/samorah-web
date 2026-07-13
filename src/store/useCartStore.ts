@@ -39,12 +39,15 @@ export interface CartItem {
 
 export interface CartState {
   items: CartItem[];
+  /** Deletion tombstones (lineKey → epoch ms) — drive cross-device deletion sync. */
+  tombstones: Record<string, number>;
   addItem: (product: CartProduct, vessel: string, size: string) => void;
   removeItem: (key: string) => void;
   updateQty: (key: string, qty: number) => void;
   clearCart: () => void;
   /** Replace the whole cart — used to hydrate from the cross-device account state. */
   setItems: (items: CartItem[]) => void;
+  setTombstones: (t: Record<string, number>) => void;
 }
 
 const lineKey = (id: string, vessel: string, size: string, compositionId?: string) =>
@@ -61,6 +64,7 @@ export const useCartStore = create<CartState>()(
   persist(
     (set) => ({
       items: [],
+      tombstones: {},
 
       // ADD: increment qty if the key already exists, else append with qty 1.
       // Composition lines are keyed with their compositionId, so they stay a
@@ -92,27 +96,33 @@ export const useCartStore = create<CartState>()(
                   updatedAt: now,
                 },
               ];
-          return { items };
+          // Re-adding a line clears its tombstone (revive).
+          const { [key]: _drop, ...tombstones } = state.tombstones;
+          return { items, tombstones };
         }),
 
       removeItem: (key) =>
-        set((state) => ({ items: state.items.filter((i) => i.key !== key) })),
+        set((state) => ({ items: state.items.filter((i) => i.key !== key), tombstones: { ...state.tombstones, [key]: Date.now() } })),
 
       // Set qty for the key, then drop any line at qty <= 0 (prototype behavior).
       updateQty: (key, qty) =>
-        set((state) => ({
-          items: state.items
-            .map((i) => (i.key === key ? { ...i, qty, updatedAt: Date.now() } : i))
-            .filter((i) => i.qty > 0),
-        })),
+        set((state) => {
+          const items = state.items.map((i) => (i.key === key ? { ...i, qty, updatedAt: Date.now() } : i)).filter((i) => i.qty > 0);
+          const removed = qty <= 0 && state.items.some((i) => i.key === key);
+          return { items, tombstones: removed ? { ...state.tombstones, [key]: Date.now() } : state.tombstones };
+        }),
 
-      clearCart: () => set({ items: [] }),
+      clearCart: () => {
+        const now = Date.now();
+        set((state) => ({ items: [], tombstones: { ...state.tombstones, ...Object.fromEntries(state.items.map((i) => [i.key, now])) } }));
+      },
 
       setItems: (items) => set({ items }),
+      setTombstones: (t) => set({ tombstones: t }),
     }),
     {
       name: "samorah_cart", // same localStorage key as the prototype
-      partialize: (state) => ({ items: state.items }), // persist only items
+      partialize: (state) => ({ items: state.items, tombstones: state.tombstones }),
     },
   ),
 );

@@ -25,12 +25,14 @@ export function AccountSync() {
     ready.current = false;
     let alive = true;
 
+    const payload = () => ({
+      cart: useCartStore.getState().items,
+      wishlist: useWishlistStore.getState().items,
+      tombstones: { cart: useCartStore.getState().tombstones, wish: useWishlistStore.getState().tombstones },
+    });
     const push = async () => {
       try {
-        await fetch("/api/account/sync", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cart: useCartStore.getState().items, wishlist: useWishlistStore.getState().items }),
-        });
+        await fetch("/api/account/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload()) });
       } catch { /* retry on next change */ }
     };
     const schedulePush = () => {
@@ -47,17 +49,15 @@ export function AccountSync() {
         const res = await fetch("/api/account/sync");
         const remote = res.ok ? await res.json() : { cart: [], wishlist: [] };
         if (!alive) return;
-        // POST our local state; the server merges with stored and returns the result.
-        const posted = await fetch("/api/account/sync", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cart: localCart, wishlist: localWish }),
-        });
+        // POST our local state (+ tombstones); the server merges with stored and returns the result.
+        const posted = await fetch("/api/account/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload()) });
         const merged = posted.ok ? await posted.json() : null;
         if (!alive) return;
         const cart = (merged?.cart ?? mergeCart(localCart as any, remote.cart ?? [])) as CartItem[]; // eslint-disable-line @typescript-eslint/no-explicit-any
         const wish = (merged?.wishlist ?? mergeWishlist(localWish as any, remote.wishlist ?? [])) as WishlistItem[]; // eslint-disable-line @typescript-eslint/no-explicit-any
         useCartStore.getState().setItems(cart);
         useWishlistStore.getState().setItems(wish);
+        if (merged?.tombstones) { useCartStore.getState().setTombstones(merged.tombstones.cart ?? {}); useWishlistStore.getState().setTombstones(merged.tombstones.wish ?? {}); }
         const gained = cart.length > localCart.length || wish.length > localWish.length;
         if (gained) { track("cart_merge_occurred", { lines: cart.length }); track("wishlist_merge_occurred", { items: wish.length }); }
       } catch { /* leave local state intact on failure */ }

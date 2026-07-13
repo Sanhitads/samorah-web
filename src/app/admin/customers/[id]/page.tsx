@@ -4,10 +4,14 @@ import { redirect, notFound } from "next/navigation";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { hasCapability } from "@/lib/auth/capabilities";
 import { getCustomer360 } from "@/services/customerAdminService";
+import { getAccountAudit } from "@/services/accountAuditService";
 import { CustomerMeta } from "@/components/admin/CustomerMeta";
 
 export const metadata: Metadata = { title: "Customer", robots: { index: false } };
 export const dynamic = "force-dynamic";
+
+const AUDIT_LABEL: Record<string, string> = { login: "Signed in", logout: "Signed out", password_change: "Changed password", email_change: "Changed email", profile_update: "Updated profile", address_change: "Changed an address", wishlist_change: "Changed wishlist", newsletter_change: "Newsletter preference" };
+const auditAgo = (v: string) => { const d = (Date.now() - new Date(v).getTime()) / 86400000; return d < 1 ? "today" : d < 2 ? "yesterday" : `${Math.floor(d)}d ago`; };
 
 const money = (v: number) => `₹${v.toLocaleString("en-IN")}`;
 const fmt = (v: string) => new Date(v).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
@@ -21,6 +25,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
 
   const c = await getCustomer360(id);
   if (!c) notFound();
+  const audit = await getAccountAudit(id, 12);
 
   return (
     <main className="admin">
@@ -98,6 +103,18 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           )) : <p className="admin__muted">No returns.</p>}
         </section>
       </div>
+
+      {/* Account activity (audit trail — CS/admin only) */}
+      <section className="od-card" style={{ marginTop: 14 }}>
+        <h2 className="od-card__title">Account activity</h2>
+        {audit.length ? audit.map((a, i) => (
+          <div key={i} className="od-line">
+            <span>{AUDIT_LABEL[a.event] ?? a.event}</span>
+            <span className="admin__muted">{a.metadata?.provider ? String(a.metadata.provider) : a.metadata?.action ? String(a.metadata.action) : ""}</span>
+            <span className="admin__muted">{auditAgo(a.createdAt)}</span>
+          </div>
+        )) : <p className="admin__muted">No recorded account activity.</p>}
+      </section>
     </main>
   );
 }
