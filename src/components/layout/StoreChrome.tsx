@@ -7,6 +7,7 @@ import { SearchOverlay } from "./SearchOverlay";
 import { CartDrawer } from "./CartDrawer";
 import { useUIStore } from "@/store/useUIStore";
 import { useStore } from "@/hooks/useStore";
+import { useUserStore } from "@/store/useUserStore";
 import {
   type CartState,
   selectCartCount,
@@ -33,6 +34,7 @@ export function StoreChrome({ branches }: { branches?: NavBranch[] }) {
   const closeCart = useUIStore((s) => s.closeCart);
 
   const cartCount = useStore<CartState, number>(useCartStore, selectCartCount);
+  const avatarUrl = useUserStore((s) => s.user?.avatarUrl ?? null);
 
   // The homepage hero is a dark cinematic ground → the Header floats transparent
   // (light tone) over it and warms to ivory glass on scroll (Pending P1).
@@ -50,6 +52,7 @@ export function StoreChrome({ branches }: { branches?: NavBranch[] }) {
         onCartClick={openCart}
         onAccountClick={() => router.push("/account")}
         cartCount={cartCount}
+        avatarUrl={avatarUrl}
       />
       <MegaMenu open={menuOpen} onClose={closeMenu} branches={branches} />
       <SearchOverlay open={searchOpen} onClose={closeSearch} />

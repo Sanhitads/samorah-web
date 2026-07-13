@@ -11,6 +11,37 @@ function loose() {
   return createAdminClient() as unknown as { from: (t: string) => any };
 }
 
+export interface AccountProfile {
+  fullName: string | null; email: string; avatarUrl: string | null;
+  provider: string | null; emailVerified: boolean; lastLoginAt: string | null; lastLoginProvider: string | null;
+  loyaltyPoints: number; loyaltyTier: string; marketingConsent: boolean; createdAt: string | null;
+  logins: { provider: string | null; device: string | null; browser: string | null; country: string | null; createdAt: string }[];
+}
+
+/** Full account profile + recent sign-in history (session/activity list). */
+export async function getAccountProfile(userId: string): Promise<AccountProfile | null> {
+  const db = loose();
+  const { data: u } = await db.from("users").select("full_name,email,avatar_url,provider,email_verified,last_login_at,last_login_provider,loyalty_points,loyalty_tier,marketing_consent,created_at").eq("id", userId).maybeSingle();
+  if (!u) return null;
+  const { data: logins } = await db.from("login_history").select("provider,device,browser,country,created_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(6);
+  return {
+    fullName: u.full_name ?? null, email: u.email, avatarUrl: u.avatar_url ?? null,
+    provider: u.provider ?? null, emailVerified: Boolean(u.email_verified), lastLoginAt: u.last_login_at ?? null, lastLoginProvider: u.last_login_provider ?? null,
+    loyaltyPoints: Number(u.loyalty_points ?? 0), loyaltyTier: u.loyalty_tier ?? "bronze", marketingConsent: Boolean(u.marketing_consent), createdAt: u.created_at ?? null,
+    logins: (logins ?? []).map((l: any) => ({ provider: l.provider, device: l.device, browser: l.browser, country: l.country, createdAt: l.created_at })),
+  };
+}
+
+/** Update the editable profile fields (display name, marketing consent). */
+export async function updateProfile(userId: string, patch: { fullName?: string; marketingConsent?: boolean }): Promise<{ ok: boolean; reason?: string }> {
+  const db = loose();
+  const row: any = { updated_at: new Date().toISOString() };
+  if (patch.fullName !== undefined) row.full_name = patch.fullName.trim().slice(0, 160) || null;
+  if (patch.marketingConsent !== undefined) row.marketing_consent = Boolean(patch.marketingConsent);
+  const { error } = await db.from("users").update(row).eq("id", userId);
+  return error ? { ok: false, reason: error.message } : { ok: true };
+}
+
 /** The authenticated customer for the current request, or null. */
 export async function getSessionUser(): Promise<{ id: string; email: string } | null> {
   try {

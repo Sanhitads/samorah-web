@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUserStore } from "@/store/useUserStore";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { AuthLoader } from "@/components/auth/AuthFlame";
+import { track } from "@/lib/analytics/events";
 
 type Status = { type: "error" | "info"; message: string } | null;
 
@@ -29,19 +30,24 @@ function LoginInner() {
     if (isLoggedIn && next && next.startsWith("/")) router.replace(next);
   }, [isLoggedIn, next, router]);
 
-  async function run(action: () => Promise<{ error: { message: string } | null }>, ok?: string) {
+  async function run(action: () => Promise<{ error: { message: string } | null }>, ok?: string, onErr?: (m: string) => void) {
     setBusy(true); setStatus(null);
     const { error } = await action();
     setBusy(false);
-    if (error) setStatus({ type: "error", message: error.message });
+    if (error) { setStatus({ type: "error", message: error.message }); onErr?.(error.message); }
     else if (ok) setStatus({ type: "info", message: ok });
   }
 
-  const onEmailSignIn = (e: FormEvent) => { e.preventDefault(); return run(() => auth.signInWithPassword(email, password), "Signed in."); };
+  const onEmailSignIn = (e: FormEvent) => {
+    e.preventDefault();
+    track("login_started", { method: "password" });
+    return run(() => auth.signInWithPassword(email, password), "Signed in.", (m) => track("login_failure", { method: "password", reason: m }));
+  };
   const onMagicLink = (e: FormEvent) => {
     e.preventDefault();
     if (!email) return setStatus({ type: "error", message: "Enter your email first." });
-    return run(() => auth.signInWithMagicLink(email), "Magic link sent — check your inbox to continue.");
+    track("login_started", { method: "magic_link" });
+    return run(() => auth.signInWithMagicLink(email), "Magic link sent — check your inbox to continue.").then(() => track("magic_link_sent"));
   };
 
   if (isLoggedIn && user) {

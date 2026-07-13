@@ -32,6 +32,8 @@ export interface HeaderProps {
   onSearchClick?: () => void;
   /** Account action — integrates with Phase 3 auth later (Component / page). */
   onAccountClick?: () => void;
+  /** When signed in, the customer's avatar shown on the account control. */
+  avatarUrl?: string | null;
   /** Open the Cart Drawer (Component 5). */
   onCartClick?: () => void;
 }
@@ -52,6 +54,7 @@ export function Header({
   onSearchClick,
   onAccountClick,
   onCartClick,
+  avatarUrl = null,
 }: HeaderProps) {
   const [scrolled, setScrolled] = useState(false);
 
@@ -131,12 +134,17 @@ export function Header({
             aria-label="Account"
             onClick={onAccountClick}
           >
-            <User
-              className="site-header__action-icon"
-              size={18}
-              strokeWidth={1.25}
-              aria-hidden="true"
-            />
+            {avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={avatarUrl} alt="" referrerPolicy="no-referrer" className="site-header__avatar" width={22} height={22} />
+            ) : (
+              <User
+                className="site-header__action-icon"
+                size={18}
+                strokeWidth={1.25}
+                aria-hidden="true"
+              />
+            )}
             <span className="site-header__action-label">Account</span>
           </button>
 

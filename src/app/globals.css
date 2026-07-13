@@ -4999,3 +4999,6 @@ video.asset-image {
 @keyframes flame-glow { 0%,100% { opacity: 0.35; } 50% { opacity: 0.6; } }
 .flame-btn { width: 16px; height: 16px; display: inline-block; animation: flame-flicker 1.2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .flame, .flame__glow, .flame-btn { animation: none; } }
+
+/* Header avatar (signed-in) */
+.site-header__avatar { border-radius: 50%; object-fit: cover; display: block; }

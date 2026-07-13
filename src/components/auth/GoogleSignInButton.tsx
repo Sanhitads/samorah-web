@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { track } from "@/lib/analytics/events";
 
 /** The official multicolour Google "G". */
 function GoogleG() {
@@ -25,8 +26,9 @@ export function GoogleSignInButton({ next, label = "Continue with Google", onBus
 
   const onClick = async () => {
     setBusy(true); onBusy?.(true); setErr("");
+    track("login_started", { method: "google" });
     const { error } = await auth.signInWithGoogle(next && next.startsWith("/") ? next : undefined);
-    if (error) { setBusy(false); onBusy?.(false); setErr(error.message); } // success → browser redirects to Google
+    if (error) { setBusy(false); onBusy?.(false); setErr(error.message); track("login_failure", { method: "google", reason: error.message }); }
   };
 
   return (

@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { useUserStore } from "@/store/useUserStore";
+import { track } from "@/lib/analytics/events";
 
 /**
  * Keeps useUserStore in sync with the Supabase auth session.
@@ -26,9 +27,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let active = true;
 
     async function loadProfile(session: Session) {
-      const { data: profile } = await supabase
-        .from("users")
-        .select("full_name, role")
+      // Cast: avatar_url is newer than the generated DB types.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: profile } = await (supabase.from("users") as any)
+        .select("full_name, role, avatar_url")
         .eq("id", session.user.id)
         .maybeSingle();
 
@@ -39,6 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           id: session.user.id,
           email: session.user.email ?? "",
           fullName: profile?.full_name ?? null,
+          avatarUrl: profile?.avatar_url ?? (session.user.user_metadata?.avatar_url as string | undefined) ?? null,
         },
         profile?.role ?? "customer",
       );
@@ -46,13 +49,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (!session) {
         clearUser();
         return;
       }
       setSession(session);
       void loadProfile(session);
+
+      // Record the sign-in ONCE (not on every page load / token refresh) — captures
+      // provider, device, last-login, email-verified + detects first login (points 2,5,6,8,11,14).
+      if (event === "SIGNED_IN") {
+        void (async () => {
+          try {
+            const res = await fetch("/api/account/login-event", { method: "POST" });
+            const d = res.ok ? await res.json() : {};
+            const provider = d.provider ?? (session.user.app_metadata?.provider as string) ?? "email";
+            track("login_success", { provider });
+            if (provider === "google") track("google_login_success");
+            else if (provider === "email" && session.user.app_metadata?.providers?.includes?.("email")) track("magic_link_completed");
+            if (d.firstLogin) { track("first_login_completed", { provider }); try { localStorage.setItem("samorah_welcome", "1"); } catch { /* ignore */ } }
+          } catch { /* analytics/capture must never block auth */ }
+        })();
+      }
     });
 
     return () => {
