@@ -2,6 +2,7 @@
 
 import { useState, type CSSProperties, type FormEvent } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 
 // Functional-only styling — no design system yet.
 const wrap: CSSProperties = {
@@ -62,6 +63,11 @@ export default function RegisterPage() {
   return (
     <main style={wrap}>
       <h1>Create account</h1>
+
+      <GoogleSignInButton label="Sign up with Google" />
+      <div style={{ display: "flex", alignItems: "center", gap: 10, color: "#999", fontSize: 12, margin: "4px 0" }}>
+        <span style={{ flex: 1, height: 1, background: "#eee" }} /> or <span style={{ flex: 1, height: 1, background: "#eee" }} />
+      </div>
 
       <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <input

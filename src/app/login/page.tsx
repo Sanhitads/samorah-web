@@ -10,6 +10,7 @@ import {
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserStore } from "@/store/useUserStore";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 
 // Functional-only styling — no design system yet (Phase 5.5 SDD comes later).
 const wrap: CSSProperties = {
@@ -102,6 +103,11 @@ function LoginInner() {
     <main style={wrap}>
       <h1>Sign in</h1>
 
+      <GoogleSignInButton next={next} />
+      <div style={{ display: "flex", alignItems: "center", gap: 10, color: "#999", fontSize: 12, margin: "4px 0" }}>
+        <span style={{ flex: 1, height: 1, background: "#eee" }} /> or <span style={{ flex: 1, height: 1, background: "#eee" }} />
+      </div>
+
       <form onSubmit={onPasswordSignIn} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <input
           style={input}
@@ -140,14 +146,6 @@ function LoginInner() {
         onClick={() => requireEmail() && run(() => auth.resetPassword(email), "Password reset email sent.")}
       >
         Forgot password?
-      </button>
-
-      <button
-        style={btnGhost}
-        disabled={busy}
-        onClick={() => run(() => auth.signInWithGoogle())}
-      >
-        Continue with Google (setup pending)
       </button>
 
       {status && (

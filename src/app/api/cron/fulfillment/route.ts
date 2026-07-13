@@ -99,3 +99,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Fulfillment run failed.", ...devDetail(e) }, { status: 500 });
   }
 }
+
+// Vercel Cron invokes the path with GET; accept it (still guarded by CRON_SECRET).
+export const GET = POST;

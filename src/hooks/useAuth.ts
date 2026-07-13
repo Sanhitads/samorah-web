@@ -50,11 +50,13 @@ export function useAuth() {
         options: { emailRedirectTo: callbackUrl() },
       }),
 
-    /** Present but DORMANT until the Google provider is configured in Supabase. */
-    signInWithGoogle: () =>
+    /** Google OAuth. Redirects to Google, then back to /auth/callback?code= which
+     *  exchanges the code; a new user's profile row is created by the handle_new_user
+     *  trigger (name from Google metadata). `next` preserves the intended destination. */
+    signInWithGoogle: (next?: string) =>
       supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: callbackUrl() },
+        options: { redirectTo: callbackUrl(next) },
       }),
 
     /** Send a password-reset email; the link returns to the update-password page. */
