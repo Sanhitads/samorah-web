@@ -10,29 +10,37 @@ import type { AdminAlert, AlertPriority, EventNotification } from "@/services/no
 
 interface ResolvedItem { id: string; label: string; orderNumber: string | null; at: string }
 
-const PRIO_FILTERS: { key: string; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "critical", label: "🔴 Critical" },
-  { key: "high", label: "🟠 High" },
-  { key: "medium", label: "🟡 Medium" },
-  { key: "info", label: "🔵 Info" },
+type FilterKind = "all" | "prio" | "type" | "class" | "time";
+interface Filter { key: string; label: string; kind: FilterKind; prio?: AlertPriority; match?: (a: AdminAlert) => boolean; days?: number }
+
+const FILTERS: Filter[] = [
+  { key: "all", label: "All", kind: "all" },
+  { key: "critical", label: "🔴 Critical", kind: "prio", prio: "critical" },
+  { key: "high", label: "🟠 High", kind: "prio", prio: "high" },
+  { key: "medium", label: "🟡 Medium", kind: "prio", prio: "medium" },
+  { key: "operational", label: "Operational", kind: "class" },
+  { key: "events", label: "Events", kind: "class" },
+  { key: "refunds", label: "Refunds", kind: "type", match: (a) => a.key.includes("refund") },
+  { key: "payments", label: "Payments", kind: "type", match: (a) => a.key.includes("payment") },
+  { key: "shipments", label: "Shipments", kind: "type", match: (a) => a.key.includes("shipment") },
+  { key: "inventory", label: "Inventory", kind: "type", match: (a) => a.key === "low_stock" },
+  { key: "today", label: "Today", kind: "time", days: 1 },
+  { key: "week", label: "This week", kind: "time", days: 7 },
 ];
 
 const resolvedAgo = (iso: string) => { const h = (Date.now() - new Date(iso).getTime()) / 3.6e6; return h < 1 ? "just now" : `${Math.floor(h)}h ago`; };
 
 /**
- * Notification center shell (review points 12, 13, 17, 18). Adds filter tabs + search over
- * the enriched operational alerts and events, an Open/History split, and LIVE updates:
- * a Supabase realtime channel on the source tables plus a 30s poll fallback, so a new failure
- * appears — and a resolved one disappears — without a manual refresh.
+ * Notification center shell (review points 5, 12, 13, 17, 18). Filter tabs (priority / type /
+ * class / time) + search over the enriched operational alerts and events, an Open/History split,
+ * and LIVE updates (Supabase realtime channel + 30s poll fallback).
  */
 export function NotificationCenter({ operational, events, resolved }: { operational: AdminAlert[]; events: EventNotification[]; resolved: ResolvedItem[] }) {
   const router = useRouter();
   const [tab, setTab] = useState<"open" | "history">("open");
-  const [prio, setPrio] = useState("all");
+  const [filterKey, setFilterKey] = useState("all");
   const [query, setQuery] = useState("");
 
-  // Live updates — realtime channel (best-effort) + poll fallback (review point 18).
   useEffect(() => {
     const supabase = createClient();
     const channel = supabase.channel("admin-notifications");
@@ -44,49 +52,62 @@ export function NotificationCenter({ operational, events, resolved }: { operatio
     return () => { void supabase.removeChannel(channel); clearInterval(poll); };
   }, [router]);
 
+  const filter = FILTERS.find((f) => f.key === filterKey) ?? FILTERS[0];
   const q = query.trim().toLowerCase();
-  const matchItem = (t: { primary: string; secondary?: string; meta?: string }) =>
-    !q || [t.primary, t.secondary, t.meta].some((v) => (v ?? "").toLowerCase().includes(q));
+  const matchText = (...parts: (string | undefined | null)[]) => !q || parts.some((v) => (v ?? "").toLowerCase().includes(q));
+  const withinDays = (iso: string | null, days?: number) => !days || (iso ? Date.now() - new Date(iso).getTime() <= days * 86400000 : false);
+
+  const showOps = tab === "open" && filter.kind !== "class" || filter.key === "operational";
+  const showEvents = filter.kind === "all" || filter.key === "events";
 
   const filteredOps = useMemo(() => {
+    if (!showOps) return [];
     return operational
-      .filter((a) => prio === "all" || a.priority === (prio as AlertPriority))
-      .map((a) => (q ? { ...a, items: a.items.filter(matchItem) } : a))
-      .filter((a) => !q || a.title.toLowerCase().includes(q) || a.items.length > 0);
-  }, [operational, prio, q]); // eslint-disable-line react-hooks/exhaustive-deps
+      .filter((a) => (filter.kind === "prio" ? a.priority === filter.prio : true))
+      .filter((a) => (filter.kind === "type" && filter.match ? filter.match(a) : true))
+      .map((a) => {
+        let items = a.items;
+        if (q) items = items.filter((it) => matchText(it.primary, it.secondary, it.meta));
+        if (filter.kind === "time") items = items.filter((it) => withinDays(it.at, filter.days));
+        return { ...a, items };
+      })
+      .filter((a) => (q || filter.kind === "time" ? a.items.length > 0 : true));
+  }, [operational, filter, q, showOps]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const unreadEvents = useMemo(() => events.filter((e) => !e.readAt && (!q || `${e.title} ${e.body ?? ""}`.toLowerCase().includes(q))), [events, q]);
-  const readEvents = useMemo(() => events.filter((e) => e.readAt && (!q || `${e.title} ${e.body ?? ""}`.toLowerCase().includes(q))), [events, q]);
-  const showOps = prio !== "events" && (tab === "open");
+  const unreadEvents = useMemo(() => events.filter((e) => !e.readAt && matchText(e.title, e.body) && (filter.kind !== "time" || withinDays(e.createdAt, filter.days))), [events, q, filter]); // eslint-disable-line react-hooks/exhaustive-deps
+  const readEvents = useMemo(() => events.filter((e) => e.readAt && matchText(e.title, e.body)), [events, q]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div>
-      {/* Tabs + search */}
       <div className="nc-bar">
         <div className="nc-tabs" role="tablist">
           <button type="button" role="tab" aria-selected={tab === "open"} className="nc-tab" data-on={tab === "open" ? "1" : undefined} onClick={() => setTab("open")}>Open</button>
           <button type="button" role="tab" aria-selected={tab === "history"} className="nc-tab" data-on={tab === "history" ? "1" : undefined} onClick={() => setTab("history")}>History</button>
         </div>
-        <input className="nc-search" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search order, customer, reason…" aria-label="Search notifications" />
+        <input className="nc-search" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search order, customer, SKU, error…" aria-label="Search notifications" />
       </div>
 
       {tab === "open" ? (
         <>
           <div className="nc-filters">
-            {PRIO_FILTERS.map((f) => (
-              <button key={f.key} type="button" className="nc-chip" data-on={prio === f.key ? "1" : undefined} onClick={() => setPrio(f.key)}>{f.label}</button>
+            {FILTERS.map((f) => (
+              <button key={f.key} type="button" className="nc-chip" data-on={filterKey === f.key ? "1" : undefined} onClick={() => setFilterKey(f.key)}>{f.label}</button>
             ))}
           </div>
 
-          <section className="ash-metrics">
-            <div className="ash-activity__head"><h2 className="ash-jump__title">Open operational alerts</h2><span className="admin__muted">live · clears when resolved</span></div>
-            {showOps ? <OperationalAlerts alerts={filteredOps} /> : null}
-          </section>
+          {showOps ? (
+            <section className="ash-metrics">
+              <div className="ash-activity__head"><h2 className="ash-jump__title">Open operational alerts</h2><span className="admin__muted">live · clears when resolved</span></div>
+              <OperationalAlerts alerts={filteredOps} />
+            </section>
+          ) : null}
 
-          <section className="ash-metrics">
-            <div className="ash-activity__head"><h2 className="ash-jump__title">Recent events</h2><span className="admin__muted">{unreadEvents.length} unread</span></div>
-            <NotificationEvents events={unreadEvents} />
-          </section>
+          {showEvents ? (
+            <section className="ash-metrics">
+              <div className="ash-activity__head"><h2 className="ash-jump__title">Recent events</h2><span className="admin__muted">{unreadEvents.length} unread</span></div>
+              <NotificationEvents events={unreadEvents} />
+            </section>
+          ) : null}
         </>
       ) : (
         <>
@@ -94,7 +115,7 @@ export function NotificationCenter({ operational, events, resolved }: { operatio
             <section className="ash-metrics">
               <div className="ash-activity__head"><h2 className="ash-jump__title">Resolved today</h2><span className="admin__muted">{resolved.length}</span></div>
               <ul className="op-resolved">
-                {resolved.filter((r) => !q || `${r.label} ${r.orderNumber ?? ""}`.toLowerCase().includes(q)).map((r) => (
+                {resolved.filter((r) => matchText(r.label, r.orderNumber)).map((r) => (
                   <li key={r.id} className="op-resolved__item">
                     <span className="op-resolved__check">✓</span>
                     <span>{r.label}{r.orderNumber ? <> · <Link href={`/admin/orders/${r.orderNumber}`} className="admin__mono">{r.orderNumber}</Link></> : null}</span>

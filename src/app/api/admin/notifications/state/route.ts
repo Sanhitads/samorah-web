@@ -16,14 +16,15 @@ export async function POST(request: Request) {
   const staff = await requireStaff("editor");
   if (!staff.ok) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
 
-  let body: { alertKey?: string; state?: string; note?: string };
+  let body: { alertKey?: string; alertKeys?: string[]; state?: string; note?: string; snoozeMinutes?: number };
   try {
     body = (await request.json()) as typeof body;
   } catch {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
-  if (!body.alertKey || !body.state || !STATES.includes(body.state as NotificationState)) {
-    return NextResponse.json({ error: "alertKey and a valid state are required." }, { status: 400 });
+  const keys = body.alertKeys?.length ? body.alertKeys : body.alertKey ? [body.alertKey] : [];
+  if (!keys.length || !body.state || !STATES.includes(body.state as NotificationState)) {
+    return NextResponse.json({ error: "alertKey(s) and a valid state are required." }, { status: 400 });
   }
 
   const claiming = body.state !== "open";
@@ -35,13 +36,15 @@ export async function POST(request: Request) {
       name = data?.full_name ?? "Staff";
     } catch { name = "Staff"; }
   }
+  const snoozedUntil = body.snoozeMinutes && body.snoozeMinutes > 0 ? new Date(Date.now() + body.snoozeMinutes * 60000).toISOString() : null;
   const res = await setNotificationState({
-    alertKey: body.alertKey,
+    alertKeys: keys,
     state: body.state as NotificationState,
     assigneeId: claiming ? staff.userId ?? null : null,
     assigneeName: name,
     note: body.note,
     updatedBy: staff.userId ?? null,
+    snoozedUntil,
   });
   return res.ok ? NextResponse.json({ ok: true }) : NextResponse.json({ error: res.reason ?? "Failed." }, { status: 500 });
 }

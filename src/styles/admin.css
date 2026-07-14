@@ -743,3 +743,23 @@
 .nc-chip { font-family: var(--font-sans); font-size: 11px; letter-spacing: 0.02em; padding: 5px 12px; border: 1px solid var(--ad-hair); border-radius: 999px; background: #fff; color: var(--smoke, #6b6259); cursor: pointer; }
 .nc-chip[data-on] { background: var(--ink, #1f1a16); color: #f7f3ec; border-color: var(--ink, #1f1a16); }
 .op-item__owner { font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.02em; text-transform: uppercase; color: #8a6d3b; background: rgba(201, 169, 110, 0.14); padding: 3px 8px; border-radius: 999px; white-space: nowrap; align-self: center; }
+
+/* Bulk actions + view-all + snooze (points 1, 3, 11) */
+.op-bulk { display: flex; align-items: center; gap: 8px; padding: 8px 16px 4px; flex-wrap: wrap; }
+.op-bulk__label { font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--smoke, #6b6259); }
+.op-bulk__btn { font-family: var(--font-sans); font-size: 11px; padding: 4px 11px; border: 1px solid var(--ad-hair); border-radius: 999px; background: #fbf9f5; color: var(--ink, #1f1a16); cursor: pointer; }
+.op-bulk__btn:hover { border-color: rgba(31, 26, 22, 0.35); }
+.op-bulk__btn:disabled { opacity: 0.6; cursor: default; }
+.op-items__more { padding: 8px 0 2px; border-top: 1px solid var(--ad-hair); }
+.op-items__more a { font-family: var(--font-sans); font-size: 11.5px; color: #8a6d3b; text-decoration: none; }
+.op-snooze { position: relative; }
+.op-snooze__menu { position: absolute; top: calc(100% + 4px); right: 0; z-index: 30; display: flex; flex-direction: column; background: #fff; border: 1px solid var(--ad-hair); border-radius: 6px; box-shadow: 0 10px 26px rgba(31,26,22,0.16); overflow: hidden; }
+.op-snooze__menu button { font-family: var(--font-sans); font-size: 12px; padding: 7px 16px; background: none; border: none; text-align: left; cursor: pointer; white-space: nowrap; color: var(--ink, #1f1a16); }
+.op-snooze__menu button:hover { background: #fbf9f5; }
+
+/* Richer order banner grid */
+.od-banner { align-items: flex-start; }
+.od-banner__main { display: flex; gap: 12px; flex: 1; min-width: 240px; }
+.od-banner__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px 18px; margin: 6px 0 0; }
+.od-banner__grid dt { font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--smoke, #6b6259); }
+.od-banner__grid dd { font-family: var(--font-sans); font-size: 12.5px; color: var(--ink, #1f1a16); margin: 0; }

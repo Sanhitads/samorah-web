@@ -73,22 +73,41 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
     items: low.slice(0, 12).map((v) => ({ id: v.id, alertKey: `low_stock:${v.id}`, primary: v.products?.name ?? "Variant", secondary: v.sku ?? undefined, meta: `${Number(v.stock)} left`, at: null, href: "/admin/products" })),
   });
 
-  // Refunds failed (high) — the headline example: full context + retry deep-link
+  // Refunds failed (high) — DEDUPED by order (review point 2): repeated failures on one
+  // order collapse into a single item with an occurrence count + latest failure time.
   const refunds = (refundRes.data ?? []) as any[];
-  if (refunds.length) alerts.push({
-    key: "refund_failed", severity: "critical", priority: "high", title: "Refund failed", count: refunds.length, href: "/admin/orders?payment=failed",
-    items: refunds.map((r) => {
-      const num = r.orders?.order_number ?? "";
-      return { id: r.id, alertKey: `refund_failed:${r.id}`, primary: num, secondary: r.orders?.ship_full_name ?? undefined, meta: `${inr(r.amount)} · ${r.error_description || r.reason || "gateway error"}`, at: r.created_at, href: `/admin/orders/${num}#refunds`, retryOrderNumber: num };
-    }),
-  });
+  if (refunds.length) {
+    const byOrder = new Map<string, { num: string; customer?: string; amount: number; reason: string; latest: string; count: number; id: string }>();
+    for (const r of refunds) {
+      const num = r.orders?.order_number ?? "—";
+      const g = byOrder.get(num);
+      const reason = r.error_description || r.reason || "gateway error";
+      if (!g) byOrder.set(num, { num, customer: r.orders?.ship_full_name ?? undefined, amount: Number(r.amount ?? 0), reason, latest: r.created_at, count: 1, id: r.id });
+      else { g.count++; if (new Date(r.created_at) > new Date(g.latest)) { g.latest = r.created_at; g.reason = reason; } }
+    }
+    alerts.push({
+      key: "refund_failed", severity: "critical", priority: "high", title: "Refund failed", count: byOrder.size, href: "/admin/orders?payment=failed",
+      items: [...byOrder.values()].map((g) => ({ id: g.id, alertKey: `refund_failed:order:${g.num}`, primary: g.num, secondary: g.customer, meta: `${inr(g.amount)} · ${g.reason}${g.count > 1 ? ` · ${g.count}×` : ""}`, at: g.latest, href: `/admin/orders/${g.num}#refunds`, retryOrderNumber: g.num })),
+    });
+  }
 
-  // Failed payments (high)
+  // Failed payments (high) — deduped by order
   const pays = (payRes.data ?? []) as any[];
-  if (pays.length) alerts.push({
-    key: "failed_payments", severity: "warn", priority: "high", title: "Failed payments (7d)", count: pays.length, href: "/admin/orders?payment=failed",
-    items: pays.map((p) => { const num = p.orders?.order_number; return { id: p.id, alertKey: `failed_payments:${p.id}`, primary: num ?? p.razorpay_order_id ?? "—", secondary: num ? undefined : "no order", meta: p.error_description || "payment failed", at: p.created_at, href: num ? `/admin/orders/${num}` : "/admin/orders?payment=failed" }; }),
-  });
+  if (pays.length) {
+    const byKey = new Map<string, { key: string; num: string | null; reason: string; latest: string; count: number; id: string }>();
+    for (const p of pays) {
+      const num = p.orders?.order_number ?? null;
+      const k = num ?? p.razorpay_order_id ?? p.id;
+      const g = byKey.get(k);
+      const reason = p.error_description || "payment failed";
+      if (!g) byKey.set(k, { key: k, num, reason, latest: p.created_at, count: 1, id: p.id });
+      else { g.count++; if (new Date(p.created_at) > new Date(g.latest)) { g.latest = p.created_at; g.reason = reason; } }
+    }
+    alerts.push({
+      key: "failed_payments", severity: "warn", priority: "high", title: "Failed payments (7d)", count: byKey.size, href: "/admin/orders?payment=failed",
+      items: [...byKey.values()].map((g) => ({ id: g.id, alertKey: `failed_payments:${g.key}`, primary: g.num ?? g.key, secondary: g.num ? undefined : "no order", meta: `${g.reason}${g.count > 1 ? ` · ${g.count}×` : ""}`, at: g.latest, href: g.num ? `/admin/orders/${g.num}` : "/admin/orders?payment=failed" })),
+    });
+  }
 
   // Shipment exceptions / NDR (medium)
   const ships = (shipRes.data ?? []) as any[];
@@ -109,13 +128,20 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
   // Failed background jobs (critical)
   if (jobsFailed) alerts.push({ key: "jobs_failed", severity: "critical", priority: "critical", title: "Failed background jobs", count: jobsFailed, href: "/admin/health", items: [] });
 
-  // Attach workflow state (acknowledged / assignee) to each item (review points 5, 8).
+  // Attach workflow state (assignee/ack) + drop snoozed items (review points 5, 8, 11).
   const allItems = alerts.flatMap((a) => a.items);
   if (allItems.length) {
     try {
-      const { data: states } = await db.from("notification_state").select("alert_key,state,assignee_name").in("alert_key", allItems.map((i) => i.alertKey));
+      const nowMs = Date.now();
+      const { data: states } = await db.from("notification_state").select("alert_key,state,assignee_name,snoozed_until").in("alert_key", allItems.map((i) => i.alertKey));
       const byKey = new Map<string, any>((states ?? []).map((s: any) => [String(s.alert_key), s]));
-      for (const it of allItems) { const s = byKey.get(it.alertKey); if (s) { it.state = s.state as NotificationState; it.assigneeName = s.assignee_name; } }
+      for (const a of alerts) {
+        a.items = a.items.filter((it) => {
+          const s = byKey.get(it.alertKey);
+          if (s) { it.state = s.state as NotificationState; it.assigneeName = s.assignee_name; }
+          return !(s?.snoozed_until && new Date(s.snoozed_until).getTime() > nowMs); // hide snoozed
+        });
+      }
     } catch { /* state is best-effort */ }
   }
 
@@ -123,15 +149,50 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
   return alerts.sort((a, b) => rank[a.priority] - rank[b.priority]);
 }
 
-/** Set the workflow state of an alert item (acknowledge / claim / annotate — points 5, 8). */
-export async function setNotificationState(input: { alertKey: string; state: NotificationState; assigneeId?: string | null; assigneeName?: string | null; note?: string; updatedBy?: string | null }): Promise<{ ok: boolean; reason?: string }> {
+/** At-a-glance metrics for the top of the page (review point 14). */
+export interface NotificationMetrics { openOps: number; critical: number; unreadEvents: number; resolvedToday: number; avgResolutionMin: number | null }
+export async function getNotificationMetrics(): Promise<NotificationMetrics> {
+  const [alerts, unread, resolved, avg] = await Promise.all([getAdminAlerts(), unreadEventCount(), getResolvedToday(), avgResolutionMinutes()]);
+  return {
+    openOps: alerts.length,
+    critical: alerts.filter((a) => a.priority === "critical" || a.priority === "high").reduce((n, a) => n + a.count, 0),
+    unreadEvents: unread,
+    resolvedToday: resolved.length,
+    avgResolutionMin: avg,
+  };
+}
+
+/** Rough average resolution time today — refund.initiated → refund.processed per order. */
+async function avgResolutionMinutes(): Promise<number | null> {
   try {
     const db = createAdminClient() as any;
-    const { error } = await db.from("notification_state").upsert({
-      alert_key: input.alertKey, state: input.state,
-      assignee_id: input.assigneeId ?? null, assignee_name: input.assigneeName ?? null,
-      note: input.note ?? null, updated_by: input.updatedBy ?? null, updated_at: new Date().toISOString(),
-    }, { onConflict: "alert_key" });
+    const start = new Date(); start.setHours(0, 0, 0, 0);
+    const dayAgo = new Date(Date.now() - 2 * 86400000).toISOString();
+    const { data } = await db.from("audit_events").select("order_id,event,created_at").in("event", ["refund.initiated", "refund.processed"]).gte("created_at", dayAgo).order("created_at", { ascending: true }).limit(500);
+    const opened = new Map<string, number>();
+    const spans: number[] = [];
+    for (const e of (data ?? []) as any[]) {
+      if (e.event === "refund.initiated") opened.set(e.order_id, new Date(e.created_at).getTime());
+      else if (e.event === "refund.processed" && opened.has(e.order_id) && new Date(e.created_at) >= start) {
+        spans.push((new Date(e.created_at).getTime() - (opened.get(e.order_id) as number)) / 60000);
+        opened.delete(e.order_id);
+      }
+    }
+    if (!spans.length) return null;
+    return Math.round(spans.reduce((a, b) => a + b, 0) / spans.length);
+  } catch { return null; }
+}
+
+/** Set the workflow state of one or MANY alert items (acknowledge / claim / snooze / bulk —
+ *  review points 3, 5, 8, 11). Pass `alertKeys` for a bulk operation. */
+export async function setNotificationState(input: { alertKey?: string; alertKeys?: string[]; state: NotificationState; assigneeId?: string | null; assigneeName?: string | null; note?: string; updatedBy?: string | null; snoozedUntil?: string | null }): Promise<{ ok: boolean; reason?: string }> {
+  try {
+    const db = createAdminClient() as any;
+    const keys = input.alertKeys?.length ? input.alertKeys : input.alertKey ? [input.alertKey] : [];
+    if (!keys.length) return { ok: false, reason: "no keys" };
+    const now = new Date().toISOString();
+    const rows = keys.map((k) => ({ alert_key: k, state: input.state, assignee_id: input.assigneeId ?? null, assignee_name: input.assigneeName ?? null, note: input.note ?? null, updated_by: input.updatedBy ?? null, snoozed_until: input.snoozedUntil ?? null, updated_at: now }));
+    const { error } = await db.from("notification_state").upsert(rows, { onConflict: "alert_key" });
     return error ? { ok: false, reason: error.message } : { ok: true };
   } catch (e) { return { ok: false, reason: e instanceof Error ? e.message : "failed" }; }
 }

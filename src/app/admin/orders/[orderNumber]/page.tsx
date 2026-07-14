@@ -37,7 +37,8 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
     getOrderTimeline(order.id),
   ]);
   const items = (order.order_items ?? []) as any[];
-  const failedRefund = (refunds as any[]).find((r) => r.status === "failed");
+  const failedRefunds = (refunds as any[]).filter((r) => r.status === "failed");
+  const failedRefund = failedRefunds[0];
 
   return (
     <main className="admin">
@@ -52,7 +53,15 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
       </header>
 
       {failedRefund ? (
-        <RefundRetryBanner orderNumber={order.order_number} reason={failedRefund.error_description || failedRefund.reason || "Gateway error"} attemptedAt={failedRefund.created_at} />
+        <RefundRetryBanner
+          orderNumber={order.order_number}
+          reason={failedRefund.error_description || failedRefund.reason || "Gateway error"}
+          attemptedAt={failedRefund.created_at}
+          amount={Number(failedRefund.amount ?? 0)}
+          gateway={failedRefund.method === "manual" ? "Manual" : "Razorpay"}
+          refundId={failedRefund.razorpay_refund_id ?? null}
+          attempts={failedRefunds.length}
+        />
       ) : null}
 
       <div className="od-grid">
