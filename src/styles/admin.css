@@ -484,8 +484,8 @@
 .cc-qa { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
 .cc-qa__btn { font-family: var(--font-sans); font-size: 12px; letter-spacing: 0.02em; padding: 9px 15px; border: 1px solid var(--ad-hair); border-radius: 999px; background: #fff; color: var(--ink, #1f1a16); text-decoration: none; transition: border-color .15s, background .15s; }
 .cc-qa__btn:hover { border-color: rgba(31, 26, 22, 0.35); }
-.cc-qa__btn--primary { background: var(--ink, #1f1a16); color: #f7f3ec; border-color: var(--ink, #1f1a16); }
-.cc-qa__btn--primary:hover { background: #33291f; }
+.cc-qa__btn--primary { background: rgba(201, 169, 110, 0.16); color: #8a6d3b; border-color: rgba(201, 169, 110, 0.45); }
+.cc-qa__btn--primary:hover { background: rgba(201, 169, 110, 0.26); border-color: rgba(201, 169, 110, 0.7); }
 
 /* Grid + card shell */
 .cc-grid { display: grid; gap: 12px; margin-top: 24px; }
@@ -635,11 +635,12 @@
 .cc-queue__item[data-urg="overdue"] .cc-queue__label { color: #8a3d2f; font-weight: 500; }
 
 /* Integration status */
-.cc-integ { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
-.cc-integ__item { display: flex; align-items: center; gap: 8px; padding: 11px 12px; background: #fbf9f5; border-radius: 6px; }
-.cc-integ__dot { font-size: 10px; }
-.cc-integ__name { font-family: var(--font-sans); font-size: 13px; color: var(--ink, #1f1a16); }
-.cc-integ__note { font-family: var(--font-sans); font-size: 11px; color: var(--smoke, #6b6259); margin-left: auto; }
+.cc-integ { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+.cc-integ__item { display: flex; flex-direction: column; gap: 5px; padding: 12px 14px; background: #fbf9f5; border-radius: 6px; text-decoration: none; }
+.cc-integ__head { display: flex; align-items: center; gap: 7px; }
+.cc-integ__dot { font-size: 9px; flex: none; }
+.cc-integ__name { font-family: var(--font-sans); font-size: 13px; font-weight: 500; color: var(--ink, #1f1a16); }
+.cc-integ__note { font-family: var(--font-sans); font-size: 11px; color: var(--smoke, #6b6259); line-height: 1.35; }
 .cc-integ__item:not([data-ok]) .cc-integ__note { color: #8a6d3b; }
 
 /* ─── Dashboard v4 — command-center polish ─── */
@@ -649,10 +650,11 @@
 .cc-bh__link:hover { border-color: rgba(31, 26, 22, 0.35); }
 
 /* Quick Actions — grouped */
-.cc-qa { flex-direction: column; align-items: stretch; gap: 12px; }
+.cc-qa { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 32px; align-items: start; }
 .cc-qa__group { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.cc-qa__label { font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--smoke, #6b6259); min-width: 78px; }
+.cc-qa__label { font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--smoke, #6b6259); min-width: 74px; flex: none; }
 .cc-qa__row { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 720px) { .cc-qa { grid-template-columns: 1fr; } }
 
 /* Inventory rows now: name · stock · Manage → */
 .cc-inv__list li { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--ad-hair); font-family: var(--font-sans); font-size: 13px; }
@@ -661,9 +663,8 @@
 .cc-inv__manage { font-size: 11px; letter-spacing: 0.03em; text-transform: uppercase; color: #8a6d3b !important; text-decoration: none; white-space: nowrap; }
 
 /* Integration item as a link + CTA */
-.cc-integ__item { text-decoration: none; }
 .cc-integ__item:hover { outline: 1px solid var(--ad-hair); outline-offset: 2px; border-radius: 6px; }
-.cc-integ__cta { margin-left: auto; font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--smoke, #6b6259); opacity: 0; transition: opacity .15s; white-space: nowrap; }
+.cc-integ__cta { margin-left: auto; flex: none; font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--smoke, #6b6259); opacity: 0; transition: opacity .15s; white-space: nowrap; }
 .cc-integ__item:hover .cc-integ__cta { opacity: 1; }
 .cc-integ__item:not([data-ok]) .cc-integ__cta { color: #8a3d2f; opacity: 1; }
 

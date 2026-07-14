@@ -378,10 +378,12 @@ export default async function AdminDashboard() {
         <div className="cc-integ">
           {integrations.items.map((it) => (
             <a key={it.key} href={INTEGRATION_CONSOLE[it.key] ?? "/admin/health"} target={INTEGRATION_CONSOLE[it.key] ? "_blank" : undefined} rel="noopener noreferrer" className="cc-integ__item" data-ok={it.ok ? "1" : undefined}>
-              <span className="cc-integ__dot" aria-hidden>{it.ok ? "🟢" : "⚪"}</span>
-              <span className="cc-integ__name">{it.label}</span>
+              <span className="cc-integ__head">
+                <span className="cc-integ__dot" aria-hidden>{it.ok ? "🟢" : "⚪"}</span>
+                <span className="cc-integ__name">{it.label}</span>
+                <span className="cc-integ__cta">{it.ok ? "Open →" : "Configure →"}</span>
+              </span>
               <span className="cc-integ__note">{it.ok ? it.note : "not configured"}</span>
-              <span className="cc-integ__cta">{it.ok ? "Open →" : "Configure →"}</span>
             </a>
           ))}
         </div>
