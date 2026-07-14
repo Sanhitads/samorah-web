@@ -763,3 +763,24 @@
 .od-banner__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px 18px; margin: 6px 0 0; }
 .od-banner__grid dt { font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--smoke, #6b6259); }
 .od-banner__grid dd { font-family: var(--font-sans); font-size: 12.5px; color: var(--ink, #1f1a16); margin: 0; }
+
+/* ─── Notification health header, incident, trends, ID ─── */
+.nc-incident { display: flex; align-items: center; gap: 10px; padding: 12px 16px; margin: 12px 0; border: 1px solid rgba(168, 68, 58, 0.4); background: rgba(168, 68, 58, 0.07); border-radius: 8px; font-family: var(--font-sans); font-size: 13px; color: var(--ink, #1f1a16); }
+.nc-health { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 14px 18px; margin: 12px 0; border: 1px solid var(--ad-hair); border-radius: 8px; }
+.nc-health[data-status="healthy"] { border-color: rgba(60, 120, 70, 0.3); background: rgba(60, 120, 70, 0.05); }
+.nc-health[data-status="attention"] { border-color: rgba(201, 169, 110, 0.45); background: rgba(201, 169, 110, 0.08); }
+.nc-health[data-status="critical"] { border-color: rgba(168, 68, 58, 0.45); background: rgba(168, 68, 58, 0.06); }
+.nc-health__status { display: flex; align-items: center; gap: 12px; }
+.nc-health__dot { font-size: 15px; }
+.nc-health__label { display: block; font-family: var(--font-serif); font-size: 1.1rem; color: var(--ink, #1f1a16); }
+.nc-health__sub { display: block; font-family: var(--font-sans); font-size: 12px; color: var(--smoke, #6b6259); }
+.nc-health__tiers { display: flex; gap: 8px; flex-wrap: wrap; }
+.nc-tier { font-family: var(--font-sans); font-size: 11px; letter-spacing: 0.03em; text-transform: uppercase; color: var(--smoke, #6b6259); background: #fff; border: 1px solid var(--ad-hair); border-radius: 999px; padding: 5px 12px; }
+.nc-tier b { font-family: var(--font-serif); font-size: 1rem; margin-right: 4px; color: var(--ink, #1f1a16); }
+.nc-tier[data-t="critical"] b { color: #8a3d2f; }
+.nc-tier[data-t="high"] b { color: #c47a3d; }
+.nc-delta { font-family: var(--font-sans); font-size: 11px; }
+.nc-delta[data-tone="up"] { color: #2f6b3c; }
+.nc-delta[data-tone="warn"] { color: #8a3d2f; }
+.od-line .nc-delta { margin-left: 8px; }
+.op-item__id { font-family: ui-monospace, monospace; font-size: 10px; color: var(--smoke, #6b6259); letter-spacing: 0.02em; }

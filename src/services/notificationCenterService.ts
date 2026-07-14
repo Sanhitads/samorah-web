@@ -35,7 +35,27 @@ export interface AlertItem {
   retryOrderNumber?: string;    // set when a Retry Refund action applies
   state?: NotificationState;    // acknowledged / investigating (from notification_state)
   assigneeName?: string | null; // "Rahul" — so others don't duplicate
+  notId?: string;               // stable support reference "NOT-XXXXX" (point 8.3)
+  subsystem?: string;           // searchable subsystem tag (point 1)
 }
+
+/** Deterministic short support reference for an alert item (review point 8.3). */
+export function notificationId(alertKey: string): string {
+  let h = 2166136261;
+  for (let i = 0; i < alertKey.length; i++) { h ^= alertKey.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return `NOT-${(h >>> 0).toString(36).toUpperCase().padStart(5, "0").slice(0, 5)}`;
+}
+
+/** Subsystem keyword per alert key — operators search by subsystem, not order number (point 1). */
+const SUBSYSTEM: Record<string, string> = {
+  refund_failed: "razorpay gateway refund payment",
+  failed_payments: "razorpay gateway payment",
+  shipment_exception: "shiprocket shipment logistics ndr",
+  returns_pending: "returns rma",
+  low_stock: "inventory stock",
+  email_failed: "email resend notification",
+  jobs_failed: "jobs background worker",
+};
 
 export interface AdminAlert {
   key: string;
@@ -139,6 +159,8 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
         a.items = a.items.filter((it) => {
           const s = byKey.get(it.alertKey);
           if (s) { it.state = s.state as NotificationState; it.assigneeName = s.assignee_name; }
+          it.notId = notificationId(it.alertKey);
+          it.subsystem = SUBSYSTEM[a.key];
           return !(s?.snoozed_until && new Date(s.snoozed_until).getTime() > nowMs); // hide snoozed
         });
       }
@@ -149,38 +171,111 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
   return alerts.sort((a, b) => rank[a.priority] - rank[b.priority]);
 }
 
-/** At-a-glance metrics for the top of the page (review point 14). */
-export interface NotificationMetrics { openOps: number; critical: number; unreadEvents: number; resolvedToday: number; avgResolutionMin: number | null }
+/** At-a-glance metrics + operational health (review points 6, 8.4, 8.5, 14). */
+export interface NotificationMetrics {
+  openOps: number;
+  breakdown: { critical: number; high: number; medium: number; info: number };
+  status: "healthy" | "attention" | "critical";
+  unreadEvents: number;
+  resolvedToday: number;
+  avgResolutionMin: number | null;
+  oldestUnresolvedMin: number | null;                                  // point 6
+  resolutionByCategory: { category: string; minutes: number | null }[]; // point 8.5
+}
 export async function getNotificationMetrics(): Promise<NotificationMetrics> {
-  const [alerts, unread, resolved, avg] = await Promise.all([getAdminAlerts(), unreadEventCount(), getResolvedToday(), avgResolutionMinutes()]);
+  const [alerts, unread, resolved, avg, byCat] = await Promise.all([
+    getAdminAlerts(), unreadEventCount(), getResolvedToday(), pairedAvgMinutes("refund.initiated", "refund.processed", 2),
+    resolutionByCategory(),
+  ]);
+  const breakdown = { critical: 0, high: 0, medium: 0, info: 0 };
+  let oldest: number | null = null;
+  for (const a of alerts) {
+    breakdown[a.priority] += a.count;
+    for (const it of a.items) if (it.at) { const age = (Date.now() - new Date(it.at).getTime()) / 60000; if (oldest == null || age > oldest) oldest = age; }
+  }
+  const status = breakdown.critical > 0 ? "critical" : breakdown.high > 0 ? "attention" : "healthy";
   return {
-    openOps: alerts.length,
-    critical: alerts.filter((a) => a.priority === "critical" || a.priority === "high").reduce((n, a) => n + a.count, 0),
-    unreadEvents: unread,
-    resolvedToday: resolved.length,
-    avgResolutionMin: avg,
+    openOps: alerts.length, breakdown, status, unreadEvents: unread, resolvedToday: resolved.length,
+    avgResolutionMin: avg, oldestUnresolvedMin: oldest == null ? null : Math.round(oldest), resolutionByCategory: byCat,
   };
 }
 
-/** Rough average resolution time today — refund.initiated → refund.processed per order. */
-async function avgResolutionMinutes(): Promise<number | null> {
+/** Mean minutes between a paired start/end audit event, per order, over the last `days`. */
+async function pairedAvgMinutes(startEvent: string, endEvent: string, days: number): Promise<number | null> {
   try {
     const db = createAdminClient() as any;
-    const start = new Date(); start.setHours(0, 0, 0, 0);
-    const dayAgo = new Date(Date.now() - 2 * 86400000).toISOString();
-    const { data } = await db.from("audit_events").select("order_id,event,created_at").in("event", ["refund.initiated", "refund.processed"]).gte("created_at", dayAgo).order("created_at", { ascending: true }).limit(500);
+    const since = new Date(Date.now() - days * 86400000).toISOString();
+    const { data } = await db.from("audit_events").select("order_id,event,created_at").in("event", [startEvent, endEvent]).gte("created_at", since).order("created_at", { ascending: true }).limit(800);
     const opened = new Map<string, number>();
     const spans: number[] = [];
     for (const e of (data ?? []) as any[]) {
-      if (e.event === "refund.initiated") opened.set(e.order_id, new Date(e.created_at).getTime());
-      else if (e.event === "refund.processed" && opened.has(e.order_id) && new Date(e.created_at) >= start) {
-        spans.push((new Date(e.created_at).getTime() - (opened.get(e.order_id) as number)) / 60000);
-        opened.delete(e.order_id);
-      }
+      if (e.event === startEvent) opened.set(e.order_id, new Date(e.created_at).getTime());
+      else if (e.event === endEvent && opened.has(e.order_id)) { spans.push((new Date(e.created_at).getTime() - (opened.get(e.order_id) as number)) / 60000); opened.delete(e.order_id); }
     }
     if (!spans.length) return null;
     return Math.round(spans.reduce((a, b) => a + b, 0) / spans.length);
   } catch { return null; }
+}
+
+/** Average resolution time split by category (review point 8.5) — where paired events exist. */
+async function resolutionByCategory(): Promise<{ category: string; minutes: number | null }[]> {
+  const [refund, ret, ship] = await Promise.all([
+    pairedAvgMinutes("refund.initiated", "refund.processed", 30),
+    pairedAvgMinutes("return.requested", "return.closed", 30),
+    pairedAvgMinutes("order.confirmed", "shipment.dispatched", 7),
+  ]);
+  return [{ category: "Refund", minutes: refund }, { category: "Shipment", minutes: ship }, { category: "Return", minutes: ret }];
+}
+
+/** Incident correlation MVP (review point 7) — no engine, just a windowed count. If gateway
+ *  errors spike (N+ failed refunds/payments with a gateway/timeout/network reason in the last
+ *  few minutes), flag a likely payment-gateway incident so the noise reads as one event. */
+export interface Incident { active: boolean; count: number; windowMin: number; label: string }
+const INCIDENT_THRESHOLD = 6;
+const INCIDENT_WINDOW_MIN = 10;
+export async function getIncident(): Promise<Incident> {
+  const base = { active: false, count: 0, windowMin: INCIDENT_WINDOW_MIN, label: "Payment gateway incident" };
+  try {
+    const db = createAdminClient() as any;
+    const since = new Date(Date.now() - INCIDENT_WINDOW_MIN * 60000).toISOString();
+    const [rf, pf] = await Promise.all([
+      db.from("refunds").select("error_description,reason,created_at").eq("status", "failed").gte("created_at", since),
+      db.from("payment_attempts").select("error_description,created_at").eq("status", "failed").gte("created_at", since),
+    ]);
+    const isGateway = (s: string | null | undefined) => /timeout|gateway|network|unavailable|5\d\d/i.test(s ?? "");
+    const count = [...((rf.data ?? []) as any[]), ...((pf.data ?? []) as any[])].filter((x) => isGateway(x.error_description || x.reason)).length;
+    return { ...base, active: count >= INCIDENT_THRESHOLD, count };
+  } catch { return base; }
+}
+
+/** Notification trends (review point 8.6) — this 30d vs the prior 30d, per category. Turns the
+ *  page from reactive to strategic ("refund failures down 38%"). */
+export interface Trend { label: string; current: number; prior: number; deltaPct: number | null }
+export async function getNotificationTrends(): Promise<Trend[]> {
+  try {
+    const db = createAdminClient() as any;
+    const c30 = new Date(Date.now() - 30 * 86400000).toISOString();
+    const c60 = new Date(Date.now() - 60 * 86400000).toISOString();
+    const head = async (build: () => Promise<{ count: number | null }>) => { try { return (await build()).count ?? 0; } catch { return 0; } };
+    const window = async (table: string, statusCol: string, statusVal: string) => {
+      const [cur, pri] = await Promise.all([
+        head(() => db.from(table).select("id", { count: "exact", head: true }).eq(statusCol, statusVal).gte("created_at", c30)),
+        head(() => db.from(table).select("id", { count: "exact", head: true }).eq(statusCol, statusVal).gte("created_at", c60).lt("created_at", c30)),
+      ]);
+      return { cur, pri };
+    };
+    const [refund, ship, pay] = await Promise.all([
+      window("refunds", "status", "failed"),
+      window("shipments", "status", "exception"),
+      window("payment_attempts", "status", "failed"),
+    ]);
+    const delta = (cur: number, pri: number) => (pri > 0 ? Math.round(((cur - pri) / pri) * 100) : null);
+    return [
+      { label: "Refund failures", current: refund.cur, prior: refund.pri, deltaPct: delta(refund.cur, refund.pri) },
+      { label: "Shipment failures", current: ship.cur, prior: ship.pri, deltaPct: delta(ship.cur, ship.pri) },
+      { label: "Payment failures", current: pay.cur, prior: pay.pri, deltaPct: delta(pay.cur, pay.pri) },
+    ];
+  } catch { return []; }
 }
 
 /** Set the workflow state of one or MANY alert items (acknowledge / claim / snooze / bulk —

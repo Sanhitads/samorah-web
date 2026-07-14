@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -40,17 +40,39 @@ export function NotificationCenter({ operational, events, resolved }: { operatio
   const [tab, setTab] = useState<"open" | "history">("open");
   const [filterKey, setFilterKey] = useState("all");
   const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
 
+  // Live updates (review point 3): the 30s poll runs INDEPENDENTLY of the realtime channel, so
+  // if realtime drops, refreshes continue. We also watch the channel status and poll FASTER
+  // (10s) while it's disconnected, then relax once it reconnects — so a dropped socket degrades
+  // gracefully instead of going stale.
   useEffect(() => {
     const supabase = createClient();
     const channel = supabase.channel("admin-notifications");
     for (const table of ["admin_notifications", "refunds", "payment_attempts", "shipments", "notification_state"]) {
       channel.on("postgres_changes" as never, { event: "*", schema: "public", table } as never, () => router.refresh());
     }
-    channel.subscribe();
-    const poll = setInterval(() => router.refresh(), 30_000);
+    let live = false;
+    let poll = setInterval(() => router.refresh(), 30_000);
+    const setPoll = (ms: number) => { clearInterval(poll); poll = setInterval(() => router.refresh(), ms); };
+    channel.subscribe((status) => {
+      const connected = status === "SUBSCRIBED";
+      if (connected !== live) { live = connected; setPoll(connected ? 30_000 : 10_000); }
+    });
     return () => { void supabase.removeChannel(channel); clearInterval(poll); };
   }, [router]);
+
+  // "/" focuses search (review point 8.2) — unless already typing.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "/" || e.metaKey || e.ctrlKey) return;
+      const el = document.activeElement as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
+      e.preventDefault(); searchRef.current?.focus();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const filter = FILTERS.find((f) => f.key === filterKey) ?? FILTERS[0];
   const q = query.trim().toLowerCase();
@@ -67,7 +89,7 @@ export function NotificationCenter({ operational, events, resolved }: { operatio
       .filter((a) => (filter.kind === "type" && filter.match ? filter.match(a) : true))
       .map((a) => {
         let items = a.items;
-        if (q) items = items.filter((it) => matchText(it.primary, it.secondary, it.meta));
+        if (q) items = items.filter((it) => matchText(it.primary, it.secondary, it.meta, it.subsystem, it.notId));
         if (filter.kind === "time") items = items.filter((it) => withinDays(it.at, filter.days));
         return { ...a, items };
       })
@@ -84,7 +106,7 @@ export function NotificationCenter({ operational, events, resolved }: { operatio
           <button type="button" role="tab" aria-selected={tab === "open"} className="nc-tab" data-on={tab === "open" ? "1" : undefined} onClick={() => setTab("open")}>Open</button>
           <button type="button" role="tab" aria-selected={tab === "history"} className="nc-tab" data-on={tab === "history" ? "1" : undefined} onClick={() => setTab("history")}>History</button>
         </div>
-        <input className="nc-search" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search order, customer, SKU, error…" aria-label="Search notifications" />
+        <input ref={searchRef} className="nc-search" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search order, customer, SKU, subsystem (razorpay…), NOT-id…  ( / )" aria-label="Search notifications" />
       </div>
 
       {tab === "open" ? (

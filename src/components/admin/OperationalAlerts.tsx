@@ -102,6 +102,7 @@ export function OperationalAlerts({ alerts }: { alerts: AdminAlert[] }) {
                       <div className="op-item__body">
                         <span className="op-item__primary">{it.primary}{it.secondary ? <span className="op-item__secondary"> · {it.secondary}</span> : null}</span>
                         {it.meta ? <span className="op-item__meta">{it.meta}</span> : null}
+                        {it.notId ? <span className="op-item__id" title="Support reference">{it.notId}</span> : null}
                       </div>
                       <span className="op-item__time">{ago(it.at)}</span>
                       <div className="op-item__actions">

@@ -9,8 +9,8 @@ import { useRouter } from "next/navigation";
  * context operators need — amount, gateway, refund id, attempts, reason — with a one-click
  * Retry and a jump to the audit logs.
  */
-export function RefundRetryBanner({ orderNumber, reason, attemptedAt, amount, gateway, refundId, attempts }: {
-  orderNumber: string; reason: string; attemptedAt: string; amount: number; gateway: string; refundId: string | null; attempts: number;
+export function RefundRetryBanner({ orderNumber, customer, reason, attemptedAt, amount, gateway, refundId, attempts }: {
+  orderNumber: string; customer: string; reason: string; attemptedAt: string; amount: number; gateway: string; refundId: string | null; attempts: number;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -37,6 +37,7 @@ export function RefundRetryBanner({ orderNumber, reason, attemptedAt, amount, ga
         <div className="od-banner__body">
           <span className="od-banner__title">Refund failed</span>
           <dl className="od-banner__grid">
+            <div><dt>Customer</dt><dd>{customer}</dd></div>
             <div><dt>Attempted</dt><dd>{when}</dd></div>
             <div><dt>Amount</dt><dd>{inr}</dd></div>
             <div><dt>Gateway</dt><dd>{gateway}</dd></div>

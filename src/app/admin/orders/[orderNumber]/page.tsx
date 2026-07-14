@@ -55,6 +55,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
       {failedRefund ? (
         <RefundRetryBanner
           orderNumber={order.order_number}
+          customer={order.ship_full_name ?? order.email ?? "—"}
           reason={failedRefund.error_description || failedRefund.reason || "Gateway error"}
           attemptedAt={failedRefund.created_at}
           amount={Number(failedRefund.amount ?? 0)}
