@@ -641,3 +641,32 @@
 .cc-integ__name { font-family: var(--font-sans); font-size: 13px; color: var(--ink, #1f1a16); }
 .cc-integ__note { font-family: var(--font-sans); font-size: 11px; color: var(--smoke, #6b6259); margin-left: auto; }
 .cc-integ__item:not([data-ok]) .cc-integ__note { color: #8a6d3b; }
+
+/* ─── Dashboard v4 — command-center polish ─── */
+/* Business Health: View details link */
+.cc-bh { position: relative; }
+.cc-bh__link { margin-left: auto; font-family: var(--font-sans); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink, #1f1a16); text-decoration: none; white-space: nowrap; border: 1px solid var(--ad-hair); padding: 6px 12px; border-radius: 999px; }
+.cc-bh__link:hover { border-color: rgba(31, 26, 22, 0.35); }
+
+/* Quick Actions — grouped */
+.cc-qa { flex-direction: column; align-items: stretch; gap: 12px; }
+.cc-qa__group { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.cc-qa__label { font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--smoke, #6b6259); min-width: 78px; }
+.cc-qa__row { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Inventory rows now: name · stock · Manage → */
+.cc-inv__list li { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--ad-hair); font-family: var(--font-sans); font-size: 13px; }
+.cc-inv__list li a { display: inline; padding: 0; border: none; }
+.cc-inv__name { color: var(--ink, #1f1a16); }
+.cc-inv__manage { font-size: 11px; letter-spacing: 0.03em; text-transform: uppercase; color: #8a6d3b !important; text-decoration: none; white-space: nowrap; }
+
+/* Integration item as a link + CTA */
+.cc-integ__item { text-decoration: none; }
+.cc-integ__item:hover { outline: 1px solid var(--ad-hair); outline-offset: 2px; border-radius: 6px; }
+.cc-integ__cta { margin-left: auto; font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--smoke, #6b6259); opacity: 0; transition: opacity .15s; white-space: nowrap; }
+.cc-integ__item:hover .cc-integ__cta { opacity: 1; }
+.cc-integ__item:not([data-ok]) .cc-integ__cta { color: #8a3d2f; opacity: 1; }
+
+/* Activity feed — Show more */
+.ash-feed__more { margin-top: 10px; width: 100%; font-family: var(--font-sans); font-size: 12px; letter-spacing: 0.03em; padding: 9px; border: 1px solid var(--ad-hair); border-radius: 6px; background: #fbf9f5; color: var(--smoke, #6b6259); cursor: pointer; }
+.ash-feed__more:hover { border-color: rgba(31, 26, 22, 0.3); color: var(--ink, #1f1a16); }

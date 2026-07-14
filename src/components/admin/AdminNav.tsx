@@ -17,7 +17,7 @@ const NAV: NavGroup[] = [
     title: "Operations",
     items: [
       { label: "Dashboard", href: "/admin", icon: "◆" },
-      { label: "Notifications", href: "/admin/notifications", icon: "◔" },
+      { label: "Notifications", href: "/admin/notifications", icon: "🔔" },
       { label: "Orders", href: "/admin/orders", icon: "▤" },
       { label: "Fulfillment", href: "/admin/fulfillment", icon: "▦" },
       { label: "Returns", href: "/admin/returns", icon: "↩" },

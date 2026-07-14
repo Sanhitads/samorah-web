@@ -61,9 +61,20 @@ function hrefFor(cat: Cat, orderNumber: string | null): string {
   }
 }
 
+// External consoles for the Integration Status row (point 10).
+const INTEGRATION_CONSOLE: Record<string, string> = {
+  ga4: "https://analytics.google.com",
+  gtm: "https://tagmanager.google.com",
+  clarity: "https://clarity.microsoft.com",
+  razorpay: "https://dashboard.razorpay.com",
+  shiprocket: "https://app.shiprocket.in",
+  resend: "https://resend.com/emails",
+  cloudinary: "https://console.cloudinary.com",
+};
+
 const SEV_ICON: Record<Severity, string> = { critical: "🔴", warning: "🟠", info: "🔵" };
 const SEV_LABEL: Record<Severity, string> = { critical: "Critical", warning: "Warning", info: "Information" };
-const URG_META: Record<Urgency, { icon: string; label: string }> = { overdue: { icon: "🔥", label: "Overdue" }, today: { icon: "⚠", label: "Today" }, later: { icon: "○", label: "Later" } };
+const URG_META: Record<Urgency, { icon: string; label: string }> = { overdue: { icon: "🔥", label: "Overdue" }, today: { icon: "⚠", label: "Today" }, later: { icon: "🟡", label: "Later" } };
 
 // Widgets the admin can hide/show (review point 15).
 const WIDGETS: WidgetDef[] = [
@@ -78,7 +89,7 @@ const WIDGETS: WidgetDef[] = [
 export default async function AdminDashboard() {
   const staff = await requireStaff("editor");
   const [cc, metrics, activityRaw] = await Promise.all([
-    getCommandCenter(), getOperationalMetrics(), getRecentAuditEvents({ limit: 24 }),
+    getCommandCenter(), getOperationalMetrics(), getRecentAuditEvents({ limit: 48 }),
   ]);
   const { revenue, inventory, customers, operations, marketing, cashflow, integrations, seasonal, founder, alerts, workQueue, health } = cc;
 
@@ -95,6 +106,8 @@ export default async function AdminDashboard() {
   const sparkPts = spark.map((v, i) => `${(i / (spark.length - 1)) * 100},${30 - (v / sparkMax) * 28}`).join(" ");
 
   const slaOk = operations.avgFulfillmentHours == null || operations.avgFulfillmentHours <= operations.dispatchSlaTargetHours;
+  const PICK_PACK_TARGET_MIN = 5; // warehouse pick/pack target (minutes) — point 7
+  const pickPackOk = (metrics.avgPickMinutes == null || metrics.avgPickMinutes <= PICK_PACK_TARGET_MIN) && (metrics.avgPackMinutes == null || metrics.avgPackMinutes <= PICK_PACK_TARGET_MIN);
 
   return (
     <main className="admin">
@@ -107,13 +120,14 @@ export default async function AdminDashboard() {
         <DashboardPersonalize widgets={WIDGETS} />
       </header>
 
-      {/* Business Health — one glance (16) */}
+      {/* Business Health — one glance (16); View Details → Alerts (point 1) */}
       <section data-widget="health" className="cc-bh" data-status={health.status}>
         <span className="cc-bh__dot" aria-hidden>{health.status === "healthy" ? "🟢" : "🟠"}</span>
         <div className="cc-bh__body">
           <span className="cc-bh__title">Business Health · {health.status === "healthy" ? "Healthy" : "Attention required"}</span>
           <span className="cc-bh__reasons">{health.reasons.length ? health.reasons.join(" · ") : "Stock, payments, dispatch, and content all look good."}</span>
         </div>
+        {alerts.length ? <a href="#cc-alerts" className="cc-bh__link">View details →</a> : null}
       </section>
 
       {/* Seasonal reminder (18) */}
@@ -150,15 +164,31 @@ export default async function AdminDashboard() {
         </div>
       </section>
 
-      {/* Quick Actions (1) */}
+      {/* Quick Actions — grouped by domain (point 3) */}
       <section data-widget="quickactions" className="cc-qa">
-        <Link href="/admin/products" className="cc-qa__btn cc-qa__btn--primary">+ New Product</Link>
-        <Link href="/admin/coupons" className="cc-qa__btn">+ New Discount</Link>
-        <Link href="/admin/journal" className="cc-qa__btn">+ New Blog</Link>
-        <Link href="/admin/media" className="cc-qa__btn">Upload Media</Link>
-        <Link href="/admin/homepage" className="cc-qa__btn">Homepage Draft</Link>
-        <Link href="/admin/emails" className="cc-qa__btn">Send Newsletter</Link>
-        <Link href="/admin/fulfillment" className="cc-qa__btn">Dispatch Ready</Link>
+        <div className="cc-qa__group">
+          <span className="cc-qa__label">Commerce</span>
+          <div className="cc-qa__row">
+            <Link href="/admin/products" className="cc-qa__btn cc-qa__btn--primary">+ New Product</Link>
+            <Link href="/admin/coupons" className="cc-qa__btn">+ New Discount</Link>
+          </div>
+        </div>
+        <div className="cc-qa__group">
+          <span className="cc-qa__label">Content</span>
+          <div className="cc-qa__row">
+            <Link href="/admin/journal" className="cc-qa__btn">+ New Blog</Link>
+            <Link href="/admin/homepage" className="cc-qa__btn">Homepage Draft</Link>
+            <Link href="/admin/media" className="cc-qa__btn">Upload Media</Link>
+          </div>
+        </div>
+        <div className="cc-qa__group">
+          <span className="cc-qa__label">Marketing</span>
+          <div className="cc-qa__row"><Link href="/admin/emails" className="cc-qa__btn">Send Newsletter</Link></div>
+        </div>
+        <div className="cc-qa__group">
+          <span className="cc-qa__label">Logistics</span>
+          <div className="cc-qa__row"><Link href="/admin/fulfillment" className="cc-qa__btn">Dispatch Ready</Link></div>
+        </div>
       </section>
 
       {/* Work Queue (11, 16) + Alerts (2) */}
@@ -177,7 +207,7 @@ export default async function AdminDashboard() {
           ) : <p className="cc-empty">✦ You're all caught up. Nothing needs action right now.</p>}
         </section>
 
-        <section data-widget="alerts" className="cc-card">
+        <section data-widget="alerts" id="cc-alerts" className="cc-card">
           <div className="cc-card__head"><h2 className="cc-card__title">Alerts</h2><span className="admin__muted">{alerts.length}</span></div>
           {alerts.length ? (
             <div className="cc-sev">
@@ -247,7 +277,8 @@ export default async function AdminDashboard() {
             </li>
             <li className="cc-health__row">
               <span className="cc-health__l">Avg pick / pack</span>
-              <span className="cc-health__v">{metrics.avgPickMinutes == null ? "—" : `${metrics.avgPickMinutes}m`} / {metrics.avgPackMinutes == null ? "—" : `${metrics.avgPackMinutes}m`}</span>
+              <span className="cc-health__v" data-tone={pickPackOk ? "up" : "down"}>{metrics.avgPickMinutes == null ? "—" : `${metrics.avgPickMinutes}m`} / {metrics.avgPackMinutes == null ? "—" : `${metrics.avgPackMinutes}m`}</span>
+              <span className="cc-health__t admin__muted">target &lt; {PICK_PACK_TARGET_MIN}m each</span>
             </li>
           </ul>
         </section>
@@ -316,22 +347,27 @@ export default async function AdminDashboard() {
         {inventory.critical.length ? (
           <ul className="cc-inv__list">
             {inventory.critical.map((c) => (
-              <li key={c.id}><Link href="/admin/products"><span>{c.name}</span><span className="admin__muted">{c.stock <= 0 ? "Out of stock" : c.daysLeft != null ? `${c.stock} left · ~${plural(c.daysLeft, "day")} left` : `${c.stock} left`}</span></Link></li>
+              <li key={c.id}>
+                <span className="cc-inv__name">{c.name}</span>
+                <span className="admin__muted">{c.stock <= 0 ? "Out of stock" : c.daysLeft != null ? `${c.stock} left · ~${plural(c.daysLeft, "day")} left` : `${c.stock} left`}</span>
+                <Link href="/admin/products" className="cc-inv__manage">Manage →</Link>
+              </li>
             ))}
           </ul>
         ) : null}
       </section>
 
-      {/* Integration Status (17) */}
+      {/* Integration Status — each clickable to its console (point 10) */}
       <section data-widget="integrations" className="cc-card">
         <div className="cc-card__head"><h2 className="cc-card__title">Integrations</h2><span className="admin__muted">{integrations.connected}/{integrations.total} connected</span></div>
         <div className="cc-integ">
           {integrations.items.map((it) => (
-            <div key={it.key} className="cc-integ__item" data-ok={it.ok ? "1" : undefined}>
+            <a key={it.key} href={INTEGRATION_CONSOLE[it.key] ?? "/admin/health"} target={INTEGRATION_CONSOLE[it.key] ? "_blank" : undefined} rel="noopener noreferrer" className="cc-integ__item" data-ok={it.ok ? "1" : undefined}>
               <span className="cc-integ__dot" aria-hidden>{it.ok ? "🟢" : "⚪"}</span>
               <span className="cc-integ__name">{it.label}</span>
               <span className="cc-integ__note">{it.ok ? it.note : "not configured"}</span>
-            </div>
+              <span className="cc-integ__cta">{it.ok ? "Open →" : "Configure →"}</span>
+            </a>
           ))}
         </div>
       </section>

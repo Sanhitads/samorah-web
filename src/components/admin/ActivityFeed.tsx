@@ -30,9 +30,12 @@ const FILTERS: { key: string; label: string; cats: ActivityItem["category"][] | 
 
 const PIN_KEY = "samorah_activity_pins";
 
+const PAGE = 8;
+
 export function ActivityFeed({ items }: { items: ActivityItem[] }) {
   const [active, setActive] = useState("all");
   const [pins, setPins] = useState<Set<string>>(new Set());
+  const [limit, setLimit] = useState(PAGE);
 
   // Pinned events (review point 10) — persisted per-browser so important items stay on top.
   useEffect(() => {
@@ -52,13 +55,15 @@ export function ActivityFeed({ items }: { items: ActivityItem[] }) {
   const sel = FILTERS.find((f) => f.key === active) ?? FILTERS[0];
   const filtered = sel.cats ? items.filter((i) => sel.cats!.includes(i.category)) : items;
   // Pinned first (in original order), then the rest.
-  const shown = [...filtered].sort((a, b) => Number(pins.has(b.id)) - Number(pins.has(a.id)));
+  const ordered = [...filtered].sort((a, b) => Number(pins.has(b.id)) - Number(pins.has(a.id)));
+  const shown = ordered.slice(0, limit); // paginate (review point 12)
+  const setFilter = (key: string) => { setActive(key); setLimit(PAGE); };
 
   return (
     <div className="ash-feed">
       <div className="ash-feed__filters" role="tablist" aria-label="Filter activity">
         {FILTERS.map((f) => (
-          <button key={f.key} role="tab" aria-selected={active === f.key} className="ash-feed__chip" data-on={active === f.key ? "1" : undefined} onClick={() => setActive(f.key)}>
+          <button key={f.key} role="tab" aria-selected={active === f.key} className="ash-feed__chip" data-on={active === f.key ? "1" : undefined} onClick={() => setFilter(f.key)}>
             {f.label}
           </button>
         ))}
@@ -80,6 +85,11 @@ export function ActivityFeed({ items }: { items: ActivityItem[] }) {
         })}
         {shown.length === 0 ? <li className="admin__muted" style={{ padding: "12px 0" }}>Nothing in this view.</li> : null}
       </ol>
+      {ordered.length > limit ? (
+        <button type="button" className="ash-feed__more" onClick={() => setLimit((n) => n + PAGE)}>
+          Show more ({ordered.length - limit})
+        </button>
+      ) : null}
     </div>
   );
 }
