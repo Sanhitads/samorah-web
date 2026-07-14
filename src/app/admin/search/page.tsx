@@ -54,6 +54,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
       <Group title="Returns" hits={results.returns} />
       <Group title="Pages & Journal" hits={results.pages} />
       <Group title="Media" hits={results.media} />
+      <Group title="Settings & Tools" hits={results.admin} />
     </main>
   );
 }

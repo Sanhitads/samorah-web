@@ -14,7 +14,7 @@
  * Swapping the engine touches only a provider file; policy/presentation stay put.
  */
 
-export type SearchResource = "orders" | "customers" | "products" | "coupons" | "returns" | "pages" | "media";
+export type SearchResource = "orders" | "customers" | "products" | "coupons" | "returns" | "pages" | "media" | "admin";
 
 /** A raw match from a provider — normalised retrieval only, no policy or href. */
 export interface RawHit {
@@ -48,4 +48,5 @@ export interface SearchResults {
   returns: SearchHit[];
   pages: SearchHit[];
   media: SearchHit[];
+  admin: SearchHit[];
 }

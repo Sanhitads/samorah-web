@@ -1,18 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireStaff } from "@/lib/auth/requireStaff";
-import { getDashboardStats, getOperationalMetrics } from "@/services/orderAdminService";
-import { getReorderList } from "@/services/packagingService";
-import { getBusinessDashboard } from "@/services/dashboardService";
-import { getCommandCenter } from "@/services/commandCenterService";
+import { getOperationalMetrics } from "@/services/orderAdminService";
+import { getCommandCenter, type Severity, type Urgency } from "@/services/commandCenterService";
 import { getRecentAuditEvents } from "@/services/auditService";
 import { ActivityFeed, type ActivityItem } from "@/components/admin/ActivityFeed";
+import { DashboardPersonalize, type WidgetDef } from "@/components/admin/DashboardPersonalize";
 
 /**
- * Admin Dashboard — `/admin`. Operational command center (dashboard v2): a place to
- * *act*, not just read. Hero KPIs → Quick Actions → Work Queue + Alerts (the morning
- * inbox) → operational + money bands → snapshots → inventory → activity feed. Stays
- * visually minimal — one sparkline, no chart library.
+ * Admin Dashboard — `/admin`. Operational command center (v3): business polish over
+ * complexity. Business Health glance → seasonal → hero → quick actions → work queue +
+ * severity alerts → money → operations → snapshots → inventory → integrations →
+ * activity. Luxury-minimal — one sparkline, no chart library. Widgets are personalizable
+ * (hide/show per admin, localStorage). Data via the modular commandCenterService.
  */
 export const metadata: Metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
@@ -21,6 +21,7 @@ const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 const inrK = (n: number) => (n >= 100000 ? `₹${(n / 100000).toFixed(1)}L` : n >= 1000 ? `₹${(n / 1000).toFixed(1)}k` : `₹${Math.round(n)}`);
 const plural = (n: number, s: string) => `${n} ${s}${n === 1 ? "" : "s"}`;
 const EVENT_LABEL = (e: string) => e.replace(/[._]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+const hrs = (h: number | null) => (h == null ? "—" : h < 24 ? `${h}h` : `${Math.round((h / 24) * 10) / 10}d`);
 function ago(iso: string): string {
   const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
   if (s < 60) return "just now";
@@ -29,7 +30,14 @@ function ago(iso: string): string {
   return `${Math.floor(s / 86400)}d ago`;
 }
 
-// ── Activity feed mapping (icons + category + deep link) ──
+// Period-over-period badge (review point 3).
+function Trend({ delta }: { delta: number | null }) {
+  if (delta == null) return <span className="cc-delta cc-delta--flat">—</span>;
+  const up = delta >= 0;
+  return <span className="cc-delta" data-tone={up ? "up" : "down"}>{up ? "▲" : "▼"} {Math.abs(delta)}%</span>;
+}
+
+// ── Activity feed mapping ──
 type Cat = ActivityItem["category"];
 function categorize(entityType: string, event: string): Cat {
   const e = (entityType || "").toLowerCase();
@@ -53,238 +61,283 @@ function hrefFor(cat: Cat, orderNumber: string | null): string {
   }
 }
 
-interface Alert { tone: "critical" | "warn" | "info"; title: string; detail: string; href: string; action: string }
-interface WorkItem { label: string; href: string; count: number }
+const SEV_ICON: Record<Severity, string> = { critical: "🔴", warning: "🟠", info: "🔵" };
+const SEV_LABEL: Record<Severity, string> = { critical: "Critical", warning: "Warning", info: "Information" };
+const URG_META: Record<Urgency, { icon: string; label: string }> = { overdue: { icon: "🔥", label: "Overdue" }, today: { icon: "⚠", label: "Today" }, later: { icon: "○", label: "Later" } };
+
+// Widgets the admin can hide/show (review point 15).
+const WIDGETS: WidgetDef[] = [
+  { key: "health", label: "Business Health" }, { key: "seasonal", label: "Seasonal reminder" },
+  { key: "hero", label: "Hero KPIs" }, { key: "quickactions", label: "Quick Actions" },
+  { key: "workqueue", label: "Work Queue" }, { key: "alerts", label: "Alerts" },
+  { key: "money", label: "Sales & Revenue" }, { key: "operations", label: "Operations & Cash" },
+  { key: "snapshots", label: "Customers & Marketing" }, { key: "inventory", label: "Inventory" },
+  { key: "integrations", label: "Integration Status" }, { key: "activity", label: "Activity feed" },
+];
 
 export default async function AdminDashboard() {
   const staff = await requireStaff("editor");
-  const [stats, metrics, reorder, biz, cc, activityRaw] = await Promise.all([
-    getDashboardStats(), getOperationalMetrics(), getReorderList(), getBusinessDashboard(), getCommandCenter(),
-    getRecentAuditEvents({ limit: 24 }),
+  const [cc, metrics, activityRaw] = await Promise.all([
+    getCommandCenter(), getOperationalMetrics(), getRecentAuditEvents({ limit: 24 }),
   ]);
-  const dur = (m: number | null) => (m == null ? "—" : m < 60 ? `${m}m` : `${Math.round((m / 60) * 10) / 10}h`);
+  const { revenue, inventory, customers, operations, marketing, cashflow, integrations, seasonal, founder, alerts, workQueue, health } = cc;
 
-  // Sales-trend delta vs yesterday (day-so-far comparison is rough but directional).
-  const dayDelta = cc.trend.yesterday > 0 ? Math.round(((cc.trend.today - cc.trend.yesterday) / cc.trend.yesterday) * 100) : null;
+  const alertsBySev: Record<Severity, typeof alerts> = { critical: [], warning: [], info: [] };
+  for (const a of alerts) alertsBySev[a.severity].push(a);
 
-  // ── Alerts (the inbox) ──
-  const alerts: Alert[] = [];
-  for (const c of cc.inventory.critical.slice(0, 4)) {
-    alerts.push({ tone: c.stock <= 0 ? "critical" : "warn", title: c.name, detail: c.stock <= 0 ? "Out of stock" : `Only ${c.stock} left`, href: "/admin/products", action: "View" });
-  }
-  if (biz.failedPayments > 0) alerts.push({ tone: "warn", title: plural(biz.failedPayments, "failed payment"), detail: "Last 30 days", href: "/admin/orders", action: "Review" });
-  if (cc.returnsQueue.toQc > 0) alerts.push({ tone: "warn", title: plural(cc.returnsQueue.toQc, "return"), detail: "Awaiting QC", href: "/admin/returns", action: "Open" });
-  if (stats.onHold > 0) alerts.push({ tone: "warn", title: plural(stats.onHold, "order"), detail: "On hold — needs triage", href: "/admin/fulfillment", action: "Triage" });
-  for (const k of cc.draftsPending.keys.slice(0, 3)) {
-    alerts.push({ tone: "info", title: `${EVENT_LABEL(k)} draft`, detail: "Unpublished changes", href: k === "homepage" ? "/admin/homepage" : "/admin/content", action: "Publish" });
-  }
-  if (biz.pendingEmails > 5) alerts.push({ tone: "info", title: plural(biz.pendingEmails, "email"), detail: "Queued to send", href: "/admin/health", action: "Check" });
-
-  // ── Work Queue (today's actions) ──
-  const queue: WorkItem[] = [];
-  if (stats.readyForDispatch > 0) queue.push({ label: `Dispatch ${plural(stats.readyForDispatch, "order")}`, href: "/admin/fulfillment", count: stats.readyForDispatch });
-  if (cc.returnsQueue.toQc > 0) queue.push({ label: `Review ${plural(cc.returnsQueue.toQc, "return")} in QC`, href: "/admin/returns", count: cc.returnsQueue.toQc });
-  if (stats.onHold > 0) queue.push({ label: `Resolve ${plural(stats.onHold, "on-hold order")}`, href: "/admin/fulfillment", count: stats.onHold });
-  if (stats.refundsPending > 0) queue.push({ label: `Process ${plural(stats.refundsPending, "refund")}`, href: "/admin/orders", count: stats.refundsPending });
-  if (cc.draftsPending.count > 0) queue.push({ label: `Publish ${plural(cc.draftsPending.count, "content draft")}`, href: "/admin/content", count: cc.draftsPending.count });
-  if (biz.failedPayments > 0) queue.push({ label: `Follow up ${plural(biz.failedPayments, "failed payment")}`, href: "/admin/orders", count: biz.failedPayments });
-  if (reorder.length > 0) queue.push({ label: `Reorder ${plural(reorder.length, "packaging item")}`, href: "/admin/packaging", count: reorder.length });
-
-  // ── Activity feed items ──
   const activity: ActivityItem[] = activityRaw.map((e) => {
     const cat = categorize(e.entity_type, e.event);
     return { id: e.id, category: cat, label: EVENT_LABEL(e.event), detail: e.notes ?? null, href: hrefFor(cat, e.orderNumber), orderNumber: e.orderNumber, timeAgo: ago(e.created_at) };
   });
 
-  // ── Sparkline (pure SVG, no chart lib) ──
-  const spark = cc.trend.spark;
+  const spark = revenue.trend.spark;
   const sparkMax = Math.max(1, ...spark);
   const sparkPts = spark.map((v, i) => `${(i / (spark.length - 1)) * 100},${30 - (v / sparkMax) * 28}`).join(" ");
 
-  // Hero KPIs — operational-first, revenue anchored, with visual emphasis (points 12 + 15).
-  const hero = [
-    { label: "Revenue today", value: inr(biz.todayRevenue), href: undefined as string | undefined, sub: dayDelta == null ? "vs ₹0 yesterday" : `${dayDelta >= 0 ? "▲" : "▼"} ${Math.abs(dayDelta)}% vs yesterday`, tone: "plain", delta: dayDelta },
-    { label: "Pending dispatch", value: String(stats.readyForDispatch), href: "/admin/fulfillment", sub: `${stats.awaitingFulfillment} awaiting`, tone: stats.readyForDispatch ? "gold" : "plain", delta: null },
-    { label: "Open returns", value: String(cc.returnsQueue.open), href: "/admin/returns", sub: cc.returnsQueue.toQc ? `${cc.returnsQueue.toQc} in QC` : "none in QC", tone: cc.returnsQueue.toQc ? "warn" : "plain", delta: null },
-    { label: "Alerts", value: String(alerts.length), href: undefined, sub: alerts.some((a) => a.tone === "critical") ? "needs attention" : "under control", tone: alerts.length ? "warn" : "plain", delta: null },
-  ];
+  const slaOk = operations.avgFulfillmentHours == null || operations.avgFulfillmentHours <= operations.dispatchSlaTargetHours;
 
   return (
     <main className="admin">
-      <header className="admin__head">
-        <p className="admin__eyebrow">Operations · {staff.role}</p>
-        <h1 className="admin__title">Dashboard</h1>
-        <p className="admin__count">Everything that needs you today — at a glance.</p>
+      <header className="admin__head cc-head">
+        <div>
+          <p className="admin__eyebrow">Operations · {staff.role}</p>
+          <h1 className="admin__title">Dashboard</h1>
+          <p className="admin__count">Everything that needs you today — at a glance.</p>
+        </div>
+        <DashboardPersonalize widgets={WIDGETS} />
       </header>
 
-      {/* Hero KPIs — visual emphasis (15) */}
-      <section className="cc-hero">
-        {hero.map((h) => {
-          const inner = (
-            <>
-              <span className="cc-hero__value" data-tone={h.tone}>{h.value}</span>
-              <span className="cc-hero__label">{h.label}</span>
-              <span className="cc-hero__sub" data-tone={h.delta != null ? (h.delta >= 0 ? "up" : "down") : undefined}>{h.sub}</span>
-            </>
-          );
-          return h.href ? <Link key={h.label} href={h.href} className="cc-hero__card cc-hero__card--link">{inner}</Link> : <div key={h.label} className="cc-hero__card">{inner}</div>;
-        })}
+      {/* Business Health — one glance (16) */}
+      <section data-widget="health" className="cc-bh" data-status={health.status}>
+        <span className="cc-bh__dot" aria-hidden>{health.status === "healthy" ? "🟢" : "🟠"}</span>
+        <div className="cc-bh__body">
+          <span className="cc-bh__title">Business Health · {health.status === "healthy" ? "Healthy" : "Attention required"}</span>
+          <span className="cc-bh__reasons">{health.reasons.length ? health.reasons.join(" · ") : "Stock, payments, dispatch, and content all look good."}</span>
+        </div>
+      </section>
+
+      {/* Seasonal reminder (18) */}
+      {seasonal.next ? (
+        <Link href="/admin/homepage" data-widget="seasonal" className="cc-season">
+          <span className="cc-season__icon" aria-hidden>✦</span>
+          <span><b>{seasonal.next.name}</b> in {plural(seasonal.next.daysUntil, "day")}
+            {seasonal.homepageDraftUnpublished ? <span className="cc-season__warn"> · homepage draft not published</span> : <span className="admin__muted"> · plan the campaign</span>}
+          </span>
+        </Link>
+      ) : null}
+
+      {/* Hero KPIs (12 + 15) */}
+      <section data-widget="hero" className="cc-hero">
+        <div className="cc-hero__card">
+          <span className="cc-hero__value">{inr(revenue.trend.today)}</span>
+          <span className="cc-hero__label">Revenue today</span>
+          <span className="cc-hero__sub"><Trend delta={revenue.trend.deltaDay} /> vs yesterday</span>
+        </div>
+        <Link href="/admin/fulfillment" className="cc-hero__card cc-hero__card--link">
+          <span className="cc-hero__value" data-tone="gold">{workQueue.length}</span>
+          <span className="cc-hero__label">Tasks in queue</span>
+          <span className="cc-hero__sub">{plural(workQueue.filter((w) => w.urgency === "overdue").length, "overdue")}</span>
+        </Link>
+        <Link href="/admin/returns" className="cc-hero__card cc-hero__card--link">
+          <span className="cc-hero__value" data-tone={operations.returnsQueue.toQc ? "warn" : "plain"}>{operations.returnsQueue.open}</span>
+          <span className="cc-hero__label">Open returns</span>
+          <span className="cc-hero__sub">{operations.returnsQueue.toQc ? `${operations.returnsQueue.toQc} in QC` : "none in QC"}</span>
+        </Link>
+        <div className="cc-hero__card">
+          <span className="cc-hero__value" data-tone={alertsBySev.critical.length ? "warn" : "plain"}>{alerts.length}</span>
+          <span className="cc-hero__label">Alerts</span>
+          <span className="cc-hero__sub">{alertsBySev.critical.length ? `${alertsBySev.critical.length} critical` : "under control"}</span>
+        </div>
       </section>
 
       {/* Quick Actions (1) */}
-      <section className="cc-qa">
+      <section data-widget="quickactions" className="cc-qa">
         <Link href="/admin/products" className="cc-qa__btn cc-qa__btn--primary">+ New Product</Link>
-        <Link href="/admin/coupons" className="cc-qa__btn">+ New Coupon</Link>
-        <Link href="/admin/homepage" className="cc-qa__btn">+ Homepage Draft</Link>
-        <Link href="/admin/orders" className="cc-qa__btn">View Pending Orders</Link>
-        <Link href="/admin/fulfillment" className="cc-qa__btn">Dispatch Ready Orders</Link>
+        <Link href="/admin/coupons" className="cc-qa__btn">+ New Discount</Link>
+        <Link href="/admin/journal" className="cc-qa__btn">+ New Blog</Link>
+        <Link href="/admin/media" className="cc-qa__btn">Upload Media</Link>
+        <Link href="/admin/homepage" className="cc-qa__btn">Homepage Draft</Link>
+        <Link href="/admin/emails" className="cc-qa__btn">Send Newsletter</Link>
+        <Link href="/admin/fulfillment" className="cc-qa__btn">Dispatch Ready</Link>
       </section>
 
-      {/* The morning inbox: Work Queue (16) + Alerts (2) */}
+      {/* Work Queue (11, 16) + Alerts (2) */}
       <div className="cc-grid cc-grid--2">
-        <section className="cc-card">
-          <div className="cc-card__head"><h2 className="cc-card__title">My Work Queue</h2><span className="admin__muted">Today</span></div>
-          {queue.length ? (
+        <section data-widget="workqueue" className="cc-card">
+          <div className="cc-card__head"><h2 className="cc-card__title">My Work Queue</h2><span className="admin__muted">auto-prioritized</span></div>
+          {workQueue.length ? (
             <ul className="cc-queue">
-              {queue.map((q, i) => (
-                <li key={i}><Link href={q.href} className="cc-queue__item"><span className="cc-queue__dot" /><span className="cc-queue__label">{q.label}</span><span className="cc-queue__go">→</span></Link></li>
+              {workQueue.map((q, i) => (
+                <li key={i}><Link href={q.href} className="cc-queue__item" data-urg={q.urgency}>
+                  <span className="cc-queue__urg" title={URG_META[q.urgency].label}>{URG_META[q.urgency].icon}</span>
+                  <span className="cc-queue__label">{q.label}</span><span className="cc-queue__go">→</span>
+                </Link></li>
               ))}
             </ul>
           ) : <p className="cc-empty">✦ You're all caught up. Nothing needs action right now.</p>}
         </section>
 
-        <section className="cc-card">
-          <div className="cc-card__head"><h2 className="cc-card__title">Alerts</h2><span className="admin__muted">{alerts.length || "0"}</span></div>
+        <section data-widget="alerts" className="cc-card">
+          <div className="cc-card__head"><h2 className="cc-card__title">Alerts</h2><span className="admin__muted">{alerts.length}</span></div>
           {alerts.length ? (
-            <ul className="cc-alerts">
-              {alerts.map((a, i) => (
-                <li key={i} className="cc-alert" data-tone={a.tone}>
-                  <span className="cc-alert__mark" aria-hidden>{a.tone === "critical" ? "⛔" : a.tone === "warn" ? "⚠" : "◔"}</span>
-                  <span className="cc-alert__body"><span className="cc-alert__title">{a.title}</span><span className="cc-alert__detail">{a.detail}</span></span>
-                  <Link href={a.href} className="cc-alert__action">{a.action}</Link>
-                </li>
-              ))}
-            </ul>
+            <div className="cc-sev">
+              {(["critical", "warning", "info"] as Severity[]).map((sev) => alertsBySev[sev].length ? (
+                <div key={sev} className="cc-sev__group">
+                  <p className="cc-sev__label"><span aria-hidden>{SEV_ICON[sev]}</span> {SEV_LABEL[sev]}</p>
+                  <ul className="cc-alerts">
+                    {alertsBySev[sev].map((a, i) => (
+                      <li key={i} className="cc-alert">
+                        <span className="cc-alert__body"><span className="cc-alert__title">{a.title}</span><span className="cc-alert__detail">{a.detail}</span></span>
+                        <Link href={a.href} className="cc-alert__action">{a.action}</Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null)}
+            </div>
           ) : <p className="cc-empty">All clear — no alerts.</p>}
         </section>
       </div>
 
-      {/* Money band: Sales Trend (3) + Revenue Breakdown (4) */}
-      <div className="cc-grid cc-grid--2">
+      {/* Money band: Sales trend (3) + Revenue breakdown (4) */}
+      <div data-widget="money" className="cc-grid cc-grid--2">
         <section className="cc-card">
           <div className="cc-card__head"><h2 className="cc-card__title">Sales trend</h2><span className="admin__muted">last 14 days</span></div>
           <div className="cc-trend">
             <div className="cc-trend__nums">
-              <div className="cc-trend__n"><span className="cc-trend__v">{inr(cc.trend.today)}</span><span className="cc-trend__l">Today</span></div>
-              <div className="cc-trend__n"><span className="cc-trend__v">{inr(cc.trend.yesterday)}</span><span className="cc-trend__l">Yesterday</span></div>
-              <div className="cc-trend__n"><span className="cc-trend__v">{inrK(cc.trend.last7)}</span><span className="cc-trend__l">7 days</span></div>
-              <div className="cc-trend__n"><span className="cc-trend__v">{inrK(cc.trend.last30)}</span><span className="cc-trend__l">30 days</span></div>
+              <div className="cc-trend__n"><span className="cc-trend__v">{inr(revenue.trend.today)}</span><span className="cc-trend__l">Today</span></div>
+              <div className="cc-trend__n"><span className="cc-trend__v">{inr(revenue.trend.yesterday)}</span><span className="cc-trend__l">Yesterday</span></div>
+              <div className="cc-trend__n"><span className="cc-trend__v">{inrK(revenue.trend.last7)}</span><span className="cc-trend__l">7d <Trend delta={revenue.trend.delta7} /></span></div>
+              <div className="cc-trend__n"><span className="cc-trend__v">{inrK(revenue.trend.last30)}</span><span className="cc-trend__l">30d <Trend delta={revenue.trend.delta30} /></span></div>
             </div>
-            <svg className="cc-spark" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden>
-              <polyline points={sparkPts} fill="none" stroke="currentColor" strokeWidth="1.4" vectorEffect="non-scaling-stroke" />
-            </svg>
+            <svg className="cc-spark" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden><polyline points={sparkPts} fill="none" stroke="currentColor" strokeWidth="1.4" vectorEffect="non-scaling-stroke" /></svg>
           </div>
         </section>
 
         <section className="cc-card">
           <div className="cc-card__head"><h2 className="cc-card__title">Revenue breakdown</h2><span className="admin__muted">30 days</span></div>
           <ul className="cc-break">
-            <li><span>Gross</span><span className="admin__mono">{inr(cc.revenue.gross)}</span></li>
-            <li><span>Shipping</span><span className="admin__mono">{inr(cc.revenue.shipping)}</span></li>
-            <li><span>Tax (GST)</span><span className="admin__mono">{inr(cc.revenue.tax)}</span></li>
-            <li><span>Refunds</span><span className="admin__mono" data-tone={cc.revenue.refunds ? "warn" : undefined}>−{inr(cc.revenue.refunds)}</span></li>
-            <li className="cc-break__net"><span>Net (ex-tax)</span><span className="admin__mono">{inr(cc.revenue.net)}</span></li>
+            <li><span>Gross</span><span className="admin__mono">{inr(revenue.breakdown.gross)}</span></li>
+            <li><span>Shipping</span><span className="admin__mono">{inr(revenue.breakdown.shipping)}</span></li>
+            <li><span>Tax (GST)</span><span className="admin__mono">{inr(revenue.breakdown.tax)}</span></li>
+            <li><span>Refunds</span><span className="admin__mono" data-tone={revenue.breakdown.refunds ? "warn" : undefined}>−{inr(revenue.breakdown.refunds)}</span></li>
+            <li className="cc-break__net"><span>Net (ex-tax)</span><span className="admin__mono">{inr(revenue.breakdown.net)}</span></li>
           </ul>
         </section>
       </div>
 
-      {/* Operational band: Schedule (6) + Fulfillment health (10) + Cash flow (9) */}
-      <div className="cc-grid cc-grid--3">
+      {/* Operations band: Schedule (5) + Fulfillment/SLA (9) + Cash flow (8) */}
+      <div data-widget="operations" className="cc-grid cc-grid--3">
         <section className="cc-card">
           <div className="cc-card__head"><h2 className="cc-card__title">Today's schedule</h2></div>
           <ul className="cc-sched">
-            <li><Link href="/admin/fulfillment"><b>{stats.readyForDispatch}</b> {plural(stats.readyForDispatch, "order").replace(/^\d+ /, "")} to dispatch</Link></li>
-            <li><Link href="/admin/returns"><b>{cc.returnsQueue.toQc}</b> {cc.returnsQueue.toQc === 1 ? "return" : "returns"} to QC</Link></li>
-            <li><Link href="/admin/shipments"><b>{cc.shipmentsAwaitingPickup}</b> {cc.shipmentsAwaitingPickup === 1 ? "shipment" : "shipments"} awaiting pickup</Link></li>
+            <li><Link href="/admin/fulfillment"><b>{queueCountFor(workQueue, "Dispatch")}</b> to dispatch</Link></li>
+            <li><Link href="/admin/returns"><b>{operations.returnsQueue.toQc}</b> {operations.returnsQueue.toQc === 1 ? "return" : "returns"} to QC</Link></li>
+            <li><Link href="/admin/shipments"><b>{operations.shipmentsAwaitingPickup}</b> awaiting pickup <span className="admin__muted">· time needs Shiprocket</span></Link></li>
           </ul>
         </section>
 
         <section className="cc-card">
           <div className="cc-card__head"><h2 className="cc-card__title">Fulfillment health</h2></div>
           <ul className="cc-health">
-            <FulfilRow label="Pick time" actual={metrics.avgPickMinutes} target={5} fmt={dur} />
-            <FulfilRow label="Pack time" actual={metrics.avgPackMinutes} target={5} fmt={dur} />
+            <li className="cc-health__row">
+              <span className="cc-health__l">Dispatch SLA</span>
+              <span className="cc-health__v" data-tone={slaOk ? "up" : "down"}>{hrs(operations.avgFulfillmentHours)} {operations.avgFulfillmentHours == null ? "" : slaOk ? "✓" : "↑"}</span>
+              <span className="cc-health__t admin__muted">target &lt; {operations.dispatchSlaTargetHours}h · confirmed → dispatched</span>
+            </li>
+            <li className="cc-health__row">
+              <span className="cc-health__l">Avg pick / pack</span>
+              <span className="cc-health__v">{metrics.avgPickMinutes == null ? "—" : `${metrics.avgPickMinutes}m`} / {metrics.avgPackMinutes == null ? "—" : `${metrics.avgPackMinutes}m`}</span>
+            </li>
           </ul>
         </section>
 
         <section className="cc-card">
           <div className="cc-card__head"><h2 className="cc-card__title">Cash flow</h2><span className="admin__muted">30 days</span></div>
           <ul className="cc-break">
-            <li><span>Received</span><span className="admin__mono">{inr(cc.cashflow.received30)}</span></li>
-            <li><span>COD pending</span><span className="admin__mono">{inr(cc.cashflow.pendingCod)}</span></li>
-            <li><span>Refunds</span><span className="admin__mono" data-tone={cc.cashflow.refunds30 ? "warn" : undefined}>−{inr(cc.cashflow.refunds30)}</span></li>
+            <li><span>Received</span><span className="admin__mono">{inr(cashflow.received30)}</span></li>
+            <li><span>COD pending</span><span className="admin__mono">{inr(cashflow.pendingCod)}</span></li>
+            <li><span>Refunds</span><span className="admin__mono" data-tone={cashflow.refunds30 ? "warn" : undefined}>−{inr(cashflow.refunds30)}</span></li>
             <li className="cc-note"><span className="admin__muted">Settlement dates need Razorpay sync</span></li>
           </ul>
         </section>
       </div>
 
-      {/* Snapshot band: Customers (7) + Marketing (8) + Founder KPIs (13) + AI (13) */}
-      <div className="cc-grid cc-grid--4">
+      {/* Snapshot band: Customers (6) + Marketing/Newsletter (7) + Founder KPIs (13) + AI (14) */}
+      <div data-widget="snapshots" className="cc-grid cc-grid--4">
         <section className="cc-card">
-          <div className="cc-card__head"><h2 className="cc-card__title">Customers</h2><span className="admin__muted">30d active</span></div>
+          <div className="cc-card__head"><h2 className="cc-card__title">Customers</h2><span className="admin__muted">{customers.active30} active 30d</span></div>
           <div className="cc-mini">
-            <div><b>{cc.customers.new30}</b><span>New</span></div>
-            <div><b>{cc.customers.returning30}</b><span>Returning</span></div>
-            <Link href="/admin/customers"><b>{cc.customers.vip}</b><span>VIP</span></Link>
+            <div><b>{customers.new30}</b><span>New</span></div>
+            <div><b>{customers.returning30}</b><span>Returning</span></div>
+            <Link href="/admin/customers"><b>{customers.vip}</b><span>VIP</span></Link>
+          </div>
+          <div className="cc-mini" style={{ marginTop: 6 }}>
+            <div><b>{customers.firstTimeBuyers}</b><span>First-time</span></div>
+            <div><b>{customers.repeatBuyers}</b><span>Repeat</span></div>
           </div>
         </section>
 
         <section className="cc-card">
           <div className="cc-card__head"><h2 className="cc-card__title">Marketing</h2></div>
-          {cc.marketing.topCoupon ? (
-            <div className="cc-mini cc-mini--wide">
-              <Link href="/admin/coupons"><b className="admin__mono">{cc.marketing.topCoupon.code}</b><span>{plural(cc.marketing.topCoupon.redemptions, "use")}</span></Link>
-              <div><b>{inr(cc.marketing.topCoupon.discount)}</b><span>Given</span></div>
-            </div>
-          ) : <p className="admin__muted" style={{ fontSize: ".85rem" }}>No coupon usage in 30 days.</p>}
-          <p className="cc-note"><span className="admin__muted">Carts · opens · attribution need GA4/Resend</span></p>
+          <div className="cc-mini">
+            <Link href="/admin/customers"><b>{marketing.newsletter.active}</b><span>Subscribers</span></Link>
+            <div><b>+{marketing.newsletter.new7}</b><span>New · 7d</span></div>
+          </div>
+          {marketing.topCoupon ? (
+            <p className="cc-note"><Link href="/admin/coupons"><span className="admin__mono">{marketing.topCoupon.code}</span></Link> <span className="admin__muted">· {plural(marketing.topCoupon.redemptions, "use")}, {inr(marketing.topCoupon.discount)} given</span></p>
+          ) : <p className="cc-note"><span className="admin__muted">No coupon usage in 30 days</span></p>}
         </section>
 
         <section className="cc-card">
           <div className="cc-card__head"><h2 className="cc-card__title">Founder KPIs</h2></div>
           <div className="cc-mini">
-            <div><b>{cc.founder.repeatRate}%</b><span>Repeat</span></div>
-            <div><b>{inrK(cc.founder.ltv)}</b><span>Avg LTV</span></div>
-            <div><b data-tone={cc.founder.refundRate > 5 ? "warn" : undefined}>{cc.founder.refundRate}%</b><span>Refund</span></div>
+            <div><b>{founder.repeatRate}%</b><span>Repeat</span></div>
+            <div><b>{inrK(founder.ltv)}</b><span>Avg LTV</span></div>
+            <div><b data-tone={founder.refundRate > 5 ? "warn" : undefined}>{founder.refundRate}%</b><span>Refund</span></div>
           </div>
+          <p className="cc-note"><span className="admin__muted">Avg fulfillment</span> <b className="admin__mono">{hrs(founder.avgFulfillmentHours)}</b></p>
         </section>
 
-        {/* Reserved for Samorah Assistant — kept minimal, not built (13) */}
         <section className="cc-card cc-card--ai" aria-label="Samorah Assistant (coming soon)">
           <div className="cc-card__head"><h2 className="cc-card__title">Samorah Assistant</h2><span className="cc-soon">soon</span></div>
           <p className="cc-ai__hint">A daily brief of what needs you — delayed orders, low stock, drafts ready. Reserved.</p>
         </section>
       </div>
 
-      {/* Inventory buckets (5) */}
-      <section className="cc-card">
+      {/* Inventory (4) */}
+      <section data-widget="inventory" className="cc-card">
         <div className="cc-card__head"><h2 className="cc-card__title">Inventory</h2><Link href="/admin/products" className="text-link">Manage</Link></div>
         <div className="cc-inv">
-          <Link href="/admin/products" className="cc-inv__bucket" data-tone={cc.inventory.criticalCount ? "critical" : "plain"}><b>{cc.inventory.criticalCount}</b><span>Critical</span></Link>
-          <Link href="/admin/products" className="cc-inv__bucket" data-tone={cc.inventory.warningCount ? "warn" : "plain"}><b>{cc.inventory.warningCount}</b><span>Warning</span></Link>
-          <div className="cc-inv__bucket"><b>{cc.inventory.healthyCount}</b><span>Healthy</span></div>
+          <Link href="/admin/products" className="cc-inv__bucket" data-tone={inventory.criticalCount ? "critical" : "plain"}><b>{inventory.criticalCount}</b><span>Critical</span></Link>
+          <Link href="/admin/products" className="cc-inv__bucket" data-tone={inventory.warningCount ? "warn" : "plain"}><b>{inventory.warningCount}</b><span>Warning</span></Link>
+          <div className="cc-inv__bucket"><b>{inventory.healthyCount}</b><span>Healthy</span></div>
         </div>
-        {cc.inventory.critical.length ? (
+        {inventory.critical.length ? (
           <ul className="cc-inv__list">
-            {cc.inventory.critical.map((c) => (
-              <li key={c.id}><Link href="/admin/products"><span>{c.name}</span><span className="admin__muted">{c.stock <= 0 ? "Out of stock" : `${c.stock} left`}</span></Link></li>
+            {inventory.critical.map((c) => (
+              <li key={c.id}><Link href="/admin/products"><span>{c.name}</span><span className="admin__muted">{c.stock <= 0 ? "Out of stock" : c.daysLeft != null ? `${c.stock} left · ~${plural(c.daysLeft, "day")} left` : `${c.stock} left`}</span></Link></li>
             ))}
           </ul>
         ) : null}
       </section>
 
-      {/* Activity feed (11) — icons, filters, deep links */}
-      <section className="cc-card">
+      {/* Integration Status (17) */}
+      <section data-widget="integrations" className="cc-card">
+        <div className="cc-card__head"><h2 className="cc-card__title">Integrations</h2><span className="admin__muted">{integrations.connected}/{integrations.total} connected</span></div>
+        <div className="cc-integ">
+          {integrations.items.map((it) => (
+            <div key={it.key} className="cc-integ__item" data-ok={it.ok ? "1" : undefined}>
+              <span className="cc-integ__dot" aria-hidden>{it.ok ? "🟢" : "⚪"}</span>
+              <span className="cc-integ__name">{it.label}</span>
+              <span className="cc-integ__note">{it.ok ? it.note : "not configured"}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Activity feed (10, 11) */}
+      <section data-widget="activity" className="cc-card">
         <div className="cc-card__head"><h2 className="cc-card__title">Recent activity</h2><Link href="/admin/audit" className="text-link">View all</Link></div>
         <ActivityFeed items={activity} />
       </section>
@@ -300,14 +353,7 @@ export default async function AdminDashboard() {
   );
 }
 
-/** One fulfillment metric vs its target, with a direction arrow. */
-function FulfilRow({ label, actual, target, fmt }: { label: string; actual: number | null; target: number; fmt: (m: number | null) => string }) {
-  const ok = actual == null || actual <= target;
-  return (
-    <li className="cc-health__row">
-      <span className="cc-health__l">{label}</span>
-      <span className="cc-health__v" data-tone={ok ? "up" : "down"}>{fmt(actual)} {actual == null ? "" : ok ? "↓" : "↑"}</span>
-      <span className="cc-health__t admin__muted">target {fmt(target)}</span>
-    </li>
-  );
+function queueCountFor(q: { label: string; count: number }[], prefix: string): number {
+  const item = q.find((w) => w.label.startsWith(prefix));
+  return item ? item.count : 0;
 }

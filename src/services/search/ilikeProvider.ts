@@ -13,6 +13,20 @@ import type { SearchProvider, ProviderQuery, RawHit, SearchResource } from "./ty
 
 const inr = (v: unknown) => `₹${Number(v ?? 0).toLocaleString("en-IN")}`;
 
+// Editable admin destinations — settings/nav/homepage/seo/emails/reports etc. (review point 12).
+// Static config (they're routes, not records); matched in-memory against label + keywords.
+const ADMIN_DESTINATIONS: { href: string; label: string; keywords: string; note: string }[] = [
+  { href: "/admin/settings", label: "Settings", keywords: "settings config gstin store state tax", note: "Store configuration" },
+  { href: "/admin/navigation", label: "Navigation", keywords: "navigation menu header nav links", note: "Menu builder" },
+  { href: "/admin/homepage", label: "Homepage", keywords: "homepage home builder sections hero", note: "Homepage builder" },
+  { href: "/admin/seo", label: "SEO & Redirects", keywords: "seo redirects meta canonical sitemap", note: "SEO manager" },
+  { href: "/admin/emails", label: "Emails", keywords: "emails templates newsletter transactional", note: "Email templates" },
+  { href: "/admin/reports", label: "Reports", keywords: "reports gst profit cohort revenue analytics", note: "Business reports" },
+  { href: "/admin/about", label: "About page", keywords: "about page story", note: "About editor" },
+  { href: "/admin/health", label: "Health", keywords: "health system status jobs cron integrations", note: "System health" },
+  { href: "/admin/audit", label: "Audit log", keywords: "audit log activity events history", note: "Audit trail" },
+];
+
 export const ilikeProvider: SearchProvider = {
   name: "ilike",
   async search({ query, resources, limitPerResource: n }: ProviderQuery): Promise<RawHit[]> {
@@ -54,6 +68,15 @@ export const ilikeProvider: SearchProvider = {
     if (want.has("media")) jobs.push(
       listMedia({ search: q, limit: n }).then((assets) => (assets ?? [])
         .map((m): RawHit => ({ resource: "media", ref: m.id, primary: m.title || m.alt || m.id, secondary: m.folder ? `${m.folder} · ${m.kind}` : m.kind }))));
+
+    // Editable admin destinations (settings/nav/homepage/seo/emails/reports) — in-memory.
+    if (want.has("admin")) {
+      const ql = q.toLowerCase();
+      jobs.push(Promise.resolve(
+        ADMIN_DESTINATIONS.filter((d) => d.label.toLowerCase().includes(ql) || d.keywords.includes(ql))
+          .slice(0, n)
+          .map((d): RawHit => ({ resource: "admin", ref: d.href, primary: d.label, secondary: d.note }))));
+    }
 
     const groups = await Promise.all(jobs);
     return groups.flat();

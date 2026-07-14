@@ -26,7 +26,7 @@ export function getSearchProvider(): SearchProvider {
 
 // ── 1. Permissions — which resources this caller may search ──
 const PII_RESOURCES: SearchResource[] = ["orders", "customers"];
-const PUBLIC_RESOURCES: SearchResource[] = ["products", "coupons", "returns", "pages", "media"];
+const PUBLIC_RESOURCES: SearchResource[] = ["products", "coupons", "returns", "pages", "media", "admin"];
 function allowedResources(pii: boolean): SearchResource[] {
   return pii ? [...PII_RESOURCES, ...PUBLIC_RESOURCES] : PUBLIC_RESOURCES;
 }
@@ -58,9 +58,10 @@ const HREF: Record<SearchResource, (ref: string) => string> = {
   returns: () => `/admin/returns`,
   pages: () => `/admin/content`,
   media: () => `/admin/media`,
+  admin: (r) => r, // ref IS the destination href
 };
 
-const emptyResults = (): SearchResults => ({ orders: [], customers: [], products: [], coupons: [], returns: [], pages: [], media: [] });
+const emptyResults = (): SearchResults => ({ orders: [], customers: [], products: [], coupons: [], returns: [], pages: [], media: [], admin: [] });
 
 /** The facade the admin calls. Retrieval delegated to the provider; everything else here. */
 export async function globalSearch(query: string, opts: SearchOpts = { pii: false }): Promise<SearchResults> {
