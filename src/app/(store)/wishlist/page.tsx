@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useWishlistStore } from "@/store/useWishlistStore";
+import { trackWishlistOpened } from "@/lib/analytics/events";
 
 /**
  * Wishlist page (review point 13). Saved fragrances with remove + view actions. The
@@ -14,6 +15,8 @@ export default function WishlistPage() {
   const items = useWishlistStore((s) => s.items);
   const remove = useWishlistStore((s) => s.removeFromWishlist);
   useEffect(() => setMounted(true), []); // persisted store → render after hydration
+  // wishlist_opened (review point 9) — fired once the persisted list has hydrated.
+  useEffect(() => { if (mounted) trackWishlistOpened(items.length); }, [mounted]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <main className="acc" style={{ maxWidth: 960 }}>

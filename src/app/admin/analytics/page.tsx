@@ -6,6 +6,7 @@ import { hasCapability } from "@/lib/auth/capabilities";
 import { getAnalytics } from "@/services/analyticsService";
 import { getChannelReport } from "@/services/reportsService";
 import { getSearchInsights, getCampaignReport } from "@/services/marketingAnalyticsService";
+import { getBusinessOverview } from "@/services/businessOverviewService";
 
 /**
  * Analytics — `/admin/analytics`. The Insights module: read-only dashboards over
@@ -41,11 +42,12 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const { window } = await searchParams;
   const win = window === "7" || window === "90" || window === "all" ? window : "30";
   const winDays = win === "all" ? null : Number(win);
-  const [a, search, channels, campaigns] = await Promise.all([
+  const [a, search, channels, campaigns, overview] = await Promise.all([
     getAnalytics(winDays),
     getSearchInsights(winDays ?? 3650),
     getChannelReport(winDays),
     getCampaignReport(winDays),
+    getBusinessOverview(winDays),
   ]);
   const maxReason = Math.max(1, ...a.returns.byReason.map((r) => r.count));
   const maxChannelRev = Math.max(1, ...channels.map((c) => c.revenue));
@@ -63,6 +65,44 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
           <Link key={w.k} href={`/admin/analytics?window=${w.k}`} className="ff-queue" data-active={win === w.k ? "1" : "0"}>{w.l}</Link>
         ))}
       </nav>
+
+      {/* ── Business overview — the CEO glance (review point 11) ── */}
+      <section className="ash-metrics">
+        <h2 className="ash-jump__title">Business overview</h2>
+        <div className="ash-metrics__row" style={{ marginBottom: 10 }}>
+          <Tile v={String(overview.today.orders)} l="Orders today" />
+          <Tile v={inr(overview.today.revenue)} l="Revenue today" />
+          <Tile v={inr(overview.window.revenue)} l={`Revenue (${win === "all" ? "all" : win + "d"})`} />
+          <Tile v={inr(overview.window.avgBasket)} l="Average basket" />
+          <Tile v={pct(overview.customers.repeatRate)} l="Repeat customers" />
+        </div>
+        <div className="ash-metrics__row" style={{ marginBottom: 10 }}>
+          <Tile v={String(overview.window.pending)} l="Pending orders" tone={overview.window.pending ? "warn" : "plain"} />
+          <Tile v={String(overview.window.cancelled)} l="Cancelled" />
+          <Tile v={String(overview.window.refunded)} l="Refunded" />
+          <Tile v={pct(overview.payment.codShare)} l="COD share" />
+          <Tile v={pct(overview.payment.prepaidShare)} l="Prepaid share" />
+        </div>
+        <div className="ash-metrics__row">
+          <Tile v={String(overview.inventory.outOfStock)} l="Out of stock" tone={overview.inventory.outOfStock ? "warn" : "plain"} />
+          <Tile v={String(overview.inventory.lowStock)} l="Low stock" tone={overview.inventory.lowStock ? "warn" : "plain"} />
+          <Tile v={String(overview.customers.total)} l="Total customers" />
+        </div>
+        <div className="od-grid" style={{ marginTop: 12 }}>
+          <div className="od-card">
+            <h3 className="od-card__title">Best sellers</h3>
+            {overview.bestSellers.map((p) => (
+              <div key={p.name} className="od-line"><span>{p.name}</span><span className="admin__muted">{p.units}u · {inr(p.revenue)}</span></div>
+            ))}
+          </div>
+          <div className="od-card">
+            <h3 className="od-card__title">Worst sellers <span className="admin__muted">— slow movers</span></h3>
+            {overview.worstSellers.map((p) => (
+              <div key={p.name} className="od-line"><span>{p.name}</span><span className="admin__muted" data-tone={p.units === 0 ? "warn" : undefined}>{p.units}u · {inr(p.revenue)}</span></div>
+            ))}
+          </div>
+        </div>
+      </section>
 
       <section className="ash-metrics">
         <h2 className="ash-jump__title">Revenue</h2>
@@ -170,16 +210,22 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
               <div key={c.channel} className="an-bar">
                 <span className="an-bar__label">{c.channel}</span>
                 <span className="an-bar__track"><span className="an-bar__fill" style={{ width: `${(c.revenue / maxChannelRev) * 100}%` }} /></span>
-                <span className="an-bar__n">{inr(c.revenue)} · {c.orders}o · {pct(c.share)}</span>
+                <span className="an-bar__n">{inr(c.revenue)} · {c.orders}o · AOV {inr(c.aov)} · {pct(c.share)}</span>
               </div>
             ))}
           </div>
         ) : <p className="admin__empty">No attributed orders in window.</p>}
       </section>
 
-      {/* ── UTM campaigns (review point 20) ── */}
+      {/* ── UTM campaigns (review points 13, 20) ── */}
       <section className="ash-metrics">
         <h2 className="ash-jump__title">UTM campaigns</h2>
+        {campaigns.length ? (
+          <p className="admin__muted" style={{ marginBottom: 8, fontSize: 12 }}>
+            Top: <b>{campaigns[0].campaign}</b> ({inr(campaigns[0].revenue)}) · Weakest: <b>{campaigns[campaigns.length - 1].campaign}</b> ({inr(campaigns[campaigns.length - 1].revenue)})
+            {" "}· ROAS/ROI need ad-spend (manual entry — not stored).
+          </p>
+        ) : null}
         <div className="admin__table-wrap">
           <table className="admin__table">
             <thead><tr><th>Source</th><th>Medium</th><th>Campaign</th><th>Channel</th><th>Orders</th><th>Revenue</th><th>AOV</th><th>Share</th></tr></thead>

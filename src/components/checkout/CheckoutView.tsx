@@ -17,7 +17,8 @@ import { COMMERCE } from "@/config/commerce";
 import { composeComposition } from "@/lib/bundle";
 import { formatPaise, formatPaise2 } from "@/lib/money";
 import { readStoredUtm } from "@/lib/utm";
-import { trackBeginCheckout, trackAddPaymentInfo, trackApplyCoupon, trackPaymentSelected, trackPaymentStarted, trackPaymentSuccess, trackPaymentFailed, trackCheckoutError } from "@/lib/analytics/events";
+import { trackBeginCheckout, trackAddPaymentInfo, trackApplyCoupon, trackCouponRejected, trackPaymentSelected, trackPaymentStarted, trackPaymentSuccess, trackPaymentFailed, trackCheckoutError, trackWishlistPurchased } from "@/lib/analytics/events";
+import { useWishlistStore } from "@/store/useWishlistStore";
 import type { AnalyticsItem } from "@/lib/analytics/types";
 import { StateSelect } from "./StateSelect";
 
@@ -133,8 +134,22 @@ export function CheckoutView() {
     if (Object.keys(found).length === 0) void pay();
   };
 
-  const applyCode = () => {
-    setCouponCode(codeInput.trim().toUpperCase());
+  const [codeError, setCodeError] = useState("");
+  // Validate the code server-side for the specific reason (expired / invalid / min not met),
+  // firing coupon_rejected with that reason (review point 8). Falls back to client apply on error.
+  const applyCode = async () => {
+    const code = codeInput.trim().toUpperCase();
+    if (!code) return;
+    setCodeError("");
+    try {
+      const subtotalPaise = Math.round(items.reduce((s, i) => s + i.price * i.qty, 0) * 100);
+      const res = await fetch("/api/coupons/apply", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code, subtotalPaise }) });
+      const d = (await res.json()) as { ok?: boolean; reason?: string };
+      if (d.ok) { setCouponCode(code); }
+      else { setCodeError(d.reason ?? "This code can't be applied."); trackCouponRejected(code, d.reason); }
+    } catch {
+      setCouponCode(code); // network hiccup → let the client-side re-price decide
+    }
   };
 
   /**
@@ -222,6 +237,9 @@ export function CheckoutView() {
             const vd = await vr.json();
             if (vr.ok && vd.orderNumber && vd.token) {
               trackPaymentSuccess(vd.orderNumber, orderValue); // purchase itself fires on the order page
+              // wishlist_purchased (review point 9) — any purchased line that was wishlisted converted.
+              const wl = new Set(useWishlistStore.getState().items.map((w) => w.productId));
+              for (const it of items) if (wl.has(it.productId)) trackWishlistPurchased({ item_id: it.productId, item_name: it.name, item_variant: [it.vessel, it.size].filter(Boolean).join(" · ") || undefined, price: it.price, quantity: it.qty });
               clearCart();
               router.push(`/order/${vd.orderNumber}?t=${encodeURIComponent(vd.token)}`);
               return;
@@ -470,7 +488,9 @@ export function CheckoutView() {
                 <button type="button" className="checkout__code-apply" onClick={applyCode}>Apply</button>
               </div>
             )}
-            {couponCode && !couponApplied ? (
+            {codeError ? (
+              <p className="checkout__code-error">{codeError}</p>
+            ) : couponCode && !couponApplied ? (
               <p className="checkout__code-error">That code isn’t recognised.</p>
             ) : null}
           </div>

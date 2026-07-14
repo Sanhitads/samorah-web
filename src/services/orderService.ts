@@ -18,6 +18,7 @@ import { validateRazorpayPayment } from "@/lib/razorpayApi";
 import { signOrderToken } from "@/lib/orderToken";
 import { logEvent } from "@/services/auditService";
 import { incrementCouponUsage } from "@/services/couponService";
+import { trackServerPurchase } from "@/lib/analytics/server";
 import type { RepriceResult } from "@/lib/repricing";
 
 export interface OrderAddress {
@@ -342,6 +343,32 @@ export async function persistOrder(input: {
       notes: data.invoice_number ? `Invoice ${data.invoice_number}` : undefined,
       metadata: { paymentId: input.paymentId, method: check.method ?? null },
     });
+
+    // Authoritative server-side `purchase` (review priority B) — fires even if the browser
+    // never runs the client event. GA4 dedupes by transaction_id, so this is safe alongside
+    // the Thank-You page event. Non-blocking; never affects order finalisation.
+    try {
+      const db = createAdminClient();
+      const { data: ord } = await db.from("orders")
+        .select("order_number,total_amount,taxable_amount,shipping_amount,cgst_amount,sgst_amount,igst_amount,coupon_code,order_items(product_name,variant_name,quantity,line_total)")
+        .eq("id", data.order_id).maybeSingle();
+      if (ord) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const o = ord as any;
+        const tax = Number(o.cgst_amount ?? 0) + Number(o.sgst_amount ?? 0) + Number(o.igst_amount ?? 0);
+        void trackServerPurchase({
+          transactionId: o.order_number,
+          value: Number(o.total_amount ?? 0),
+          tax: Math.round(tax * 100) / 100,
+          shipping: Number(o.shipping_amount ?? 0),
+          coupon: o.coupon_code,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          items: (o.order_items ?? []).map((it: any) => ({ item_id: it.product_name, item_name: it.product_name, item_variant: it.variant_name ?? undefined, price: it.quantity ? Number(it.line_total ?? 0) / it.quantity : Number(it.line_total ?? 0), quantity: it.quantity ?? 1 })),
+        });
+      }
+    } catch (e) {
+      console.error("server purchase event failed (non-fatal)", e);
+    }
   }
 
   return {

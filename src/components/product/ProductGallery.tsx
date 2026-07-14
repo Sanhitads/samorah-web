@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { Maximize2, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { AssetImage } from "@/components/ui/AssetImage";
+import { trackGalleryImageView, trackGalleryFullscreen } from "@/lib/analytics/events";
 import type { ProductGalleryImage } from "@/lib/productPage";
 
 /**
@@ -12,11 +13,22 @@ import type { ProductGalleryImage } from "@/lib/productPage";
  * images; Escape closes the lightbox; body scroll locks while open. A single
  * image renders without thumbnails; thumbnails appear once a product has 2+.
  */
-export function ProductGallery({ images, name }: { images: ProductGalleryImage[]; name: string }) {
+export function ProductGallery({ images, name, itemId }: { images: ProductGalleryImage[]; name: string; itemId?: string }) {
   const imgs = images.length ? images : [];
   const count = imgs.length;
   const [active, setActive] = useState(0);
   const [open, setOpen] = useState(false);
+
+  // Gallery engagement (review point 5) — luxury buyers look carefully. Fire image_change
+  // (skip the initial render) and fullscreen. Zoom is a CSS hover; fullscreen is the signal.
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) { firstRender.current = false; return; }
+    if (itemId) trackGalleryImageView(itemId, active);
+  }, [active, itemId]);
+  useEffect(() => {
+    if (open && itemId) trackGalleryFullscreen(itemId);
+  }, [open, itemId]);
 
   const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
     if (count < 2) return;

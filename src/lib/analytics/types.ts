@@ -43,8 +43,8 @@ export type AnalyticsEvent =
   | "view_gift_box" | "bundle_started" | "bundle_completed" | "bundle_abandoned"
   // ── coupon lifecycle (review point 9) ──
   | "coupon_rejected" | "coupon_removed"
-  // ── wishlist intelligence (review point 10) ──
-  | "wishlist_purchased" | "wishlist_reminder_click"
+  // ── wishlist intelligence (review points 9, 10) ──
+  | "wishlist_opened" | "wishlist_shared" | "wishlist_purchased" | "wishlist_reminder_click"
   // ── out-of-stock / notify-me (review point 11) ──
   | "notify_me_requested" | "back_in_stock_purchased"
   // ── referral (review point 12) ──
@@ -66,6 +66,8 @@ export type AnalyticsEvent =
   // ── payment / errors (Razorpay) ──
   | "payment_started" | "payment_success" | "payment_failed" | "order_completed"
   | "checkout_error"
+  // ── authoritative server-side (review priority B) ──
+  | "refund" | "shipment_dispatched" | "shipment_delivered" | "shipment_rto"
   // ── auth funnel (pre-existing, retained) ──
   | "login_started" | "login_success" | "login_failure" | "google_login_success"
   | "magic_link_sent" | "magic_link_completed" | "first_login_completed"

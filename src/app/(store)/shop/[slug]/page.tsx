@@ -127,7 +127,7 @@ export default async function ProductRoute({
         </nav>
 
         <div className="pdp__layout">
-          <ProductGallery images={p.gallery} name={p.name} />
+          <ProductGallery images={p.gallery} name={p.name} itemId={p.slug} />
 
         <div className="pdp__info">
           {p.chapterName ? (

@@ -19,6 +19,7 @@ import { createRazorpayRefund } from "@/lib/razorpayApi";
 import { logEvent } from "@/services/auditService";
 import { toPaise } from "@/lib/money";
 import { RAZORPAY } from "@/config/commerce";
+import { trackServerRefund } from "@/lib/analytics/server";
 
 export interface IssueRefundInput {
   orderId: string;
@@ -124,6 +125,17 @@ export async function issueRefund(input: IssueRefundInput): Promise<IssueRefundR
     notes: `Refund ₹${input.amount.toFixed(2)} via Razorpay${input.reason ? ` — ${input.reason}` : ""}`,
     metadata: { method: "gateway", amount: input.amount, razorpayRefundId: gw.refundId },
   });
+  // Authoritative server-side `refund` (review priority B), keyed by order_number so it
+  // matches the purchase transaction in GA4. Non-blocking.
+  if (status === "processed") {
+    try {
+      const { data: o } = await createAdminClient().from("orders").select("order_number").eq("id", input.orderId).maybeSingle();
+      const num = (o as { order_number?: string } | null)?.order_number;
+      if (num) void trackServerRefund(num, input.amount);
+    } catch (e) {
+      console.error("server refund event failed (non-fatal)", e);
+    }
+  }
   return { ok: true, refundId, status, method };
 }
 

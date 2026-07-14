@@ -134,6 +134,39 @@ conversion, scroll/impression heatmaps and session recordings require GA4 Realti
 API / Clarity. The page links to those rather than inventing numbers. Wiring the GA4 Data API
 (service account) to pull live users into the admin is a documented future upgrade.
 
+## Server-side tracking (authoritative commerce events)
+
+Client events are lossy (blockers, closed tabs). Authoritative commerce events fire
+**server-side** via the GA4 Measurement Protocol (`lib/analytics/server.ts`), from trusted
+code where the outcome is certain:
+
+| Event | Fired from | Note |
+|---|---|---|
+| `purchase` | `orderService.persistOrder` (order confirmed) | GA4 dedupes by `transaction_id`, so this is safe alongside the client purchase |
+| `refund` | `refundService.issueRefund` (processed) | keyed by `order_number` to match the purchase |
+| `shipment_dispatched` / `shipment_delivered` / `shipment_rto` | `shipmentService` transitions | lifecycle after the sale |
+
+**Config:** `NEXT_PUBLIC_GA_MEASUREMENT_ID` + `GA4_API_SECRET` (GA4 Admin → Data Streams →
+Measurement Protocol API secrets). No-op when the secret is unset — set it to light server
+events up. All calls are non-blocking and never affect order/refund/shipment processing.
+
+## Wired storefront events (this pass)
+
+- **Variant** (`select_variant`) — PDP vessel/size selection.
+- **Gallery** (`gallery_image_view`, `gallery_fullscreen`) — PDP gallery.
+- **Bundle** (`bundle_started/completed/abandoned`) — the Discovery Composition builder.
+- **Wishlist** (`wishlist_opened`, `wishlist_purchased`) — wishlist page + checkout success.
+- **Coupon** (`coupon_rejected` with the real reason) — checkout validates via `/api/coupons/apply`.
+- **Search** (`search` + `search_source`, `autocomplete_used`) — SearchOverlay.
+
+## Admin operational KPIs (`/admin/analytics` → Business overview)
+
+First-party CEO glance (review point 11): orders today, revenue today/window, average basket,
+pending/cancelled/refunded orders, COD vs prepaid share, repeat-customer rate, out-of-stock &
+low-stock counts, best sellers, worst sellers (slow movers). Plus attribution-by-channel (with
+AOV) and UTM campaigns (top/weakest). **ROAS/ROI need ad-spend (manual entry — not stored);
+visitors/bounce/conversion need GA4** — both are surfaced as honest notes, not invented.
+
 ## Naming conventions
 
 - Use the **GA4 recommended event names** (`add_to_cart`, `begin_checkout`, `purchase`, …)

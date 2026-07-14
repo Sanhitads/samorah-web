@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { AssetImage } from "@/components/ui/AssetImage";
 import { useCartStore } from "@/store/useCartStore";
 import { useUIStore } from "@/store/useUIStore";
 import { useCompositionStore } from "@/store/useCompositionStore";
+import { trackBundleStarted, trackBundleCompleted, trackBundleAbandoned } from "@/lib/analytics/events";
 import { isGradientPlaceholder, gradientClass } from "@/lib/product";
 import {
   BUNDLE_SIZE,
@@ -76,6 +77,18 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
   const composition = composeComposition(items.map((i) => i.price));
   const isFull = items.length >= BUNDLE_SIZE;
 
+  // Bundle analytics (review point 7). started = first candle added; completed = added to
+  // bag; abandoned = navigated away with an in-progress-but-incomplete set (read live state).
+  const completedRef = useRef(false);
+  useEffect(() => {
+    return () => {
+      const remaining = useCompositionStore.getState().items;
+      if (!completedRef.current && remaining.length > 0 && remaining.length < BUNDLE_SIZE) {
+        trackBundleAbandoned(remaining.length);
+      }
+    };
+  }, []);
+
   const chooseVessel = (key: string) => {
     setAdded(false);
     if (key === vessel) {
@@ -108,6 +121,7 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
     if (selectedIds.has(candle.id)) {
       removeCandle(candle.id);
     } else {
+      if (items.length === 0) trackBundleStarted(); // first candle → bundle started
       addCandle({
         id: candle.id,
         slug: candle.slug,
@@ -124,6 +138,8 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
 
   const addComposition = () => {
     if (!composition.complete || !vessel) return;
+    completedRef.current = true;
+    trackBundleCompleted(items.reduce((s, i) => s + i.price, 0), items.length);
     const material = vesselLabel(vessel);
     // Editing → reuse the same compositionId and replace the existing cart lines
     // in place (no duplicate bundle). New → a fresh id. The 15% stays a cart-level

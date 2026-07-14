@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useCartStore } from "@/store/useCartStore";
 import { useUIStore } from "@/store/useUIStore";
 import { AddToComposition } from "@/components/product/AddToComposition";
+import { trackSelectVariant } from "@/lib/analytics/events";
 import type { ProductVariantView } from "@/lib/productPage";
 
 /**
@@ -42,6 +43,10 @@ export function ProductPurchasePanel({ product }: { product: PurchaseProduct }) 
     () => product.variants.find((v) => v.vessel === vessel && v.size === size) ?? null,
     [product.variants, vessel, size],
   );
+
+  // Variant selection (review point 6) — informs pricing/size demand ("140g added, 180g ignored").
+  const chooseVessel = (v: string) => { setVessel(v); trackSelectVariant(product.slug, [v, size].filter(Boolean).join(" · ")); };
+  const chooseSize = (s: string) => { setSize(s); trackSelectVariant(product.slug, [vessel, s].filter(Boolean).join(" · ")); };
 
   const handleAdd = () => {
     if (!current || !current.inStock) return;
@@ -94,7 +99,7 @@ export function ProductPurchasePanel({ product }: { product: PurchaseProduct }) 
                 type="button"
                 className="purchase__option"
                 data-selected={v === vessel}
-                onClick={() => setVessel(v)}
+                onClick={() => chooseVessel(v)}
               >
                 {v}
               </button>
@@ -113,7 +118,7 @@ export function ProductPurchasePanel({ product }: { product: PurchaseProduct }) 
                 type="button"
                 className="purchase__option"
                 data-selected={s === size}
-                onClick={() => setSize(s)}
+                onClick={() => chooseSize(s)}
               >
                 {s}
               </button>

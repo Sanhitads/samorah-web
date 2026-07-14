@@ -6,7 +6,7 @@ import { Search as SearchIcon, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useOverlay } from "@/hooks/useOverlay";
 import { SEARCH_SUGGESTIONS, searchProducts } from "@/lib/search";
-import { trackSearch, trackSelectItem } from "@/lib/analytics/events";
+import { trackSearch, trackSelectItem, trackAutocompleteUsed } from "@/lib/analytics/events";
 import { logStorefrontSearch } from "@/lib/analytics/searchLog";
 
 /**
@@ -122,7 +122,7 @@ export function SearchOverlay({ open, onClose }: SearchOverlayProps) {
                       key={term}
                       type="button"
                       className="search-chip"
-                      onClick={() => setQuery(term)}
+                      onClick={() => { trackAutocompleteUsed(term); setQuery(term); }}
                     >
                       {term}
                     </button>

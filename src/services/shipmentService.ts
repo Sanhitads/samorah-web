@@ -9,6 +9,7 @@ import { getShippingProvider } from "@/lib/shipping";
 import type { ProviderName, ShipmentRequest, PickupLocation } from "@/lib/shipping/types";
 import { routeWarehouseForOrder } from "@/services/warehouseService";
 import { toCustomerStatus, assertShipmentTransition, nextShipmentStates, type ShipmentStatus } from "@/lib/shipment/state";
+import { trackServerShipment } from "@/lib/analytics/server";
 import { fulfillmentReadyToShip, type FulfillmentStatus } from "@/lib/fulfillment/state";
 import {
   DEFAULT_WAREHOUSE,
@@ -337,6 +338,10 @@ export async function markShipmentDispatched(orderId: string, opts?: { actorId?:
   await db.from("orders").update({ status: "shipped" }).eq("id", orderId);
   await emitShipmentEvent("order.dispatched", orderId); // "your order is on its way" email
   await logEvent({ orderId, entityType: "shipment", entityId: shipment.id, event: "shipment.dispatched", actorId: opts?.actorId, previousState: shipment.status, newState: "picked_up" });
+  try {
+    const { data: o } = await db.from("orders").select("order_number").eq("id", orderId).maybeSingle();
+    if (o?.order_number) void trackServerShipment("shipment_dispatched", o.order_number); // authoritative (priority B)
+  } catch (e) { console.error("server shipment event failed (non-fatal)", e); }
   return { ok: true };
 }
 
@@ -395,6 +400,12 @@ export async function advanceShipment(shipmentId: string, to: ShipmentStatus, op
   // Order-level sync only for the meaningful outcomes (order stays 'shipped' through transit).
   if (to === "delivered") await db.from("orders").update({ status: "delivered" }).eq("id", sh.order_id);
   if (to === "rto") await db.from("orders").update({ status: "rto" }).eq("id", sh.order_id);
+  if (to === "delivered" || to === "rto") {
+    try {
+      const { data: o } = await db.from("orders").select("order_number").eq("id", sh.order_id).maybeSingle();
+      if (o?.order_number) void trackServerShipment(to === "delivered" ? "shipment_delivered" : "shipment_rto", o.order_number); // authoritative (priority B)
+    } catch (e) { console.error("server shipment event failed (non-fatal)", e); }
+  }
 
   await logEvent({
     orderId: sh.order_id,

@@ -55,7 +55,7 @@ export function AirProductDetail({
         </nav>
 
         <div className="pdp__layout">
-          <ProductGallery images={[{ src: hour.gradient, alt: hour.name }]} name={hour.name} />
+          <ProductGallery images={[{ src: hour.gradient, alt: hour.name }]} name={hour.name} itemId={hour.productSlug} />
 
         <div className="pdp__info">
           <Link href={`/collections/${volume.slug}`} className="pdp__chapter">

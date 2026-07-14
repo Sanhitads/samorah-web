@@ -69,7 +69,7 @@ export const trackPurchase = (p: PurchasePayload): void =>
   track("purchase", { transaction_id: p.transactionId, currency: CURRENCY, value: p.value, tax: p.tax, shipping: p.shipping, coupon: p.coupon, items: p.items ? withCurrency(p.items) : undefined });
 
 // ── Search intelligence (review point 1) ──
-export const trackSearch = (searchTerm: string, resultsCount?: number): void => track("search", { search_term: searchTerm, results_count: resultsCount });
+export const trackSearch = (searchTerm: string, resultsCount?: number, source = "header"): void => track("search", { search_term: searchTerm, results_count: resultsCount, search_source: source });
 export const trackSearchZeroResults = (searchTerm: string): void => track("search_zero_results", { search_term: searchTerm });
 export const trackSearchAbandoned = (searchTerm: string): void => track("search_abandoned", { search_term: searchTerm });
 export const trackAutocompleteUsed = (searchTerm: string): void => track("autocomplete_used", { search_term: searchTerm });
@@ -101,7 +101,9 @@ export const trackBundleAbandoned = (size: number): void => track("bundle_abando
 export const trackCouponRejected = (coupon: string, reason?: string): void => track("coupon_rejected", { coupon, reason });
 export const trackCouponRemoved = (coupon: string): void => track("coupon_removed", { coupon });
 
-// ── Wishlist intelligence (review point 10) ──
+// ── Wishlist intelligence (review points 9, 10) ──
+export const trackWishlistOpened = (count: number): void => track("wishlist_opened", { count });
+export const trackWishlistShared = (method: string): void => track("wishlist_shared", { method });
 export const trackWishlistPurchased = (item: AnalyticsItem): void => track("wishlist_purchased", { currency: CURRENCY, value: sumValue([item]), items: withCurrency([item]) });
 export const trackWishlistReminderClick = (itemId: string): void => track("wishlist_reminder_click", { item_id: itemId });
 
