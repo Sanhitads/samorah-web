@@ -8,6 +8,7 @@ import { getChannelReport } from "@/services/reportsService";
 import { getSearchInsights, getCampaignReport } from "@/services/marketingAnalyticsService";
 import { getBusinessOverview } from "@/services/businessOverviewService";
 import { getClarityInsights } from "@/services/clarityService";
+import { getGa4Insights } from "@/services/ga4DataService";
 
 /**
  * Analytics — `/admin/analytics`. The Insights module: read-only dashboards over
@@ -43,13 +44,14 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const { window } = await searchParams;
   const win = window === "7" || window === "90" || window === "all" ? window : "30";
   const winDays = win === "all" ? null : Number(win);
-  const [a, search, channels, campaigns, overview, clarity] = await Promise.all([
+  const [a, search, channels, campaigns, overview, clarity, ga4] = await Promise.all([
     getAnalytics(winDays),
     getSearchInsights(winDays ?? 3650),
     getChannelReport(winDays),
     getCampaignReport(winDays),
     getBusinessOverview(winDays),
     getClarityInsights(),
+    getGa4Insights(),
   ]);
   const maxReason = Math.max(1, ...a.returns.byReason.map((r) => r.count));
   const maxChannelRev = Math.max(1, ...channels.map((c) => c.revenue));
@@ -270,9 +272,26 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
         <p className="admin__muted" style={{ marginTop: 8, fontSize: 12 }}>
           Heatmaps + session recordings live in{" "}
           <a href="https://clarity.microsoft.com" target="_blank" rel="noopener noreferrer" className="text-link">Clarity</a>.
-          Live users + true visitor→order conversion need the GA4 Data API (a service account — the Measurement Protocol
-          secret you set only *sends* events).
         </p>
+      </section>
+
+      {/* ── Live · GA4 Data API (real-time users + conversion) ── */}
+      <section className="ash-metrics">
+        <h2 className="ash-jump__title">Live · GA4 {ga4.available ? <span className="admin__muted" style={{ fontSize: 12 }}>— realtime + 7d</span> : null}</h2>
+        {ga4.available ? (
+          <div className="ash-metrics__row">
+            <Tile v={ga4.activeUsers?.toLocaleString("en-IN") ?? "—"} l="Active users now" tone="gold" />
+            <Tile v={ga4.sessions7d?.toLocaleString("en-IN") ?? "—"} l="Sessions · 7d" />
+            <Tile v={ga4.conversions7d?.toLocaleString("en-IN") ?? "—"} l="Conversions · 7d" />
+            <Tile v={ga4.conversionRate != null ? pct(ga4.conversionRate) : "—"} l="Conversion rate" />
+          </div>
+        ) : (
+          <p className="admin__muted" style={{ fontSize: 13, lineHeight: 1.6 }}>
+            Live users + true visitor→order conversion need the GA4 <b>Data API</b> — a Google Cloud service account
+            (the Measurement Protocol secret only <i>sends</i> events). Add <code>GA4_PROPERTY_ID</code>,
+            {" "}<code>GA4_CLIENT_EMAIL</code>, <code>GA4_PRIVATE_KEY</code> and grant that email Viewer access in GA4 Admin.
+          </p>
+        )}
       </section>
     </main>
   );

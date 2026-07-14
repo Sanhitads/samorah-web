@@ -4,6 +4,8 @@ import { requireStaff } from "@/lib/auth/requireStaff";
 import { getOperationalMetrics } from "@/services/orderAdminService";
 import { getCommandCenter, type Severity, type Urgency } from "@/services/commandCenterService";
 import { getRecentAuditEvents } from "@/services/auditService";
+import { getSettlementSummary } from "@/services/razorpaySettlementService";
+import { getGa4Insights } from "@/services/ga4DataService";
 import { ActivityFeed, type ActivityItem } from "@/components/admin/ActivityFeed";
 import { DashboardPersonalize, type WidgetDef } from "@/components/admin/DashboardPersonalize";
 
@@ -22,6 +24,7 @@ const inrK = (n: number) => (n >= 100000 ? `₹${(n / 100000).toFixed(1)}L` : n 
 const plural = (n: number, s: string) => `${n} ${s}${n === 1 ? "" : "s"}`;
 const EVENT_LABEL = (e: string) => e.replace(/[._]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 const hrs = (h: number | null) => (h == null ? "—" : h < 24 ? `${h}h` : `${Math.round((h / 24) * 10) / 10}d`);
+const shortDate = (iso: string) => (iso ? new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }) : "");
 function ago(iso: string): string {
   const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
   if (s < 60) return "just now";
@@ -88,8 +91,8 @@ const WIDGETS: WidgetDef[] = [
 
 export default async function AdminDashboard() {
   const staff = await requireStaff("editor");
-  const [cc, metrics, activityRaw] = await Promise.all([
-    getCommandCenter(), getOperationalMetrics(), getRecentAuditEvents({ limit: 48 }),
+  const [cc, metrics, activityRaw, settlement, ga4] = await Promise.all([
+    getCommandCenter(), getOperationalMetrics(), getRecentAuditEvents({ limit: 48 }), getSettlementSummary(), getGa4Insights(),
   ]);
   const { revenue, inventory, customers, operations, marketing, cashflow, integrations, seasonal, founder, alerts, workQueue, health } = cc;
 
@@ -117,7 +120,12 @@ export default async function AdminDashboard() {
           <h1 className="admin__title">Dashboard</h1>
           <p className="admin__count">Everything that needs you today — at a glance.</p>
         </div>
-        <DashboardPersonalize widgets={WIDGETS} />
+        <div className="cc-head__right">
+          {ga4.available && ga4.activeUsers != null ? (
+            <a href="/admin/analytics" className="cc-live" title="Active users now (GA4 realtime)"><span className="cc-live__dot" aria-hidden />{ga4.activeUsers} live</a>
+          ) : null}
+          <DashboardPersonalize widgets={WIDGETS} />
+        </div>
       </header>
 
       {/* Business Health — one glance (16); View Details → Alerts (point 1) */}
@@ -289,7 +297,14 @@ export default async function AdminDashboard() {
             <li><span>Received</span><span className="admin__mono">{inr(cashflow.received30)}</span></li>
             <li><span>COD pending</span><span className="admin__mono">{inr(cashflow.pendingCod)}</span></li>
             <li><span>Refunds</span><span className="admin__mono" data-tone={cashflow.refunds30 ? "warn" : undefined}>−{inr(cashflow.refunds30)}</span></li>
-            <li className="cc-note"><span className="admin__muted">Settlement dates need Razorpay sync</span></li>
+            {settlement.expected ? (
+              <li><span>Expected settlement</span><span className="admin__mono" data-tone="up">{inr(settlement.expected.amount)}</span></li>
+            ) : null}
+            {settlement.last ? (
+              <li><span>Last settlement</span><span className="admin__mono">{inr(settlement.last.amount)} · {shortDate(settlement.last.at)}</span></li>
+            ) : (
+              <li className="cc-note"><span className="admin__muted">{settlement.available ? "No settlements yet" : "Connect Razorpay to see settlements"}</span></li>
+            )}
           </ul>
         </section>
       </div>

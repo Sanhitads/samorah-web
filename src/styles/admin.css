@@ -670,3 +670,9 @@
 /* Activity feed — Show more */
 .ash-feed__more { margin-top: 10px; width: 100%; font-family: var(--font-sans); font-size: 12px; letter-spacing: 0.03em; padding: 9px; border: 1px solid var(--ad-hair); border-radius: 6px; background: #fbf9f5; color: var(--smoke, #6b6259); cursor: pointer; }
 .ash-feed__more:hover { border-color: rgba(31, 26, 22, 0.3); color: var(--ink, #1f1a16); }
+
+/* Live users pill (GA4 realtime) */
+.cc-head__right { display: flex; align-items: center; gap: 10px; flex: none; }
+.cc-live { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-sans); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: #2f6b3c; text-decoration: none; padding: 6px 12px; border: 1px solid rgba(60, 120, 70, 0.3); border-radius: 999px; white-space: nowrap; }
+.cc-live__dot { width: 7px; height: 7px; border-radius: 999px; background: #2f6b3c; animation: cc-pulse 2s ease-in-out infinite; }
+@keyframes cc-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
