@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { safeNextPath } from "@/lib/account/redirect";
 
 /**
  * Auth callback (PKCE) for Magic Link, email confirmation, password reset, and
@@ -11,8 +12,7 @@ export async function GET(request: Request) {
   const code = searchParams.get("code");
 
   // Only honor relative redirect targets (prevents open-redirect abuse).
-  const nextParam = searchParams.get("next") ?? "/";
-  const next = nextParam.startsWith("/") ? nextParam : "/";
+  const next = safeNextPath(searchParams.get("next"));
 
   if (code) {
     const supabase = await createClient();

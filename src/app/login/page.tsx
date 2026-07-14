@@ -7,6 +7,7 @@ import { useUserStore } from "@/store/useUserStore";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { AuthLoader } from "@/components/auth/AuthFlame";
 import { track } from "@/lib/analytics/events";
+import { safeNextPath } from "@/lib/account/redirect";
 
 type Status = { type: "error" | "info"; message: string } | null;
 
@@ -27,7 +28,7 @@ function LoginInner() {
   const [redirecting, setRedirecting] = useState(false); // OAuth redirect in flight
 
   useEffect(() => {
-    if (isLoggedIn && next && next.startsWith("/")) router.replace(next);
+    if (isLoggedIn && next) router.replace(safeNextPath(next));
   }, [isLoggedIn, next, router]);
 
   async function run(action: () => Promise<{ error: { message: string } | null }>, ok?: string, onErr?: (m: string) => void) {

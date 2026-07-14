@@ -9,9 +9,9 @@
  * wins over another device's older, higher quantity (MAX would wrongly keep the higher).
  * Ties fall back to the higher quantity for determinism.
  *
- * Known limitation: without tombstones, a line fully removed on one device can be
- * re-added from another device that still holds it (deletion doesn't propagate). Quantity
- * edits — the common case — are handled correctly. Tombstones are a documented follow-up.
+ * Deletion propagation is handled by the tombstone layer below (review point 8): a line
+ * removed on one device records a tombstone, so the removal wins over a stale copy still
+ * held by another device — while a genuine re-add (newer `updatedAt`) revives the line.
  */
 
 export interface CartLine { key: string; qty: number; updatedAt?: number; [k: string]: unknown }

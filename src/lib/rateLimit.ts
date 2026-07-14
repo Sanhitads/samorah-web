@@ -2,8 +2,15 @@
  * In-memory fixed-window rate limiter (audit gap: payment/webhook/coupon routes
  * were completely open). Keyed by IP + bucket. Per-instance — fine for a single
  * Vercel instance / dev; swap the store for Upstash Redis when horizontal scaling
- * lands (the check() signature stays the same). Fails OPEN on any internal error
- * so a limiter bug never blocks checkout.
+ * lands (the rateLimit() signature stays the same).
+ *
+ * Fail-open policy (deliberate, and precisely scoped): a request is allowed ONLY when
+ * the limiter itself throws — i.e. the limiter *infrastructure* is unavailable (a bug,
+ * or a down Redis once we migrate). A normal threshold breach is NOT an error: it takes
+ * the `hit.count > limit` branch and returns `{ ok: false }`, which every caller renders
+ * as HTTP 429 + `Retry-After`. So the limiter never silently disables enforcement under
+ * load — it only degrades to allow-through if its own store is broken, so a limiter fault
+ * can never block checkout/login. See docs/authentication/architecture.md § Rate limiting.
  */
 type Hit = { count: number; resetAt: number };
 const store = new Map<string, Hit>();

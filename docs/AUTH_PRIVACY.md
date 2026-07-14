@@ -58,7 +58,9 @@ so retention scans stay efficient as the tables grow.
 ## Security controls
 
 - **Rate limiting** on `login-event`, `account/sync`, `account/profile`, `account/audit`
-  (fail-open limiter; 429 + `Retry-After`). Magic-link/OTP is rate-limited by Supabase.
+  (429 + `Retry-After` on breach; fail-open **only** if the limiter infra faults — never on a
+  threshold breach — see [authentication/architecture.md § Rate limiting](authentication/architecture.md#8-rate-limiting)).
+  Magic-link/OTP is rate-limited by Supabase.
 - **Password change** revokes all *other* sessions (`signOut({ scope: 'others' })`) and
   writes a `password_change` audit event.
 - **OAuth CSRF/state** is handled by Supabase PKCE (`exchangeCodeForSession`); our
