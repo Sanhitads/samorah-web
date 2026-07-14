@@ -22,14 +22,19 @@ export type AlertPriority = "critical" | "high" | "medium" | "info";
 
 /** One concrete item behind an alert — carries the context that answers "which order?"
  *  and a deep-link to the exact place to act (review points 2, 3, 7, 10). */
+export type NotificationState = "open" | "acknowledged" | "in_progress" | "resolved";
+
 export interface AlertItem {
   id: string;
+  alertKey: string;             // stable per-item key for workflow state (points 5, 8)
   primary: string;              // order number / product / RMA
   secondary?: string;           // customer / SKU / order
   meta?: string;                // ₹amount · failure reason
   at: string | null;            // ISO timestamp → "3 min ago"
   href: string;                 // deep-link to the exact order + section
   retryOrderNumber?: string;    // set when a Retry Refund action applies
+  state?: NotificationState;    // acknowledged / investigating (from notification_state)
+  assigneeName?: string | null; // "Rahul" — so others don't duplicate
 }
 
 export interface AdminAlert {
@@ -65,7 +70,7 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
   const low = ((variantsRes.data ?? []) as any[]).filter((v) => Number(v.stock) <= Number(v.low_stock_threshold ?? 0));
   if (low.length) alerts.push({
     key: "low_stock", severity: "warn", priority: "medium", title: "Low-stock variants", count: low.length, href: "/admin/products",
-    items: low.slice(0, 12).map((v) => ({ id: v.id, primary: v.products?.name ?? "Variant", secondary: v.sku ?? undefined, meta: `${Number(v.stock)} left`, at: null, href: "/admin/products" })),
+    items: low.slice(0, 12).map((v) => ({ id: v.id, alertKey: `low_stock:${v.id}`, primary: v.products?.name ?? "Variant", secondary: v.sku ?? undefined, meta: `${Number(v.stock)} left`, at: null, href: "/admin/products" })),
   });
 
   // Refunds failed (high) — the headline example: full context + retry deep-link
@@ -74,7 +79,7 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
     key: "refund_failed", severity: "critical", priority: "high", title: "Refund failed", count: refunds.length, href: "/admin/orders?payment=failed",
     items: refunds.map((r) => {
       const num = r.orders?.order_number ?? "";
-      return { id: r.id, primary: num, secondary: r.orders?.ship_full_name ?? undefined, meta: `${inr(r.amount)} · ${r.error_description || r.reason || "gateway error"}`, at: r.created_at, href: `/admin/orders/${num}#refunds`, retryOrderNumber: num };
+      return { id: r.id, alertKey: `refund_failed:${r.id}`, primary: num, secondary: r.orders?.ship_full_name ?? undefined, meta: `${inr(r.amount)} · ${r.error_description || r.reason || "gateway error"}`, at: r.created_at, href: `/admin/orders/${num}#refunds`, retryOrderNumber: num };
     }),
   });
 
@@ -82,21 +87,21 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
   const pays = (payRes.data ?? []) as any[];
   if (pays.length) alerts.push({
     key: "failed_payments", severity: "warn", priority: "high", title: "Failed payments (7d)", count: pays.length, href: "/admin/orders?payment=failed",
-    items: pays.map((p) => { const num = p.orders?.order_number; return { id: p.id, primary: num ?? p.razorpay_order_id ?? "—", secondary: num ? undefined : "no order", meta: p.error_description || "payment failed", at: p.created_at, href: num ? `/admin/orders/${num}` : "/admin/orders?payment=failed" }; }),
+    items: pays.map((p) => { const num = p.orders?.order_number; return { id: p.id, alertKey: `failed_payments:${p.id}`, primary: num ?? p.razorpay_order_id ?? "—", secondary: num ? undefined : "no order", meta: p.error_description || "payment failed", at: p.created_at, href: num ? `/admin/orders/${num}` : "/admin/orders?payment=failed" }; }),
   });
 
   // Shipment exceptions / NDR (medium)
   const ships = (shipRes.data ?? []) as any[];
   if (ships.length) alerts.push({
     key: "shipment_exception", severity: "warn", priority: "medium", title: "Shipments in exception (NDR)", count: ships.length, href: "/admin/shipments",
-    items: ships.map((s) => ({ id: s.id, primary: s.order_number ?? "—", meta: s.exception_reason || "exception", at: s.updated_at, href: s.order_number ? `/admin/orders/${s.order_number}` : "/admin/shipments" })),
+    items: ships.map((s) => ({ id: s.id, alertKey: `shipment_exception:${s.id}`, primary: s.order_number ?? "—", meta: s.exception_reason || "exception", at: s.updated_at, href: s.order_number ? `/admin/orders/${s.order_number}` : "/admin/shipments" })),
   });
 
   // Return requests awaiting review (info)
   const returns = (returnsRes.data ?? []) as any[];
   if (returns.length) alerts.push({
     key: "returns_pending", severity: "info", priority: "info", title: "Return requests awaiting review", count: returns.length, href: "/admin/returns",
-    items: returns.map((r) => ({ id: r.id, primary: r.rma_number ?? r.order_number ?? "RMA", secondary: r.order_number ?? undefined, meta: r.reason || undefined, at: r.created_at, href: "/admin/returns" })),
+    items: returns.map((r) => ({ id: r.id, alertKey: `returns_pending:${r.id}`, primary: r.rma_number ?? r.order_number ?? "RMA", secondary: r.order_number ?? undefined, meta: r.reason || undefined, at: r.created_at, href: "/admin/returns" })),
   });
 
   // Failed customer emails (medium) — count only
@@ -104,8 +109,31 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
   // Failed background jobs (critical)
   if (jobsFailed) alerts.push({ key: "jobs_failed", severity: "critical", priority: "critical", title: "Failed background jobs", count: jobsFailed, href: "/admin/health", items: [] });
 
+  // Attach workflow state (acknowledged / assignee) to each item (review points 5, 8).
+  const allItems = alerts.flatMap((a) => a.items);
+  if (allItems.length) {
+    try {
+      const { data: states } = await db.from("notification_state").select("alert_key,state,assignee_name").in("alert_key", allItems.map((i) => i.alertKey));
+      const byKey = new Map<string, any>((states ?? []).map((s: any) => [String(s.alert_key), s]));
+      for (const it of allItems) { const s = byKey.get(it.alertKey); if (s) { it.state = s.state as NotificationState; it.assigneeName = s.assignee_name; } }
+    } catch { /* state is best-effort */ }
+  }
+
   const rank: Record<AlertPriority, number> = { critical: 0, high: 1, medium: 2, info: 3 };
   return alerts.sort((a, b) => rank[a.priority] - rank[b.priority]);
+}
+
+/** Set the workflow state of an alert item (acknowledge / claim / annotate — points 5, 8). */
+export async function setNotificationState(input: { alertKey: string; state: NotificationState; assigneeId?: string | null; assigneeName?: string | null; note?: string; updatedBy?: string | null }): Promise<{ ok: boolean; reason?: string }> {
+  try {
+    const db = createAdminClient() as any;
+    const { error } = await db.from("notification_state").upsert({
+      alert_key: input.alertKey, state: input.state,
+      assignee_id: input.assigneeId ?? null, assignee_name: input.assigneeName ?? null,
+      note: input.note ?? null, updated_by: input.updatedBy ?? null, updated_at: new Date().toISOString(),
+    }, { onConflict: "alert_key" });
+    return error ? { ok: false, reason: error.message } : { ok: true };
+  } catch (e) { return { ok: false, reason: e instanceof Error ? e.message : "failed" }; }
 }
 
 /** Resolutions recorded today (review points 14, 17) — derived from the audit log, so it

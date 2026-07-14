@@ -52,6 +52,14 @@ export function OperationalAlerts({ alerts }: { alerts: AdminAlert[] }) {
     }
   };
 
+  // Acknowledge / claim an alert item so other staff don't duplicate (review points 5, 8).
+  const setState = async (alertKey: string, state: string) => {
+    try {
+      const res = await fetch("/api/admin/notifications/state", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ alertKey, state }) });
+      if (res.ok) router.refresh();
+    } catch { /* best-effort */ }
+  };
+
   if (!alerts.length) {
     return (
       <div className="no-alerts">
@@ -86,12 +94,18 @@ export function OperationalAlerts({ alerts }: { alerts: AdminAlert[] }) {
                     </div>
                     <span className="op-item__time">{ago(it.at)}</span>
                     <div className="op-item__actions">
+                      {it.assigneeName ? <span className="op-item__owner" title={`Assigned to ${it.assigneeName}`}>👤 {it.assigneeName}{it.state && it.state !== "acknowledged" ? ` · ${it.state.replace("_", " ")}` : " · ack"}</span> : null}
                       <Link href={it.href} className="op-item__btn">Review</Link>
                       {it.retryOrderNumber ? (
                         <button type="button" className="op-item__btn op-item__btn--retry" disabled={retrying === it.id} onClick={() => retry(it.id, it.retryOrderNumber as string)}>
                           {retrying === it.id ? "Retrying…" : "Retry"}
                         </button>
                       ) : null}
+                      {!it.assigneeName ? (
+                        <button type="button" className="op-item__btn" onClick={() => setState(it.alertKey, "acknowledged")} title="Claim this — others see you're on it">Assign to me</button>
+                      ) : (
+                        <button type="button" className="op-item__btn" onClick={() => setState(it.alertKey, "open")} title="Release the claim">Release</button>
+                      )}
                     </div>
                     {msg[it.id] ? <span className="op-item__msg">{msg[it.id]}</span> : null}
                   </li>
