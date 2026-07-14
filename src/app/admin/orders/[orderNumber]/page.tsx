@@ -8,6 +8,7 @@ import { getOrderNotifications } from "@/services/notificationService";
 import { getOrderTimeline } from "@/services/auditService";
 import { hasCapability } from "@/lib/auth/capabilities";
 import { OrderMeta } from "@/components/admin/OrderMeta";
+import { RefundRetryBanner } from "@/components/admin/RefundRetryBanner";
 
 /**
  * Order detail — `/admin/orders/[orderNumber]`. The single pane of glass for one
@@ -36,6 +37,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
     getOrderTimeline(order.id),
   ]);
   const items = (order.order_items ?? []) as any[];
+  const failedRefund = (refunds as any[]).find((r) => r.status === "failed");
 
   return (
     <main className="admin">
@@ -48,6 +50,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
           <span className="admin__muted"> · placed {dt(order.placed_at)}{order.invoice_number ? ` · Invoice ${order.invoice_number}` : ""}</span>
         </p>
       </header>
+
+      {failedRefund ? (
+        <RefundRetryBanner orderNumber={order.order_number} reason={failedRefund.error_description || failedRefund.reason || "Gateway error"} attemptedAt={failedRefund.created_at} />
+      ) : null}
 
       <div className="od-grid">
         {/* Money */}
@@ -96,7 +102,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
 
       <div className="od-grid">
         {/* Refunds */}
-        <section className="od-card">
+        <section className="od-card" id="refunds" style={{ scrollMarginTop: 20 }}>
           <h2 className="od-card__title">Refunds ({refunds.length})</h2>
           {refunds.length ? refunds.map((r) => (
             <div key={r.id} className="od-line"><span>{inr(r.amount)} · {r.method}</span><span className="om-pay" data-tone={r.status === "processed" ? "paid" : r.status === "failed" ? "failed" : "refundprog"}>{r.status}</span><span className="admin__muted">{dt(r.created_at)}</span></div>

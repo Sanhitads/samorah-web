@@ -17,39 +17,113 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type AlertSeverity = "info" | "warn" | "critical";
-export interface AdminAlert { key: string; severity: AlertSeverity; title: string; count: number; href: string }
+/** 4-tier operational priority (review point 6). */
+export type AlertPriority = "critical" | "high" | "medium" | "info";
 
+/** One concrete item behind an alert — carries the context that answers "which order?"
+ *  and a deep-link to the exact place to act (review points 2, 3, 7, 10). */
+export interface AlertItem {
+  id: string;
+  primary: string;              // order number / product / RMA
+  secondary?: string;           // customer / SKU / order
+  meta?: string;                // ₹amount · failure reason
+  at: string | null;            // ISO timestamp → "3 min ago"
+  href: string;                 // deep-link to the exact order + section
+  retryOrderNumber?: string;    // set when a Retry Refund action applies
+}
+
+export interface AdminAlert {
+  key: string;
+  severity: AlertSeverity;      // retained for back-compat
+  priority: AlertPriority;      // 4-tier display/sort
+  title: string;
+  count: number;
+  href: string;                 // "review all" fallback
+  items: AlertItem[];           // enriched per-item context
+}
+
+const inr = (n: unknown) => `₹${Math.round(Number(n ?? 0)).toLocaleString("en-IN")}`;
+
+/** Operational alerts, ENRICHED with per-item context + deep-links. Derived live from the
+ *  source tables → self-clears when the work is done (auto-resolve). */
 export async function getAdminAlerts(): Promise<AdminAlert[]> {
   const db = createAdminClient() as any;
   const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
   const alerts: AdminAlert[] = [];
-  const cnt = async (build: () => Promise<{ count: number | null }>): Promise<number> => { try { return (await build()).count ?? 0; } catch { return 0; } };
 
-  // Low stock (active variants at/below threshold) — computed in JS (column-vs-column).
-  try {
-    const { data } = await db.from("variants").select("stock,low_stock_threshold,is_active").eq("is_active", true);
-    const low = (data ?? []).filter((v: any) => Number(v.stock) <= Number(v.low_stock_threshold ?? 0)).length;
-    if (low) alerts.push({ key: "low_stock", severity: "warn", title: "Low-stock variants", count: low, href: "/admin/products" });
-  } catch { /* ignore */ }
-
-  const [returnsPending, shipExceptions, refundFailed, payFailed, emailFailed, jobsFailed] = await Promise.all([
-    cnt(() => db.from("returns").select("id", { count: "exact", head: true }).eq("status", "requested")),
-    cnt(() => db.from("shipments").select("id", { count: "exact", head: true }).eq("status", "exception")),
-    cnt(() => db.from("refunds").select("id", { count: "exact", head: true }).eq("status", "failed")),
-    cnt(() => db.from("payment_attempts").select("id", { count: "exact", head: true }).eq("status", "failed").gte("created_at", weekAgo)),
-    cnt(() => db.from("notification_dispatches").select("id", { count: "exact", head: true }).eq("status", "failed").gte("created_at", weekAgo)),
-    cnt(() => db.from("fulfillment_jobs").select("id", { count: "exact", head: true }).eq("status", "failed")),
+  const [variantsRes, returnsRes, shipRes, refundRes, payRes, emailFailed, jobsFailed] = await Promise.all([
+    db.from("variants").select("id,sku,stock,low_stock_threshold,products(name)").eq("is_active", true),
+    db.from("returns").select("id,rma_number,order_number,reason,created_at").eq("status", "requested").order("created_at", { ascending: false }).limit(20),
+    db.from("shipments").select("id,order_number,exception_reason,updated_at").eq("status", "exception").order("updated_at", { ascending: false }).limit(20),
+    db.from("refunds").select("id,amount,reason,error_description,created_at,orders!inner(order_number,ship_full_name,total_amount)").eq("status", "failed").order("created_at", { ascending: false }).limit(20),
+    db.from("payment_attempts").select("id,razorpay_order_id,error_description,created_at,orders(order_number)").eq("status", "failed").gte("created_at", weekAgo).order("created_at", { ascending: false }).limit(20),
+    db.from("notification_dispatches").select("id", { count: "exact", head: true }).eq("status", "failed").gte("created_at", weekAgo).then((r: any) => r.count ?? 0).catch(() => 0),
+    db.from("fulfillment_jobs").select("id", { count: "exact", head: true }).eq("status", "failed").then((r: any) => r.count ?? 0).catch(() => 0),
   ]);
 
-  if (returnsPending) alerts.push({ key: "returns_pending", severity: "info", title: "Return requests awaiting review", count: returnsPending, href: "/admin/returns" });
-  if (shipExceptions) alerts.push({ key: "shipment_exception", severity: "warn", title: "Shipments in exception (NDR)", count: shipExceptions, href: "/admin/shipments" });
-  if (refundFailed) alerts.push({ key: "refund_failed", severity: "critical", title: "Refunds failed", count: refundFailed, href: "/admin/orders" });
-  if (payFailed) alerts.push({ key: "failed_payments", severity: "warn", title: "Failed payments (7d)", count: payFailed, href: "/admin/orders?payment=failed" });
-  if (emailFailed) alerts.push({ key: "email_failed", severity: "warn", title: "Failed customer emails (7d)", count: emailFailed, href: "/admin/audit?search=email" });
-  if (jobsFailed) alerts.push({ key: "jobs_failed", severity: "critical", title: "Failed background jobs", count: jobsFailed, href: "/admin/health" });
+  // Low stock (medium)
+  const low = ((variantsRes.data ?? []) as any[]).filter((v) => Number(v.stock) <= Number(v.low_stock_threshold ?? 0));
+  if (low.length) alerts.push({
+    key: "low_stock", severity: "warn", priority: "medium", title: "Low-stock variants", count: low.length, href: "/admin/products",
+    items: low.slice(0, 12).map((v) => ({ id: v.id, primary: v.products?.name ?? "Variant", secondary: v.sku ?? undefined, meta: `${Number(v.stock)} left`, at: null, href: "/admin/products" })),
+  });
 
-  const rank: Record<AlertSeverity, number> = { critical: 0, warn: 1, info: 2 };
-  return alerts.sort((a, b) => rank[a.severity] - rank[b.severity]);
+  // Refunds failed (high) — the headline example: full context + retry deep-link
+  const refunds = (refundRes.data ?? []) as any[];
+  if (refunds.length) alerts.push({
+    key: "refund_failed", severity: "critical", priority: "high", title: "Refund failed", count: refunds.length, href: "/admin/orders?payment=failed",
+    items: refunds.map((r) => {
+      const num = r.orders?.order_number ?? "";
+      return { id: r.id, primary: num, secondary: r.orders?.ship_full_name ?? undefined, meta: `${inr(r.amount)} · ${r.error_description || r.reason || "gateway error"}`, at: r.created_at, href: `/admin/orders/${num}#refunds`, retryOrderNumber: num };
+    }),
+  });
+
+  // Failed payments (high)
+  const pays = (payRes.data ?? []) as any[];
+  if (pays.length) alerts.push({
+    key: "failed_payments", severity: "warn", priority: "high", title: "Failed payments (7d)", count: pays.length, href: "/admin/orders?payment=failed",
+    items: pays.map((p) => { const num = p.orders?.order_number; return { id: p.id, primary: num ?? p.razorpay_order_id ?? "—", secondary: num ? undefined : "no order", meta: p.error_description || "payment failed", at: p.created_at, href: num ? `/admin/orders/${num}` : "/admin/orders?payment=failed" }; }),
+  });
+
+  // Shipment exceptions / NDR (medium)
+  const ships = (shipRes.data ?? []) as any[];
+  if (ships.length) alerts.push({
+    key: "shipment_exception", severity: "warn", priority: "medium", title: "Shipments in exception (NDR)", count: ships.length, href: "/admin/shipments",
+    items: ships.map((s) => ({ id: s.id, primary: s.order_number ?? "—", meta: s.exception_reason || "exception", at: s.updated_at, href: s.order_number ? `/admin/orders/${s.order_number}` : "/admin/shipments" })),
+  });
+
+  // Return requests awaiting review (info)
+  const returns = (returnsRes.data ?? []) as any[];
+  if (returns.length) alerts.push({
+    key: "returns_pending", severity: "info", priority: "info", title: "Return requests awaiting review", count: returns.length, href: "/admin/returns",
+    items: returns.map((r) => ({ id: r.id, primary: r.rma_number ?? r.order_number ?? "RMA", secondary: r.order_number ?? undefined, meta: r.reason || undefined, at: r.created_at, href: "/admin/returns" })),
+  });
+
+  // Failed customer emails (medium) — count only
+  if (emailFailed) alerts.push({ key: "email_failed", severity: "warn", priority: "medium", title: "Failed customer emails (7d)", count: emailFailed, href: "/admin/audit?search=email", items: [] });
+  // Failed background jobs (critical)
+  if (jobsFailed) alerts.push({ key: "jobs_failed", severity: "critical", priority: "critical", title: "Failed background jobs", count: jobsFailed, href: "/admin/health", items: [] });
+
+  const rank: Record<AlertPriority, number> = { critical: 0, high: 1, medium: 2, info: 3 };
+  return alerts.sort((a, b) => rank[a.priority] - rank[b.priority]);
+}
+
+/** Resolutions recorded today (review points 14, 17) — derived from the audit log, so it
+ *  reflects what actually got fixed (refunds processed, orders dispatched, returns closed). */
+export interface ResolvedItem { id: string; label: string; orderNumber: string | null; at: string }
+export async function getResolvedToday(): Promise<ResolvedItem[]> {
+  try {
+    const db = createAdminClient() as any;
+    const start = new Date(); start.setHours(0, 0, 0, 0);
+    const RESOLVE_EVENTS = ["refund.processed", "shipment.dispatched", "return.closed", "shipment.delivered"];
+    const { data } = await db.from("audit_events").select("id,event,order_id,created_at").in("event", RESOLVE_EVENTS).gte("created_at", start.toISOString()).order("created_at", { ascending: false }).limit(20);
+    const rows = (data ?? []) as any[];
+    const ids = [...new Set(rows.map((r) => r.order_id).filter(Boolean))];
+    const numById = new Map<string, string>();
+    if (ids.length) { const { data: os } = await db.from("orders").select("id,order_number").in("id", ids); for (const o of os ?? []) numById.set(o.id, o.order_number); }
+    const LABEL: Record<string, string> = { "refund.processed": "Refund processed", "shipment.dispatched": "Order dispatched", "return.closed": "Return closed", "shipment.delivered": "Order delivered" };
+    return rows.map((r) => ({ id: r.id, label: LABEL[r.event] ?? r.event, orderNumber: r.order_id ? numById.get(r.order_id) ?? null : null, at: r.created_at }));
+  } catch { return []; }
 }
 
 // ── Event notifications (class 2) ────────────────────────────────────────────
@@ -120,14 +194,30 @@ async function unreadEventCount(): Promise<number> {
   } catch { return 0; }
 }
 
-/** Both classes for the notification center page. */
-export async function getNotificationCenter(): Promise<{ operational: AdminAlert[]; events: EventNotification[]; unreadEvents: number }> {
-  const [operational, events] = await Promise.all([getAdminAlerts(), getEventNotifications({ limit: 50 })]);
-  return { operational, events, unreadEvents: events.filter((e) => !e.readAt).length };
+/** Both classes + resolutions for the notification center page. */
+export async function getNotificationCenter(): Promise<{ operational: AdminAlert[]; events: EventNotification[]; resolved: ResolvedItem[]; unreadEvents: number }> {
+  const [operational, events, resolved] = await Promise.all([getAdminAlerts(), getEventNotifications({ limit: 50 }), getResolvedToday()]);
+  return { operational, events, resolved, unreadEvents: events.filter((e) => !e.readAt).length };
 }
 
-/** Nav badge — standing operational alerts (one per condition) + unread events. */
+/** Nav badge (review point 15) — OPEN operational conditions + unread events only (read
+ *  events never count). Uses lightweight head-counts (runs on every admin page). */
 export async function getAlertCount(): Promise<number> {
-  const [alerts, unread] = await Promise.all([getAdminAlerts(), unreadEventCount()]);
-  return alerts.length + unread;
+  const db = createAdminClient() as any;
+  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+  const head = async (build: () => Promise<{ count: number | null }>): Promise<number> => { try { return (await build()).count ?? 0; } catch { return 0; } };
+  const [lowRes, returnsC, shipC, refundC, payC, emailC, jobsC, unread] = await Promise.all([
+    db.from("variants").select("stock,low_stock_threshold").eq("is_active", true),
+    head(() => db.from("returns").select("id", { count: "exact", head: true }).eq("status", "requested")),
+    head(() => db.from("shipments").select("id", { count: "exact", head: true }).eq("status", "exception")),
+    head(() => db.from("refunds").select("id", { count: "exact", head: true }).eq("status", "failed")),
+    head(() => db.from("payment_attempts").select("id", { count: "exact", head: true }).eq("status", "failed").gte("created_at", weekAgo)),
+    head(() => db.from("notification_dispatches").select("id", { count: "exact", head: true }).eq("status", "failed").gte("created_at", weekAgo)),
+    head(() => db.from("fulfillment_jobs").select("id", { count: "exact", head: true }).eq("status", "failed")),
+    unreadEventCount(),
+  ]);
+  const lowStock = ((lowRes.data ?? []) as any[]).some((v) => Number(v.stock) <= Number(v.low_stock_threshold ?? 0)) ? 1 : 0;
+  // Count of OPEN operational conditions (one per active alert type) + unread events.
+  const conditions = lowStock + [returnsC, shipC, refundC, payC, emailC, jobsC].filter((n) => n > 0).length;
+  return conditions + unread;
 }

@@ -147,6 +147,7 @@ export async function getOrderRefunds(orderId: string): Promise<
     status: string;
     method: string;
     reason: string | null;
+    error_description: string | null;
     razorpay_refund_id: string | null;
     created_at: string;
   }>
@@ -159,7 +160,7 @@ export async function getOrderRefunds(orderId: string): Promise<
   };
   const { data } = await db
     .from("refunds")
-    .select("id,amount,status,method,reason,razorpay_refund_id,created_at")
+    .select("id,amount,status,method,reason,error_description,razorpay_refund_id,created_at")
     .eq("order_id", orderId)
     .order("created_at", { ascending: false });
   return (data ?? []) as never;
