@@ -90,6 +90,50 @@ Every ecommerce event carries `currency` (INR) + `value`, and an `items[]` array
 `AnalyticsItem`: `item_id`, `item_name`, `item_category` (fragrance chapter), `item_variant`
 (vessel · size), `item_list_name`, `price`, `quantity`.
 
+## Expanded event vocabulary (engagement & funnels)
+
+Beyond the core ecommerce events, a full typed vocabulary exists in `events.ts`. Helpers are
+**ready to call**; those whose feature/UI doesn't exist yet are documented as such and simply
+aren't wired — no dead code firing for absent features.
+
+| Area | Events | Wired? |
+|---|---|---|
+| Search intelligence | `search`, `search_zero_results`, `search_abandoned`, `autocomplete_used`, `select_item` | ✅ SearchOverlay (+ first-party `search_logs`) |
+| Collection / list | `view_item_list`, `view_collection` | ✅ Shop grid (`view_item_list`) |
+| Product engagement | `product_impression`, `product_hover`, `quick_view`, `gallery_image_view/zoom/fullscreen`, `select_variant` | helpers ready — wire on PDP |
+| Engagement | `scroll_depth` (25/50/75/100), `time_engaged` (30/60/120/300) | ✅ global `EngagementTracker` |
+| Gift / bundle | `view_gift_box`, `bundle_started/completed/abandoned` | helpers ready — bundle UI exists |
+| Coupon lifecycle | `apply_coupon`, `coupon_rejected`, `coupon_removed` | apply wired; reject/remove ready |
+| Wishlist | `add_to_wishlist`, `remove_from_wishlist`, `wishlist_purchased`, `wishlist_reminder_click` | add/remove wired |
+| Notify-Me | `notify_me_requested`, `back_in_stock_purchased` | **wire when Notify-Me UI ships** |
+| Referral | `referral_shared/used/purchase` | **wire when referral ships (BRD-future)** |
+| Loyalty | `points_earned/redeemed`, `tier_upgraded` | **wire when loyalty ships** |
+| Blog | `blog_read`, `blog_related_click`, `blog_product_click` | helpers ready |
+| Artist story | `artist_story_open/share`, `artist_cta_click` | **wire when the section ships** |
+| Reviews | `review_expanded`, `review_photo_view`, `review_helpful`, `review_sort` | **wire when review UI ships** |
+| Checkout funnel | `begin_checkout`, `address_completed`, `shipping_selected`, `payment_selected`, `add_payment_info`, `payment_retry`, `payment_timeout`, `purchase` | begin/payment_selected/add_payment_info/payment_* wired |
+
+**Firehose events stay in GA4 + Clarity, not our DB.** Scroll depth, impressions, hover, and
+gallery views are high-frequency behavioural signals — GA4 aggregates them and Clarity records
+them (heatmaps/recordings). We do **not** duplicate them into Postgres.
+
+## Admin analytics (first-party) — `/admin/analytics`
+
+The admin surfaces what we can answer accurately from **our own tables** (no GA4 Data API):
+
+- **Search intelligence** (review point 1) — top searches + **zero-result searches** ("unmet
+  demand": a term searched often with 0 results is a product worth adding), from `search_logs`.
+  Storefront searches are logged via `POST /api/search/log` (consent-gated, rate-limited).
+- **Attribution by channel** (review point 19) — revenue/orders/share per channel, from each
+  paid order's UTMs (`getChannelReport`).
+- **UTM campaigns** (review point 20) — source/medium/campaign revenue table (`getCampaignReport`).
+- Revenue, AOV, units, returns, refunds, courier performance (existing analytics).
+
+**Deliberately link-out, not faked:** live users, real-time visitor counts, true visitor→order
+conversion, scroll/impression heatmaps and session recordings require GA4 Realtime / the GA4 Data
+API / Clarity. The page links to those rather than inventing numbers. Wiring the GA4 Data API
+(service account) to pull live users into the admin is a documented future upgrade.
+
 ## Naming conventions
 
 - Use the **GA4 recommended event names** (`add_to_cart`, `begin_checkout`, `purchase`, …)

@@ -5,6 +5,7 @@ import { buildShopPage, canonicalShopUrl, type ShopProductInput } from "@/lib/sh
 import type { ProductEdition } from "@/services/collectionService";
 import { ProductCard } from "@/components/ui/ProductCard";
 import { ShopToolbar } from "@/components/shop/ShopToolbar";
+import { TrackEvent } from "@/components/analytics/TrackEvent";
 import { withRouteSeo } from "@/services/seoRedirectService";
 
 /**
@@ -65,6 +66,11 @@ export default async function ShopRoute({
         vesselOptions={view.vesselOptions}
         sorts={view.sorts}
       />
+
+      {/* Collection/list impression — GA4 view_item_list (review points 2, 3). */}
+      {view.cards.length > 0 ? (
+        <TrackEvent event="view_item_list" params={{ item_list_name: "Shop", items: view.cards.slice(0, 24).map((c) => ({ item_id: c.slug, item_name: c.name, item_category: c.collectionType, item_list_name: "Shop" })) }} />
+      ) : null}
 
       {view.cards.length > 0 ? (
         <ul className="plp__grid">

@@ -17,7 +17,7 @@ import { COMMERCE } from "@/config/commerce";
 import { composeComposition } from "@/lib/bundle";
 import { formatPaise, formatPaise2 } from "@/lib/money";
 import { readStoredUtm } from "@/lib/utm";
-import { trackBeginCheckout, trackAddPaymentInfo, trackApplyCoupon, trackPaymentStarted, trackPaymentSuccess, trackPaymentFailed, trackCheckoutError } from "@/lib/analytics/events";
+import { trackBeginCheckout, trackAddPaymentInfo, trackApplyCoupon, trackPaymentSelected, trackPaymentStarted, trackPaymentSuccess, trackPaymentFailed, trackCheckoutError } from "@/lib/analytics/events";
 import type { AnalyticsItem } from "@/lib/analytics/types";
 import { StateSelect } from "./StateSelect";
 
@@ -191,6 +191,7 @@ export function CheckoutView() {
         return;
       }
       const orderValue = Number(data.amount ?? 0) / 100; // paise → rupees
+      trackPaymentSelected("razorpay");
       trackAddPaymentInfo(analyticsItems, "razorpay");
       trackPaymentStarted(data.orderId, orderValue);
       const rzp = new window.Razorpay({

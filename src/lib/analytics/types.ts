@@ -29,8 +29,36 @@ export type AnalyticsEvent =
   | "begin_checkout" | "add_shipping_info" | "add_payment_info" | "purchase"
   // ── wishlist ──
   | "add_to_wishlist" | "remove_from_wishlist"
-  // ── search / discovery ──
-  | "search" | "select_promotion" | "view_promotion"
+  // ── search / discovery (review point 1) ──
+  | "search" | "search_zero_results" | "search_abandoned" | "autocomplete_used"
+  | "select_promotion" | "view_promotion"
+  // ── collection performance (review point 2) ──
+  | "view_collection"
+  // ── product engagement (review points 3, 6, 7) ──
+  | "product_impression" | "product_hover" | "quick_view"
+  | "gallery_image_view" | "gallery_zoom" | "gallery_fullscreen" | "select_variant"
+  // ── engagement (review points 4, 5) ──
+  | "scroll_depth" | "time_engaged"
+  // ── gift / bundle (review point 8) ──
+  | "view_gift_box" | "bundle_started" | "bundle_completed" | "bundle_abandoned"
+  // ── coupon lifecycle (review point 9) ──
+  | "coupon_rejected" | "coupon_removed"
+  // ── wishlist intelligence (review point 10) ──
+  | "wishlist_purchased" | "wishlist_reminder_click"
+  // ── out-of-stock / notify-me (review point 11) ──
+  | "notify_me_requested" | "back_in_stock_purchased"
+  // ── referral (review point 12) ──
+  | "referral_shared" | "referral_used" | "referral_purchase"
+  // ── loyalty (review point 13) ──
+  | "points_earned" | "points_redeemed" | "tier_upgraded"
+  // ── blog / editorial (review point 14) ──
+  | "blog_read" | "blog_related_click" | "blog_product_click"
+  // ── artist story (review point 15) ──
+  | "artist_story_open" | "artist_story_share" | "artist_cta_click"
+  // ── reviews (review point 16) ──
+  | "review_expanded" | "review_photo_view" | "review_helpful" | "review_sort"
+  // ── checkout funnel granularity (review point 17) ──
+  | "address_completed" | "shipping_selected" | "payment_selected" | "payment_retry" | "payment_timeout"
   // ── user ──
   | "login" | "sign_up" | "generate_lead" | "newsletter_signup" | "contact_form_submit"
   // ── marketing ──

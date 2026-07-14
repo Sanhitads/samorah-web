@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { hasCapability } from "@/lib/auth/capabilities";
 import { getAnalytics } from "@/services/analyticsService";
+import { getChannelReport } from "@/services/reportsService";
+import { getSearchInsights, getCampaignReport } from "@/services/marketingAnalyticsService";
 
 /**
  * Analytics — `/admin/analytics`. The Insights module: read-only dashboards over
@@ -38,8 +40,15 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
 
   const { window } = await searchParams;
   const win = window === "7" || window === "90" || window === "all" ? window : "30";
-  const a = await getAnalytics(win === "all" ? null : Number(win));
+  const winDays = win === "all" ? null : Number(win);
+  const [a, search, channels, campaigns] = await Promise.all([
+    getAnalytics(winDays),
+    getSearchInsights(winDays ?? 3650),
+    getChannelReport(winDays),
+    getCampaignReport(winDays),
+  ]);
   const maxReason = Math.max(1, ...a.returns.byReason.map((r) => r.count));
+  const maxChannelRev = Math.max(1, ...channels.map((c) => c.revenue));
 
   return (
     <main className="admin">
@@ -123,6 +132,76 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
             </tbody>
           </table>
         </div>
+      </section>
+
+      {/* ── Search intelligence (review points 1, 18) ── */}
+      <section className="ash-metrics">
+        <h2 className="ash-jump__title">Search intelligence</h2>
+        <div className="ash-metrics__row" style={{ marginBottom: 14 }}>
+          <Tile v={String(search.totalSearches)} l="Searches" />
+          <Tile v={pct(search.zeroResultShare)} l="Zero-result rate" tone={search.zeroResultShare >= 20 ? "warn" : "plain"} />
+        </div>
+        <div className="od-grid">
+          <div className="od-card">
+            <h3 className="od-card__title">Top searches</h3>
+            {search.top.length ? search.top.map((s) => (
+              <div key={s.query} className="od-line">
+                <span>{s.query}</span>
+                <span className="admin__muted">{s.searches}× · avg {s.avgResults} results</span>
+              </div>
+            )) : <p className="admin__muted">No storefront searches in window.</p>}
+          </div>
+          <div className="od-card">
+            <h3 className="od-card__title">Zero-result searches <span className="admin__muted">— unmet demand</span></h3>
+            {search.zeroResult.length ? search.zeroResult.map((s) => (
+              <div key={s.query} className="od-line"><span>{s.query}</span><span className="admin__muted" data-tone="warn">{s.searches}× · 0 results</span></div>
+            )) : <p className="admin__muted">Every search found something. ✦</p>}
+          </div>
+        </div>
+        <p className="admin__muted" style={{ marginTop: 8, fontSize: 12 }}>Demand signal: a term searched often with 0 results is a product worth adding.</p>
+      </section>
+
+      {/* ── Marketing attribution by channel (review point 19) ── */}
+      <section className="ash-metrics">
+        <h2 className="ash-jump__title">Attribution by channel</h2>
+        {channels.length ? (
+          <div className="an-bars">
+            {channels.map((c) => (
+              <div key={c.channel} className="an-bar">
+                <span className="an-bar__label">{c.channel}</span>
+                <span className="an-bar__track"><span className="an-bar__fill" style={{ width: `${(c.revenue / maxChannelRev) * 100}%` }} /></span>
+                <span className="an-bar__n">{inr(c.revenue)} · {c.orders}o · {pct(c.share)}</span>
+              </div>
+            ))}
+          </div>
+        ) : <p className="admin__empty">No attributed orders in window.</p>}
+      </section>
+
+      {/* ── UTM campaigns (review point 20) ── */}
+      <section className="ash-metrics">
+        <h2 className="ash-jump__title">UTM campaigns</h2>
+        <div className="admin__table-wrap">
+          <table className="admin__table">
+            <thead><tr><th>Source</th><th>Medium</th><th>Campaign</th><th>Channel</th><th>Orders</th><th>Revenue</th><th>AOV</th><th>Share</th></tr></thead>
+            <tbody>
+              {campaigns.map((c, i) => (
+                <tr key={i}><td>{c.source}</td><td>{c.medium}</td><td>{c.campaign}</td><td>{c.channel}</td><td className="admin__mono">{c.orders}</td><td className="admin__mono">{inr(c.revenue)}</td><td className="admin__mono">{inr(c.aov)}</td><td className="admin__mono">{pct(c.share)}</td></tr>
+              ))}
+              {campaigns.length === 0 ? <tr><td colSpan={8} className="admin__empty">No campaign-tagged orders in window.</td></tr> : null}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* Live visitors / real-time conversion need GA4 Realtime (link-out — not first-party). */}
+      <section className="ash-metrics">
+        <h2 className="ash-jump__title">Live & behavioural</h2>
+        <p className="admin__muted" style={{ fontSize: 13, lineHeight: 1.6 }}>
+          Live users, real-time visitors, scroll/impression heatmaps and session recordings live in
+          {" "}<a href="https://analytics.google.com" target="_blank" rel="noopener noreferrer" className="text-link">GA4 Realtime</a> and
+          {" "}<a href="https://clarity.microsoft.com" target="_blank" rel="noopener noreferrer" className="text-link">Microsoft Clarity</a> —
+          the dashboards above are first-party (orders + search), so they stay accurate without an external API round-trip.
+        </p>
       </section>
     </main>
   );

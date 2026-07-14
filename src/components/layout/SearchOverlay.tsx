@@ -6,7 +6,8 @@ import { Search as SearchIcon, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useOverlay } from "@/hooks/useOverlay";
 import { SEARCH_SUGGESTIONS, searchProducts } from "@/lib/search";
-import { trackSearch } from "@/lib/analytics/events";
+import { trackSearch, trackSelectItem } from "@/lib/analytics/events";
+import { logStorefrontSearch } from "@/lib/analytics/searchLog";
 
 /**
  * Search Overlay (Phase 6 · Component 4).
@@ -38,13 +39,17 @@ export function SearchOverlay({ open, onClose }: SearchOverlayProps) {
   const results = useMemo(() => searchProducts(query), [query]);
   const hasQuery = query.trim().length > 0;
 
-  // Fire a GA4 `search` event once the query settles (debounced; review point 4).
+  // Fire GA4 `search` + first-party search log once the query settles (review points 1, 4).
+  // The first-party log (query + result count) powers admin top/zero-result searches.
   useEffect(() => {
     const q = query.trim();
     if (q.length < 3) return;
-    const t = setTimeout(() => trackSearch(q), 800);
+    const t = setTimeout(() => {
+      trackSearch(q);
+      logStorefrontSearch(q, results.length);
+    }, 800);
     return () => clearTimeout(t);
-  }, [query]);
+  }, [query, results.length]);
 
   const scrimMotion = reduceMotion
     ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: 0.15 } }
@@ -137,7 +142,7 @@ export function SearchOverlay({ open, onClose }: SearchOverlayProps) {
                           key={r.slug}
                           href={`/shop/${r.slug}`}
                           className="search-result-item"
-                          onClick={onClose}
+                          onClick={() => { trackSelectItem("search_results", { item_id: r.slug, item_name: r.name, price: r.price, item_category: r.chapterName }); onClose(); }}
                         >
                           <span
                             className={`search-result-item__img ${r.gradClass}`}

@@ -11,6 +11,7 @@ import { clarityInitScript } from "@/lib/analytics/clarity";
 import { getConsent, onConsentChange } from "@/lib/analytics/consent";
 import type { ConsentState } from "@/lib/analytics/types";
 import { ConsentBanner } from "./ConsentBanner";
+import { EngagementTracker } from "./EngagementTracker";
 
 /**
  * Global analytics installer (review points 2, 3, 10, 11). Loads GA4 + GTM + Clarity via
@@ -57,6 +58,8 @@ export function AnalyticsProvider() {
       <Suspense fallback={null}>
         <PageViewTracker enabled={load} />
       </Suspense>
+
+      {analyticsEnabled ? <EngagementTracker /> : null}
 
       {analyticsEnabled && consent === "unset" ? <ConsentBanner /> : null}
     </>
