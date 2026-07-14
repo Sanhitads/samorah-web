@@ -8,6 +8,7 @@
  */
 import { createAdminClient } from "@/lib/supabase/admin";
 import { listPagesAdmin } from "@/services/cmsService";
+import { listMedia } from "@/services/media/mediaService";
 import type { SearchProvider, ProviderQuery, RawHit, SearchResource } from "./types";
 
 const inr = (v: unknown) => `₹${Number(v ?? 0).toLocaleString("en-IN")}`;
@@ -48,6 +49,11 @@ export const ilikeProvider: SearchProvider = {
         .filter((p) => p.slug.includes(q.toLowerCase()) || p.title.toLowerCase().includes(q.toLowerCase()))
         .slice(0, n)
         .map((p): RawHit => ({ resource: "pages", ref: p.slug, primary: p.title, secondary: `/${p.slug}` }))));
+
+    // Media library (title / alt) — the CMS asset store.
+    if (want.has("media")) jobs.push(
+      listMedia({ search: q, limit: n }).then((assets) => (assets ?? [])
+        .map((m): RawHit => ({ resource: "media", ref: m.id, primary: m.title || m.alt || m.id, secondary: m.folder ? `${m.folder} · ${m.kind}` : m.kind }))));
 
     const groups = await Promise.all(jobs);
     return groups.flat();

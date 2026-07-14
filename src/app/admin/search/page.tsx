@@ -45,14 +45,15 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
         <p className="admin__count">{query ? `${total} result${total === 1 ? "" : "s"}` : "Type in the search bar above."}</p>
       </header>
 
-      {query && total === 0 ? <p className="admin__empty">Nothing matched. Try an order number, email, product, coupon code, RMA, or page.</p> : null}
+      {query && total === 0 ? <p className="admin__empty">Nothing matched. Try an order number, email, product, coupon code, RMA, page, or media title.</p> : null}
 
       <Group title="Orders" hits={results.orders} />
       <Group title="Customers" hits={results.customers} />
       <Group title="Products" hits={results.products} />
       <Group title="Coupons" hits={results.coupons} />
       <Group title="Returns" hits={results.returns} />
-      <Group title="Pages" hits={results.pages} />
+      <Group title="Pages & Journal" hits={results.pages} />
+      <Group title="Media" hits={results.media} />
     </main>
   );
 }
