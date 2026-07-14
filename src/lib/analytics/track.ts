@@ -1,36 +1,8 @@
 /**
- * Analytics seam (Principle 24 — "Events over Guesswork": one seam, not scattered
- * gtag calls). Every meaningful interaction flows through track(). It pushes to
- * gtag/dataLayer when GA is present and is a safe no-op otherwise — so wiring the
- * real GA4 measurement ID later (NEXT_PUBLIC_GA_ID) needs zero call-site changes.
+ * Back-compat shim. The analytics seam now lives in the provider-based module
+ * (analytics.ts + events.ts). This file preserves the historical import path
+ * `@/lib/analytics/track` so existing call-sites keep working. Prefer importing the
+ * typed helpers (trackAddToCart, …) or `track` from `@/lib/analytics/events`.
  */
-export type AnalyticsEvent =
-  | "view_item"
-  | "view_item_list"
-  | "add_to_cart"
-  | "remove_from_cart"
-  | "begin_checkout"
-  | "add_payment_info"
-  | "purchase"
-  | "search"
-  | "sign_up"
-  | "newsletter_signup";
-
-export type TrackParams = Record<string, unknown>;
-
-export function track(event: AnalyticsEvent, params: TrackParams = {}): void {
-  if (typeof window === "undefined") return;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const w = window as any;
-    if (typeof w.gtag === "function") {
-      w.gtag("event", event, params);
-    } else {
-      w.dataLayer = w.dataLayer || [];
-      w.dataLayer.push({ event, ...params });
-    }
-    if (process.env.NODE_ENV !== "production") console.debug("[track]", event, params);
-  } catch {
-    /* analytics must never break the app */
-  }
-}
+export { track } from "./analytics";
+export type { AnalyticsEvent, TrackParams } from "./types";

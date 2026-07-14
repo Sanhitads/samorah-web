@@ -67,9 +67,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const d = res.ok ? await res.json() : {};
             const provider = d.provider ?? (session.user.app_metadata?.provider as string) ?? "email";
             track("login_success", { provider });
+            track("login", { method: provider }); // GA4-recommended event
             if (provider === "google") track("google_login_success");
             else if (provider === "email" && session.user.app_metadata?.providers?.includes?.("email")) track("magic_link_completed");
-            if (d.firstLogin) { track("first_login_completed", { provider }); try { localStorage.setItem("samorah_welcome", "1"); } catch { /* ignore */ } }
+            if (d.firstLogin) { track("first_login_completed", { provider }); track("sign_up", { method: provider }); try { localStorage.setItem("samorah_welcome", "1"); } catch { /* ignore */ } }
           } catch { /* analytics/capture must never block auth */ }
         })();
       }

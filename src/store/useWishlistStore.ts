@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { trackAddToWishlist, trackRemoveFromWishlist } from "@/lib/analytics/events";
 
 /** A wishlist entry — minimal product essentials for later display. */
 export interface WishlistItem {
@@ -40,14 +41,19 @@ export const useWishlistStore = create<WishlistState>()(
         set((state) => {
           if (state.items.some((i) => i.productId === item.productId)) return state; // no duplicates
           const { [item.productId]: _drop, ...tombstones } = state.tombstones; // revive → clear tombstone
+          trackAddToWishlist({ item_id: item.productId, item_name: item.name, price: item.price });
           return { items: [...state.items, { ...item, updatedAt: Date.now() }], tombstones };
         }),
 
       removeFromWishlist: (productId) =>
-        set((state) => ({
-          items: state.items.filter((i) => i.productId !== productId),
-          tombstones: { ...state.tombstones, [productId]: Date.now() },
-        })),
+        set((state) => {
+          const it = state.items.find((i) => i.productId === productId);
+          if (it) trackRemoveFromWishlist({ item_id: it.productId, item_name: it.name, price: it.price });
+          return {
+            items: state.items.filter((i) => i.productId !== productId),
+            tombstones: { ...state.tombstones, [productId]: Date.now() },
+          };
+        }),
 
       isWishlisted: (productId) =>
         get().items.some((i) => i.productId === productId),

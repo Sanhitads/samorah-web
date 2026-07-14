@@ -6,6 +6,7 @@ import { Search as SearchIcon, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useOverlay } from "@/hooks/useOverlay";
 import { SEARCH_SUGGESTIONS, searchProducts } from "@/lib/search";
+import { trackSearch } from "@/lib/analytics/events";
 
 /**
  * Search Overlay (Phase 6 · Component 4).
@@ -36,6 +37,14 @@ export function SearchOverlay({ open, onClose }: SearchOverlayProps) {
 
   const results = useMemo(() => searchProducts(query), [query]);
   const hasQuery = query.trim().length > 0;
+
+  // Fire a GA4 `search` event once the query settles (debounced; review point 4).
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 3) return;
+    const t = setTimeout(() => trackSearch(q), 800);
+    return () => clearTimeout(t);
+  }, [query]);
 
   const scrimMotion = reduceMotion
     ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: 0.15 } }

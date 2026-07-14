@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Script from "next/script";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { COMPOSITION_DISCOUNT_PCT, useCartStore, type CartItem } from "@/store/useCartStore";
 import {
   calculateOrderTotals,
@@ -17,6 +17,8 @@ import { COMMERCE } from "@/config/commerce";
 import { composeComposition } from "@/lib/bundle";
 import { formatPaise, formatPaise2 } from "@/lib/money";
 import { readStoredUtm } from "@/lib/utm";
+import { trackBeginCheckout, trackAddPaymentInfo, trackApplyCoupon, trackPaymentStarted, trackPaymentSuccess, trackPaymentFailed, trackCheckoutError } from "@/lib/analytics/events";
+import type { AnalyticsItem } from "@/lib/analytics/types";
 import { StateSelect } from "./StateSelect";
 
 const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`; // rupee line inputs
@@ -84,6 +86,23 @@ export function CheckoutView() {
     [items, ship.state, couponCode],
   );
   const couponApplied = couponCode ? totals.promotions.some((p) => p.code === couponCode.toUpperCase()) : false;
+
+  // GA4 ecommerce items for this checkout (no PII).
+  const analyticsItems = useMemo<AnalyticsItem[]>(
+    () => items.map((i) => ({ item_id: i.productId, item_name: i.name, item_category: i.chapterName, item_variant: [i.vessel, i.size].filter(Boolean).join(" · ") || undefined, price: i.price, quantity: i.qty })),
+    [items],
+  );
+  // begin_checkout once the checkout renders with a bag (review point 4).
+  const beganRef = useRef(false);
+  useEffect(() => {
+    if (beganRef.current || !mounted || items.length === 0) return;
+    beganRef.current = true;
+    trackBeginCheckout(analyticsItems, couponCode || undefined);
+  }, [mounted, items.length, analyticsItems, couponCode]);
+  // apply_coupon when a code becomes valid (review point 6).
+  useEffect(() => {
+    if (couponApplied) trackApplyCoupon(couponCode.toUpperCase(), totals.total);
+  }, [couponApplied, couponCode, totals.total]);
 
   if (!mounted) return <div className="checkout checkout--loading" aria-busy="true" />;
   if (items.length === 0 && !paid) {
@@ -161,14 +180,19 @@ export function CheckoutView() {
       const data = await res.json();
       if (!res.ok) {
         setPayError(data.error ?? "Could not start payment. Please try again.");
+        trackCheckoutError("create_order", data.error);
         setPaying(false);
         return;
       }
       if (typeof window === "undefined" || !window.Razorpay) {
         setPayError("Payment could not load. Please refresh and try again.");
+        trackCheckoutError("razorpay_unavailable");
         setPaying(false);
         return;
       }
+      const orderValue = Number(data.amount ?? 0) / 100; // paise → rupees
+      trackAddPaymentInfo(analyticsItems, "razorpay");
+      trackPaymentStarted(data.orderId, orderValue);
       const rzp = new window.Razorpay({
         key: data.keyId,
         amount: data.amount,
@@ -196,6 +220,7 @@ export function CheckoutView() {
             });
             const vd = await vr.json();
             if (vr.ok && vd.orderNumber && vd.token) {
+              trackPaymentSuccess(vd.orderNumber, orderValue); // purchase itself fires on the order page
               clearCart();
               router.push(`/order/${vd.orderNumber}?t=${encodeURIComponent(vd.token)}`);
               return;
@@ -212,11 +237,13 @@ export function CheckoutView() {
       });
       rzp.on("payment.failed", (resp) => {
         setPayError(resp.error?.description ?? "Payment failed. Your bag is safe — please try again.");
+        trackPaymentFailed(data.orderId, resp.error?.description);
         setPaying(false);
       });
       rzp.open();
     } catch {
       setPayError("Something went wrong. Your bag is safe — please try again.");
+      trackCheckoutError("pay_exception");
       setPaying(false);
     }
   };

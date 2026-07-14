@@ -17,7 +17,7 @@ import "@/styles/invoice.css";
 import "@/styles/admin.css";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { UtmCapture } from "@/components/analytics/UtmCapture";
-import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
+import { AnalyticsProvider } from "@/components/analytics/AnalyticsProvider";
 import { canonicalOrigin } from "@/config/site";
 import { buildThemeStylesheet } from "@/platform/themeStylesheet";
 
@@ -59,7 +59,7 @@ export default function RootLayout({
         <style href="samorah-themes" precedence="high">
           {buildThemeStylesheet()}
         </style>
-        <GoogleAnalytics />
+        <AnalyticsProvider />
         <UtmCapture />
         <AuthProvider>{children}</AuthProvider>
       </body>

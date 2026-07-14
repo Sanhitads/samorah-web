@@ -1,6 +1,18 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { BUNDLE_DISCOUNT, BUNDLE_SIZE, bundleUnitPrice } from "@/lib/bundle";
+import { trackAddToCart, trackRemoveFromCart } from "@/lib/analytics/events";
+import type { AnalyticsItem } from "@/lib/analytics/types";
+
+/** Map a cart line/product to the GA4 ecommerce item shape (no PII). */
+const toAnalyticsItem = (p: { productId?: string; id?: string; slug?: string; name?: string; price?: number; chapterName?: string; vessel?: string; size?: string; qty?: number }): AnalyticsItem => ({
+  item_id: p.productId ?? p.id ?? p.slug ?? "",
+  item_name: p.name ?? "",
+  item_category: p.chapterName,
+  item_variant: [p.vessel, p.size].filter(Boolean).join(" · ") || undefined,
+  price: p.price,
+  quantity: p.qty ?? 1,
+});
 
 /** Minimal product shape the cart needs (matches the prototype's addItem input). */
 export interface CartProduct {
@@ -98,11 +110,16 @@ export const useCartStore = create<CartState>()(
               ];
           // Re-adding a line clears its tombstone (revive).
           const { [key]: _drop, ...tombstones } = state.tombstones;
+          trackAddToCart(toAnalyticsItem({ ...product, vessel, size, qty: 1 }));
           return { items, tombstones };
         }),
 
       removeItem: (key) =>
-        set((state) => ({ items: state.items.filter((i) => i.key !== key), tombstones: { ...state.tombstones, [key]: Date.now() } })),
+        set((state) => {
+          const line = state.items.find((i) => i.key === key);
+          if (line) trackRemoveFromCart(toAnalyticsItem(line));
+          return { items: state.items.filter((i) => i.key !== key), tombstones: { ...state.tombstones, [key]: Date.now() } };
+        }),
 
       // Set qty for the key, then drop any line at qty <= 0 (prototype behavior).
       updateQty: (key, qty) =>

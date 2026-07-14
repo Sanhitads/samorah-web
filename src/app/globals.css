@@ -5002,3 +5002,20 @@ video.asset-image {
 
 /* Header avatar (signed-in) */
 .site-header__avatar { border-radius: 50%; object-fit: cover; display: block; }
+
+/* ─── Cookie consent (analytics) — quiet luxury strip, not a modal wall ─── */
+.consent {
+  position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
+  z-index: 200; display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  max-width: min(680px, calc(100vw - 32px)); padding: 14px 20px;
+  background: var(--deep-charcoal, #1a1a1a); color: var(--ivory, #faf7f2);
+  border-radius: 10px; box-shadow: 0 18px 50px rgba(26, 26, 26, 0.28);
+}
+.consent__text { font-family: var(--font-dm-sans), sans-serif; font-size: 12.5px; line-height: 1.55; margin: 0; flex: 1; min-width: 240px; color: rgba(250, 247, 242, 0.85); }
+.consent__link { color: var(--ivory, #faf7f2); text-decoration: underline; text-underline-offset: 2px; }
+.consent__actions { display: flex; gap: 8px; }
+.consent__btn { font-family: var(--font-dm-sans), sans-serif; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; padding: 9px 18px; border-radius: 999px; cursor: pointer; border: 1px solid rgba(250, 247, 242, 0.35); background: transparent; color: var(--ivory, #faf7f2); transition: background .18s, color .18s; }
+.consent__btn--ghost:hover { background: rgba(250, 247, 242, 0.1); }
+.consent__btn--accept { background: var(--ivory, #faf7f2); color: var(--deep-charcoal, #1a1a1a); border-color: var(--ivory, #faf7f2); }
+.consent__btn--accept:hover { background: #fff; }
+@media (max-width: 520px) { .consent { flex-direction: column; align-items: stretch; text-align: center; } .consent__actions { justify-content: center; } }

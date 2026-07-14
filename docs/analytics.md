@@ -1,0 +1,130 @@
+# Analytics — GA4 · GTM · Microsoft Clarity
+
+Production analytics for Samorah. One provider-agnostic seam; components call typed
+helpers (`trackAddToCart`, …) and never touch GA4/GTM/Clarity directly.
+
+## Architecture
+
+```
+src/lib/analytics/
+├── types.ts       — event names, AnalyticsItem, ConsentState, provider interface
+├── config.ts      — reads IDs from env; production-only gate
+├── consent.ts     — cookie-consent state (localStorage) + change events
+├── ga4.ts         — GA4 provider (gtag)            ← canonical analytics path
+├── gtm.ts         — GTM provider (dataLayer)       ← marketing tags only
+├── clarity.ts     — Microsoft Clarity provider     ← heatmaps / recordings
+├── analytics.ts   — facade: consent gate + buffer + fan-out to providers
+└── events.ts      — typed helpers (the app's public API)
+
+src/components/analytics/
+├── AnalyticsProvider.tsx — loads scripts (post-consent), auto page views
+├── ConsentBanner.tsx     — accept/decline strip
+└── TrackEvent.tsx        — fire one event on mount (for server components)
+```
+
+**Data flow:** `component → events.ts helper → analytics facade → (consent? ) → GA4 + GTM + Clarity`.
+Switching or adding a provider (e.g. Meta Pixel) touches only the provider files + the
+provider list in `analytics.ts` — never a UI component.
+
+## Environment variables (`.env.local`)
+
+```bash
+NEXT_PUBLIC_GA_MEASUREMENT_ID=G-QRD2T860NQ   # GA4 (legacy NEXT_PUBLIC_GA_ID still honoured)
+NEXT_PUBLIC_GTM_ID=GTM-PZ7MTN5F              # Google Tag Manager
+NEXT_PUBLIC_CLARITY_ID=xmaw47izhv            # Microsoft Clarity
+# NEXT_PUBLIC_META_PIXEL_ID=                 # Phase 3 — not yet
+# NEXT_PUBLIC_ANALYTICS_DEBUG=1              # force analytics ON in dev for DebugView
+```
+
+IDs are **never hardcoded**. A provider is inert unless its ID is set, so unconfigured
+providers silently no-op. Analytics only runs when `NODE_ENV=production` (or when
+`NEXT_PUBLIC_ANALYTICS_DEBUG=1` for local testing).
+
+> **Google Search Console** is verified via a meta/DNS record — no app code. Nothing to wire.
+
+## The GA4 + GTM dual-install rule (important)
+
+Both a GA4 tag **and** GTM are installed. To avoid double-counting every hit:
+
+- **GA4 events flow through `gtag` directly** (`ga4.ts`) — this is the canonical path.
+- **GTM is for marketing tags only** (Meta Pixel, Google Ads). It receives a `dataLayer`
+  mirror of every event.
+- **Do NOT add a GA4 Configuration tag inside GTM.** If you do, every event counts twice.
+
+Page views are duplicate-free: GA4 config sets `send_page_view:false` and we fire
+`page_view` manually once per App Router navigation.
+
+## Consent & privacy
+
+- Analytics **does not load or fire before consent** (`ConsentBanner` → Accept).
+- Before consent, events are buffered in memory (max 50) and **flushed on Accept**.
+- Decline → nothing loads, nothing fires.
+- **No PII ever** — no email, phone, or name is passed in any event. Ecommerce items carry
+  only `item_id`, `item_name`, `item_category`, `item_variant`, `price`, `quantity`.
+- GA4 is configured with `anonymize_ip:true`.
+
+## Event catalogue
+
+| Category | Event | Helper | Fires from |
+|---|---|---|---|
+| Page | `page_view` | `trackPageView` | every route change (auto) |
+| Product | `view_item` | `trackViewItem` | PDP (`shop/[slug]`) |
+| Product | `view_item_list` / `select_item` | `trackViewItemList` / `trackSelectItem` | collection grids |
+| Cart | `add_to_cart` | `trackAddToCart` | cart store `addItem` |
+| Cart | `remove_from_cart` | `trackRemoveFromCart` | cart store `removeItem` |
+| Cart | `view_cart` | `trackViewCart` | cart drawer/page |
+| Wishlist | `add_to_wishlist` / `remove_from_wishlist` | `trackAddToWishlist` / `trackRemoveFromWishlist` | wishlist store |
+| Checkout | `begin_checkout` | `trackBeginCheckout` | CheckoutView mount |
+| Checkout | `add_shipping_info` / `add_payment_info` | `trackAddShippingInfo` / `trackAddPaymentInfo` | checkout / pay |
+| Checkout | `purchase` | `trackPurchase` | order confirmation page |
+| Search | `search` | `trackSearch` | SearchOverlay (debounced) |
+| Marketing | `apply_coupon` | `trackApplyCoupon` | checkout coupon applied |
+| Marketing | `newsletter_signup` | `trackNewsletterSignup` | newsletter forms |
+| User | `login` / `sign_up` | `trackLogin` / `trackSignup` | AuthProvider on sign-in |
+| User | `generate_lead` / `contact_form_submit` | `trackGenerateLead` / `trackContactFormSubmit` | forms |
+| Payment | `payment_started` / `payment_success` / `payment_failed` | `trackPaymentStarted` / … | Razorpay flow |
+| Error | `checkout_error` | `trackCheckoutError` | checkout failure paths |
+
+### Custom parameters (ecommerce)
+Every ecommerce event carries `currency` (INR) + `value`, and an `items[]` array of
+`AnalyticsItem`: `item_id`, `item_name`, `item_category` (fragrance chapter), `item_variant`
+(vessel · size), `item_list_name`, `price`, `quantity`.
+
+## Naming conventions
+
+- Use the **GA4 recommended event names** (`add_to_cart`, `begin_checkout`, `purchase`, …)
+  so GA4's built-in ecommerce reports light up automatically.
+- Event names are `snake_case`; a typed union in `types.ts` keeps them consistent + greppable.
+- No PII in params — ever.
+
+## Testing (GA4 DebugView)
+
+1. Add `NEXT_PUBLIC_ANALYTICS_DEBUG=1` to `.env.local` and run `npm run dev`.
+2. Open the site, **Accept** the consent banner.
+3. In GA4 → Admin → **DebugView**, watch events arrive in real time.
+4. The browser console echoes every event (`[ga4] add_to_cart …`, `[gtm] …`, `[clarity] …`)
+   so you can confirm shape without leaving the app.
+5. Exercise the funnel: view a product → add to cart → checkout → coupon → pay → order page.
+6. Verify no **duplicate** `page_view` on navigation, and that nothing fires before consent.
+7. **Clarity:** open the Clarity dashboard → Recordings; sessions appear within a few minutes.
+
+## Adding a new event
+
+1. Add the name to the `AnalyticsEvent` union in `types.ts`.
+2. Add a typed helper in `events.ts` (build the correct param shape there — call-sites stay simple).
+3. Call the helper from the component/store. Never call `gtag`/`dataLayer` directly.
+4. If it's a conversion milestone worth watching in recordings, add it to `TAGGED` in `clarity.ts`.
+
+## Adding a new provider (e.g. Meta Pixel)
+
+1. Create `src/lib/analytics/meta.ts` implementing `AnalyticsProvider` (+ an init snippet).
+2. Register it in the `providers` array in `analytics.ts` and inject its script in
+   `AnalyticsProvider.tsx` (gated on config + consent).
+3. Done — no UI component changes. Set `NEXT_PUBLIC_META_PIXEL_ID` to light it up.
+
+## Roadmap
+
+- **Phase 1 (done):** GA4 · GTM · Search Console.
+- **Phase 2 (done):** Microsoft Clarity — heatmaps, session recordings, rage/dead clicks.
+- **Phase 3 (marketing, later):** Meta Pixel (`meta.ts` stub reserved), Pinterest Tag,
+  Google Ads conversion tracking.
