@@ -19,7 +19,7 @@
  *      that prompted #1). Set GA4_CLIENT_EMAIL + GA4_PRIVATE_KEY.
  */
 import crypto from "node:crypto";
-import { unstable_cache } from "next/cache";
+import { headers } from "next/headers";
 
 export interface Ga4Insights {
   available: boolean;
@@ -42,12 +42,28 @@ export function ga4Configured(): boolean {
   return wif || key;
 }
 
+/** The Vercel OIDC token. In Vercel Functions it arrives as the `x-vercel-oidc-token`
+ *  REQUEST HEADER (not an env var); env is only set in Builds / after `vercel env pull`
+ *  locally. (`@vercel/functions`' getVercelOidcToken() wraps this with 45-min caching —
+ *  we read it directly to avoid the dependency.) */
+async function getOidcToken(): Promise<string | undefined> {
+  try {
+    const t = (await headers()).get("x-vercel-oidc-token");
+    if (t) return t;
+  } catch {
+    /* not in a request scope (build/CLI) — fall through to env */
+  }
+  return process.env.VERCEL_OIDC_TOKEN || undefined;
+}
+
 /** Obtain an analytics-scoped access token, preferring keyless Workload Identity Federation. */
 async function getAccessToken(): Promise<string | null> {
   const audience = process.env.GCP_WORKLOAD_IDENTITY_AUDIENCE;
   const saEmail = process.env.GA4_SERVICE_ACCOUNT_EMAIL;
-  const oidcToken = process.env.VERCEL_OIDC_TOKEN; // injected by Vercel when OIDC federation is enabled
-  if (audience && saEmail && oidcToken) return tokenViaWif(oidcToken, audience, saEmail);
+  if (audience && saEmail) {
+    const oidcToken = await getOidcToken();
+    if (oidcToken) return tokenViaWif(oidcToken, audience, saEmail);
+  }
 
   const clientEmail = process.env.GA4_CLIENT_EMAIL;
   const privateKey = process.env.GA4_PRIVATE_KEY;
@@ -118,39 +134,44 @@ const firstMetric = (report: any, i = 0): number | null => { // eslint-disable-l
   return v == null ? null : Number(v);
 };
 
-const fetchGa4 = unstable_cache(
-  async (): Promise<Ga4Insights> => {
-    const propertyId = process.env.GA4_PROPERTY_ID;
-    if (!propertyId || !ga4Configured()) return { ...EMPTY, error: "not_configured" };
-    try {
-      const token = await getAccessToken();
-      if (!token) return { ...EMPTY, error: "auth_failed" };
+async function fetchGa4(): Promise<Ga4Insights> {
+  const propertyId = process.env.GA4_PROPERTY_ID;
+  if (!propertyId || !ga4Configured()) return { ...EMPTY, error: "not_configured" };
+  try {
+    const token = await getAccessToken();
+    if (!token) return { ...EMPTY, error: "auth_failed" };
 
-      const [realtime, report] = await Promise.all([
-        runReport(propertyId, token, "runRealtimeReport", { metrics: [{ name: "activeUsers" }] }),
-        runReport(propertyId, token, "runReport", {
-          dateRanges: [{ startDate: "7daysAgo", endDate: "today" }],
-          metrics: [{ name: "sessions" }, { name: "conversions" }],
-        }),
-      ]);
+    const [realtime, report] = await Promise.all([
+      runReport(propertyId, token, "runRealtimeReport", { metrics: [{ name: "activeUsers" }] }),
+      runReport(propertyId, token, "runReport", {
+        dateRanges: [{ startDate: "7daysAgo", endDate: "today" }],
+        metrics: [{ name: "sessions" }, { name: "conversions" }],
+      }),
+    ]);
 
-      const sessions = firstMetric(report, 0);
-      const conversions = firstMetric(report, 1);
-      return {
-        available: true,
-        activeUsers: firstMetric(realtime, 0),
-        sessions7d: sessions,
-        conversions7d: conversions,
-        conversionRate: sessions && conversions != null ? Math.round((conversions / sessions) * 1000) / 10 : null,
-      };
-    } catch (e) {
-      return { ...EMPTY, error: e instanceof Error ? e.message : "fetch_failed" };
-    }
-  },
-  ["ga4-insights"],
-  { revalidate: 120, tags: ["ga4"] },
-);
+    const sessions = firstMetric(report, 0);
+    const conversions = firstMetric(report, 1);
+    return {
+      available: true,
+      activeUsers: firstMetric(realtime, 0),
+      sessions7d: sessions,
+      conversions7d: conversions,
+      conversionRate: sessions && conversions != null ? Math.round((conversions / sessions) * 1000) / 10 : null,
+    };
+  } catch (e) {
+    return { ...EMPTY, error: e instanceof Error ? e.message : "fetch_failed" };
+  }
+}
 
-export function getGa4Insights(): Promise<Ga4Insights> {
-  return fetchGa4();
+// Request-safe TTL cache (2 min). unstable_cache can't be used here — the WIF path reads
+// the per-request `x-vercel-oidc-token` header, which is unavailable in a cached scope.
+// Module cache is per-instance/ephemeral on Vercel, which is fine for realtime metrics.
+let cache: { at: number; data: Ga4Insights } | null = null;
+const TTL_MS = 120_000;
+
+export async function getGa4Insights(): Promise<Ga4Insights> {
+  if (cache && Date.now() - cache.at < TTL_MS) return cache.data;
+  const data = await fetchGa4();
+  if (data.available) cache = { at: Date.now(), data }; // cache successes only
+  return data;
 }
