@@ -1,17 +1,22 @@
 /**
  * GA4 Data API reader (live users + conversion, into the admin). The Measurement Protocol
- * secret only *sends* events — *reading* reports needs a Google Cloud service account. This
- * mints a short-lived OAuth token from the service-account key (RS256 JWT, via Node crypto —
- * no extra dependency) and calls the Analytics Data API. Server-only; no-op + { available:false }
- * until the three env vars are set. Cached 2 min (realtime moves fast but not per-render).
+ * secret only *sends* events — *reading* reports needs a Google identity with GA4 access.
+ * Server-only; no-op + { available:false } until configured. Cached 2 min.
  *
- * Setup (Google Cloud + GA4 Admin):
- *   1. Create a service account, download its JSON key.
- *   2. In GA4 Admin → Property Access Management, add the service-account email as Viewer.
- *   3. Set env (server-only):
- *        GA4_PROPERTY_ID   = the NUMERIC property id (Admin → Property Settings)
- *        GA4_CLIENT_EMAIL  = client_email from the JSON
- *        GA4_PRIVATE_KEY   = private_key from the JSON (keep the \n escapes)
+ * Auth branches — KEYLESS FIRST (works under `disableServiceAccountKeyCreation`):
+ *
+ *   1. Workload Identity Federation (recommended, no JSON key). The Vercel runtime issues an
+ *      OIDC token (VERCEL_OIDC_TOKEN); we exchange it at Google STS for a federated token, then
+ *      impersonate a GA4-Viewer service account for an analytics-scoped token. Set env:
+ *        GA4_PROPERTY_ID
+ *        GCP_WORKLOAD_IDENTITY_AUDIENCE = //iam.googleapis.com/projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools/<POOL>/providers/<PROVIDER>
+ *        GA4_SERVICE_ACCOUNT_EMAIL      = the SA (with GA4 Viewer) to impersonate
+ *      One-time GCP setup: create a Workload Identity Pool + OIDC provider whose issuer is
+ *      Vercel's (https://oidc.vercel.com/<team>), allow your audience, and grant the external
+ *      principal roles/iam.workloadIdentityUser on the SA. No key is ever downloaded.
+ *
+ *   2. Service-account JSON key (LOCAL DEV / non-Vercel fallback; blocked by the org policy
+ *      that prompted #1). Set GA4_CLIENT_EMAIL + GA4_PRIVATE_KEY.
  */
 import crypto from "node:crypto";
 import { unstable_cache } from "next/cache";
@@ -27,26 +32,72 @@ export interface Ga4Insights {
 
 const EMPTY: Ga4Insights = { available: false, activeUsers: null, sessions7d: null, conversions7d: null, conversionRate: null };
 const b64url = (s: string | Buffer) => Buffer.from(s).toString("base64url");
+const ANALYTICS_SCOPE = "https://www.googleapis.com/auth/analytics.readonly";
 
-/** Mint an OAuth access token from the service-account key (JWT-bearer grant). */
-async function getAccessToken(clientEmail: string, privateKey: string): Promise<string | null> {
+/** True when either auth path is configured (keyless WIF, or a fallback key). */
+export function ga4Configured(): boolean {
+  if (!process.env.GA4_PROPERTY_ID) return false;
+  const wif = !!process.env.GCP_WORKLOAD_IDENTITY_AUDIENCE && !!process.env.GA4_SERVICE_ACCOUNT_EMAIL;
+  const key = !!process.env.GA4_CLIENT_EMAIL && !!process.env.GA4_PRIVATE_KEY;
+  return wif || key;
+}
+
+/** Obtain an analytics-scoped access token, preferring keyless Workload Identity Federation. */
+async function getAccessToken(): Promise<string | null> {
+  const audience = process.env.GCP_WORKLOAD_IDENTITY_AUDIENCE;
+  const saEmail = process.env.GA4_SERVICE_ACCOUNT_EMAIL;
+  const oidcToken = process.env.VERCEL_OIDC_TOKEN; // injected by Vercel when OIDC federation is enabled
+  if (audience && saEmail && oidcToken) return tokenViaWif(oidcToken, audience, saEmail);
+
+  const clientEmail = process.env.GA4_CLIENT_EMAIL;
+  const privateKey = process.env.GA4_PRIVATE_KEY;
+  if (clientEmail && privateKey) return tokenViaKey(clientEmail, privateKey);
+  return null;
+}
+
+/** KEYLESS: Vercel OIDC → Google STS federated token → impersonate the GA4 SA. */
+async function tokenViaWif(subjectToken: string, audience: string, saEmail: string): Promise<string | null> {
+  // 1. Exchange the workload's OIDC token for a Google federated access token (RFC 8693).
+  const sts = await fetch("https://sts.googleapis.com/v1/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
+      audience,
+      scope: "https://www.googleapis.com/auth/cloud-platform",
+      requested_token_type: "urn:ietf:params:oauth:token-type:access_token",
+      subject_token: subjectToken,
+      subject_token_type: "urn:ietf:params:oauth:token-type:jwt",
+    }),
+  });
+  if (!sts.ok) return null;
+  const federated = ((await sts.json()) as { access_token?: string }).access_token;
+  if (!federated) return null;
+
+  // 2. Impersonate the GA4-Viewer service account for an analytics-scoped token (no key).
+  const imp = await fetch(
+    `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${encodeURIComponent(saEmail)}:generateAccessToken`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${federated}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ scope: [ANALYTICS_SCOPE] }),
+    },
+  );
+  if (!imp.ok) return null;
+  return ((await imp.json()) as { accessToken?: string }).accessToken ?? null;
+}
+
+/** FALLBACK (local dev / non-Vercel): self-signed JWT-bearer grant with a downloaded SA key. */
+async function tokenViaKey(clientEmail: string, privateKey: string): Promise<string | null> {
   const now = Math.floor(Date.now() / 1000);
   const header = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
-  const claims = b64url(JSON.stringify({
-    iss: clientEmail,
-    scope: "https://www.googleapis.com/auth/analytics.readonly",
-    aud: "https://oauth2.googleapis.com/token",
-    iat: now,
-    exp: now + 3600,
-  }));
+  const claims = b64url(JSON.stringify({ iss: clientEmail, scope: ANALYTICS_SCOPE, aud: "https://oauth2.googleapis.com/token", iat: now, exp: now + 3600 }));
   const signingInput = `${header}.${claims}`;
   const signature = crypto.sign("RSA-SHA256", Buffer.from(signingInput), privateKey.replace(/\\n/g, "\n")).toString("base64url");
-  const assertion = `${signingInput}.${signature}`;
-
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion }),
+    body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: `${signingInput}.${signature}` }),
   });
   if (!res.ok) return null;
   return ((await res.json()) as { access_token?: string }).access_token ?? null;
@@ -70,11 +121,9 @@ const firstMetric = (report: any, i = 0): number | null => { // eslint-disable-l
 const fetchGa4 = unstable_cache(
   async (): Promise<Ga4Insights> => {
     const propertyId = process.env.GA4_PROPERTY_ID;
-    const clientEmail = process.env.GA4_CLIENT_EMAIL;
-    const privateKey = process.env.GA4_PRIVATE_KEY;
-    if (!propertyId || !clientEmail || !privateKey) return { ...EMPTY, error: "not_configured" };
+    if (!propertyId || !ga4Configured()) return { ...EMPTY, error: "not_configured" };
     try {
-      const token = await getAccessToken(clientEmail, privateKey);
+      const token = await getAccessToken();
       if (!token) return { ...EMPTY, error: "auth_failed" };
 
       const [realtime, report] = await Promise.all([

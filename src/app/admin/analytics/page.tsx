@@ -287,9 +287,10 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
           </div>
         ) : (
           <p className="admin__muted" style={{ fontSize: 13, lineHeight: 1.6 }}>
-            Live users + true visitor→order conversion need the GA4 <b>Data API</b> — a Google Cloud service account
-            (the Measurement Protocol secret only <i>sends</i> events). Add <code>GA4_PROPERTY_ID</code>,
-            {" "}<code>GA4_CLIENT_EMAIL</code>, <code>GA4_PRIVATE_KEY</code> and grant that email Viewer access in GA4 Admin.
+            Live users + true visitor→order conversion need the GA4 <b>Data API</b> (the Measurement Protocol secret only
+            <i> sends</i> events). Keyless setup via Workload Identity Federation — set <code>GA4_PROPERTY_ID</code>,
+            {" "}<code>GCP_WORKLOAD_IDENTITY_AUDIENCE</code>, <code>GA4_SERVICE_ACCOUNT_EMAIL</code>, enable Vercel OIDC,
+            and grant that service account Viewer access in GA4 Admin. No JSON key required.
           </p>
         )}
       </section>
