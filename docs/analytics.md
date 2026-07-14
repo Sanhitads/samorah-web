@@ -150,6 +150,28 @@ code where the outcome is certain:
 Measurement Protocol API secrets). No-op when the secret is unset — set it to light server
 events up. All calls are non-blocking and never affect order/refund/shipment processing.
 
+## Microsoft Clarity — metrics in the admin
+
+Clarity behavioural metrics are pulled into `/admin/analytics` → **Behavioural · Clarity**
+via the Data Export API (`clarityService.ts`): sessions, distinct users, bot sessions, avg
+scroll depth, avg engagement time, and rage/dead/quick-back clicks + script errors (last 3
+days — the API's max). Heatmaps + session recordings stay in the Clarity dashboard.
+
+**Config (server-only secrets):** `CLARITY_API_TOKEN` (Clarity → Settings → Data Export →
+generate token) + `CLARITY_API_ENDPOINT` (defaults to the live-insights URL). The API is
+capped at **10 requests/day/project**, so the call is cached 6h (`unstable_cache`).
+
+> ⚠️ These are **secrets** — never `NEXT_PUBLIC_*` (that inlines them into the browser bundle,
+> exposing your GA4 send-secret and Clarity token to every visitor). `NEXT_PUBLIC_` is only for
+> the GA4 **measurement id** and Clarity **project id**, which are meant to be public.
+
+## What still needs a GA4 service account
+
+The GA4 **Measurement Protocol secret** only *sends* events — it cannot *read* reports. Live
+users, real-time visitors, and true visitor→order conversion require the **GA4 Data API**
+(a Google Cloud service account with JSON credentials + the numeric property id). Not wired
+yet; the admin honestly links out to GA4 Realtime for those.
+
 ## Wired storefront events (this pass)
 
 - **Variant** (`select_variant`) — PDP vessel/size selection.

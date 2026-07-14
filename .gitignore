@@ -44,3 +44,7 @@ supabase/.temp
 
 # Claude Code (personal/local)
 .claude/settings.local.json
+
+# Never commit env backups (they contain secrets)
+*.bak
+.env*.local.bak

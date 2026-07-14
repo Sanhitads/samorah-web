@@ -7,6 +7,7 @@ import { getAnalytics } from "@/services/analyticsService";
 import { getChannelReport } from "@/services/reportsService";
 import { getSearchInsights, getCampaignReport } from "@/services/marketingAnalyticsService";
 import { getBusinessOverview } from "@/services/businessOverviewService";
+import { getClarityInsights } from "@/services/clarityService";
 
 /**
  * Analytics — `/admin/analytics`. The Insights module: read-only dashboards over
@@ -42,12 +43,13 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const { window } = await searchParams;
   const win = window === "7" || window === "90" || window === "all" ? window : "30";
   const winDays = win === "all" ? null : Number(win);
-  const [a, search, channels, campaigns, overview] = await Promise.all([
+  const [a, search, channels, campaigns, overview, clarity] = await Promise.all([
     getAnalytics(winDays),
     getSearchInsights(winDays ?? 3650),
     getChannelReport(winDays),
     getCampaignReport(winDays),
     getBusinessOverview(winDays),
+    getClarityInsights(),
   ]);
   const maxReason = Math.max(1, ...a.returns.byReason.map((r) => r.count));
   const maxChannelRev = Math.max(1, ...channels.map((c) => c.revenue));
@@ -239,14 +241,37 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
         </div>
       </section>
 
-      {/* Live visitors / real-time conversion need GA4 Realtime (link-out — not first-party). */}
+      {/* ── Behavioural — Microsoft Clarity (Data Export API, last 3 days) ── */}
       <section className="ash-metrics">
-        <h2 className="ash-jump__title">Live & behavioural</h2>
-        <p className="admin__muted" style={{ fontSize: 13, lineHeight: 1.6 }}>
-          Live users, real-time visitors, scroll/impression heatmaps and session recordings live in
-          {" "}<a href="https://analytics.google.com" target="_blank" rel="noopener noreferrer" className="text-link">GA4 Realtime</a> and
-          {" "}<a href="https://clarity.microsoft.com" target="_blank" rel="noopener noreferrer" className="text-link">Microsoft Clarity</a> —
-          the dashboards above are first-party (orders + search), so they stay accurate without an external API round-trip.
+        <h2 className="ash-jump__title">Behavioural · Clarity <span className="admin__muted" style={{ fontSize: 12 }}>— last 3 days</span></h2>
+        {clarity.available ? (
+          <>
+            <div className="ash-metrics__row" style={{ marginBottom: 10 }}>
+              <Tile v={clarity.sessions?.toLocaleString("en-IN") ?? "—"} l="Sessions" />
+              <Tile v={clarity.distinctUsers?.toLocaleString("en-IN") ?? "—"} l="Distinct users" />
+              <Tile v={clarity.avgScrollDepth != null ? `${Math.round(clarity.avgScrollDepth)}%` : "—"} l="Avg scroll depth" />
+              <Tile v={clarity.avgEngagementSec != null ? `${clarity.avgEngagementSec}s` : "—"} l="Avg engagement" />
+              <Tile v={clarity.bots?.toLocaleString("en-IN") ?? "—"} l="Bot sessions" />
+            </div>
+            <div className="ash-metrics__row">
+              <Tile v={clarity.rageClicks?.toLocaleString("en-IN") ?? "—"} l="Rage clicks" tone={clarity.rageClicks ? "warn" : "plain"} />
+              <Tile v={clarity.deadClicks?.toLocaleString("en-IN") ?? "—"} l="Dead clicks" tone={clarity.deadClicks ? "warn" : "plain"} />
+              <Tile v={clarity.quickBacks?.toLocaleString("en-IN") ?? "—"} l="Quick-backs" />
+              <Tile v={clarity.scriptErrors?.toLocaleString("en-IN") ?? "—"} l="Script errors" tone={clarity.scriptErrors ? "warn" : "plain"} />
+            </div>
+          </>
+        ) : (
+          <p className="admin__muted" style={{ fontSize: 13 }}>
+            {clarity.error === "not_configured"
+              ? "Set CLARITY_API_TOKEN to pull Clarity metrics here."
+              : "Clarity metrics are temporarily unavailable (the export API is capped at 10 requests/day; cached 6h)."}
+          </p>
+        )}
+        <p className="admin__muted" style={{ marginTop: 8, fontSize: 12 }}>
+          Heatmaps + session recordings live in{" "}
+          <a href="https://clarity.microsoft.com" target="_blank" rel="noopener noreferrer" className="text-link">Clarity</a>.
+          Live users + true visitor→order conversion need the GA4 Data API (a service account — the Measurement Protocol
+          secret you set only *sends* events).
         </p>
       </section>
     </main>

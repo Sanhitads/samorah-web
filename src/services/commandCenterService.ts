@@ -213,9 +213,9 @@ export function getIntegrations(): IntegrationsSlice {
   const has = (...keys: string[]) => keys.every((k) => !!process.env[k]);
   const anyOf = (...keys: string[]) => keys.some((k) => !!process.env[k]);
   const items = [
-    { key: "ga4", label: "GA4", ok: anyOf("NEXT_PUBLIC_GA_MEASUREMENT_ID", "NEXT_PUBLIC_GA_ID"), note: "Analytics" },
+    { key: "ga4", label: "GA4", ok: anyOf("NEXT_PUBLIC_GA_MEASUREMENT_ID", "NEXT_PUBLIC_GA_ID"), note: has("GA4_API_SECRET") ? "Analytics + server events" : "Analytics" },
     { key: "gtm", label: "Tag Manager", ok: has("NEXT_PUBLIC_GTM_ID"), note: "Tag Manager" },
-    { key: "clarity", label: "Clarity", ok: has("NEXT_PUBLIC_CLARITY_ID"), note: "Heatmaps" },
+    { key: "clarity", label: "Clarity", ok: has("NEXT_PUBLIC_CLARITY_ID"), note: has("CLARITY_API_TOKEN") ? "Heatmaps + metrics API" : "Heatmaps" },
     { key: "razorpay", label: "Razorpay", ok: has("NEXT_PUBLIC_RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"), note: "Payments" },
     { key: "shiprocket", label: "Shiprocket", ok: process.env.SHIPPING_PROVIDER === "shiprocket", note: "Logistics" },
     { key: "resend", label: "Resend", ok: has("RESEND_API_KEY"), note: "Email" },
