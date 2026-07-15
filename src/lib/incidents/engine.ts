@@ -54,6 +54,18 @@ export function allNotificationsResolved(notifs: { resolvedAt: string | null }[]
   return notifs.length > 0 && notifs.every((n) => n.resolvedAt != null);
 }
 
+/** Free-text search predicate (Phase 2) — case-insensitive substring across an incident's own
+ *  text fields. Order/customer matches are resolved separately in the service (they need the DB);
+ *  this covers ID / title / root cause / gateway / team / assignee / owner. Pure & testable. */
+export function matchesIncidentSearch(
+  fields: (string | null | undefined)[],
+  term: string,
+): boolean {
+  const t = term.trim().toLowerCase();
+  if (!t) return true;
+  return fields.some((v) => (v ?? "").toLowerCase().includes(t));
+}
+
 /** Display formatter for an incident number from a sequence value (DB generates the real one). */
 export function formatIncidentNumber(seq: number): string {
   return `INC-${String(seq).padStart(5, "0")}`;

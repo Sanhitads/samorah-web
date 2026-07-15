@@ -134,3 +134,26 @@ export const INCIDENT_CATEGORY_LABEL: Record<IncidentCategory, string> = {
   import_export: "Import / Export",
   unknown: "Unknown",
 };
+
+// ── Phase 2: collaboration config ──────────────────────────────────────────────
+export type IncidentTeam = "finance" | "warehouse" | "support" | "marketing" | "admin";
+export const INCIDENT_TEAMS: IncidentTeam[] = ["finance", "warehouse", "support", "marketing", "admin"];
+export const TEAM_LABEL: Record<IncidentTeam, string> = {
+  finance: "Finance", warehouse: "Warehouse", support: "Customer Support", marketing: "Marketing", admin: "Admin",
+};
+
+/** Which team owns each category by default (set on incident creation; reassignable). */
+export const CATEGORY_TEAM: Record<IncidentCategory, IncidentTeam> = {
+  payment_gateway: "finance", refund: "finance", shipment: "warehouse", inventory: "warehouse",
+  email: "marketing", import_export: "admin", unknown: "admin",
+};
+
+/** Configurable checklist templates, seeded onto an incident when it opens. Edit here. */
+export const INCIDENT_CHECKLISTS: Partial<Record<IncidentCategory, string[]>> = {
+  refund: ["Retry refund", "Verify gateway status", "Inform customer", "Confirm settlement"],
+  payment_gateway: ["Check Razorpay status page", "Verify webhook health", "Notify affected customers", "Confirm recovery"],
+  shipment: ["Contact courier", "Check AWB / tracking", "Update customer", "Re-attempt or RTO"],
+  inventory: ["Re-run inventory sync", "Verify stock counts", "Check integration logs"],
+  email: ["Check Resend status", "Verify sending domain / DNS", "Re-queue failed emails"],
+  import_export: ["Re-run the job", "Validate the file", "Confirm completion"],
+};

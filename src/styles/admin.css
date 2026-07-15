@@ -818,3 +818,21 @@
 .inc-timeline__item { display: grid; grid-template-columns: 14px 1fr auto; gap: 10px; align-items: start; padding: 8px 0; font-family: var(--font-sans); font-size: 13px; }
 .inc-timeline__dot { width: 7px; height: 7px; border-radius: 999px; background: #8a6d3b; margin-top: 5px; }
 .inc-timeline__time { font-size: 11px; white-space: nowrap; }
+
+/* ─── Incidents Phase 2 — collaboration ─── */
+.inc-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 0; border-bottom: 1px solid var(--ad-hair); margin-bottom: 14px; }
+.inc-toolbar select { font-family: var(--font-sans); font-size: 12px; padding: 5px 8px; border: 1px solid var(--ad-hair); border-radius: 6px; background: #fff; }
+.inc-checklist { list-style: none; margin: 0; padding: 0; }
+.inc-checklist li { padding: 6px 0; font-family: var(--font-sans); font-size: 13px; }
+.inc-checklist label { display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--ink, #1f1a16); }
+.inc-checklist span[data-done] { text-decoration: line-through; color: var(--smoke, #6b6259); }
+.inc-noteform { display: flex; gap: 8px; margin-bottom: 12px; }
+.inc-noteform input { flex: 1; font-family: var(--font-sans); font-size: 13px; padding: 8px 12px; border: 1px solid var(--ad-hair); border-radius: 6px; background: #fff; }
+.inc-notes { list-style: none; margin: 0; padding: 0; }
+.inc-notes__item { display: flex; flex-direction: column; gap: 2px; padding: 9px 0; border-top: 1px solid var(--ad-hair); font-family: var(--font-sans); font-size: 13px; color: var(--ink, #1f1a16); }
+.inc-notes__item .admin__muted { font-size: 11px; }
+.inc-filters { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+.inc-filters .nc-search { min-width: 260px; }
+.inc-filters select { font-family: var(--font-sans); font-size: 12px; padding: 7px 10px; border: 1px solid var(--ad-hair); border-radius: 999px; background: #fff; color: var(--ink, #1f1a16); }
+.inc-listbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; font-family: var(--font-sans); font-size: 12px; }
+.inc-listbar__right { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }

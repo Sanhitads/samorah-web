@@ -6,8 +6,8 @@
  * an incident references them by their stable `alert_key`.
  */
 import { createAdminClient } from "@/lib/supabase/admin";
-import { INCIDENT_RULES, INCIDENT_CATEGORY_LABEL, type IncidentRule, type IncidentSeverity } from "@/config/incidents";
-import { highestSeverity, ruleTriggered, matchesReason, shouldMergeInto, allNotificationsResolved, incidentTitle } from "@/lib/incidents/engine";
+import { INCIDENT_RULES, INCIDENT_CATEGORY_LABEL, CATEGORY_TEAM, INCIDENT_CHECKLISTS, type IncidentRule, type IncidentSeverity, type IncidentCategory } from "@/config/incidents";
+import { highestSeverity, ruleTriggered, matchesReason, shouldMergeInto, allNotificationsResolved, incidentTitle, matchesIncidentSearch } from "@/lib/incidents/engine";
 
 const db = () => createAdminClient() as any;
 
@@ -50,14 +50,26 @@ async function addHistory(incidentId: string, event: string, detail: string, act
   try { await db().from("incident_history").insert({ incident_id: incidentId, event, detail, actor_id: actor?.id ?? null, actor_name: actor?.name ?? null }); } catch { /* non-fatal */ }
 }
 
-/** Recompute derived fields (severity from highest notification, counts, last activity). */
+/** Recompute derived fields (counts, last activity; severity auto-inherits from the highest
+ *  notification UNLESS a human has locked it via a manual severity change). */
 async function recompute(incidentId: string): Promise<void> {
-  const { data: notifs } = await db().from("incident_notifications").select("order_number,severity,resolved_at").eq("incident_id", incidentId);
+  const [{ data: inc }, { data: notifs }] = await Promise.all([
+    db().from("incidents").select("severity_locked").eq("id", incidentId).maybeSingle(),
+    db().from("incident_notifications").select("order_number,severity,resolved_at").eq("incident_id", incidentId),
+  ]);
   const rows = (notifs ?? []) as any[];
   const open = rows.filter((n) => !n.resolved_at);
-  const severity = highestSeverity((open.length ? open : rows).map((n) => (n.severity ?? "info") as IncidentSeverity));
   const orders = new Set(rows.map((n) => n.order_number).filter(Boolean));
-  await db().from("incidents").update({ severity, affected_notifications: rows.length, affected_orders: orders.size, last_activity_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", incidentId);
+  const patch: any = { affected_notifications: rows.length, affected_orders: orders.size, last_activity_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+  if (!inc?.severity_locked) patch.severity = highestSeverity((open.length ? open : rows).map((n) => (n.severity ?? "info") as IncidentSeverity));
+  await db().from("incidents").update(patch).eq("id", incidentId);
+}
+
+/** Seed the configurable checklist template for a new incident's category (Phase 2). */
+async function seedChecklist(incidentId: string, category: IncidentCategory): Promise<void> {
+  const items = INCIDENT_CHECKLISTS[category];
+  if (!items?.length) return;
+  try { await db().from("incident_checklist_items").insert(items.map((label, i) => ({ incident_id: incidentId, label, sort_order: i }))); } catch { /* non-fatal */ }
 }
 
 export interface CorrelationResult { created: number; merged: number; attached: number; resolved: number }
@@ -85,10 +97,11 @@ export async function correlateIncidents(): Promise<CorrelationResult> {
     } else {
       const { data: newInc } = await db().from("incidents").insert({
         title: incidentTitle(rule, notifs.length), category: rule.category, severity: rule.notificationSeverity, status: "open",
-        root_cause: rule.rootCauseLabel, source_system: rule.sourceSystem, rule_id: rule.id,
+        root_cause: rule.rootCauseLabel, source_system: rule.sourceSystem, rule_id: rule.id, team: CATEGORY_TEAM[rule.category as IncidentCategory],
         description: `Correlated by rule "${rule.id}" — ${rows.length} events within ${rule.windowMinutes} min.`,
       }).select("id").single();
       incidentId = newInc.id;
+      await seedChecklist(incidentId, rule.category as IncidentCategory); // configurable template
       await addHistory(incidentId, "created", `Opened by rule ${rule.id} — ${rows.length} events in ${rule.windowMinutes}m`);
       created++;
     }
@@ -145,13 +158,13 @@ export async function autoResolveIncidents(): Promise<{ resolved: number }> {
 // ── Queries ──────────────────────────────────────────────────────────────────
 export interface IncidentRow {
   id: string; number: string; title: string; category: string; categoryLabel: string; severity: IncidentSeverity;
-  status: string; rootCause: string | null; sourceSystem: string | null; assigneeName: string | null;
-  affectedOrders: number; affectedNotifications: number; startedAt: string; lastActivityAt: string; resolvedAt: string | null;
+  status: string; rootCause: string | null; sourceSystem: string | null; team: string | null; ownerName: string | null; assigneeName: string | null;
+  snoozedUntil: string | null; affectedOrders: number; affectedNotifications: number; startedAt: string; lastActivityAt: string; resolvedAt: string | null;
 }
 const mapIncident = (r: any): IncidentRow => ({
   id: r.id, number: r.number, title: r.title, category: r.category, categoryLabel: INCIDENT_CATEGORY_LABEL[r.category as keyof typeof INCIDENT_CATEGORY_LABEL] ?? r.category,
-  severity: r.severity, status: r.status, rootCause: r.root_cause ?? null, sourceSystem: r.source_system ?? null, assigneeName: r.assignee_name ?? null,
-  affectedOrders: r.affected_orders ?? 0, affectedNotifications: r.affected_notifications ?? 0, startedAt: r.started_at, lastActivityAt: r.last_activity_at, resolvedAt: r.resolved_at ?? null,
+  severity: r.severity, status: r.status, rootCause: r.root_cause ?? null, sourceSystem: r.source_system ?? null, team: r.team ?? null, ownerName: r.owner_name ?? null, assigneeName: r.assignee_name ?? null,
+  snoozedUntil: r.snoozed_until ?? null, affectedOrders: r.affected_orders ?? 0, affectedNotifications: r.affected_notifications ?? 0, startedAt: r.started_at, lastActivityAt: r.last_activity_at, resolvedAt: r.resolved_at ?? null,
 });
 
 export async function getIncidents(opts: { status?: "active" | "all"; limit?: number } = {}): Promise<IncidentRow[]> {
@@ -163,21 +176,80 @@ export async function getIncidents(opts: { status?: "active" | "all"; limit?: nu
   } catch { return []; }
 }
 
+// ── Filters + search + pagination (Phase 2) ───────────────────────────────────
+export interface IncidentFilters {
+  status?: string;        // "active" | "all" | one of the statuses
+  severity?: string; category?: string; team?: string;
+  assigned?: string;      // "unassigned" | a staff name (e.g. current user for "mine")
+  createdDays?: number;   // Created today (1) / this week (7)
+  resolvedToday?: boolean;
+  q?: string;             // ID / order / customer / gateway / reason / assignee
+  page?: number; pageSize?: number;
+}
+export interface IncidentPage { rows: IncidentRow[]; total: number; page: number; pageSize: number }
+
+export async function getIncidentsFiltered(f: IncidentFilters): Promise<IncidentPage> {
+  const client = db();
+  try {
+    let q = client.from("incidents").select("*").order("last_activity_at", { ascending: false }).limit(1000);
+    if (!f.status || f.status === "active") {
+      q = q.in("status", ["open", "investigating", "mitigated"]).or(`snoozed_until.is.null,snoozed_until.lt.${new Date().toISOString()}`); // hide snoozed
+    } else if (f.status !== "all") q = q.eq("status", f.status);
+    if (f.severity) q = q.eq("severity", f.severity);
+    if (f.category) q = q.eq("category", f.category);
+    if (f.team) q = q.eq("team", f.team);
+    if (f.assigned === "unassigned") q = q.is("assignee_id", null);
+    else if (f.assigned) q = q.eq("assignee_name", f.assigned);
+    if (f.createdDays) q = q.gte("started_at", new Date(Date.now() - f.createdDays * 86400000).toISOString());
+    if (f.resolvedToday) { const s = new Date(); s.setHours(0, 0, 0, 0); q = q.eq("status", "resolved").gte("resolved_at", s.toISOString()); }
+    const { data } = await q;
+    let rows: IncidentRow[] = (data ?? []).map(mapIncident);
+
+    const term = (f.q ?? "").trim().toLowerCase();
+    if (term) {
+      const ids = new Set<string>();
+      const { data: byOrder } = await client.from("incident_notifications").select("incident_id").ilike("order_number", `%${term}%`);
+      for (const r of (byOrder ?? []) as any[]) ids.add(r.incident_id);
+      const { data: custOrders } = await client.from("orders").select("order_number").ilike("ship_full_name", `%${term}%`).limit(300);
+      const nums = (custOrders ?? []).map((o: any) => o.order_number);
+      if (nums.length) { const { data: byCust } = await client.from("incident_notifications").select("incident_id").in("order_number", nums); for (const r of (byCust ?? []) as any[]) ids.add(r.incident_id); }
+      rows = rows.filter((r) => ids.has(r.id) || matchesIncidentSearch([r.number, r.title, r.rootCause, r.sourceSystem, r.assigneeName, r.ownerName, r.team], term));
+    }
+
+    const total = rows.length;
+    const page = Math.max(1, f.page ?? 1);
+    const pageSize = f.pageSize ?? 20;
+    return { rows: rows.slice((page - 1) * pageSize, page * pageSize), total, page, pageSize };
+  } catch { return { rows: [], total: 0, page: 1, pageSize: f.pageSize ?? 20 }; }
+}
+
+/** All rows matching the filters (no pagination) — for CSV / Excel export. */
+export async function getIncidentsForExport(f: IncidentFilters): Promise<IncidentRow[]> {
+  const { rows } = await getIncidentsFiltered({ ...f, page: 1, pageSize: 100000 });
+  return rows;
+}
+
 export interface IncidentDetail extends IncidentRow {
   description: string | null; resolutionNotes: string | null;
   notifications: { alertKey: string; orderNumber: string | null; severity: string | null; addedAt: string; resolvedAt: string | null }[];
   orders: string[];
   history: { event: string; detail: string | null; actorName: string | null; createdAt: string }[];
   related: { number: string; title: string; status: string }[];
+  participants: { userId: string | null; userName: string; role: string }[];
+  notes: { note: string; authorName: string | null; createdAt: string }[];
+  checklist: { id: string; label: string; done: boolean; doneBy: string | null; doneAt: string | null }[];
 }
 export async function getIncidentByNumber(number: string): Promise<IncidentDetail | null> {
   try {
     const { data: inc } = await db().from("incidents").select("*").eq("number", number).maybeSingle();
     if (!inc) return null;
-    const [{ data: notifs }, { data: hist }, { data: related }] = await Promise.all([
+    const [{ data: notifs }, { data: hist }, { data: related }, { data: parts }, { data: notes }, { data: checklist }] = await Promise.all([
       db().from("incident_notifications").select("alert_key,order_number,severity,added_at,resolved_at").eq("incident_id", inc.id).order("added_at", { ascending: true }),
       db().from("incident_history").select("event,detail,actor_name,created_at").eq("incident_id", inc.id).order("created_at", { ascending: true }),
       db().from("incidents").select("number,title,status").eq("category", inc.category).neq("id", inc.id).order("last_activity_at", { ascending: false }).limit(5),
+      db().from("incident_participants").select("user_id,user_name,role").eq("incident_id", inc.id),
+      db().from("incident_notes").select("note,author_name,created_at").eq("incident_id", inc.id).order("created_at", { ascending: false }),
+      db().from("incident_checklist_items").select("id,label,done,done_by,done_at").eq("incident_id", inc.id).order("sort_order", { ascending: true }),
     ]);
     const orders = [...new Set((notifs ?? []).map((n: any) => n.order_number).filter(Boolean))] as string[];
     return {
@@ -186,6 +258,9 @@ export async function getIncidentByNumber(number: string): Promise<IncidentDetai
       orders,
       history: (hist ?? []).map((h: any) => ({ event: h.event, detail: h.detail ?? null, actorName: h.actor_name ?? null, createdAt: h.created_at })),
       related: (related ?? []).map((r: any) => ({ number: r.number, title: r.title, status: r.status })),
+      participants: (parts ?? []).map((p: any) => ({ userId: p.user_id ?? null, userName: p.user_name, role: p.role })),
+      notes: (notes ?? []).map((n: any) => ({ note: n.note, authorName: n.author_name ?? null, createdAt: n.created_at })),
+      checklist: (checklist ?? []).map((c: any) => ({ id: c.id, label: c.label, done: c.done, doneBy: c.done_by ?? null, doneAt: c.done_at ?? null })),
     };
   } catch { return null; }
 }
@@ -234,33 +309,114 @@ export async function getIncidentMetrics(): Promise<IncidentMetrics> {
   } catch { return { critical: 0, high: 0, open: 0, resolvedToday: 0, avgResolutionMin: null, oldestOpenMin: null }; }
 }
 
-// ── Mutations ────────────────────────────────────────────────────────────────
-export async function assignIncident(number: string, staff: { id: string | null; name: string }): Promise<{ ok: boolean }> {
+// ── Mutations (Phase 2 collaboration) ─────────────────────────────────────────
+type Actor = { id: string | null; name: string };
+const touch = () => new Date().toISOString();
+async function incId(number: string): Promise<string | null> {
+  const { data } = await db().from("incidents").select("id").eq("number", number).maybeSingle();
+  return data?.id ?? null;
+}
+
+/** Assign to a target (or self). The FIRST assignee also becomes the owner. */
+export async function assignIncident(number: string, target: Actor, actor: Actor): Promise<{ ok: boolean }> {
   try {
-    const { data: inc } = await db().from("incidents").select("id").eq("number", number).maybeSingle();
+    const { data: inc } = await db().from("incidents").select("id,owner_id,assignee_name").eq("number", number).maybeSingle();
     if (!inc) return { ok: false };
-    await db().from("incidents").update({ assignee_id: staff.id, assignee_name: staff.name, last_activity_at: new Date().toISOString() }).eq("id", inc.id);
-    await addHistory(inc.id, "assigned", staff.name, { id: staff.id, name: staff.name });
+    const patch: any = { assignee_id: target.id, assignee_name: target.name, last_activity_at: touch() };
+    if (!inc.owner_id) { patch.owner_id = target.id; patch.owner_name = target.name; }
+    await db().from("incidents").update(patch).eq("id", inc.id);
+    await addHistory(inc.id, inc.assignee_name ? "transferred" : "assigned", inc.assignee_name ? `${inc.assignee_name} → ${target.name}` : target.name, actor);
     return { ok: true };
   } catch { return { ok: false }; }
 }
-export async function setIncidentStatus(number: string, status: string, actor: { id: string | null; name: string }): Promise<{ ok: boolean }> {
+export async function removeAssignment(number: string, actor: Actor): Promise<{ ok: boolean }> {
+  try {
+    const id = await incId(number); if (!id) return { ok: false };
+    await db().from("incidents").update({ assignee_id: null, assignee_name: null, last_activity_at: touch() }).eq("id", id);
+    await addHistory(id, "unassigned", "Assignment removed", actor);
+    return { ok: true };
+  } catch { return { ok: false }; }
+}
+export async function watchIncident(number: string, watcher: Actor, role: "watcher" | "follower", actor: Actor): Promise<{ ok: boolean }> {
+  try {
+    const id = await incId(number); if (!id) return { ok: false };
+    await db().from("incident_participants").upsert({ incident_id: id, user_id: watcher.id, user_name: watcher.name, role }, { onConflict: "incident_id,user_id,role" });
+    await addHistory(id, "watcher_added", `${watcher.name} (${role})`, actor);
+    return { ok: true };
+  } catch { return { ok: false }; }
+}
+export async function unwatchIncident(number: string, userId: string | null, actor: Actor): Promise<{ ok: boolean }> {
+  try {
+    const id = await incId(number); if (!id) return { ok: false };
+    if (userId) await db().from("incident_participants").delete().eq("incident_id", id).eq("user_id", userId);
+    await addHistory(id, "watcher_removed", actor.name, actor);
+    return { ok: true };
+  } catch { return { ok: false }; }
+}
+export async function setIncidentTeam(number: string, team: string, actor: Actor): Promise<{ ok: boolean }> {
+  try {
+    const { data: inc } = await db().from("incidents").select("id,team").eq("number", number).maybeSingle();
+    if (!inc) return { ok: false };
+    await db().from("incidents").update({ team, last_activity_at: touch() }).eq("id", inc.id);
+    await addHistory(inc.id, "team_changed", `${inc.team ?? "none"} → ${team}`, actor);
+    return { ok: true };
+  } catch { return { ok: false }; }
+}
+export async function setIncidentStatus(number: string, status: string, actor: Actor): Promise<{ ok: boolean }> {
   try {
     const { data: inc } = await db().from("incidents").select("id,status").eq("number", number).maybeSingle();
     if (!inc) return { ok: false };
-    const patch: any = { status, last_activity_at: new Date().toISOString(), updated_at: new Date().toISOString() };
-    if (status === "resolved" || status === "closed") patch.resolved_at = new Date().toISOString();
+    const patch: any = { status, last_activity_at: touch(), updated_at: touch() };
+    if (status === "resolved" || status === "closed") patch.resolved_at = touch();
     await db().from("incidents").update(patch).eq("id", inc.id);
     await addHistory(inc.id, "status_changed", `${inc.status} → ${status}`, actor);
     return { ok: true };
   } catch { return { ok: false }; }
 }
-export async function addIncidentNote(number: string, note: string, actor: { id: string | null; name: string }): Promise<{ ok: boolean }> {
+/** Manual severity override — locks auto-inheritance (logged as severity_changed). */
+export async function setIncidentSeverity(number: string, severity: string, actor: Actor): Promise<{ ok: boolean }> {
   try {
-    const { data: inc } = await db().from("incidents").select("id").eq("number", number).maybeSingle();
+    const { data: inc } = await db().from("incidents").select("id,severity").eq("number", number).maybeSingle();
     if (!inc) return { ok: false };
-    await db().from("incidents").update({ resolution_notes: note, last_activity_at: new Date().toISOString() }).eq("id", inc.id);
-    await addHistory(inc.id, "note_added", note.slice(0, 200), actor);
+    await db().from("incidents").update({ severity, severity_locked: true, last_activity_at: touch() }).eq("id", inc.id);
+    await addHistory(inc.id, "severity_changed", `${inc.severity} → ${severity}`, actor);
     return { ok: true };
   } catch { return { ok: false }; }
+}
+/** Add a timestamped operational note (append-only; never deleted). */
+export async function addIncidentNote(number: string, note: string, actor: Actor): Promise<{ ok: boolean }> {
+  try {
+    const id = await incId(number); if (!id) return { ok: false };
+    await db().from("incident_notes").insert({ incident_id: id, note, author_id: actor.id, author_name: actor.name });
+    await db().from("incidents").update({ last_activity_at: touch() }).eq("id", id);
+    await addHistory(id, "comment_added", note.slice(0, 120), actor);
+    return { ok: true };
+  } catch { return { ok: false }; }
+}
+export async function toggleChecklistItem(itemId: string, done: boolean, actor: Actor): Promise<{ ok: boolean }> {
+  try {
+    const { data: item } = await db().from("incident_checklist_items").select("id,incident_id,label").eq("id", itemId).maybeSingle();
+    if (!item) return { ok: false };
+    await db().from("incident_checklist_items").update({ done, done_by: done ? actor.name : null, done_at: done ? touch() : null }).eq("id", itemId);
+    await db().from("incidents").update({ last_activity_at: touch() }).eq("id", item.incident_id);
+    await addHistory(item.incident_id, "checklist_toggled", `${done ? "✓" : "☐"} ${item.label}`, actor);
+    return { ok: true };
+  } catch { return { ok: false }; }
+}
+export async function snoozeIncident(number: string, minutes: number, actor: Actor): Promise<{ ok: boolean }> {
+  try {
+    const id = await incId(number); if (!id) return { ok: false };
+    const until = minutes > 0 ? new Date(Date.now() + minutes * 60000).toISOString() : null;
+    await db().from("incidents").update({ snoozed_until: until, last_activity_at: touch() }).eq("id", id);
+    await addHistory(id, "snoozed", until ? `until ${new Date(until).toLocaleString("en-IN")}` : "unsnoozed", actor);
+    return { ok: true };
+  } catch { return { ok: false }; }
+}
+
+/** Staff list for the assign/transfer picker. */
+export async function getStaffUsers(): Promise<{ id: string; name: string }[]> {
+  try {
+    const { data } = await db().from("users").select("id,full_name,role").in("role", ["editor", "manager", "admin"]).order("full_name");
+    return (data ?? []).map((u: any) => ({ id: u.id, name: u.full_name ?? "Staff" }));
+  } catch { return []; }
 }

@@ -1,4 +1,4 @@
-# Incident Management — Phase 1
+# Incident Management — Phases 1 & 2
 
 A correlation layer **above** notifications. Notifications are unchanged; incidents group the
 notifications caused by one operational problem, to cut noise (Datadog / Stripe style). **No AI** —
@@ -72,6 +72,65 @@ incident is resolved, the incident is auto-marked **Resolved** — no manual clo
 - Full DB-integration correlation/auto-resolution is verified via an end-to-end scenario against the
   live schema (documented in the PR); a dedicated test DB harness is the follow-up for CI integration tests.
 
-## Roadmap (Phase 2 / 3 — not in Phase 1)
-Collaboration & ops workflow (Phase 2); analytics, intelligence, escalation, enterprise (Phase 3).
-Inventory-sync incidents activate once an inventory sync-failure event source exists (`enabled:false` today).
+---
+
+# Phase 2 — Operations & Collaboration
+
+Built **above** Phase 1 (nothing in Phase 1 was redesigned). Adds ownership, teams, workflow, notes,
+checklists, snooze, search/filter, and export. **Audit-first: nothing is deleted** — every action
+appends to `incident_history`; notes are append-only.
+
+## Model additions
+
+| Table / column | Purpose |
+|---|---|
+| `incidents.owner_id/owner_name` | the incident owner — set to the **first** person assigned |
+| `incidents.assignee_id/assignee_name` | current assignee (reassignable = transfer) |
+| `incidents.team` | owning team — finance · warehouse · support · marketing · admin |
+| `incidents.snoozed_until` | whole-incident snooze; snoozed incidents drop out of the default Open view until it elapses |
+| `incidents.severity_locked` | set when a human overrides severity → stops auto-inheritance |
+| `incident_participants` | watchers / followers — `(incident_id, user_id, role)` unique |
+| `incident_notes` | timestamped operational notes (append-only, never deleted) |
+| `incident_checklist_items` | per-incident checklist — label, done, done_by, done_at, sort_order |
+
+All new tables have RLS enabled + `grant all … to service_role`.
+
+## Teams & routing
+`CATEGORY_TEAM` (config) routes a new incident to a default team: refund/payment → **Finance**,
+shipment/inventory → **Warehouse**, email → **Marketing**, else **Admin**. Reassignable in the UI.
+
+## Checklists
+Configurable templates in `INCIDENT_CHECKLISTS` (config) seed onto an incident when it opens.
+E.g. Refund → *Retry refund · Verify gateway status · Inform customer · Confirm settlement*. Ticking
+an item records who + when.
+
+## Workflow
+- **Assign to me / Transfer** (staff picker) — first assignee becomes owner; transfer logged `assigned → transferred`.
+- **Remove assignment**, **Watch** (add self as watcher).
+- **Team**, **Status**, **Severity** (manual severity locks inheritance), **Snooze** (30 min / 1 h / tomorrow 9am / custom).
+- **Notes** — timestamped, attributed, append-only.
+
+## Search / filter / export
+- **Search** (`?q=`) across incident ID, title, root cause, gateway/source, team, owner/assignee, **plus** order number & customer name (resolved via `incident_notifications` → `orders`).
+- **Filters**: status · severity · category · team · assigned (me / unassigned / anyone) · created today / this week · resolved today.
+- **Pagination** (20/page) — the pragmatic stand-in for virtual scrolling; server caps the working set.
+- **Export**: `GET /api/admin/incidents/export?format=csv|xls` honours the current filters. CSV + Excel (dependency-free HTML-table `.xls`); **PDF** via the browser print dialog.
+
+## API additions
+`POST /api/admin/incidents/action` actions: `assign` (self or `targetId`), `unassign`, `watch`,
+`unwatch`, `team`, `status`, `severity`, `note`, `checklist` (`itemId` + `done`), `snooze` (`minutes`).
+Each writes `incident_history` with the acting staff member + timestamp.
+
+## UI additions
+- **List** — filter bar + search + CSV/Excel/Print + pagination; Team column; 💤 snooze indicator.
+- **Detail** — **People** (team / owner / assignee / watchers / followers), **Checklist**, **Notes** stream, and a toolbar (assign · transfer · remove · watch · team · status · severity · snooze). Activity log now labels all collaboration events.
+
+## Tests
+- `src/lib/incidents/collaboration.test.ts` — category→team routing, checklist templates, `matchesIncidentSearch` predicate (7 tests).
+- `engine.test.ts` still green (14). Live end-to-end scenario exercises every new table/column with the service_role client and cleans up (11 checks).
+
+---
+
+## Roadmap (Phase 3 — not yet built)
+Analytics, intelligence, escalation, enterprise. Inventory-sync incidents activate once an inventory
+sync-failure event source exists (`enabled:false` today).

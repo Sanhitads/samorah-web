@@ -2,22 +2,36 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth/requireStaff";
-import { getIncidents } from "@/services/incidentService";
-import { RunCorrelation } from "@/components/admin/IncidentControls";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getIncidentsFiltered, type IncidentFilters } from "@/services/incidentService";
+import { RunCorrelation, IncidentFilterBar } from "@/components/admin/IncidentControls";
+import { TEAM_LABEL } from "@/config/incidents";
 
-/** Incident list — `/admin/incidents`. The correlation layer above notifications. */
+/** Incident list — `/admin/incidents`. Filters, search, pagination, export (Phase 2). */
 export const metadata: Metadata = { title: "Incidents", robots: { index: false } };
 export const dynamic = "force-dynamic";
 
 const SEV_ICON: Record<string, string> = { critical: "🔴", high: "🟠", medium: "🟡", low: "🔵", info: "⚪" };
 const ago = (iso: string) => { const m = (Date.now() - new Date(iso).getTime()) / 60000; return m < 1 ? "just now" : m < 60 ? `${Math.floor(m)}m ago` : m < 1440 ? `${Math.floor(m / 60)}h ago` : `${Math.floor(m / 1440)}d ago`; };
 
-export default async function IncidentsPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
+async function myName(userId: string | null): Promise<string | undefined> {
+  if (!userId) return undefined;
+  try { const db = createAdminClient() as any; const { data } = await db.from("users").select("full_name").eq("id", userId).maybeSingle(); return data?.full_name ?? undefined; } catch { return undefined; } // eslint-disable-line @typescript-eslint/no-explicit-any
+}
+
+export default async function IncidentsPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const staff = await requireStaff("editor");
   if (!staff.ok) redirect("/login");
-  const { view } = await searchParams;
-  const all = view === "all";
-  const incidents = await getIncidents({ status: all ? "all" : "active" });
+  const sp = await searchParams;
+
+  const filters: IncidentFilters = {
+    status: sp.status || "active", severity: sp.severity || undefined, category: sp.category || undefined,
+    team: sp.team || undefined,
+    assigned: sp.assigned === "mine" ? (await myName(staff.userId)) : sp.assigned || undefined,
+    createdDays: sp.created ? Number(sp.created) : undefined, resolvedToday: sp.resolved === "today",
+    q: sp.q || undefined, page: sp.page ? Number(sp.page) : 1, pageSize: 20,
+  };
+  const { rows, total, page, pageSize } = await getIncidentsFiltered(filters);
 
   return (
     <main className="admin">
@@ -25,27 +39,25 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Pr
         <div>
           <p className="admin__eyebrow">Operations · {staff.role}</p>
           <h1 className="admin__title">Incidents</h1>
-          <p className="admin__count">{incidents.length} {all ? "total" : "open"} · related notifications grouped by root cause</p>
+          <p className="admin__count">Related notifications grouped by root cause — with owners, teams, notes & checklists</p>
         </div>
         <RunCorrelation />
       </header>
 
-      <nav className="ff-queues" aria-label="View">
-        <Link href="/admin/incidents" className="ff-queue" data-active={!all ? "1" : "0"}>Open</Link>
-        <Link href="/admin/incidents?view=all" className="ff-queue" data-active={all ? "1" : "0"}>All</Link>
-      </nav>
+      <IncidentFilterBar total={total} page={page} pageSize={pageSize} />
 
-      {incidents.length ? (
+      {rows.length ? (
         <div className="admin__table-wrap">
           <table className="admin__table">
-            <thead><tr><th>Incident</th><th>Category</th><th>Severity</th><th>Status</th><th>Orders</th><th>Started</th><th>Last activity</th><th>Assigned</th><th></th></tr></thead>
+            <thead><tr><th>Incident</th><th>Category</th><th>Severity</th><th>Status</th><th>Team</th><th>Orders</th><th>Started</th><th>Last activity</th><th>Assigned</th><th></th></tr></thead>
             <tbody>
-              {incidents.map((i) => (
+              {rows.map((i) => (
                 <tr key={i.id}>
-                  <td><Link href={`/admin/incidents/${i.number}`} className="admin__mono od-link">{i.number}</Link><div className="admin__muted" style={{ fontSize: 12 }}>{i.title}</div></td>
+                  <td><Link href={`/admin/incidents/${i.number}`} className="admin__mono od-link">{i.number}</Link><div className="admin__muted" style={{ fontSize: 12 }}>{i.title}{i.snoozedUntil && new Date(i.snoozedUntil) > new Date() ? " · 💤" : ""}</div></td>
                   <td>{i.categoryLabel}</td>
                   <td><span className="inc-sev" data-s={i.severity}>{SEV_ICON[i.severity]} {i.severity}</span></td>
                   <td><span className="inc-status" data-s={i.status}>{i.status}</span></td>
+                  <td className="admin__muted">{i.team ? TEAM_LABEL[i.team as keyof typeof TEAM_LABEL] ?? i.team : "—"}</td>
                   <td className="admin__mono">{i.affectedOrders}</td>
                   <td className="admin__muted">{ago(i.startedAt)}</td>
                   <td className="admin__muted">{ago(i.lastActivityAt)}</td>
@@ -59,7 +71,7 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Pr
       ) : (
         <div className="no-alerts">
           <span className="no-alerts__check">✓</span>
-          <p className="no-alerts__title">No {all ? "" : "open "}incidents</p>
+          <p className="no-alerts__title">No incidents match</p>
           <p className="no-alerts__sub">Incidents open automatically when correlated failures cross a rule threshold. Notifications continue to work as normal.</p>
         </div>
       )}
