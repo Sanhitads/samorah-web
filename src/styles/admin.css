@@ -989,3 +989,21 @@
 .inc-cfg__badge { display: inline-block; padding: 1px 7px; border-radius: 999px; background: #eaf7ef; color: #1f7a4d; font-size: 10px; }
 .inc-sim { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .inc-impact__cell--cost { background: #f3edfa; border-color: #d9c9ee; }
+
+/* ─── Notification engine (Phase 5) ─── */
+.nt { display: flex; flex-direction: column; gap: 10px; }
+.nt__pick { display: flex; gap: 12px; flex-wrap: wrap; }
+.nt__opt { display: flex; align-items: center; gap: 5px; font-family: var(--font-sans); font-size: 12px; color: var(--ink, #1f1a16); }
+.nt__results { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.nt__result { font-family: var(--font-sans); font-size: 12px; padding: 5px 9px; border-radius: 6px; background: var(--paper, #faf7f2); }
+.nt__result--sent { background: #eaf7ef; color: #1f7a4d; }
+.nt__result--failed { background: #fdecea; color: #b3261e; }
+.nt__result--skipped { background: var(--paper, #faf7f2); color: var(--smoke, #6b6259); }
+.nt__channels { list-style: none; margin: 0; padding: 0; }
+.nt__channel { display: flex; justify-content: space-between; padding: 6px 0; border-top: 1px solid var(--ad-hair); font-family: var(--font-sans); font-size: 13px; }
+.nt__channel:first-child { border-top: none; }
+.nt__live { color: #1f7a4d; font-size: 12px; }
+.nt__dormant { color: var(--smoke, #9a8f82); font-size: 12px; }
+.nt__st--sent { color: #1f7a4d; }
+.nt__st--failed { color: #b3261e; }
+.nt__st--skipped { color: var(--smoke, #6b6259); }

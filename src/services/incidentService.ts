@@ -7,6 +7,9 @@
  */
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail, emailConfigured } from "@/lib/email";
+import { notifyOps } from "@/lib/notifications/opsEngine";
+import type { OpsPayload } from "@/lib/notifications/opsTypes";
+import type { OpsChannelKey } from "@/config/notifications";
 import {
   INCIDENT_RULES, INCIDENT_CATEGORY_LABEL, CATEGORY_TEAM, INCIDENT_CHECKLISTS,
   SUBSYSTEMS, SUBSYSTEM_LABEL, ROOT_CAUSE_LABEL, ESCALATION_POLICY, ESCALATION_MIN_SEVERITY, CROSS_SYSTEM_WINDOW_MIN,
@@ -746,13 +749,23 @@ export async function runEscalations(): Promise<{ escalated: number }> {
 }
 
 async function dispatchEscalation(inc: any, level: { notify: "manager" | "admin"; channels: string[] }, reason: string): Promise<void> {
-  if (level.channels.includes("email") && emailConfigured()) {
-    const to = await recipientsForRole(level.notify);
-    const subject = `[Incident ${inc.number}] escalation — ${inc.severity.toUpperCase()}`;
-    const html = `<p>Incident <b>${inc.number}</b> — ${inc.title}</p><p>Severity: ${inc.severity}</p><p>${reason}</p><p>Paged: ${level.notify}. Channels: ${level.channels.join(", ")}.</p>`;
-    for (const r of to) { try { await sendEmail({ to: r.email, subject, html }); } catch { /* non-fatal */ } }
-  }
-  // Slack / SMS are not yet integrated — recorded in history above so the trail is complete.
+  // Real multi-channel dispatch through the operational notification engine. The escalation
+  // policy's channels (in_app/email/slack/sms) map 1:1 to ops channel keys. SMS only fires when the
+  // incident severity is critical (the SMS channel enforces this), keeping SMS for true emergencies.
+  const base = process.env.NEXT_PUBLIC_SITE_URL || "";
+  const emails = level.channels.includes("email") ? (await recipientsForRole(level.notify)).map((r) => r.email) : undefined;
+  const payload: OpsPayload = {
+    title: `Incident ${inc.number} escalated (L${(inc.escalation_level ?? 0)})`,
+    message: `${inc.title} — ${reason}. Paged: ${level.notify}.`,
+    severity: inc.severity === "critical" ? "critical" : "warning",
+    fields: [
+      { label: "Incident", value: inc.number }, { label: "Severity", value: inc.severity },
+      { label: "Escalated to", value: level.notify }, { label: "Reason", value: reason },
+    ],
+    url: base ? `${base}/admin/incidents/${inc.number}` : undefined,
+    slackChannel: "tech", entityType: "incident", entityRef: inc.number, emailTo: emails,
+  };
+  try { await notifyOps("incident.escalated", payload, { channels: level.channels as OpsChannelKey[] }); } catch { /* non-fatal */ }
 }
 
 // ── ANALYTICS / ARCHIVE ────────────────────────────────────────────────────────

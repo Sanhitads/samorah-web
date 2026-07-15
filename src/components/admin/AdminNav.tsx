@@ -19,6 +19,7 @@ const NAV: NavGroup[] = [
       { label: "Dashboard", href: "/admin", icon: "◆" },
       { label: "Notifications", href: "/admin/notifications", icon: "🔔" },
       { label: "Incidents", href: "/admin/incidents", icon: "🚨" },
+      { label: "Notif. Log", href: "/admin/notifications-log", icon: "📡" },
       { label: "Orders", href: "/admin/orders", icon: "▤" },
       { label: "Fulfillment", href: "/admin/fulfillment", icon: "▦" },
       { label: "Returns", href: "/admin/returns", icon: "↩" },

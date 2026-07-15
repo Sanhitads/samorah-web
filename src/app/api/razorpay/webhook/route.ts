@@ -3,6 +3,30 @@ import { RAZORPAY } from "@/config/commerce";
 import { verifyWebhookSignature } from "@/lib/razorpaySignature";
 import { persistOrder, recordPaymentAttempt } from "@/services/orderService";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { notifyOps } from "@/lib/notifications/opsEngine";
+import { HIGH_VALUE_ORDER_INR } from "@/config/notifications";
+
+/** Operational Slack/dashboard alert on a finalized order (best-effort; never blocks the webhook).
+ *  High-value orders route as their own event so ops can watch them in #orders. */
+async function emitOrderPlaced(razorpayOrderId: string): Promise<void> {
+  const db = createAdminClient() as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  const { data: o } = await db.from("orders").select("order_number,ship_full_name,email,total_amount,payment_status,is_cod").eq("razorpay_order_id", razorpayOrderId).maybeSingle();
+  if (!o) return;
+  const amount = Number(o.total_amount ?? 0);
+  const base = process.env.NEXT_PUBLIC_SITE_URL || "";
+  const highValue = amount >= HIGH_VALUE_ORDER_INR;
+  await notifyOps(highValue ? "order.high_value" : "order.placed", {
+    title: highValue ? "High-Value Order" : "New Order",
+    fields: [
+      { label: "Order", value: o.order_number ?? "—" },
+      { label: "Customer", value: o.ship_full_name ?? o.email ?? "—" },
+      { label: "Amount", value: `₹${amount.toLocaleString("en-IN")}` },
+      { label: "Payment", value: o.is_cod ? "COD" : (o.payment_status ?? "captured") },
+    ],
+    url: base && o.order_number ? `${base}/admin/orders/${o.order_number}` : undefined,
+    entityType: "order", entityRef: o.order_number ?? undefined,
+  });
+}
 
 /**
  * POST /api/razorpay/webhook — the AUTHORITATIVE payment event from Razorpay and
@@ -111,6 +135,7 @@ export async function POST(request: Request) {
     }
     // created=false on a found order → replay of an already-finalized order.
     await markLog(!result.found ? "failed" : result.created ? "processed" : "duplicate", result.found ? undefined : "pending order not found");
+    if (result.created) await emitOrderPlaced(orderId).catch(() => { /* alerting must never break the webhook */ });
     return NextResponse.json({ received: true, created: result.created });
   } catch (e) {
     console.error("webhook persistOrder failed", e);
