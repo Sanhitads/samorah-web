@@ -218,3 +218,174 @@ export const ESCALATION_MIN_SEVERITY: IncidentSeverity = "medium";
 /** Cross-system correlation window — active incidents sharing a root-cause system that started
  *  within this window are grouped under one primary (the cascade → ONE incident). */
 export const CROSS_SYSTEM_WINDOW_MIN = 20;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Phase 4 — Enterprise Readiness config (deterministic + explainable + configurable)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** CONFIDENCE — how sure the engine is that an incident is real. Weighted, additive, capped at 100.
+ *  Every point is attributable (shown in the UI), so operators can trust — or challenge — it. */
+export const CONFIDENCE_WEIGHTS = {
+  base: 40,                 // a rule fired at all
+  perEventOverThreshold: 6, // each event beyond the threshold (more events = surer), capped below
+  eventsCap: 30,            // max contribution from event volume
+  reasonMatched: 15,        // the failure reason matched the rule's root-cause pattern
+  knownRootCause: 10,       // classified to a concrete system (not "unknown")
+  tightWindow: 5,           // all events within half the rule window (a real burst, not a trickle)
+};
+
+/** PRIORITY MATRIX — Priority ≠ Severity. Priority = f(Severity, Business impact). */
+export type IncidentPriority = "p1" | "p2" | "p3" | "p4";
+export const PRIORITY_LABEL: Record<IncidentPriority, string> = { p1: "P1 — Critical", p2: "P2 — High", p3: "P3 — Medium", p4: "P4 — Low" };
+export type ImpactLevel = "none" | "low" | "medium" | "high";
+export const IMPACT_LABEL: Record<ImpactLevel, string> = { none: "None", low: "Low", medium: "Medium", high: "High" };
+/** Impact buckets from affected-order count (configurable). */
+export const IMPACT_THRESHOLDS = { high: 20, medium: 5, low: 1 };
+/** severity → (impact → priority). */
+export const PRIORITY_MATRIX: Record<IncidentSeverity, Record<ImpactLevel, IncidentPriority>> = {
+  critical: { high: "p1", medium: "p1", low: "p2", none: "p2" },
+  high:     { high: "p1", medium: "p2", low: "p2", none: "p3" },
+  medium:   { high: "p2", medium: "p3", low: "p3", none: "p3" },
+  low:      { high: "p3", medium: "p3", low: "p4", none: "p4" },
+  info:     { high: "p3", medium: "p4", low: "p4", none: "p4" },
+};
+
+/** SLA resolution targets (minutes) by priority. Breach → tracked + escalated. */
+export const SLA_TARGETS_MIN: Record<IncidentPriority, number> = { p1: 30, p2: 60, p3: 240, p4: 1440 };
+
+/**
+ * DYNAMIC THRESHOLDS — the rule threshold isn't constant. Multiply the rule's base threshold by
+ * the multiplier for the current time context (business hours = strict; night/weekend = lenient).
+ * Base 5 → business 5 · off-hours 20 (×4) · weekend 10 (×2). Business calendar can override.
+ */
+export const DYNAMIC_THRESHOLDS = {
+  enabled: true,
+  timezoneOffsetMin: 330,   // IST (UTC+5:30) — evaluate "business hours" in local time
+  businessHours: { startHour: 9, endHour: 21, days: [1, 2, 3, 4, 5] }, // Mon–Fri 09:00–21:00
+  multipliers: { businessHours: 1, offHours: 4, weekend: 2 },
+};
+
+/**
+ * BUSINESS CALENDAR — named periods that tighten thresholds (a sale means even 2 failures matter).
+ * `thresholdMultiplier` < 1 lowers the trigger count; `severityBoost` bumps opened severity.
+ * Dates are explicit ISO windows the operator maintains.
+ */
+export interface CalendarPeriod { name: string; startsAt: string; endsAt: string; thresholdMultiplier: number; severityBoost: number }
+export const BUSINESS_CALENDAR: CalendarPeriod[] = [
+  { name: "Diwali Sale 2026", startsAt: "2026-10-25T00:00:00+05:30", endsAt: "2026-11-05T23:59:59+05:30", thresholdMultiplier: 0.4, severityBoost: 1 },
+  { name: "Republic Day Sale 2027", startsAt: "2027-01-24T00:00:00+05:30", endsAt: "2027-01-27T23:59:59+05:30", thresholdMultiplier: 0.5, severityBoost: 1 },
+];
+
+/** Absolute floor for an effective threshold after all multipliers (never trigger on a single blip). */
+export const MIN_EFFECTIVE_THRESHOLD = 2;
+
+/**
+ * ADVANCED AUTO-ASSIGNMENT — ordered rules; the first whose conditions all match wins. Extends the
+ * Phase 2 category→team default with value/severity/root-cause conditions. `assignRole` picks the
+ * first staff member holding that role (deterministic, ordered by name). Every match is logged.
+ */
+export interface AutoAssignRule { label: string; when: { category?: IncidentCategory; rootCauseSystem?: RootCauseSystem; minRevenue?: number; minSeverity?: IncidentSeverity }; team: IncidentTeam; assignRole?: "manager" | "admin" }
+export const AUTO_ASSIGNMENT_RULES: AutoAssignRule[] = [
+  { label: "High-value refund (≥ ₹10,000) → Finance Manager", when: { category: "refund", minRevenue: 10000 }, team: "finance", assignRole: "manager" },
+  { label: "Critical payments → Finance Manager", when: { category: "payment_gateway", minSeverity: "critical" }, team: "finance", assignRole: "manager" },
+  { label: "Shiprocket issues → Warehouse", when: { rootCauseSystem: "shiprocket" }, team: "warehouse" },
+  { label: "Email delivery → Marketing", when: { category: "email" }, team: "marketing" },
+];
+
+/**
+ * RUNBOOK ENGINE — a guided, ordered operational workflow per incident type (distinct from a
+ * checklist: each step carries an instruction and an explicit action verb). Seeded on incident
+ * creation; operators tick steps as they execute them.
+ */
+export type RunbookAction = "retry" | "verify" | "check" | "contact" | "wait" | "escalate" | "custom";
+export interface RunbookStep { title: string; instruction: string; action: RunbookAction }
+export const INCIDENT_RUNBOOKS: Partial<Record<IncidentCategory, RunbookStep[]>> = {
+  refund: [
+    { title: "Retry the refund", instruction: "Re-trigger the failed refund from the Razorpay dashboard or via the refund API.", action: "retry" },
+    { title: "Wait for the gateway", instruction: "Allow ~30 seconds for Razorpay to process before re-checking.", action: "wait" },
+    { title: "Verify refund status", instruction: "Confirm the refund shows as processed for each affected order.", action: "verify" },
+    { title: "Check settlement", instruction: "Confirm the amount appears in the next settlement cycle.", action: "check" },
+    { title: "Contact the customer", instruction: "Inform affected customers of the refund and expected timeline.", action: "contact" },
+  ],
+  payment_gateway: [
+    { title: "Check Razorpay status", instruction: "Open status.razorpay.com and confirm whether it is a provider-side outage.", action: "check" },
+    { title: "Verify webhook health", instruction: "Confirm webhooks are being received and processed (webhook_logs).", action: "verify" },
+    { title: "Notify affected customers", instruction: "Message customers with failed payments about retrying.", action: "contact" },
+    { title: "Confirm recovery", instruction: "Verify new payments succeed before resolving.", action: "verify" },
+    { title: "Escalate if unresolved", instruction: "If the outage persists beyond SLA, escalate to the manager.", action: "escalate" },
+  ],
+  shipment: [
+    { title: "Contact the courier", instruction: "Reach the Shiprocket/courier support for the exception batch.", action: "contact" },
+    { title: "Check AWB / tracking", instruction: "Verify AWB assignment and tracking status for affected shipments.", action: "check" },
+    { title: "Update the customer", instruction: "Send a delay/exception update to affected customers.", action: "contact" },
+    { title: "Re-attempt or RTO", instruction: "Trigger a re-attempt, or initiate RTO where delivery has failed.", action: "custom" },
+  ],
+  email: [
+    { title: "Check Resend status", instruction: "Confirm Resend/SMTP availability and API key validity.", action: "check" },
+    { title: "Verify sending domain", instruction: "Check SPF/DKIM/DNS for the sending domain.", action: "verify" },
+    { title: "Re-queue failed emails", instruction: "Re-dispatch the failed notification emails.", action: "retry" },
+  ],
+  inventory: [
+    { title: "Re-run inventory sync", instruction: "Trigger a fresh inventory sync job.", action: "retry" },
+    { title: "Verify stock counts", instruction: "Confirm on-hand vs reserved counts reconcile.", action: "verify" },
+    { title: "Check integration logs", instruction: "Inspect sync/integration logs for the failure cause.", action: "check" },
+  ],
+};
+
+/** INCIDENT TEMPLATES — the predefined bundle applied on creation (owner team, priority floor,
+ *  and which artefacts to seed). Ties together the category configs above. */
+export interface IncidentTemplate { team: IncidentTeam; seedChecklist: boolean; seedRunbook: boolean; priorityFloor?: IncidentPriority }
+export const INCIDENT_TEMPLATES: Record<IncidentCategory, IncidentTemplate> = {
+  refund: { team: "finance", seedChecklist: true, seedRunbook: true },
+  payment_gateway: { team: "finance", seedChecklist: true, seedRunbook: true, priorityFloor: "p2" },
+  shipment: { team: "warehouse", seedChecklist: true, seedRunbook: true },
+  inventory: { team: "warehouse", seedChecklist: true, seedRunbook: true },
+  email: { team: "marketing", seedChecklist: true, seedRunbook: true },
+  import_export: { team: "admin", seedChecklist: true, seedRunbook: false },
+  unknown: { team: "admin", seedChecklist: false, seedRunbook: false },
+};
+
+/**
+ * DEPENDENCY GRAPH — how upstream systems cascade into downstream ones. Used to render the visual
+ * graph and to highlight which downstream areas an active incident's root cause can affect.
+ */
+export type DepNode = RootCauseSystem | Subsystem | "refund" | "webhook";
+export interface DepEdge { from: DepNode; to: DepNode }
+export const DEPENDENCY_NODES: { id: DepNode; label: string; layer: number }[] = [
+  { id: "database", label: "Database", layer: 0 },
+  { id: "supabase", label: "Supabase", layer: 0 },
+  { id: "razorpay", label: "Razorpay", layer: 1 },
+  { id: "shiprocket", label: "Shiprocket", layer: 1 },
+  { id: "smtp", label: "SMTP", layer: 1 },
+  { id: "payments", label: "Payments", layer: 2 },
+  { id: "refund", label: "Refund", layer: 2 },
+  { id: "webhook", label: "Webhook", layer: 3 },
+  { id: "shipping", label: "Shipping", layer: 3 },
+  { id: "inventory", label: "Inventory", layer: 3 },
+  { id: "email", label: "Email", layer: 4 },
+];
+export const DEPENDENCY_EDGES: DepEdge[] = [
+  { from: "database", to: "supabase" },
+  { from: "supabase", to: "payments" },
+  { from: "razorpay", to: "payments" },
+  { from: "razorpay", to: "refund" },
+  { from: "payments", to: "webhook" },
+  { from: "refund", to: "email" },
+  { from: "webhook", to: "email" },
+  { from: "shiprocket", to: "shipping" },
+  { from: "shipping", to: "email" },
+  { from: "supabase", to: "inventory" },
+];
+
+/**
+ * COST MODEL — estimated financial cost of an incident (management-facing). Deterministic formula:
+ *   refundValue·refundWeight + delayed·perDelayedShipment + (SLA breached? penalty) +
+ *   opsCostPerHour·hoursOpen + revenue·revenueAtRiskPct.
+ */
+export const COST_MODEL = {
+  revenueAtRiskPct: 0.2,        // fraction of affected order value treated as at-risk
+  refundWeight: 1.0,            // refunds counted at face value
+  perDelayedShipment: 200,      // ₹ soft cost per delayed shipment
+  slaBreachPenalty: 5000,       // ₹ flat penalty when the SLA is breached
+  opsCostPerHour: 800,          // ₹ operational labour per hour the incident stays open
+};

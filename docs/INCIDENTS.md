@@ -1,4 +1,4 @@
-# Incident Management — Phases 1, 2 & 3
+# Incident Management — Phases 1, 2, 3 & 4
 
 A correlation layer **above** notifications. Notifications are unchanged; incidents group the
 notifications caused by one operational problem, to cut noise (Datadog / Stripe style). **No AI** —
@@ -206,3 +206,52 @@ export, alongside the analytics trends.
 
 ## Cron
 `/api/cron/incidents` now runs correlation → escalation → impact refresh each cycle (every 5 min).
+
+---
+
+# Phase 4 — Enterprise Readiness
+
+Closes the operational gaps between a very good platform and a world-class one. Extends Phases 1–3
+without redesigning them; every feature is deterministic, explainable, configurable, and audited.
+
+## Model additions (migration `20260721120000_incidents_enterprise.sql`)
+`incidents` += `confidence` + `confidence_reasons` (jsonb), `priority` · `impact_level` · `impact_cost`,
+`sla_target_min` · `sla_due_at` · `sla_breached(_at)`, `recovery_at`, `dismissed_at` · `dismiss_reason`
+· `false_positive`, `reclassified_from`, `merged_into_id` · `split_from_id`, `is_simulation`,
+`assignment_reason`. New tables: `incident_runbook_steps`, `incident_postmortems`,
+`incident_suppression_rules`, `maintenance_windows`. Plus 5 indexes (priority/SLA/review/merged/sim).
+
+| # | Feature | How it works (config in `src/config/incidents.ts`) |
+|---|---|---|
+| 3 | **Confidence score** | `computeConfidence()` — weighted, attributable points (event volume, reason match, known root cause, tight window); shown with the breakdown. `CONFIDENCE_WEIGHTS`. |
+| 12 | **Priority matrix** | Priority = `PRIORITY_MATRIX[severity][impact]`, distinct from severity; impact bucketed from affected orders. Template `priorityFloor` can only raise it (kept in sync on recompute). |
+| 7 | **SLA targets & breach** | `SLA_TARGETS_MIN` per priority → `sla_due_at`. `runSlaChecks()` (cron) marks breaches once + logs; live countdown + status on the incident. |
+| 6 | **Dynamic thresholds** | `effectiveThreshold()` scales the rule threshold by time context (business ×1 · off-hours ×4 · weekend ×2), in IST. `DYNAMIC_THRESHOLDS`. |
+| 13 | **Business calendar** | `BUSINESS_CALENDAR` periods (e.g. Diwali) override the multiplier to *tighten* thresholds and boost opened severity. |
+| 4 | **Suppression rules** | Operator-managed (`incident_suppression_rules`); `suppressionMatches()` gates NEW incident creation for a noisy signature. Existing incidents untouched. |
+| 5 | **Maintenance windows** | `maintenance_windows` — a scoped, time-boxed suppression for a system under maintenance. |
+| 8 | **Recovery detection** | On auto-resolve, `recovery_at` + a `recovery_detected` event ("Razorpay responding normally") — a positive signal, not a silent close. |
+| 9 | **Postmortem generator** | `generatePostmortem()` assembles Summary / Root cause / Timeline / Impact / Resolution / Lessons into `incident_postmortems` (searchable) on resolve. |
+| 10/21 | **Runbook engine** | `INCIDENT_RUNBOOKS` — ordered steps with an instruction + action verb, seeded per incident; a guided, tickable workflow (distinct from checklists). |
+| 11 | **Suggested resolutions** | The top resembling resolved incident's fix is surfaced as an actionable banner. |
+| 14 | **Advanced auto-assignment** | `AUTO_ASSIGNMENT_RULES` — ordered conditions (category / root cause / value / severity) → team + optional role assignee; logged with the reason. |
+| 15 | **Escalation countdown** | Live "Escalates to Manager in 18m 04s" timer from the policy + `started_at`. |
+| 16 | **Operational heatmap** | Big colour tiles per subsystem on the analytics page. |
+| 17 | **Estimated financial cost** | `estimateCost()` (`COST_MODEL`): revenue-at-risk + refunds + delayed-shipment cost + SLA penalty + ops labour. Snapshotted on the incident. |
+| 18 | **Dependency graph** | `DEPENDENCY_NODES/EDGES` as a layered SVG; nodes with active incidents highlighted; `dependencyDownstream()` shows the blast path. |
+| 1,2,3 | **Merge / split / dismiss / reclassify** | Manual overrides: `mergeIncidents`, `splitIncident`, `dismissIncident` (false-positive, kept), `reclassifyIncident` (records previous category). A **review queue** filter surfaces low-confidence incidents. |
+| 19/20 | **Simulation / fire drill** | `createSimulationIncident()` — flagged incidents that exercise real routing but preview escalation/notification without dispatch; excluded from health, analytics and metrics. |
+
+## API
+- `POST /api/admin/incidents/action` += `merge`, `split`, `dismiss`, `reclassify`, `runbook`, `postmortem`, `simulate`, `delete_simulation`.
+- `GET/POST /api/admin/incidents/config` — suppression-rule + maintenance-window CRUD.
+- Cron now runs correlation → **SLA checks** → escalation → impact refresh.
+
+## UI
+- **List**: Priority + Confidence + SLA columns; Priority / Review-queue / SLA-breached filters.
+- **Detail**: priority & confidence badges; SLA + live escalation countdown; runbook; correction (merge/split/reclassify/dismiss); cost; dependency chips; postmortem; recovery / merged / split / simulation banners; suggested resolution.
+- **Analytics**: operational heatmap + dependency graph. **Config** (`/admin/incidents/config`): suppression rules, maintenance windows, fire-drill launcher.
+
+## Tests
+- `enterprise.test.ts` (20) — confidence, priority matrix, SLA, dynamic/calendar thresholds, auto-assignment, cost, suppression/maintenance, dependency graph, countdown. Full incident suite **60 green**.
+- Live scenario (real cron/service) — suppression gate → lift → confidence/priority/SLA/runbook → SLA breach → recovery + postmortem → simulation exclusion → merge/split/dismiss/reclassify → maintenance suppression: **18/18**, self-cleaning.

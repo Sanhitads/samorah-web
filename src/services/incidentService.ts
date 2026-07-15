@@ -10,12 +10,17 @@ import { sendEmail, emailConfigured } from "@/lib/email";
 import {
   INCIDENT_RULES, INCIDENT_CATEGORY_LABEL, CATEGORY_TEAM, INCIDENT_CHECKLISTS,
   SUBSYSTEMS, SUBSYSTEM_LABEL, ROOT_CAUSE_LABEL, ESCALATION_POLICY, ESCALATION_MIN_SEVERITY, CROSS_SYSTEM_WINDOW_MIN,
+  INCIDENT_RUNBOOKS, INCIDENT_TEMPLATES, PRIORITY_LABEL, IMPACT_LABEL, DEPENDENCY_NODES, DEPENDENCY_EDGES,
   type IncidentRule, type IncidentSeverity, type IncidentCategory, type Subsystem, type RootCauseSystem, type HealthState,
+  type IncidentPriority, type ImpactLevel, type DepNode,
 } from "@/config/incidents";
 import {
   highestSeverity, ruleTriggered, matchesReason, shouldMergeInto, allNotificationsResolved, incidentTitle,
   matchesIncidentSearch, classifyRootCause, categorySubsystem, subsystemHealth, overallHealth, dueEscalations,
   resemblance, withinCorrelationWindow, minutesBetween, meanMinutes, topBy, severityRank,
+  computeConfidence, impactLevelFromOrders, priorityFrom, applyPriorityFloor, slaStatus, slaTargetFor,
+  effectiveThreshold, boostSeverity, matchAutoAssign, estimateCost, suppressionMatches, maintenanceActive,
+  dependencyDownstream, nextEscalationInfo,
 } from "@/lib/incidents/engine";
 
 const db = () => createAdminClient() as any;
@@ -60,17 +65,28 @@ async function addHistory(incidentId: string, event: string, detail: string, act
 }
 
 /** Recompute derived fields (counts, last activity; severity auto-inherits from the highest
- *  notification UNLESS a human has locked it via a manual severity change). */
+ *  notification UNLESS a human has locked it via a manual severity change). Phase 4 also keeps the
+ *  business-impact level + priority in sync (Priority = severity × impact). */
 async function recompute(incidentId: string): Promise<void> {
   const [{ data: inc }, { data: notifs }] = await Promise.all([
-    db().from("incidents").select("severity_locked").eq("id", incidentId).maybeSingle(),
+    db().from("incidents").select("severity,severity_locked,category,started_at,sla_breached").eq("id", incidentId).maybeSingle(),
     db().from("incident_notifications").select("order_number,severity,resolved_at").eq("incident_id", incidentId),
   ]);
   const rows = (notifs ?? []) as any[];
   const open = rows.filter((n) => !n.resolved_at);
   const orders = new Set(rows.map((n) => n.order_number).filter(Boolean));
   const patch: any = { affected_notifications: rows.length, affected_orders: orders.size, last_activity_at: new Date().toISOString(), updated_at: new Date().toISOString() };
-  if (!inc?.severity_locked) patch.severity = highestSeverity((open.length ? open : rows).map((n) => (n.severity ?? "info") as IncidentSeverity));
+  const severity: IncidentSeverity = inc?.severity_locked ? (inc.severity as IncidentSeverity) : highestSeverity((open.length ? open : rows).map((n) => (n.severity ?? "info") as IncidentSeverity));
+  if (!inc?.severity_locked) patch.severity = severity;
+  const impactLevel = impactLevelFromOrders(orders.size);
+  patch.impact_level = impactLevel;
+  // Priority = severity × impact, honouring the template floor — same rule as creation, so the two
+  // never drift. Keep the SLA target/due in sync with the (possibly upgraded) priority.
+  const priority = applyPriorityFloor(priorityFrom(severity, impactLevel), INCIDENT_TEMPLATES[inc?.category as IncidentCategory]?.priorityFloor);
+  patch.priority = priority;
+  const slaMin = slaTargetFor(priority);
+  patch.sla_target_min = slaMin;
+  if (!inc?.sla_breached && inc?.started_at) patch.sla_due_at = new Date(new Date(inc.started_at).getTime() + slaMin * 60000).toISOString();
   await db().from("incidents").update(patch).eq("id", incidentId);
 }
 
@@ -81,42 +97,95 @@ async function seedChecklist(incidentId: string, category: IncidentCategory): Pr
   try { await db().from("incident_checklist_items").insert(items.map((label, i) => ({ incident_id: incidentId, label, sort_order: i }))); } catch { /* non-fatal */ }
 }
 
-export interface CorrelationResult { created: number; merged: number; attached: number; resolved: number }
+export interface CorrelationResult { created: number; merged: number; attached: number; resolved: number; suppressed: number }
 
-/** Run every rule → open/merge incidents, then auto-resolve. Idempotent (merge prevents dupes). */
+/** Seed the configurable runbook (guided workflow) for a new incident's category (Phase 4). */
+async function seedRunbook(incidentId: string, category: IncidentCategory): Promise<void> {
+  const steps = INCIDENT_RUNBOOKS[category];
+  if (!steps?.length) return;
+  try { await db().from("incident_runbook_steps").insert(steps.map((s, i) => ({ incident_id: incidentId, step_no: i + 1, title: s.title, instruction: s.instruction, action: s.action }))); } catch { /* non-fatal */ }
+}
+async function activeSuppressionRules(): Promise<any[]> {
+  try { const { data } = await db().from("incident_suppression_rules").select("*").eq("enabled", true); return data ?? []; } catch { return []; }
+}
+async function activeMaintenanceWindows(nowMs: number): Promise<any[]> {
+  try { const iso = new Date(nowMs).toISOString(); const { data } = await db().from("maintenance_windows").select("*").eq("enabled", true).lte("starts_at", iso).gte("ends_at", iso); return data ?? []; } catch { return []; }
+}
+/** ADVANCED AUTO-ASSIGNMENT — apply the first matching rule (team + optional role assignee). Logged. */
+async function applyAutoAssignment(incidentId: string, ctx: { category: string; rootCauseSystem?: string | null; revenue?: number; severity: IncidentSeverity }): Promise<void> {
+  const rule = matchAutoAssign(ctx);
+  if (!rule) return;
+  const patch: any = { team: rule.team, assignment_reason: rule.label, last_activity_at: touch() };
+  let who: string | null = null;
+  if (rule.assignRole) {
+    const roles = rule.assignRole === "admin" ? ["admin", "super_admin"] : ["manager", "admin", "super_admin"];
+    const { data } = await db().from("users").select("id,full_name").in("role", roles).order("full_name").limit(1);
+    const u = (data ?? [])[0];
+    if (u) { patch.assignee_id = u.id; patch.assignee_name = u.full_name ?? "Staff"; patch.owner_id = u.id; patch.owner_name = u.full_name ?? "Staff"; who = u.full_name ?? "Staff"; }
+  }
+  await db().from("incidents").update(patch).eq("id", incidentId);
+  await addHistory(incidentId, "auto_assigned", `${rule.label} → ${who ?? rule.team}`);
+}
+
+/** Run every rule → open/merge incidents, then auto-resolve. Idempotent (merge prevents dupes).
+ *  Phase 4: dynamic/calendar thresholds, suppression + maintenance gating, confidence, priority,
+ *  SLA target, runbook seeding, and advanced auto-assignment on creation. */
 export async function correlateIncidents(): Promise<CorrelationResult> {
   const now = Date.now();
-  let created = 0, merged = 0, attached = 0;
+  let created = 0, merged = 0, attached = 0, suppressed = 0;
+  const [suppressions, maintenance] = await Promise.all([activeSuppressionRules(), activeMaintenanceWindows(now)]);
 
   for (const rule of INCIDENT_RULES) {
     if (!rule.enabled) continue;
     const since = new Date(now - rule.windowMinutes * 60_000).toISOString();
     const rows = (await fetchRows(rule, since)).filter((r) => matchesReason(r.reason, rule.reasonPattern));
-    if (!ruleTriggered(rows.length, rule)) continue;
+    const eff = effectiveThreshold(rule.threshold, now);        // dynamic time-of-day + business calendar
+    if (rows.length < eff.threshold) continue;                  // threshold (for the current context) not crossed
 
     const notifs = dedupeByKey(rows);
+    const rc = classifyRootCause({ sourceSystem: rule.sourceSystem, category: rule.category, reason: rule.rootCauseLabel });
+    const subsystem = categorySubsystem(rule.category);
 
     // Find an active incident of the same category+rule to merge into.
-    const { data: existing } = await db().from("incidents").select("id,category,rule_id,status,last_activity_at").eq("category", rule.category).eq("rule_id", rule.id).in("status", ["open", "investigating", "mitigated"]).order("last_activity_at", { ascending: false }).limit(1);
+    const { data: existing } = await db().from("incidents").select("id,category,rule_id,status,last_activity_at").eq("category", rule.category).eq("rule_id", rule.id).eq("is_simulation", false).in("status", ["open", "investigating", "mitigated"]).order("last_activity_at", { ascending: false }).limit(1);
     const inc = (existing ?? [])[0];
 
     let incidentId: string;
     if (inc && shouldMergeInto({ category: inc.category, ruleId: inc.rule_id, status: inc.status, lastActivityAt: inc.last_activity_at }, rule, now)) {
       incidentId = inc.id; merged++;
     } else {
-      // Phase 3: deterministic root-cause attribution + subsystem tag + detection time (MTTD).
-      const rc = classifyRootCause({ sourceSystem: rule.sourceSystem, category: rule.category, reason: rule.rootCauseLabel });
-      const detectedAt = notifs.reduce<string | null>((min, n) => (n.at && (!min || n.at < min) ? n.at : min), null);
+      // Suppression / maintenance gate — only blocks NEW incident creation, never existing ones.
+      const supCtx = { category: rule.category, subsystem, rootCauseSystem: rc.system, reason: rule.rootCauseLabel };
+      const sup = suppressions.find((s) => suppressionMatches(s, supCtx, now));
+      const mw = maintenance.find((w) => maintenanceActive(w, supCtx, now));
+      if (sup || mw) { suppressed++; continue; }                // silenced — do not open
+
+      const times = notifs.map((n) => n.at).filter(Boolean).map((t) => new Date(t as string).getTime());
+      const detectedAt = times.length ? new Date(Math.min(...times)).toISOString() : new Date().toISOString();
+      const spanMinutes = times.length ? (Math.max(...times) - Math.min(...times)) / 60000 : 0;
+      const severity = boostSeverity(rule.notificationSeverity, eff.severityBoost);
+      const conf = computeConfidence({ eventCount: rows.length, threshold: eff.threshold, reasonMatched: !!rule.reasonPattern, rootCauseSystem: rc.system, windowMinutes: rule.windowMinutes, spanMinutes });
+      const impactLevel = impactLevelFromOrders(new Set(notifs.map((n) => n.orderNumber).filter(Boolean)).size);
+      const tmpl = INCIDENT_TEMPLATES[rule.category as IncidentCategory];
+      const priority = applyPriorityFloor(priorityFrom(severity, impactLevel), tmpl.priorityFloor);
+      const slaMin = slaTargetFor(priority);
       const { data: newInc } = await db().from("incidents").insert({
-        title: incidentTitle(rule, notifs.length), category: rule.category, severity: rule.notificationSeverity, status: "open",
+        title: incidentTitle(rule, notifs.length), category: rule.category, severity, status: "open",
         root_cause: rule.rootCauseLabel, source_system: rule.sourceSystem, rule_id: rule.id, team: CATEGORY_TEAM[rule.category as IncidentCategory],
-        root_cause_system: rc.system, subsystem: categorySubsystem(rule.category), detected_at: detectedAt ?? new Date().toISOString(),
-        description: `Correlated by rule "${rule.id}" — ${rows.length} events within ${rule.windowMinutes} min.`,
+        root_cause_system: rc.system, subsystem, detected_at: detectedAt,
+        confidence: conf.score, confidence_reasons: conf.reasons, priority, impact_level: impactLevel,
+        sla_target_min: slaMin, sla_due_at: new Date(now + slaMin * 60000).toISOString(),
+        description: `Correlated by rule "${rule.id}" — ${rows.length} events within ${rule.windowMinutes} min (threshold ${eff.threshold}, ${eff.context}).`,
       }).select("id").single();
       incidentId = newInc.id;
-      await seedChecklist(incidentId, rule.category as IncidentCategory); // configurable template
+      if (tmpl.seedChecklist) await seedChecklist(incidentId, rule.category as IncidentCategory);
+      if (tmpl.seedRunbook) await seedRunbook(incidentId, rule.category as IncidentCategory);
       await addHistory(incidentId, "created", `Opened by rule ${rule.id} — ${rows.length} events in ${rule.windowMinutes}m`);
       await addHistory(incidentId, "root_cause_detected", `${ROOT_CAUSE_LABEL[rc.system]} — ${rc.why}`);
+      await addHistory(incidentId, "confidence_scored", `${conf.score}% (${conf.reasons.map((r) => r.factor).join(", ")})`);
+      if (eff.context !== "static" && eff.context !== "businessHours") await addHistory(incidentId, "threshold_context", `Effective threshold ${eff.threshold} — ${eff.context} ×${eff.multiplier}`);
+      await addHistory(incidentId, "priority_set", `${PRIORITY_LABEL[priority]} (severity ${severity} × impact ${impactLevel}); SLA ${slaMin}m`);
+      await applyAutoAssignment(incidentId, { category: rule.category, rootCauseSystem: rc.system, revenue: 0, severity });
       created++;
     }
 
@@ -134,7 +203,7 @@ export async function correlateIncidents(): Promise<CorrelationResult> {
 
   await groupCrossSystem();          // Phase 3: cascade across systems → ONE primary
   const { resolved } = await autoResolveIncidents();
-  return { created, merged, attached, resolved };
+  return { created, merged, attached, resolved, suppressed };
 }
 
 /**
@@ -150,6 +219,7 @@ export async function groupCrossSystem(): Promise<{ grouped: number }> {
     const { data } = await db().from("incidents")
       .select("id,number,root_cause_system,started_at,parent_incident_id,severity")
       .in("status", ["open", "investigating", "mitigated"])
+      .eq("is_simulation", false)
       .not("root_cause_system", "is", null)
       .neq("root_cause_system", "unknown")
       .order("started_at", { ascending: true });
@@ -185,13 +255,15 @@ async function currentFailingKeys(): Promise<Set<string>> {
   return keys;
 }
 
-/** Mark resolved notifications; when every notification in an incident is resolved, auto-close it. */
+/** Mark resolved notifications; when every notification in an incident is resolved, auto-close it.
+ *  Phase 4: RECOVERY DETECTION — record that the upstream system recovered (a positive signal, not
+ *  a silent close), then generate a postmortem. Simulations are never auto-resolved by real signals. */
 export async function autoResolveIncidents(): Promise<{ resolved: number }> {
   const failing = await currentFailingKeys();
-  const { data: active } = await db().from("incidents").select("id").in("status", ["open", "investigating", "mitigated"]);
+  const { data: active } = await db().from("incidents").select("id,number,root_cause_system").eq("is_simulation", false).in("status", ["open", "investigating", "mitigated"]);
   let resolved = 0;
   for (const inc of (active ?? []) as any[]) {
-    const { data: notifs } = await db().from("incident_notifications").select("id,alert_key,resolved_at").eq("incident_id", inc.id);
+    const { data: notifs } = await db().from("incident_notifications").select("id,alert_key,order_number,resolved_at").eq("incident_id", inc.id);
     for (const n of (notifs ?? []) as any[]) {
       if (!n.resolved_at && !failing.has(n.alert_key)) {
         await db().from("incident_notifications").update({ resolved_at: new Date().toISOString() }).eq("id", n.id);
@@ -200,8 +272,11 @@ export async function autoResolveIncidents(): Promise<{ resolved: number }> {
     }
     const { data: after } = await db().from("incident_notifications").select("resolved_at").eq("incident_id", inc.id);
     if (allNotificationsResolved(((after ?? []) as any[]).map((n) => ({ resolvedAt: n.resolved_at })))) {
-      await db().from("incidents").update({ status: "resolved", resolved_at: new Date().toISOString(), last_activity_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", inc.id);
+      const sysLabel = inc.root_cause_system ? ROOT_CAUSE_LABEL[inc.root_cause_system as RootCauseSystem] : "The affected system";
+      await db().from("incidents").update({ status: "resolved", resolved_at: new Date().toISOString(), recovery_at: new Date().toISOString(), last_activity_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", inc.id);
+      await addHistory(inc.id, "recovery_detected", `${sysLabel} responding normally — all failures cleared`);
       await addHistory(inc.id, "resolved", "All notifications resolved — auto-closed");
+      await generatePostmortem(inc.number, { id: null, name: "Auto-resolver" });   // searchable postmortem
       resolved++;
     }
   }
@@ -214,12 +289,16 @@ export interface IncidentRow {
   status: string; rootCause: string | null; sourceSystem: string | null; team: string | null; ownerName: string | null; assigneeName: string | null;
   snoozedUntil: string | null; affectedOrders: number; affectedNotifications: number; startedAt: string; lastActivityAt: string; resolvedAt: string | null;
   rootCauseSystem: string | null; subsystem: string | null; parentIncidentId: string | null; escalationLevel: number; detectedAt: string | null;
+  confidence: number | null; priority: string | null; priorityLabel: string | null; impactLevel: string | null;
+  slaTargetMin: number | null; slaDueAt: string | null; slaBreached: boolean; impactCost: number | null; isSimulation: boolean;
 }
 const mapIncident = (r: any): IncidentRow => ({
   id: r.id, number: r.number, title: r.title, category: r.category, categoryLabel: INCIDENT_CATEGORY_LABEL[r.category as keyof typeof INCIDENT_CATEGORY_LABEL] ?? r.category,
   severity: r.severity, status: r.status, rootCause: r.root_cause ?? null, sourceSystem: r.source_system ?? null, team: r.team ?? null, ownerName: r.owner_name ?? null, assigneeName: r.assignee_name ?? null,
   snoozedUntil: r.snoozed_until ?? null, affectedOrders: r.affected_orders ?? 0, affectedNotifications: r.affected_notifications ?? 0, startedAt: r.started_at, lastActivityAt: r.last_activity_at, resolvedAt: r.resolved_at ?? null,
   rootCauseSystem: r.root_cause_system ?? null, subsystem: r.subsystem ?? null, parentIncidentId: r.parent_incident_id ?? null, escalationLevel: r.escalation_level ?? 0, detectedAt: r.detected_at ?? null,
+  confidence: r.confidence ?? null, priority: r.priority ?? null, priorityLabel: r.priority ? PRIORITY_LABEL[r.priority as IncidentPriority] ?? r.priority : null, impactLevel: r.impact_level ?? null,
+  slaTargetMin: r.sla_target_min ?? null, slaDueAt: r.sla_due_at ?? null, slaBreached: !!r.sla_breached, impactCost: r.impact_cost != null ? Number(r.impact_cost) : null, isSimulation: !!r.is_simulation,
 });
 
 export async function getIncidents(opts: { status?: "active" | "all"; limit?: number } = {}): Promise<IncidentRow[]> {
@@ -239,6 +318,10 @@ export interface IncidentFilters {
   createdDays?: number;   // Created today (1) / this week (7)
   resolvedToday?: boolean;
   q?: string;             // ID / order / customer / gateway / reason / assignee
+  priority?: string;      // p1..p4 (Phase 4)
+  reviewQueue?: boolean;  // low-confidence incidents needing human review (Phase 4)
+  slaBreached?: boolean;  // SLA-breached only (Phase 4)
+  includeSimulations?: boolean; // show fire-drill incidents (default: hidden)
   page?: number; pageSize?: number;
 }
 export interface IncidentPage { rows: IncidentRow[]; total: number; page: number; pageSize: number }
@@ -250,9 +333,13 @@ export async function getIncidentsFiltered(f: IncidentFilters): Promise<Incident
     if (!f.status || f.status === "active") {
       q = q.in("status", ["open", "investigating", "mitigated"]).or(`snoozed_until.is.null,snoozed_until.lt.${new Date().toISOString()}`); // hide snoozed
     } else if (f.status !== "all") q = q.eq("status", f.status);
+    if (!f.includeSimulations) q = q.eq("is_simulation", false);   // fire-drills hidden by default
     if (f.severity) q = q.eq("severity", f.severity);
     if (f.category) q = q.eq("category", f.category);
     if (f.team) q = q.eq("team", f.team);
+    if (f.priority) q = q.eq("priority", f.priority);
+    if (f.slaBreached) q = q.eq("sla_breached", true);
+    if (f.reviewQueue) q = q.lt("confidence", 70).in("status", ["open", "investigating", "mitigated"]);  // needs human review
     if (f.assigned === "unassigned") q = q.is("assignee_id", null);
     else if (f.assigned) q = q.eq("assignee_name", f.assigned);
     if (f.createdDays) q = q.gte("started_at", new Date(Date.now() - f.createdDays * 86400000).toISOString());
@@ -284,7 +371,7 @@ export async function getIncidentsForExport(f: IncidentFilters): Promise<Inciden
   return rows;
 }
 
-export interface IncidentImpact { orders: number; revenue: number; customers: number; refundValue: number; shipmentsDelayed: number; computedAt: string | null }
+export interface IncidentImpact { orders: number; revenue: number; customers: number; refundValue: number; shipmentsDelayed: number; cost: number; costParts?: Record<string, number>; computedAt: string | null }
 export interface SimilarIncident { number: string; title: string; status: string; score: number; reasons: string[]; kbResolution: string | null; prevention: string | null; resolvedAt: string | null }
 export interface IncidentDetail extends IncidentRow {
   description: string | null; resolutionNotes: string | null; prevention: string | null; kbResolution: string | null;
@@ -302,12 +389,23 @@ export interface IncidentDetail extends IncidentRow {
   parentNumber: string | null;
   children: { number: string; title: string; status: string; category: string }[];
   mttrMin: number | null; mttdMin: number | null;
+  // Phase 4
+  confidenceReasons: { factor: string; detail: string; points: number }[];
+  impactLevelLabel: string | null;
+  slaStatus: string; slaRemainingMin: number | null;
+  nextEscalation: { level: number; notify: string; atMs: number } | null;
+  runbook: { id: string; stepNo: number; title: string; instruction: string | null; action: string | null; done: boolean; doneBy: string | null; doneAt: string | null }[];
+  postmortem: { summary: string | null; rootCause: string | null; impact: string | null; resolution: string | null; lessons: string | null; timeline: { at: string; event: string; detail: string | null }[]; generatedAt: string | null } | null;
+  dependencyDownstream: { id: string; label: string }[];
+  suggestedResolution: { number: string; resolution: string } | null;
+  assignmentReason: string | null; dismissReason: string | null; falsePositive: boolean; reclassifiedFrom: string | null;
+  mergedIntoNumber: string | null; splitFromNumber: string | null; recoveryAt: string | null;
 }
 export async function getIncidentByNumber(number: string): Promise<IncidentDetail | null> {
   try {
     const { data: inc } = await db().from("incidents").select("*").eq("number", number).maybeSingle();
     if (!inc) return null;
-    const [{ data: notifs }, { data: hist }, { data: related }, { data: parts }, { data: notes }, { data: checklist }, { data: esc }, { data: kids }, parent] = await Promise.all([
+    const [{ data: notifs }, { data: hist }, { data: related }, { data: parts }, { data: notes }, { data: checklist }, { data: esc }, { data: kids }, parent, { data: runbook }, { data: pm }, merged, split] = await Promise.all([
       db().from("incident_notifications").select("alert_key,order_number,severity,added_at,resolved_at").eq("incident_id", inc.id).order("added_at", { ascending: true }),
       db().from("incident_history").select("event,detail,actor_name,created_at").eq("incident_id", inc.id).order("created_at", { ascending: true }),
       db().from("incidents").select("number,title,status").eq("category", inc.category).neq("id", inc.id).is("parent_incident_id", null).order("last_activity_at", { ascending: false }).limit(5),
@@ -317,9 +415,16 @@ export async function getIncidentByNumber(number: string): Promise<IncidentDetai
       db().from("incident_escalations").select("level,target_role,channels,reason,age_minutes,created_at").eq("incident_id", inc.id).order("level", { ascending: true }),
       db().from("incidents").select("number,title,status,category").eq("parent_incident_id", inc.id).order("started_at", { ascending: true }),
       inc.parent_incident_id ? db().from("incidents").select("number").eq("id", inc.parent_incident_id).maybeSingle() : Promise.resolve({ data: null }),
+      db().from("incident_runbook_steps").select("id,step_no,title,instruction,action,done,done_by,done_at").eq("incident_id", inc.id).order("step_no", { ascending: true }),
+      db().from("incident_postmortems").select("summary,root_cause,impact,resolution,lessons,timeline,generated_at").eq("incident_id", inc.id).maybeSingle(),
+      inc.merged_into_id ? db().from("incidents").select("number").eq("id", inc.merged_into_id).maybeSingle() : Promise.resolve({ data: null }),
+      inc.split_from_id ? db().from("incidents").select("number").eq("id", inc.split_from_id).maybeSingle() : Promise.resolve({ data: null }),
     ]);
     const orders = [...new Set((notifs ?? []).map((n: any) => n.order_number).filter(Boolean))] as string[];
     const rcWhy = (hist ?? []).find((h: any) => h.event === "root_cause_detected")?.detail ?? null;
+    const similar = await getSimilarIncidents(inc);
+    const sla = slaStatus(inc.sla_due_at ?? null, inc.resolved_at ?? null, Date.now());
+    const suggested = similar.find((s) => s.kbResolution);
     return {
       ...mapIncident(inc), description: inc.description ?? null, resolutionNotes: inc.resolution_notes ?? null,
       prevention: inc.prevention ?? null, kbResolution: inc.kb_resolution ?? null, rootCauseWhy: rcWhy,
@@ -327,16 +432,26 @@ export async function getIncidentByNumber(number: string): Promise<IncidentDetai
       orders,
       history: (hist ?? []).map((h: any) => ({ event: h.event, detail: h.detail ?? null, actorName: h.actor_name ?? null, createdAt: h.created_at })),
       related: (related ?? []).map((r: any) => ({ number: r.number, title: r.title, status: r.status })),
-      similar: await getSimilarIncidents(inc),
+      similar,
       participants: (parts ?? []).map((p: any) => ({ userId: p.user_id ?? null, userName: p.user_name, role: p.role })),
       notes: (notes ?? []).map((n: any) => ({ note: n.note, authorName: n.author_name ?? null, createdAt: n.created_at })),
       checklist: (checklist ?? []).map((c: any) => ({ id: c.id, label: c.label, done: c.done, doneBy: c.done_by ?? null, doneAt: c.done_at ?? null })),
       escalations: (esc ?? []).map((e: any) => ({ level: e.level, targetRole: e.target_role, channels: e.channels, reason: e.reason, ageMinutes: e.age_minutes, createdAt: e.created_at })),
-      impact: { orders: inc.impact_orders ?? 0, revenue: Number(inc.impact_revenue ?? 0), customers: inc.impact_customers ?? 0, refundValue: Number(inc.impact_refund_value ?? 0), shipmentsDelayed: inc.impact_shipments_delayed ?? 0, computedAt: inc.impact_computed_at ?? null },
+      impact: { orders: inc.impact_orders ?? 0, revenue: Number(inc.impact_revenue ?? 0), customers: inc.impact_customers ?? 0, refundValue: Number(inc.impact_refund_value ?? 0), shipmentsDelayed: inc.impact_shipments_delayed ?? 0, cost: Number(inc.impact_cost ?? 0), computedAt: inc.impact_computed_at ?? null },
       parentNumber: (parent as any)?.data?.number ?? null,
       children: (kids ?? []).map((k: any) => ({ number: k.number, title: k.title, status: k.status, category: k.category })),
       mttrMin: inc.resolved_at ? Math.round(minutesBetween(inc.started_at, inc.resolved_at)) : null,
       mttdMin: inc.detected_at ? Math.max(0, Math.round(minutesBetween(inc.detected_at, inc.started_at))) : null,
+      confidenceReasons: Array.isArray(inc.confidence_reasons) ? inc.confidence_reasons : [],
+      impactLevelLabel: inc.impact_level ? IMPACT_LABEL[inc.impact_level as ImpactLevel] ?? inc.impact_level : null,
+      slaStatus: sla.status, slaRemainingMin: sla.remainingMin,
+      nextEscalation: ["open", "investigating", "mitigated"].includes(inc.status) ? nextEscalationInfo(new Date(inc.started_at).getTime(), inc.escalation_level ?? 0, ESCALATION_POLICY) : null,
+      runbook: (runbook ?? []).map((s: any) => ({ id: s.id, stepNo: s.step_no, title: s.title, instruction: s.instruction ?? null, action: s.action ?? null, done: s.done, doneBy: s.done_by ?? null, doneAt: s.done_at ?? null })),
+      postmortem: pm ? { summary: pm.summary ?? null, rootCause: pm.root_cause ?? null, impact: pm.impact ?? null, resolution: pm.resolution ?? null, lessons: pm.lessons ?? null, timeline: Array.isArray(pm.timeline) ? pm.timeline : [], generatedAt: pm.generated_at ?? null } : null,
+      dependencyDownstream: (inc.root_cause_system ? dependencyDownstream(inc.root_cause_system as DepNode) : []).map((id) => ({ id, label: DEPENDENCY_NODES.find((n) => n.id === id)?.label ?? id })),
+      suggestedResolution: suggested ? { number: suggested.number, resolution: suggested.kbResolution as string } : null,
+      assignmentReason: inc.assignment_reason ?? null, dismissReason: inc.dismiss_reason ?? null, falsePositive: !!inc.false_positive, reclassifiedFrom: inc.reclassified_from ?? null,
+      mergedIntoNumber: (merged as any)?.data?.number ?? null, splitFromNumber: (split as any)?.data?.number ?? null, recoveryAt: inc.recovery_at ?? null,
     };
   } catch { return null; }
 }
@@ -526,7 +641,9 @@ export async function getSimilarIncidents(inc: any): Promise<SimilarIncident[]> 
  *  it onto the incident. Deterministic: every number traces to concrete order/refund/shipment rows. */
 export async function computeBusinessImpact(number: string): Promise<IncidentImpact | null> {
   try {
-    const id = await incId(number); if (!id) return null;
+    const { data: inc } = await db().from("incidents").select("id,started_at,resolved_at,sla_breached").eq("number", number).maybeSingle();
+    if (!inc) return null;
+    const id = inc.id;
     const { data: notifs } = await db().from("incident_notifications").select("order_number").eq("incident_id", id);
     const orderNumbers = [...new Set(((notifs ?? []) as any[]).map((n) => n.order_number).filter(Boolean))] as string[];
     let revenue = 0, refundValue = 0, customers = 0, shipmentsDelayed = 0;
@@ -539,10 +656,29 @@ export async function computeBusinessImpact(number: string): Promise<IncidentImp
       const { data: exc } = await db().from("shipment_exceptions").select("order_number").in("order_number", orderNumbers).eq("type", "delayed");
       shipmentsDelayed = new Set(((exc ?? []) as any[]).map((e) => e.order_number)).size;
     }
-    const impact: IncidentImpact = { orders: orderNumbers.length, revenue: Math.round(revenue * 100) / 100, customers, refundValue: Math.round(refundValue * 100) / 100, shipmentsDelayed, computedAt: touch() };
-    await db().from("incidents").update({ impact_orders: impact.orders, impact_revenue: impact.revenue, impact_customers: impact.customers, impact_refund_value: impact.refundValue, impact_shipments_delayed: impact.shipmentsDelayed, impact_computed_at: impact.computedAt }).eq("id", id);
+    // Estimated financial cost of the incident (deterministic COST_MODEL).
+    const ageHours = ((inc.resolved_at ? new Date(inc.resolved_at).getTime() : Date.now()) - new Date(inc.started_at).getTime()) / 3_600_000;
+    const cost = estimateCost({ revenue, refundValue, shipmentsDelayed, slaBreached: !!inc.sla_breached, ageHours });
+    const impact: IncidentImpact = { orders: orderNumbers.length, revenue: Math.round(revenue * 100) / 100, customers, refundValue: Math.round(refundValue * 100) / 100, shipmentsDelayed, cost: cost.total, costParts: cost.parts, computedAt: touch() };
+    await db().from("incidents").update({ impact_orders: impact.orders, impact_revenue: impact.revenue, impact_customers: impact.customers, impact_refund_value: impact.refundValue, impact_shipments_delayed: impact.shipmentsDelayed, impact_cost: impact.cost, impact_computed_at: impact.computedAt }).eq("id", id);
     return impact;
   } catch { return null; }
+}
+
+/** SLA BREACH TRACKING — mark active incidents whose resolution SLA has elapsed (once), log it, and
+ *  bump escalation so a breach pages someone. Runs in the cron. */
+export async function runSlaChecks(): Promise<{ breached: number }> {
+  let breached = 0;
+  try {
+    const nowIso = new Date().toISOString();
+    const { data } = await db().from("incidents").select("id,number,sla_target_min").eq("is_simulation", false).eq("sla_breached", false).in("status", ["open", "investigating", "mitigated"]).not("sla_due_at", "is", null).lt("sla_due_at", nowIso);
+    for (const inc of (data ?? []) as any[]) {
+      await db().from("incidents").update({ sla_breached: true, sla_breached_at: nowIso, last_activity_at: nowIso }).eq("id", inc.id);
+      await addHistory(inc.id, "sla_breached", `Resolution SLA of ${inc.sla_target_min}m exceeded`);
+      breached++;
+    }
+  } catch { /* best-effort */ }
+  return { breached };
 }
 
 /** Refresh business-impact snapshots for active incidents (bounded per run for scale). */
@@ -561,7 +697,7 @@ export interface SystemHealth { overall: HealthState; subsystems: SubsystemHealt
 export async function getSystemHealth(): Promise<SystemHealth> {
   const now = Date.now();
   try {
-    const { data } = await db().from("incidents").select("subsystem,category,severity,started_at").in("status", ["open", "investigating", "mitigated"]);
+    const { data } = await db().from("incidents").select("subsystem,category,severity,started_at").eq("is_simulation", false).in("status", ["open", "investigating", "mitigated"]);
     const active = (data ?? []) as any[];
     const subsystems: SubsystemHealth[] = SUBSYSTEMS.map((s) => {
       const mine = active.filter((i) => (i.subsystem ?? categorySubsystem(i.category)) === s).map((i) => ({ severity: i.severity as IncidentSeverity, startedAt: i.started_at }));
@@ -588,7 +724,7 @@ async function recipientsForRole(role: "manager" | "admin"): Promise<{ email: st
 export async function runEscalations(): Promise<{ escalated: number }> {
   let escalated = 0;
   try {
-    const { data } = await db().from("incidents").select("id,number,title,severity,started_at,escalation_level,status").in("status", ["open", "investigating", "mitigated"]);
+    const { data } = await db().from("incidents").select("id,number,title,severity,started_at,escalation_level,status,is_simulation").in("status", ["open", "investigating", "mitigated"]);
     const minRank = severityRank(ESCALATION_MIN_SEVERITY);
     for (const inc of (data ?? []) as any[]) {
       if (severityRank(inc.severity as IncidentSeverity) < minRank) continue;   // low/info never page
@@ -600,8 +736,8 @@ export async function runEscalations(): Promise<{ escalated: number }> {
         const { error } = await db().from("incident_escalations").insert({ incident_id: inc.id, level: level.level, target_role: level.notify, channels: level.channels.join(","), reason, age_minutes: ageMin });
         if (error) continue;
         await db().from("incidents").update({ escalation_level: level.level, last_activity_at: touch() }).eq("id", inc.id);
-        await addHistory(inc.id, "escalated", `L${level.level} → ${level.notify} via ${level.channels.join(", ")} — ${reason}`);
-        await dispatchEscalation(inc, level, reason);
+        await addHistory(inc.id, "escalated", `L${level.level} → ${level.notify} via ${level.channels.join(", ")} — ${reason}${inc.is_simulation ? " (simulation — no dispatch)" : ""}`);
+        if (!inc.is_simulation) await dispatchEscalation(inc, level, reason);   // fire drills never send real pages
         escalated++;
       }
     }
@@ -630,7 +766,7 @@ export interface IncidentAnalytics {
 export async function getIncidentAnalytics(windowDays = 90): Promise<IncidentAnalytics> {
   try {
     const since = new Date(Date.now() - windowDays * 86400000).toISOString();
-    const { data } = await db().from("incidents").select("category,root_cause_system,status,started_at,detected_at,resolved_at").gte("started_at", since).limit(20000);
+    const { data } = await db().from("incidents").select("category,root_cause_system,status,started_at,detected_at,resolved_at").eq("is_simulation", false).gte("started_at", since).limit(20000);
     const rows = (data ?? []) as any[];
     const resolved = rows.filter((r) => r.resolved_at);
     const mttr = meanMinutes(resolved.map((r) => minutesBetween(r.started_at, r.resolved_at)));
@@ -666,7 +802,217 @@ export async function resolveWithKnowledge(number: string, kb: { rootCause: stri
       root_cause: kb.rootCause.trim(), kb_resolution: kb.resolution.trim(), resolution_notes: kb.resolution.trim(), prevention: kb.prevention.trim(),
     }).eq("id", id);
     await addHistory(id, "resolved", `Resolved with KB — cause: ${kb.rootCause.slice(0, 80)}`, actor);
-    await computeBusinessImpact(number);   // snapshot final blast radius
+    await computeBusinessImpact(number);        // snapshot final blast radius
+    await generatePostmortem(number, actor);    // searchable postmortem
     return { ok: true };
   } catch { return { ok: false, error: "Failed to resolve." }; }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Phase 4 — Enterprise Readiness services
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** POSTMORTEM GENERATOR — deterministically assemble a searchable postmortem from the incident,
+ *  its history and impact snapshot. Upserted (one per incident). No AI: pure aggregation. */
+export async function generatePostmortem(number: string, actor: Actor): Promise<{ ok: boolean }> {
+  try {
+    const { data: inc } = await db().from("incidents").select("*").eq("number", number).maybeSingle();
+    if (!inc) return { ok: false };
+    const { data: hist } = await db().from("incident_history").select("event,detail,created_at").eq("incident_id", inc.id).order("created_at", { ascending: true });
+    const catLabel = INCIDENT_CATEGORY_LABEL[inc.category as IncidentCategory] ?? inc.category;
+    const mttr = inc.resolved_at ? Math.round(minutesBetween(inc.started_at, inc.resolved_at)) : null;
+    const summary = `${inc.number} — ${inc.title}. ${catLabel} incident on the ${inc.subsystem ?? "—"} subsystem (severity ${inc.severity}${inc.priority ? `, ${PRIORITY_LABEL[inc.priority as IncidentPriority]}` : ""}). Opened ${inc.started_at}${inc.resolved_at ? `, resolved ${inc.resolved_at}${mttr != null ? ` (MTTR ${mttr} min)` : ""}` : ""}.`;
+    const rcWhy = (hist ?? []).find((h: any) => h.event === "root_cause_detected")?.detail ?? "";
+    const rootCause = `${inc.root_cause ?? "Unknown"}${inc.root_cause_system ? ` — attributed to ${ROOT_CAUSE_LABEL[inc.root_cause_system as RootCauseSystem]}` : ""}${rcWhy ? ` (${rcWhy})` : ""}.`;
+    const impact = `${inc.impact_orders ?? 0} orders, ₹${Number(inc.impact_revenue ?? 0).toLocaleString("en-IN")} revenue, ${inc.impact_customers ?? 0} customers, ₹${Number(inc.impact_refund_value ?? 0).toLocaleString("en-IN")} refunds, ${inc.impact_shipments_delayed ?? 0} shipments delayed. Estimated cost ₹${Number(inc.impact_cost ?? 0).toLocaleString("en-IN")}.`;
+    const resolution = inc.kb_resolution || inc.resolution_notes || (inc.recovery_at ? "Auto-resolved when the upstream system recovered." : "Resolved.");
+    const lessons = inc.prevention || (inc.sla_breached ? "SLA was breached — review escalation/thresholds and consider staffing for this window." : "Consider whether a suppression rule, dynamic threshold, or runbook update would reduce recurrence.");
+    const timeline = (hist ?? []).map((h: any) => ({ at: h.created_at, event: h.event, detail: h.detail ?? null }));
+    await db().from("incident_postmortems").upsert({ incident_id: inc.id, summary, root_cause: rootCause, timeline, impact, resolution, lessons, generated_at: touch(), generated_by: actor.name }, { onConflict: "incident_id" });
+    await addHistory(inc.id, "postmortem_generated", "Postmortem assembled", actor);
+    return { ok: true };
+  } catch { return { ok: false }; }
+}
+
+/** MANUAL MERGE — fold source into target: move its notifications, mark it merged (never deleted). */
+export async function mergeIncidents(sourceNumber: string, targetNumber: string, actor: Actor): Promise<{ ok: boolean; error?: string }> {
+  if (sourceNumber === targetNumber) return { ok: false, error: "Cannot merge an incident into itself." };
+  try {
+    const { data: src } = await db().from("incidents").select("id,number,status").eq("number", sourceNumber).maybeSingle();
+    const { data: tgt } = await db().from("incidents").select("id,number").eq("number", targetNumber).maybeSingle();
+    if (!src || !tgt) return { ok: false, error: "Incident not found." };
+    const [{ data: srcNotifs }, { data: tgtNotifs }] = await Promise.all([
+      db().from("incident_notifications").select("id,alert_key").eq("incident_id", src.id),
+      db().from("incident_notifications").select("alert_key").eq("incident_id", tgt.id),
+    ]);
+    const have = new Set(((tgtNotifs ?? []) as any[]).map((n) => n.alert_key));
+    for (const n of (srcNotifs ?? []) as any[]) {
+      if (have.has(n.alert_key)) await db().from("incident_notifications").delete().eq("id", n.id);   // dup → drop
+      else await db().from("incident_notifications").update({ incident_id: tgt.id }).eq("id", n.id);   // move
+    }
+    await db().from("incidents").update({ status: "merged", merged_into_id: tgt.id, resolved_at: touch(), last_activity_at: touch() }).eq("id", src.id);
+    await addHistory(src.id, "merged", `Merged into ${tgt.number}`, actor);
+    await addHistory(tgt.id, "merged", `${src.number} merged into this incident`, actor);
+    await recompute(tgt.id);
+    return { ok: true };
+  } catch { return { ok: false, error: "Merge failed." }; }
+}
+
+/** MANUAL SPLIT — move selected notifications out of an incident into a new one (created from it). */
+export async function splitIncident(number: string, alertKeys: string[], actor: Actor): Promise<{ ok: boolean; number?: string; error?: string }> {
+  if (!alertKeys?.length) return { ok: false, error: "Select at least one notification to split out." };
+  try {
+    const { data: src } = await db().from("incidents").select("*").eq("number", number).maybeSingle();
+    if (!src) return { ok: false, error: "Incident not found." };
+    const { data: newInc } = await db().from("incidents").insert({
+      title: `${src.title} (split)`, category: src.category, severity: src.severity, status: "open",
+      root_cause: src.root_cause, source_system: src.source_system, rule_id: src.rule_id, team: src.team,
+      root_cause_system: src.root_cause_system, subsystem: src.subsystem, detected_at: src.detected_at,
+      confidence: src.confidence, priority: src.priority, impact_level: src.impact_level,
+      sla_target_min: src.sla_target_min, sla_due_at: src.sla_due_at, split_from_id: src.id,
+      description: `Split from ${src.number}.`,
+    }).select("id,number").single();
+    await db().from("incident_notifications").update({ incident_id: newInc.id }).eq("incident_id", src.id).in("alert_key", alertKeys);
+    await addHistory(src.id, "split", `${alertKeys.length} notification(s) split into ${newInc.number}`, actor);
+    await addHistory(newInc.id, "split", `Split from ${src.number}`, actor);
+    await Promise.all([recompute(src.id), recompute(newInc.id)]);
+    return { ok: true, number: newInc.number };
+  } catch { return { ok: false, error: "Split failed." }; }
+}
+
+/** DISMISS — mark a false positive (auditable; never deleted). */
+export async function dismissIncident(number: string, reason: string, actor: Actor): Promise<{ ok: boolean; error?: string }> {
+  if (!reason?.trim()) return { ok: false, error: "A dismissal reason is required." };
+  try {
+    const id = await incId(number); if (!id) return { ok: false, error: "Incident not found." };
+    await db().from("incidents").update({ status: "dismissed", false_positive: true, dismissed_at: touch(), dismiss_reason: reason.trim(), resolved_at: touch(), last_activity_at: touch() }).eq("id", id);
+    await addHistory(id, "dismissed", `False positive — ${reason.slice(0, 120)}`, actor);
+    return { ok: true };
+  } catch { return { ok: false, error: "Dismiss failed." }; }
+}
+
+/** RECLASSIFY — correct a mis-categorised incident (records the previous category). */
+export async function reclassifyIncident(number: string, newCategory: string, actor: Actor): Promise<{ ok: boolean; error?: string }> {
+  const cat = newCategory as IncidentCategory;
+  if (!INCIDENT_CATEGORY_LABEL[cat]) return { ok: false, error: "Unknown category." };
+  try {
+    const { data: inc } = await db().from("incidents").select("id,category").eq("number", number).maybeSingle();
+    if (!inc) return { ok: false, error: "Incident not found." };
+    if (inc.category === cat) return { ok: false, error: "Already this category." };
+    await db().from("incidents").update({ category: cat, reclassified_from: inc.category, subsystem: categorySubsystem(cat), team: CATEGORY_TEAM[cat], last_activity_at: touch() }).eq("id", inc.id);
+    await addHistory(inc.id, "reclassified", `${INCIDENT_CATEGORY_LABEL[inc.category as IncidentCategory] ?? inc.category} → ${INCIDENT_CATEGORY_LABEL[cat]}`, actor);
+    return { ok: true };
+  } catch { return { ok: false, error: "Reclassify failed." }; }
+}
+
+/** Tick a runbook step (guided workflow). */
+export async function toggleRunbookStep(stepId: string, done: boolean, actor: Actor): Promise<{ ok: boolean }> {
+  try {
+    const { data: step } = await db().from("incident_runbook_steps").select("id,incident_id,title").eq("id", stepId).maybeSingle();
+    if (!step) return { ok: false };
+    await db().from("incident_runbook_steps").update({ done, done_by: done ? actor.name : null, done_at: done ? touch() : null }).eq("id", stepId);
+    await db().from("incidents").update({ last_activity_at: touch() }).eq("id", step.incident_id);
+    await addHistory(step.incident_id, "runbook_step", `${done ? "✓" : "☐"} ${step.title}`, actor);
+    return { ok: true };
+  } catch { return { ok: false }; }
+}
+
+/** SIMULATION / FIRE DRILL — create a flagged incident to exercise routing/escalation/notification
+ *  without touching production metrics. Routing (auto-assignment) is real; escalation + notification
+ *  are previewed deterministically in the history (no real emails sent). */
+export async function createSimulationIncident(opts: { category?: string; severity?: string }, actor: Actor): Promise<{ ok: boolean; number?: string }> {
+  try {
+    const category = (opts.category as IncidentCategory) && INCIDENT_CATEGORY_LABEL[opts.category as IncidentCategory] ? (opts.category as IncidentCategory) : "refund";
+    const severity = (["critical", "high", "medium", "low", "info"].includes(opts.severity ?? "") ? opts.severity : "high") as IncidentSeverity;
+    const rc = classifyRootCause({ sourceSystem: CATEGORY_TEAM[category] === "finance" ? "Razorpay" : null, category, reason: category });
+    const impactLevel = impactLevelFromOrders(0);
+    const priority = priorityFrom(severity, impactLevel);
+    const slaMin = slaTargetFor(priority);
+    const now = Date.now();
+    const { data: inc } = await db().from("incidents").insert({
+      title: `[SIMULATION] ${INCIDENT_CATEGORY_LABEL[category]} fire drill`, category, severity, status: "open",
+      root_cause: "Simulated incident (fire drill)", source_system: "Simulation", team: CATEGORY_TEAM[category],
+      root_cause_system: rc.system, subsystem: categorySubsystem(category), detected_at: new Date(now).toISOString(),
+      confidence: 100, confidence_reasons: [{ factor: "simulation", detail: "Operator-created fire drill", points: 100 }],
+      priority, impact_level: impactLevel, sla_target_min: slaMin, sla_due_at: new Date(now + slaMin * 60000).toISOString(),
+      is_simulation: true, description: "Fire-drill incident — excluded from health, analytics and metrics.",
+    }).select("id,number").single();
+    await seedChecklist(inc.id, category);
+    await seedRunbook(inc.id, category);
+    await addHistory(inc.id, "simulation_created", `Fire drill created by ${actor.name}`, actor);
+    await applyAutoAssignment(inc.id, { category, rootCauseSystem: rc.system, revenue: 0, severity });   // real routing
+    // Deterministic escalation + notification preview (no real dispatch).
+    for (const lvl of ESCALATION_POLICY) await addHistory(inc.id, "simulation_preview", `Would escalate L${lvl.level} → ${lvl.notify} via ${lvl.channels.join(", ")} at +${lvl.afterMinutes}m`);
+    return { ok: true, number: inc.number };
+  } catch { return { ok: false }; }
+}
+
+/** Delete a simulation incident (drill cleanup) — only simulations may be deleted. */
+export async function deleteSimulation(number: string, actor: Actor): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const { data: inc } = await db().from("incidents").select("id,is_simulation").eq("number", number).maybeSingle();
+    if (!inc) return { ok: false, error: "Not found." };
+    if (!inc.is_simulation) return { ok: false, error: "Only simulation incidents can be deleted." };
+    await db().from("incidents").delete().eq("id", inc.id);   // cascades children
+    return { ok: true };
+  } catch { return { ok: false, error: "Delete failed." }; }
+}
+
+// ── Suppression rules + maintenance windows (operator-managed, configurable) ─────
+export interface SuppressionRule { id: string; reason: string; category: string | null; subsystem: string | null; rootCauseSystem: string | null; reasonPattern: string | null; startsAt: string | null; endsAt: string | null; enabled: boolean; createdBy: string | null; createdAt: string }
+export async function listSuppressionRules(): Promise<SuppressionRule[]> {
+  try {
+    const { data } = await db().from("incident_suppression_rules").select("*").order("created_at", { ascending: false });
+    return ((data ?? []) as any[]).map((r) => ({ id: r.id, reason: r.reason, category: r.category ?? null, subsystem: r.subsystem ?? null, rootCauseSystem: r.root_cause_system ?? null, reasonPattern: r.reason_pattern ?? null, startsAt: r.starts_at ?? null, endsAt: r.ends_at ?? null, enabled: r.enabled, createdBy: r.created_by ?? null, createdAt: r.created_at }));
+  } catch { return []; }
+}
+export async function createSuppressionRule(input: { reason: string; category?: string | null; subsystem?: string | null; rootCauseSystem?: string | null; reasonPattern?: string | null; startsAt?: string | null; endsAt?: string | null }, actor: Actor): Promise<{ ok: boolean; error?: string }> {
+  if (!input.reason?.trim()) return { ok: false, error: "A reason is required." };
+  try {
+    await db().from("incident_suppression_rules").insert({ reason: input.reason.trim(), category: input.category || null, subsystem: input.subsystem || null, root_cause_system: input.rootCauseSystem || null, reason_pattern: input.reasonPattern || null, starts_at: input.startsAt || null, ends_at: input.endsAt || null, created_by: actor.name });
+    return { ok: true };
+  } catch { return { ok: false, error: "Create failed." }; }
+}
+export async function setSuppressionEnabled(id: string, enabled: boolean): Promise<{ ok: boolean }> {
+  try { await db().from("incident_suppression_rules").update({ enabled }).eq("id", id); return { ok: true }; } catch { return { ok: false }; }
+}
+export async function deleteSuppressionRule(id: string): Promise<{ ok: boolean }> {
+  try { await db().from("incident_suppression_rules").delete().eq("id", id); return { ok: true }; } catch { return { ok: false }; }
+}
+
+export interface MaintenanceWindow { id: string; title: string; rootCauseSystem: string | null; subsystem: string | null; startsAt: string; endsAt: string; reason: string | null; enabled: boolean; active: boolean; createdBy: string | null }
+export async function listMaintenanceWindows(): Promise<MaintenanceWindow[]> {
+  try {
+    const now = Date.now();
+    const { data } = await db().from("maintenance_windows").select("*").order("starts_at", { ascending: false });
+    return ((data ?? []) as any[]).map((r) => ({ id: r.id, title: r.title, rootCauseSystem: r.root_cause_system ?? null, subsystem: r.subsystem ?? null, startsAt: r.starts_at, endsAt: r.ends_at, reason: r.reason ?? null, enabled: r.enabled, active: r.enabled && now >= new Date(r.starts_at).getTime() && now <= new Date(r.ends_at).getTime(), createdBy: r.created_by ?? null }));
+  } catch { return []; }
+}
+export async function createMaintenanceWindow(input: { title: string; rootCauseSystem?: string | null; subsystem?: string | null; startsAt: string; endsAt: string; reason?: string | null }, actor: Actor): Promise<{ ok: boolean; error?: string }> {
+  if (!input.title?.trim() || !input.startsAt || !input.endsAt) return { ok: false, error: "Title, start and end are required." };
+  if (new Date(input.endsAt).getTime() <= new Date(input.startsAt).getTime()) return { ok: false, error: "End must be after start." };
+  try {
+    await db().from("maintenance_windows").insert({ title: input.title.trim(), root_cause_system: input.rootCauseSystem || null, subsystem: input.subsystem || null, starts_at: input.startsAt, ends_at: input.endsAt, reason: input.reason || null, created_by: actor.name });
+    return { ok: true };
+  } catch { return { ok: false, error: "Create failed." }; }
+}
+export async function setMaintenanceEnabled(id: string, enabled: boolean): Promise<{ ok: boolean }> {
+  try { await db().from("maintenance_windows").update({ enabled }).eq("id", id); return { ok: true }; } catch { return { ok: false }; }
+}
+export async function deleteMaintenanceWindow(id: string): Promise<{ ok: boolean }> {
+  try { await db().from("maintenance_windows").delete().eq("id", id); return { ok: true }; } catch { return { ok: false }; }
+}
+
+/** DEPENDENCY GRAPH — the configured nodes/edges plus which nodes have active incidents right now. */
+export interface DependencyGraph { nodes: { id: string; label: string; layer: number; active: boolean }[]; edges: { from: string; to: string }[] }
+export async function getDependencyGraph(): Promise<DependencyGraph> {
+  const active = new Set<string>();
+  try {
+    const { data } = await db().from("incidents").select("root_cause_system,subsystem").eq("is_simulation", false).in("status", ["open", "investigating", "mitigated"]);
+    for (const r of (data ?? []) as any[]) { if (r.root_cause_system) active.add(r.root_cause_system); if (r.subsystem) active.add(r.subsystem); }
+  } catch { /* best-effort */ }
+  return {
+    nodes: DEPENDENCY_NODES.map((n) => ({ id: n.id, label: n.label, layer: n.layer, active: active.has(n.id) })),
+    edges: DEPENDENCY_EDGES.map((e) => ({ from: e.from, to: e.to })),
+  };
 }

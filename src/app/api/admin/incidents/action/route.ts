@@ -5,6 +5,8 @@ import {
   assignIncident, removeAssignment, watchIncident, unwatchIncident, setIncidentTeam, setIncidentStatus,
   setIncidentSeverity, addIncidentNote, toggleChecklistItem, snoozeIncident, correlateIncidents,
   resolveWithKnowledge, computeBusinessImpact,
+  mergeIncidents, splitIncident, dismissIncident, reclassifyIncident, toggleRunbookStep,
+  createSimulationIncident, deleteSimulation, generatePostmortem,
 } from "@/services/incidentService";
 
 /**
@@ -30,7 +32,7 @@ export async function POST(request: Request) {
   const staff = await requireStaff("editor");
   if (!staff.ok) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
 
-  let b: { action?: string; number?: string; status?: string; severity?: string; note?: string; team?: string; role?: string; itemId?: string; done?: boolean; minutes?: number; targetId?: string; targetName?: string; userId?: string; rootCause?: string; resolution?: string; prevention?: string };
+  let b: { action?: string; number?: string; status?: string; severity?: string; note?: string; team?: string; role?: string; itemId?: string; done?: boolean; minutes?: number; targetId?: string; targetName?: string; userId?: string; rootCause?: string; resolution?: string; prevention?: string; targetNumber?: string; alertKeys?: string[]; reason?: string; category?: string; stepId?: string };
   try { b = (await request.json()) as typeof b; } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
 
   if (b.action === "correlate") return NextResponse.json({ ok: true, result: await correlateIncidents() });
@@ -60,6 +62,38 @@ export async function POST(request: Request) {
       return r.ok ? NextResponse.json({ ok: true }) : NextResponse.json({ error: r.error ?? "Failed." }, { status: 400 });
     }
     case "impact": return num ? NextResponse.json({ ok: true, impact: await computeBusinessImpact(num) }) : NextResponse.json({ error: "number required." }, { status: 400 });
+    // ── Phase 4 ──
+    case "merge": {
+      if (!num || !b.targetNumber) return NextResponse.json({ error: "number + targetNumber required." }, { status: 400 });
+      const r = await mergeIncidents(num, b.targetNumber, actor);
+      return r.ok ? NextResponse.json({ ok: true }) : NextResponse.json({ error: r.error ?? "Failed." }, { status: 400 });
+    }
+    case "split": {
+      if (!num || !Array.isArray(b.alertKeys)) return NextResponse.json({ error: "number + alertKeys required." }, { status: 400 });
+      const r = await splitIncident(num, b.alertKeys, actor);
+      return r.ok ? NextResponse.json({ ok: true, number: r.number }) : NextResponse.json({ error: r.error ?? "Failed." }, { status: 400 });
+    }
+    case "dismiss": {
+      if (!num) return NextResponse.json({ error: "number required." }, { status: 400 });
+      const r = await dismissIncident(num, b.reason ?? "", actor);
+      return r.ok ? NextResponse.json({ ok: true }) : NextResponse.json({ error: r.error ?? "Failed." }, { status: 400 });
+    }
+    case "reclassify": {
+      if (!num || !b.category) return NextResponse.json({ error: "number + category required." }, { status: 400 });
+      const r = await reclassifyIncident(num, b.category, actor);
+      return r.ok ? NextResponse.json({ ok: true }) : NextResponse.json({ error: r.error ?? "Failed." }, { status: 400 });
+    }
+    case "runbook": return b.stepId != null && b.done != null ? ok(await toggleRunbookStep(b.stepId, b.done, actor)) : NextResponse.json({ error: "stepId + done required." }, { status: 400 });
+    case "postmortem": return num ? ok(await generatePostmortem(num, actor)) : NextResponse.json({ error: "number required." }, { status: 400 });
+    case "simulate": {
+      const r = await createSimulationIncident({ category: b.category, severity: b.severity }, actor);
+      return r.ok ? NextResponse.json({ ok: true, number: r.number }) : NextResponse.json({ error: "Failed." }, { status: 500 });
+    }
+    case "delete_simulation": {
+      if (!num) return NextResponse.json({ error: "number required." }, { status: 400 });
+      const r = await deleteSimulation(num, actor);
+      return r.ok ? NextResponse.json({ ok: true }) : NextResponse.json({ error: r.error ?? "Failed." }, { status: 400 });
+    }
     default: return NextResponse.json({ error: "Unknown action." }, { status: 400 });
   }
 }

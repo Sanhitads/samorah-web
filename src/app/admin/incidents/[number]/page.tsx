@@ -4,12 +4,14 @@ import { redirect, notFound } from "next/navigation";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { getIncidentByNumber, getStaffUsers } from "@/services/incidentService";
 import { IncidentToolbar, IncidentChecklist, IncidentNoteForm, IncidentResolve } from "@/components/admin/IncidentControls";
+import { EscalationCountdown, IncidentRunbook, IncidentCorrection, DeleteSimulation } from "@/components/admin/IncidentEnterprise";
 import { TEAM_LABEL, ROOT_CAUSE_LABEL, SUBSYSTEM_LABEL, type RootCauseSystem, type Subsystem } from "@/config/incidents";
 
 export const metadata: Metadata = { title: "Incident", robots: { index: false } };
 export const dynamic = "force-dynamic";
 
 const SEV_ICON: Record<string, string> = { critical: "🔴", high: "🟠", medium: "🟡", low: "🔵", info: "⚪" };
+const SLA_LABEL: Record<string, string> = { none: "—", on_track: "On track", at_risk: "At risk", breached: "Breached", met: "Met" };
 const HIST_LABEL: Record<string, string> = {
   created: "Incident created", assigned: "Assigned", transferred: "Transferred", unassigned: "Unassigned",
   status_changed: "Status changed", severity_changed: "Severity changed", team_changed: "Team changed",
@@ -17,6 +19,10 @@ const HIST_LABEL: Record<string, string> = {
   watcher_added: "Watcher added", watcher_removed: "Watcher removed", snoozed: "Snoozed",
   notification_added: "Notification added", notification_removed: "Notification removed", notification_resolved: "Notification resolved", resolved: "Incident resolved",
   root_cause_detected: "Root cause detected", correlated: "Cross-system correlation", escalated: "Escalated",
+  confidence_scored: "Confidence scored", threshold_context: "Dynamic threshold", priority_set: "Priority set",
+  auto_assigned: "Auto-assigned", recovery_detected: "Recovery detected", sla_breached: "SLA breached",
+  merged: "Merged", split: "Split", dismissed: "Dismissed", reclassified: "Reclassified",
+  runbook_step: "Runbook step", postmortem_generated: "Postmortem generated", simulation_created: "Simulation created", simulation_preview: "Simulation preview",
 };
 const dt = (iso: string) => new Date(iso).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 const inr = (n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
@@ -37,15 +43,34 @@ export default async function IncidentDetailPage({ params }: { params: Promise<{
     <main className="admin">
       <header className="admin__head">
         <p className="admin__eyebrow"><Link href="/admin/incidents" className="od-back">← Incidents</Link></p>
-        <h1 className="admin__title">{inc.number}</h1>
+        <h1 className="admin__title">{inc.number}{inc.isSimulation ? <span className="inc-simbadge">SIMULATION</span> : null}</h1>
         <p className="admin__count">
-          <span className="inc-sev" data-s={inc.severity}>{SEV_ICON[inc.severity]} {inc.severity}</span>
+          {inc.priority ? <span className="inc-prio" data-p={inc.priority}>{inc.priorityLabel}</span> : null}
+          <span className="inc-sev" data-s={inc.severity} style={{ marginLeft: 8 }}>{SEV_ICON[inc.severity]} {inc.severity}</span>
           <span className="inc-status" data-s={inc.status} style={{ marginLeft: 8 }}>{inc.status}</span>
+          {inc.confidence != null ? <span className="inc-conf" title="How sure the engine is" style={{ marginLeft: 8 }}>◎ {inc.confidence}% confidence</span> : null}
           <span className="admin__muted"> · {inc.title}</span>
         </p>
       </header>
 
+      {/* Status banners */}
+      {inc.isSimulation ? <div className="inc-banner inc-banner--sim">🧪 Fire drill — this incident is a simulation and is excluded from health, analytics and metrics. Escalations do not send real pages. <DeleteSimulation number={inc.number} /></div> : null}
+      {inc.mergedIntoNumber ? <div className="inc-banner inc-banner--info">🔀 Merged into <Link href={`/admin/incidents/${inc.mergedIntoNumber}`} className="admin__mono">{inc.mergedIntoNumber}</Link>.</div> : null}
+      {inc.splitFromNumber ? <div className="inc-banner inc-banner--info">✂ Split from <Link href={`/admin/incidents/${inc.splitFromNumber}`} className="admin__mono">{inc.splitFromNumber}</Link>.</div> : null}
+      {inc.falsePositive ? <div className="inc-banner inc-banner--warn">🚫 Dismissed as a false positive{inc.dismissReason ? ` — ${inc.dismissReason}` : ""}.</div> : null}
+      {inc.recoveryAt ? <div className="inc-banner inc-banner--ok">✅ Recovery detected — the upstream system is responding normally (auto-resolved {dt(inc.recoveryAt)}).</div> : null}
+      {inc.slaBreached ? <div className="inc-banner inc-banner--warn">⏰ SLA breached — resolution target of {inc.slaTargetMin}m was exceeded.</div> : null}
+      {inc.suggestedResolution ? <div className="inc-banner inc-banner--info">💡 Suggested resolution from <Link href={`/admin/incidents/${inc.suggestedResolution.number}`} className="admin__mono">{inc.suggestedResolution.number}</Link>: {inc.suggestedResolution.resolution}</div> : null}
+
       <IncidentToolbar number={inc.number} status={inc.status} severity={inc.severity} team={inc.team} assigneeName={inc.assigneeName} staffUsers={staffUsers} />
+
+      {/* Enterprise strip: SLA + escalation countdown */}
+      {!["resolved", "closed", "merged", "dismissed"].includes(inc.status) ? (
+        <div className="inc-slastrip">
+          <span className={`inc-sla inc-sla--${inc.slaStatus}`}>SLA: {SLA_LABEL[inc.slaStatus]}{inc.slaRemainingMin != null && inc.slaStatus !== "none" ? ` · ${inc.slaRemainingMin >= 0 ? `${inc.slaRemainingMin}m left` : `${-inc.slaRemainingMin}m over`}` : ""}{inc.slaTargetMin ? ` (target ${inc.slaTargetMin}m)` : ""}</span>
+          <EscalationCountdown next={inc.nextEscalation} />
+        </div>
+      ) : null}
 
       {/* Overview + People */}
       <div className="od-grid">
@@ -83,10 +108,15 @@ export default async function IncidentDetailPage({ params }: { params: Promise<{
           <div className="od-detail">
             <div><dt>Detected system</dt><dd>{inc.rootCauseSystem ? ROOT_CAUSE_LABEL[inc.rootCauseSystem as RootCauseSystem] ?? inc.rootCauseSystem : "—"}</dd></div>
             <div><dt>Subsystem</dt><dd>{inc.subsystem ? SUBSYSTEM_LABEL[inc.subsystem as Subsystem] ?? inc.subsystem : "—"}</dd></div>
+            <div><dt>Priority</dt><dd>{inc.priorityLabel ?? "—"} <span className="admin__muted">(impact {inc.impactLevelLabel ?? "—"})</span></dd></div>
+            <div><dt>Confidence</dt><dd>{inc.confidence != null ? `${inc.confidence}%` : "—"}</dd></div>
             <div><dt>Mean time to detect</dt><dd>{fmtDur(inc.mttdMin)}</dd></div>
             <div><dt>Mean time to resolve</dt><dd>{fmtDur(inc.mttrMin)}</dd></div>
           </div>
           {inc.rootCauseWhy ? <p className="admin__muted" style={{ marginTop: 8, fontSize: 12 }}>Why: {inc.rootCauseWhy}</p> : null}
+          {inc.confidenceReasons.length ? <p className="admin__muted" style={{ marginTop: 4, fontSize: 11 }}>Confidence: {inc.confidenceReasons.map((r) => `${r.detail} (+${r.points})`).join(" · ")}</p> : null}
+          {inc.assignmentReason ? <p className="admin__muted" style={{ marginTop: 4, fontSize: 11 }}>Auto-assignment: {inc.assignmentReason}</p> : null}
+          {inc.dependencyDownstream.length ? <p className="admin__muted" style={{ marginTop: 8, fontSize: 12 }}>Can cascade to: {inc.dependencyDownstream.map((d) => <span key={d.id} className="inc-depchip">{d.label}</span>)}</p> : null}
           {inc.parentNumber ? <p className="inc-group" style={{ marginTop: 10 }}>🔗 Part of a cross-system group — primary is <Link href={`/admin/incidents/${inc.parentNumber}`} className="admin__mono od-link">{inc.parentNumber}</Link></p> : null}
           {inc.children.length ? (
             <div style={{ marginTop: 10 }}>
@@ -104,8 +134,23 @@ export default async function IncidentDetailPage({ params }: { params: Promise<{
             <div className="inc-impact__cell"><span className="inc-impact__v">{inc.impact.customers}</span><span className="inc-impact__k">Customers affected</span></div>
             <div className="inc-impact__cell"><span className="inc-impact__v">{inr(inc.impact.refundValue)}</span><span className="inc-impact__k">Refund value</span></div>
             <div className="inc-impact__cell"><span className="inc-impact__v">{inc.impact.shipmentsDelayed}</span><span className="inc-impact__k">Shipments delayed</span></div>
+            <div className="inc-impact__cell inc-impact__cell--cost"><span className="inc-impact__v">{inr(inc.impact.cost)}</span><span className="inc-impact__k">Estimated cost</span></div>
           </div>
           <p className="admin__muted" style={{ marginTop: 8, fontSize: 11 }}>{inc.impact.computedAt ? `Estimated from affected orders · updated ${dt(inc.impact.computedAt)}` : "Not yet computed — runs on the next correlation cycle."}</p>
+        </section>
+      </div>
+
+      {/* Runbook (guided workflow) + Correction (merge/split/dismiss/reclassify) */}
+      <div className="od-grid">
+        <section className="od-card">
+          <h2 className="od-card__title">Runbook</h2>
+          <p className="admin__muted" style={{ fontSize: 12, marginBottom: 8 }}>Guided, ordered response for a {inc.categoryLabel.toLowerCase()} incident.</p>
+          <IncidentRunbook steps={inc.runbook} />
+        </section>
+        <section className="od-card">
+          <h2 className="od-card__title">Correction</h2>
+          <p className="admin__muted" style={{ fontSize: 12, marginBottom: 8 }}>Humans override automation: merge duplicates, split a mixed incident, reclassify, or dismiss a false positive.</p>
+          <IncidentCorrection number={inc.number} notifications={inc.notifications} currentCategory={inc.category} />
         </section>
       </div>
 
@@ -154,6 +199,21 @@ export default async function IncidentDetailPage({ params }: { params: Promise<{
           <p className="admin__muted" style={{ marginTop: 8, fontSize: 12 }}>Resolving requires root cause, resolution &amp; prevention — captured to the knowledge base so future incidents can reuse the fix.</p>
         </section>
       )}
+
+      {/* Postmortem (searchable, generated on resolve) */}
+      {inc.postmortem ? (
+        <section className="od-card">
+          <h2 className="od-card__title">Postmortem</h2>
+          <div className="inc-pm">
+            <div className="inc-pm__row"><dt>Summary</dt><dd>{inc.postmortem.summary ?? "—"}</dd></div>
+            <div className="inc-pm__row"><dt>Root cause</dt><dd>{inc.postmortem.rootCause ?? "—"}</dd></div>
+            <div className="inc-pm__row"><dt>Impact</dt><dd>{inc.postmortem.impact ?? "—"}</dd></div>
+            <div className="inc-pm__row"><dt>Resolution</dt><dd>{inc.postmortem.resolution ?? "—"}</dd></div>
+            <div className="inc-pm__row"><dt>Lessons learned</dt><dd>{inc.postmortem.lessons ?? "—"}</dd></div>
+          </div>
+          {inc.postmortem.generatedAt ? <p className="admin__muted" style={{ marginTop: 6, fontSize: 11 }}>Generated {dt(inc.postmortem.generatedAt)}</p> : null}
+        </section>
+      ) : null}
 
       {/* Checklist + Notes */}
       <div className="od-grid">

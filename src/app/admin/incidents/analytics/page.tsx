@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth/requireStaff";
-import { getSystemHealth, getIncidentAnalytics } from "@/services/incidentService";
-import { HealthStrip } from "@/components/admin/IncidentHealth";
+import { getSystemHealth, getIncidentAnalytics, getDependencyGraph } from "@/services/incidentService";
+import { HealthStrip, HealthHeatmap } from "@/components/admin/IncidentHealth";
+import { DependencyGraph } from "@/components/admin/DependencyGraph";
 
 /** Operations intelligence — Health Dashboard + Analytics (Phase 3). Server-rendered. */
 export const metadata: Metadata = { title: "Incident Analytics", robots: { index: false } };
@@ -16,7 +17,7 @@ export default async function IncidentAnalyticsPage({ searchParams }: { searchPa
   if (!staff.ok) redirect("/login");
   const sp = await searchParams;
   const days = sp.days ? Number(sp.days) : 90;
-  const [health, a] = await Promise.all([getSystemHealth(), getIncidentAnalytics(days)]);
+  const [health, a, depGraph] = await Promise.all([getSystemHealth(), getIncidentAnalytics(days), getDependencyGraph()]);
   const maxMonthly = Math.max(1, ...a.monthly.map((m) => m.opened));
 
   return (
@@ -30,10 +31,13 @@ export default async function IncidentAnalyticsPage({ searchParams }: { searchPa
         <nav className="inc-subnav">
           <Link href="/admin/incidents" className="op-item__btn">← Incidents</Link>
           <Link href="/admin/incidents?status=all" className="op-item__btn">Archive</Link>
+          <Link href="/admin/incidents/config" className="op-item__btn">⚙ Config</Link>
           {[30, 90, 365].map((d) => <Link key={d} href={`/admin/incidents/analytics?days=${d}`} className={`op-item__btn${d === a.windowDays ? " is-active" : ""}`}>{d}d</Link>)}
         </nav>
       </header>
 
+      <h2 className="od-card__title" style={{ marginBottom: 8 }}>Operational heatmap</h2>
+      <HealthHeatmap health={health} />
       <HealthStrip health={health} />
 
       {/* KPI cards */}
@@ -88,6 +92,11 @@ export default async function IncidentAnalyticsPage({ searchParams }: { searchPa
           </div>
         ) : <p className="admin__muted">No trend data yet.</p>}
         <p className="admin__muted" style={{ marginTop: 8, fontSize: 12 }}><span className="inc-trend__key inc-trend__key--opened" /> Opened &nbsp; <span className="inc-trend__key inc-trend__key--resolved" /> Resolved</p>
+      </section>
+
+      <section className="od-card">
+        <h2 className="od-card__title">System dependency graph</h2>
+        <DependencyGraph graph={depGraph} />
       </section>
     </main>
   );

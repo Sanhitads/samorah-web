@@ -143,12 +143,15 @@ export function IncidentFilterBar({ total, page, pageSize }: { total: number; pa
       <div className="inc-filters">
         <input className="nc-search" type="search" defaultValue={val("q")} placeholder="Search ID, order, customer, gateway, reason…" onKeyDown={(e) => { if (e.key === "Enter") set("q", (e.target as HTMLInputElement).value); }} />
         <select value={val("status") || "active"} onChange={(e) => set("status", e.target.value === "active" ? "" : e.target.value)}><option value="active">Open</option><option value="all">All statuses</option><option value="investigating">Investigating</option><option value="mitigated">Mitigated</option><option value="resolved">Resolved</option><option value="closed">Closed</option></select>
+        <select value={val("priority")} onChange={(e) => set("priority", e.target.value)}><option value="">Any priority</option><option value="p1">P1</option><option value="p2">P2</option><option value="p3">P3</option><option value="p4">P4</option></select>
         <select value={val("severity")} onChange={(e) => set("severity", e.target.value)}><option value="">Any severity</option>{SEVERITIES.map((s) => <option key={s} value={s}>{s}</option>)}</select>
         <select value={val("category")} onChange={(e) => set("category", e.target.value)}><option value="">Any category</option><option value="refund">Refund</option><option value="payment_gateway">Payment Gateway</option><option value="shipment">Shipment</option><option value="inventory">Inventory</option><option value="email">Email</option></select>
         <select value={val("team")} onChange={(e) => set("team", e.target.value)}><option value="">Any team</option>{TEAMS.map((t) => <option key={t.v} value={t.v}>{t.l}</option>)}</select>
         <select value={val("assigned")} onChange={(e) => set("assigned", e.target.value)}><option value="">Anyone</option><option value="mine">Assigned to me</option><option value="unassigned">Unassigned</option></select>
         <select value={val("created")} onChange={(e) => set("created", e.target.value)}><option value="">Any time</option><option value="1">Created today</option><option value="7">This week</option></select>
         <select value={val("resolved")} onChange={(e) => set("resolved", e.target.value)}><option value="">—</option><option value="today">Resolved today</option></select>
+        <button type="button" className={`op-item__btn${val("review") === "1" ? " is-active" : ""}`} onClick={() => set("review", val("review") === "1" ? "" : "1")}>Review queue</button>
+        <button type="button" className={`op-item__btn${val("sla") === "breached" ? " is-active" : ""}`} onClick={() => set("sla", val("sla") === "breached" ? "" : "breached")}>SLA breached</button>
       </div>
       <div className="inc-listbar">
         <span className="admin__muted">{total} incident{total === 1 ? "" : "s"} · page {page}/{pages}</span>

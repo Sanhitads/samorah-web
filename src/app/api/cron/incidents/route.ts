@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { cronAuthorized } from "@/lib/cronAuth";
-import { correlateIncidents, runEscalations, refreshActiveImpacts } from "@/services/incidentService";
+import { correlateIncidents, runEscalations, refreshActiveImpacts, runSlaChecks } from "@/services/incidentService";
 
 /**
  * Incident correlation cron. Runs the deterministic rule engine to open/merge incidents from
@@ -14,9 +14,10 @@ export async function POST(request: Request) {
   if (!cronAuthorized(request)) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   try {
     const result = await correlateIncidents();
+    const sla = await runSlaChecks();
     const escalation = await runEscalations();
     const impact = await refreshActiveImpacts();
-    return NextResponse.json({ ...result, ...escalation, ...impact });
+    return NextResponse.json({ ...result, ...sla, ...escalation, ...impact });
   } catch (e) {
     console.error("incident correlation cron failed", e);
     return NextResponse.json({ error: "Correlation failed." }, { status: 500 });
