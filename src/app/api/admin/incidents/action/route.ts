@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import {
   assignIncident, removeAssignment, watchIncident, unwatchIncident, setIncidentTeam, setIncidentStatus,
   setIncidentSeverity, addIncidentNote, toggleChecklistItem, snoozeIncident, correlateIncidents,
+  resolveWithKnowledge, computeBusinessImpact,
 } from "@/services/incidentService";
 
 /**
@@ -29,7 +30,7 @@ export async function POST(request: Request) {
   const staff = await requireStaff("editor");
   if (!staff.ok) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
 
-  let b: { action?: string; number?: string; status?: string; severity?: string; note?: string; team?: string; role?: string; itemId?: string; done?: boolean; minutes?: number; targetId?: string; targetName?: string; userId?: string };
+  let b: { action?: string; number?: string; status?: string; severity?: string; note?: string; team?: string; role?: string; itemId?: string; done?: boolean; minutes?: number; targetId?: string; targetName?: string; userId?: string; rootCause?: string; resolution?: string; prevention?: string };
   try { b = (await request.json()) as typeof b; } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
 
   if (b.action === "correlate") return NextResponse.json({ ok: true, result: await correlateIncidents() });
@@ -53,6 +54,12 @@ export async function POST(request: Request) {
     case "note": return num && b.note ? ok(await addIncidentNote(num, b.note, actor)) : NextResponse.json({ error: "number + note required." }, { status: 400 });
     case "checklist": return b.itemId != null && b.done != null ? ok(await toggleChecklistItem(b.itemId, b.done, actor)) : NextResponse.json({ error: "itemId + done required." }, { status: 400 });
     case "snooze": return num && b.minutes != null ? ok(await snoozeIncident(num, b.minutes, actor)) : NextResponse.json({ error: "number + minutes required." }, { status: 400 });
+    case "resolve": {   // Knowledge-base resolve — root cause + resolution + prevention all required
+      if (!num) return NextResponse.json({ error: "number required." }, { status: 400 });
+      const r = await resolveWithKnowledge(num, { rootCause: b.rootCause ?? "", resolution: b.resolution ?? "", prevention: b.prevention ?? "" }, actor);
+      return r.ok ? NextResponse.json({ ok: true }) : NextResponse.json({ error: r.error ?? "Failed." }, { status: 400 });
+    }
+    case "impact": return num ? NextResponse.json({ ok: true, impact: await computeBusinessImpact(num) }) : NextResponse.json({ error: "number required." }, { status: 400 });
     default: return NextResponse.json({ error: "Unknown action." }, { status: 400 });
   }
 }

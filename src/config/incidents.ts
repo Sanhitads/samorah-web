@@ -157,3 +157,64 @@ export const INCIDENT_CHECKLISTS: Partial<Record<IncidentCategory, string[]>> = 
   email: ["Check Resend status", "Verify sending domain / DNS", "Re-queue failed emails"],
   import_export: ["Re-run the job", "Validate the file", "Confirm completion"],
 };
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Phase 3 — Enterprise Operations Intelligence config (all deterministic/explainable)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** Common upstream causes we can attribute deterministically (no AI/guessing). */
+export type RootCauseSystem = "razorpay" | "shiprocket" | "smtp" | "inventory" | "database" | "supabase" | "unknown";
+export const ROOT_CAUSE_LABEL: Record<RootCauseSystem, string> = {
+  razorpay: "Razorpay", shiprocket: "Shiprocket", smtp: "SMTP / Email", inventory: "Inventory",
+  database: "Database", supabase: "Supabase", unknown: "Unknown",
+};
+
+/**
+ * Root-cause classification rules, evaluated in order. The FIRST rule whose source-system or
+ * reason pattern matches wins — so the attribution is always traceable to a concrete signal
+ * (shown in the UI as "why"). `sourceSystems` matches the incident's source_system; `reason`
+ * is a case-insensitive regex over the failure reason / root-cause text.
+ */
+export interface RootCauseRule { system: RootCauseSystem; sourceSystems?: string[]; reason?: string; categories?: IncidentCategory[] }
+export const ROOT_CAUSE_RULES: RootCauseRule[] = [
+  { system: "razorpay", sourceSystems: ["Razorpay"], reason: "razorpay|payment|gateway|refund|upi|card" },
+  { system: "shiprocket", sourceSystems: ["Shiprocket"], reason: "shiprocket|courier|awb|manifest|pickup" },
+  { system: "smtp", sourceSystems: ["Resend", "SMTP"], reason: "smtp|resend|email|mail|bounce|dns|spf|dkim" },
+  { system: "inventory", categories: ["inventory"], reason: "inventory|stock|sku|oversell|sync" },
+  { system: "supabase", reason: "supabase|postgrest|jwt|rls|realtime|pgbouncer" },
+  { system: "database", reason: "database|deadlock|timeout|connection|constraint|sql|relation|pool" },
+];
+
+/** Operational subsystems shown on the Health Dashboard. */
+export type Subsystem = "payments" | "inventory" | "shipping" | "email" | "checkout" | "customers";
+export const SUBSYSTEMS: Subsystem[] = ["payments", "inventory", "shipping", "email", "checkout", "customers"];
+export const SUBSYSTEM_LABEL: Record<Subsystem, string> = {
+  payments: "Payments", inventory: "Inventory", shipping: "Shipping", email: "Email", checkout: "Checkout", customers: "Customers",
+};
+/** Which subsystem an incident category primarily belongs to. */
+export const CATEGORY_SUBSYSTEM: Record<IncidentCategory, Subsystem> = {
+  payment_gateway: "payments", refund: "payments", shipment: "shipping", inventory: "inventory",
+  email: "email", import_export: "checkout", unknown: "checkout",
+};
+
+export type HealthState = "healthy" | "warning" | "critical";
+/** Health thresholds — a subsystem is Critical with any active critical incident (or ≥N active),
+ *  Warning with any active high/medium (or an incident older than warnMinutes), else Healthy. */
+export const HEALTH_THRESHOLDS = { criticalCount: 3, warnMinutes: 60 };
+
+/**
+ * Escalation policy — time-based, deterministic. Each level fires ONCE when an incident stays
+ * unresolved past `afterMinutes`. `notify` is the role paged; `channels` how. Fully configurable.
+ */
+export interface EscalationLevel { level: number; afterMinutes: number; notify: "manager" | "admin"; channels: ("in_app" | "email" | "slack" | "sms")[] }
+export const ESCALATION_POLICY: EscalationLevel[] = [
+  { level: 1, afterMinutes: 30, notify: "manager", channels: ["in_app"] },
+  { level: 2, afterMinutes: 60, notify: "admin", channels: ["in_app", "email"] },
+  { level: 3, afterMinutes: 120, notify: "admin", channels: ["in_app", "email", "slack", "sms"] },
+];
+/** Escalation only applies to incidents at/above this severity (info/low don't page anyone). */
+export const ESCALATION_MIN_SEVERITY: IncidentSeverity = "medium";
+
+/** Cross-system correlation window — active incidents sharing a root-cause system that started
+ *  within this window are grouped under one primary (the cascade → ONE incident). */
+export const CROSS_SYSTEM_WINDOW_MIN = 20;

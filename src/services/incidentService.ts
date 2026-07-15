@@ -6,8 +6,17 @@
  * an incident references them by their stable `alert_key`.
  */
 import { createAdminClient } from "@/lib/supabase/admin";
-import { INCIDENT_RULES, INCIDENT_CATEGORY_LABEL, CATEGORY_TEAM, INCIDENT_CHECKLISTS, type IncidentRule, type IncidentSeverity, type IncidentCategory } from "@/config/incidents";
-import { highestSeverity, ruleTriggered, matchesReason, shouldMergeInto, allNotificationsResolved, incidentTitle, matchesIncidentSearch } from "@/lib/incidents/engine";
+import { sendEmail, emailConfigured } from "@/lib/email";
+import {
+  INCIDENT_RULES, INCIDENT_CATEGORY_LABEL, CATEGORY_TEAM, INCIDENT_CHECKLISTS,
+  SUBSYSTEMS, SUBSYSTEM_LABEL, ROOT_CAUSE_LABEL, ESCALATION_POLICY, ESCALATION_MIN_SEVERITY, CROSS_SYSTEM_WINDOW_MIN,
+  type IncidentRule, type IncidentSeverity, type IncidentCategory, type Subsystem, type RootCauseSystem, type HealthState,
+} from "@/config/incidents";
+import {
+  highestSeverity, ruleTriggered, matchesReason, shouldMergeInto, allNotificationsResolved, incidentTitle,
+  matchesIncidentSearch, classifyRootCause, categorySubsystem, subsystemHealth, overallHealth, dueEscalations,
+  resemblance, withinCorrelationWindow, minutesBetween, meanMinutes, topBy, severityRank,
+} from "@/lib/incidents/engine";
 
 const db = () => createAdminClient() as any;
 
@@ -95,14 +104,19 @@ export async function correlateIncidents(): Promise<CorrelationResult> {
     if (inc && shouldMergeInto({ category: inc.category, ruleId: inc.rule_id, status: inc.status, lastActivityAt: inc.last_activity_at }, rule, now)) {
       incidentId = inc.id; merged++;
     } else {
+      // Phase 3: deterministic root-cause attribution + subsystem tag + detection time (MTTD).
+      const rc = classifyRootCause({ sourceSystem: rule.sourceSystem, category: rule.category, reason: rule.rootCauseLabel });
+      const detectedAt = notifs.reduce<string | null>((min, n) => (n.at && (!min || n.at < min) ? n.at : min), null);
       const { data: newInc } = await db().from("incidents").insert({
         title: incidentTitle(rule, notifs.length), category: rule.category, severity: rule.notificationSeverity, status: "open",
         root_cause: rule.rootCauseLabel, source_system: rule.sourceSystem, rule_id: rule.id, team: CATEGORY_TEAM[rule.category as IncidentCategory],
+        root_cause_system: rc.system, subsystem: categorySubsystem(rule.category), detected_at: detectedAt ?? new Date().toISOString(),
         description: `Correlated by rule "${rule.id}" — ${rows.length} events within ${rule.windowMinutes} min.`,
       }).select("id").single();
       incidentId = newInc.id;
       await seedChecklist(incidentId, rule.category as IncidentCategory); // configurable template
       await addHistory(incidentId, "created", `Opened by rule ${rule.id} — ${rows.length} events in ${rule.windowMinutes}m`);
+      await addHistory(incidentId, "root_cause_detected", `${ROOT_CAUSE_LABEL[rc.system]} — ${rc.why}`);
       created++;
     }
 
@@ -118,8 +132,47 @@ export async function correlateIncidents(): Promise<CorrelationResult> {
     await recompute(incidentId);
   }
 
+  await groupCrossSystem();          // Phase 3: cascade across systems → ONE primary
   const { resolved } = await autoResolveIncidents();
   return { created, merged, attached, resolved };
+}
+
+/**
+ * ADVANCED CORRELATION (Phase 3) — group active incidents that share a root-cause system and
+ * started within the correlation window under a single PRIMARY (a cascade like gateway-timeout →
+ * refund-failed → payment-failed → email-failed becomes one Payment Gateway incident). The
+ * earliest-started incident is the primary; later ones get `parent_incident_id`. Deterministic
+ * and reversible — grouping only sets a pointer, never deletes; each link is logged.
+ */
+export async function groupCrossSystem(): Promise<{ grouped: number }> {
+  let grouped = 0;
+  try {
+    const { data } = await db().from("incidents")
+      .select("id,number,root_cause_system,started_at,parent_incident_id,severity")
+      .in("status", ["open", "investigating", "mitigated"])
+      .not("root_cause_system", "is", null)
+      .neq("root_cause_system", "unknown")
+      .order("started_at", { ascending: true });
+    const rows = (data ?? []) as any[];
+    const bySystem = new Map<string, any[]>();
+    for (const r of rows) { const k = r.root_cause_system; if (!bySystem.has(k)) bySystem.set(k, []); bySystem.get(k)!.push(r); }
+
+    for (const [, group] of bySystem) {
+      if (group.length < 2) continue;                 // nothing to correlate
+      const primary = group[0];                        // earliest = primary
+      const primaryMs = new Date(primary.started_at).getTime();
+      for (const child of group.slice(1)) {
+        if (child.parent_incident_id === primary.id) continue;   // already linked
+        if (child.id === primary.id) continue;
+        if (!withinCorrelationWindow(primaryMs, new Date(child.started_at).getTime(), CROSS_SYSTEM_WINDOW_MIN)) continue;
+        await db().from("incidents").update({ parent_incident_id: primary.id, last_activity_at: touch() }).eq("id", child.id);
+        await addHistory(child.id, "correlated", `Grouped under ${primary.number} — same root cause (${ROOT_CAUSE_LABEL[primary.root_cause_system as RootCauseSystem]}) within ${CROSS_SYSTEM_WINDOW_MIN}m`);
+        await addHistory(primary.id, "correlated", `${child.number} correlated into this incident`);
+        grouped++;
+      }
+    }
+  } catch { /* best-effort */ }
+  return { grouped };
 }
 
 /** Current failing alert keys across all enabled rules (current state, not windowed). */
@@ -160,11 +213,13 @@ export interface IncidentRow {
   id: string; number: string; title: string; category: string; categoryLabel: string; severity: IncidentSeverity;
   status: string; rootCause: string | null; sourceSystem: string | null; team: string | null; ownerName: string | null; assigneeName: string | null;
   snoozedUntil: string | null; affectedOrders: number; affectedNotifications: number; startedAt: string; lastActivityAt: string; resolvedAt: string | null;
+  rootCauseSystem: string | null; subsystem: string | null; parentIncidentId: string | null; escalationLevel: number; detectedAt: string | null;
 }
 const mapIncident = (r: any): IncidentRow => ({
   id: r.id, number: r.number, title: r.title, category: r.category, categoryLabel: INCIDENT_CATEGORY_LABEL[r.category as keyof typeof INCIDENT_CATEGORY_LABEL] ?? r.category,
   severity: r.severity, status: r.status, rootCause: r.root_cause ?? null, sourceSystem: r.source_system ?? null, team: r.team ?? null, ownerName: r.owner_name ?? null, assigneeName: r.assignee_name ?? null,
   snoozedUntil: r.snoozed_until ?? null, affectedOrders: r.affected_orders ?? 0, affectedNotifications: r.affected_notifications ?? 0, startedAt: r.started_at, lastActivityAt: r.last_activity_at, resolvedAt: r.resolved_at ?? null,
+  rootCauseSystem: r.root_cause_system ?? null, subsystem: r.subsystem ?? null, parentIncidentId: r.parent_incident_id ?? null, escalationLevel: r.escalation_level ?? 0, detectedAt: r.detected_at ?? null,
 });
 
 export async function getIncidents(opts: { status?: "active" | "all"; limit?: number } = {}): Promise<IncidentRow[]> {
@@ -229,38 +284,59 @@ export async function getIncidentsForExport(f: IncidentFilters): Promise<Inciden
   return rows;
 }
 
+export interface IncidentImpact { orders: number; revenue: number; customers: number; refundValue: number; shipmentsDelayed: number; computedAt: string | null }
+export interface SimilarIncident { number: string; title: string; status: string; score: number; reasons: string[]; kbResolution: string | null; prevention: string | null; resolvedAt: string | null }
 export interface IncidentDetail extends IncidentRow {
-  description: string | null; resolutionNotes: string | null;
+  description: string | null; resolutionNotes: string | null; prevention: string | null; kbResolution: string | null;
+  rootCauseWhy: string | null;
   notifications: { alertKey: string; orderNumber: string | null; severity: string | null; addedAt: string; resolvedAt: string | null }[];
   orders: string[];
   history: { event: string; detail: string | null; actorName: string | null; createdAt: string }[];
   related: { number: string; title: string; status: string }[];
+  similar: SimilarIncident[];
   participants: { userId: string | null; userName: string; role: string }[];
   notes: { note: string; authorName: string | null; createdAt: string }[];
   checklist: { id: string; label: string; done: boolean; doneBy: string | null; doneAt: string | null }[];
+  escalations: { level: number; targetRole: string; channels: string; reason: string; ageMinutes: number; createdAt: string }[];
+  impact: IncidentImpact;
+  parentNumber: string | null;
+  children: { number: string; title: string; status: string; category: string }[];
+  mttrMin: number | null; mttdMin: number | null;
 }
 export async function getIncidentByNumber(number: string): Promise<IncidentDetail | null> {
   try {
     const { data: inc } = await db().from("incidents").select("*").eq("number", number).maybeSingle();
     if (!inc) return null;
-    const [{ data: notifs }, { data: hist }, { data: related }, { data: parts }, { data: notes }, { data: checklist }] = await Promise.all([
+    const [{ data: notifs }, { data: hist }, { data: related }, { data: parts }, { data: notes }, { data: checklist }, { data: esc }, { data: kids }, parent] = await Promise.all([
       db().from("incident_notifications").select("alert_key,order_number,severity,added_at,resolved_at").eq("incident_id", inc.id).order("added_at", { ascending: true }),
       db().from("incident_history").select("event,detail,actor_name,created_at").eq("incident_id", inc.id).order("created_at", { ascending: true }),
-      db().from("incidents").select("number,title,status").eq("category", inc.category).neq("id", inc.id).order("last_activity_at", { ascending: false }).limit(5),
+      db().from("incidents").select("number,title,status").eq("category", inc.category).neq("id", inc.id).is("parent_incident_id", null).order("last_activity_at", { ascending: false }).limit(5),
       db().from("incident_participants").select("user_id,user_name,role").eq("incident_id", inc.id),
       db().from("incident_notes").select("note,author_name,created_at").eq("incident_id", inc.id).order("created_at", { ascending: false }),
       db().from("incident_checklist_items").select("id,label,done,done_by,done_at").eq("incident_id", inc.id).order("sort_order", { ascending: true }),
+      db().from("incident_escalations").select("level,target_role,channels,reason,age_minutes,created_at").eq("incident_id", inc.id).order("level", { ascending: true }),
+      db().from("incidents").select("number,title,status,category").eq("parent_incident_id", inc.id).order("started_at", { ascending: true }),
+      inc.parent_incident_id ? db().from("incidents").select("number").eq("id", inc.parent_incident_id).maybeSingle() : Promise.resolve({ data: null }),
     ]);
     const orders = [...new Set((notifs ?? []).map((n: any) => n.order_number).filter(Boolean))] as string[];
+    const rcWhy = (hist ?? []).find((h: any) => h.event === "root_cause_detected")?.detail ?? null;
     return {
       ...mapIncident(inc), description: inc.description ?? null, resolutionNotes: inc.resolution_notes ?? null,
+      prevention: inc.prevention ?? null, kbResolution: inc.kb_resolution ?? null, rootCauseWhy: rcWhy,
       notifications: (notifs ?? []).map((n: any) => ({ alertKey: n.alert_key, orderNumber: n.order_number ?? null, severity: n.severity ?? null, addedAt: n.added_at, resolvedAt: n.resolved_at ?? null })),
       orders,
       history: (hist ?? []).map((h: any) => ({ event: h.event, detail: h.detail ?? null, actorName: h.actor_name ?? null, createdAt: h.created_at })),
       related: (related ?? []).map((r: any) => ({ number: r.number, title: r.title, status: r.status })),
+      similar: await getSimilarIncidents(inc),
       participants: (parts ?? []).map((p: any) => ({ userId: p.user_id ?? null, userName: p.user_name, role: p.role })),
       notes: (notes ?? []).map((n: any) => ({ note: n.note, authorName: n.author_name ?? null, createdAt: n.created_at })),
       checklist: (checklist ?? []).map((c: any) => ({ id: c.id, label: c.label, done: c.done, doneBy: c.done_by ?? null, doneAt: c.done_at ?? null })),
+      escalations: (esc ?? []).map((e: any) => ({ level: e.level, targetRole: e.target_role, channels: e.channels, reason: e.reason, ageMinutes: e.age_minutes, createdAt: e.created_at })),
+      impact: { orders: inc.impact_orders ?? 0, revenue: Number(inc.impact_revenue ?? 0), customers: inc.impact_customers ?? 0, refundValue: Number(inc.impact_refund_value ?? 0), shipmentsDelayed: inc.impact_shipments_delayed ?? 0, computedAt: inc.impact_computed_at ?? null },
+      parentNumber: (parent as any)?.data?.number ?? null,
+      children: (kids ?? []).map((k: any) => ({ number: k.number, title: k.title, status: k.status, category: k.category })),
+      mttrMin: inc.resolved_at ? Math.round(minutesBetween(inc.started_at, inc.resolved_at)) : null,
+      mttdMin: inc.detected_at ? Math.max(0, Math.round(minutesBetween(inc.detected_at, inc.started_at))) : null,
     };
   } catch { return null; }
 }
@@ -416,7 +492,181 @@ export async function snoozeIncident(number: string, minutes: number, actor: Act
 /** Staff list for the assign/transfer picker. */
 export async function getStaffUsers(): Promise<{ id: string; name: string }[]> {
   try {
-    const { data } = await db().from("users").select("id,full_name,role").in("role", ["editor", "manager", "admin"]).order("full_name");
+    const { data } = await db().from("users").select("id,full_name,role").in("role", ["editor", "manager", "admin", "super_admin"]).order("full_name");
     return (data ?? []).map((u: any) => ({ id: u.id, name: u.full_name ?? "Staff" }));
   } catch { return []; }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Phase 3 — Operations Intelligence services
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** RELATED INCIDENTS — resolved/closed incidents that resemble this one (deterministic score),
+ *  surfacing their knowledge base so ops can reuse a prior fix. "Resembles INC-00008." */
+export async function getSimilarIncidents(inc: any): Promise<SimilarIncident[]> {
+  try {
+    const { data } = await db().from("incidents")
+      .select("number,title,status,category,root_cause_system,source_system,kb_resolution,prevention,resolved_at")
+      .in("status", ["resolved", "closed"]).neq("id", inc.id)
+      .or(`category.eq.${inc.category},root_cause_system.eq.${inc.root_cause_system ?? "unknown"}`)
+      .order("resolved_at", { ascending: false }).limit(50);
+    const self = { category: inc.category, rootCauseSystem: inc.root_cause_system, sourceSystem: inc.source_system };
+    return ((data ?? []) as any[])
+      .map((r) => {
+        const { score, reasons } = resemblance(self, { category: r.category, rootCauseSystem: r.root_cause_system, sourceSystem: r.source_system });
+        return { number: r.number, title: r.title, status: r.status, score, reasons, kbResolution: r.kb_resolution ?? null, prevention: r.prevention ?? null, resolvedAt: r.resolved_at ?? null };
+      })
+      .filter((s) => s.score >= 0.4)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3);
+  } catch { return []; }
+}
+
+/** BUSINESS IMPACT — estimate the blast radius from the incident's affected orders, and snapshot
+ *  it onto the incident. Deterministic: every number traces to concrete order/refund/shipment rows. */
+export async function computeBusinessImpact(number: string): Promise<IncidentImpact | null> {
+  try {
+    const id = await incId(number); if (!id) return null;
+    const { data: notifs } = await db().from("incident_notifications").select("order_number").eq("incident_id", id);
+    const orderNumbers = [...new Set(((notifs ?? []) as any[]).map((n) => n.order_number).filter(Boolean))] as string[];
+    let revenue = 0, refundValue = 0, customers = 0, shipmentsDelayed = 0;
+    if (orderNumbers.length) {
+      const { data: orders } = await db().from("orders").select("id,order_number,total_amount,refund_amount,email,user_id").in("order_number", orderNumbers);
+      const rows = (orders ?? []) as any[];
+      revenue = rows.reduce((s, o) => s + Number(o.total_amount ?? 0), 0);
+      refundValue = rows.reduce((s, o) => s + Number(o.refund_amount ?? 0), 0);
+      customers = new Set(rows.map((o) => o.user_id ?? o.email).filter(Boolean)).size;
+      const { data: exc } = await db().from("shipment_exceptions").select("order_number").in("order_number", orderNumbers).eq("type", "delayed");
+      shipmentsDelayed = new Set(((exc ?? []) as any[]).map((e) => e.order_number)).size;
+    }
+    const impact: IncidentImpact = { orders: orderNumbers.length, revenue: Math.round(revenue * 100) / 100, customers, refundValue: Math.round(refundValue * 100) / 100, shipmentsDelayed, computedAt: touch() };
+    await db().from("incidents").update({ impact_orders: impact.orders, impact_revenue: impact.revenue, impact_customers: impact.customers, impact_refund_value: impact.refundValue, impact_shipments_delayed: impact.shipmentsDelayed, impact_computed_at: impact.computedAt }).eq("id", id);
+    return impact;
+  } catch { return null; }
+}
+
+/** Refresh business-impact snapshots for active incidents (bounded per run for scale). */
+export async function refreshActiveImpacts(limit = 50): Promise<{ impactsRefreshed: number }> {
+  let impactsRefreshed = 0;
+  try {
+    const { data } = await db().from("incidents").select("number").in("status", ["open", "investigating", "mitigated"]).order("last_activity_at", { ascending: false }).limit(limit);
+    for (const inc of (data ?? []) as any[]) { if (await computeBusinessImpact(inc.number)) impactsRefreshed++; }
+  } catch { /* best-effort */ }
+  return { impactsRefreshed };
+}
+
+// ── HEALTH DASHBOARD ───────────────────────────────────────────────────────────
+export interface SubsystemHealth { subsystem: Subsystem; label: string; state: HealthState; why: string; active: number }
+export interface SystemHealth { overall: HealthState; subsystems: SubsystemHealth[]; computedAt: string }
+export async function getSystemHealth(): Promise<SystemHealth> {
+  const now = Date.now();
+  try {
+    const { data } = await db().from("incidents").select("subsystem,category,severity,started_at").in("status", ["open", "investigating", "mitigated"]);
+    const active = (data ?? []) as any[];
+    const subsystems: SubsystemHealth[] = SUBSYSTEMS.map((s) => {
+      const mine = active.filter((i) => (i.subsystem ?? categorySubsystem(i.category)) === s).map((i) => ({ severity: i.severity as IncidentSeverity, startedAt: i.started_at }));
+      const { state, why } = subsystemHealth(mine, now);
+      return { subsystem: s, label: SUBSYSTEM_LABEL[s], state, why, active: mine.length };
+    });
+    return { overall: overallHealth(subsystems.map((s) => s.state)), subsystems, computedAt: new Date(now).toISOString() };
+  } catch {
+    return { overall: "healthy", subsystems: SUBSYSTEMS.map((s) => ({ subsystem: s, label: SUBSYSTEM_LABEL[s], state: "healthy" as HealthState, why: "unavailable", active: 0 })), computedAt: new Date(now).toISOString() };
+  }
+}
+
+// ── ESCALATION ─────────────────────────────────────────────────────────────────
+async function recipientsForRole(role: "manager" | "admin"): Promise<{ email: string; name: string }[]> {
+  const roles = role === "manager" ? ["manager", "admin", "super_admin"] : ["admin", "super_admin"];
+  try {
+    const { data } = await db().from("users").select("email,full_name,role").in("role", roles);
+    return ((data ?? []) as any[]).filter((u) => u.email).map((u) => ({ email: u.email, name: u.full_name ?? "Staff" }));
+  } catch { return []; }
+}
+
+/** Run the time-based escalation policy over unresolved incidents. Each level fires once (DB
+ *  uniqueness). Channels: email is sent (if configured); Slack/SMS are logged (not yet wired). */
+export async function runEscalations(): Promise<{ escalated: number }> {
+  let escalated = 0;
+  try {
+    const { data } = await db().from("incidents").select("id,number,title,severity,started_at,escalation_level,status").in("status", ["open", "investigating", "mitigated"]);
+    const minRank = severityRank(ESCALATION_MIN_SEVERITY);
+    for (const inc of (data ?? []) as any[]) {
+      if (severityRank(inc.severity as IncidentSeverity) < minRank) continue;   // low/info never page
+      const ageMin = Math.floor((Date.now() - new Date(inc.started_at).getTime()) / 60000);
+      const due = dueEscalations(ageMin, inc.escalation_level ?? 0, ESCALATION_POLICY);
+      for (const level of due) {
+        const reason = `Unresolved ${ageMin} min (threshold ${level.afterMinutes} min)`;
+        // Ledger row — unique per (incident, level); ignore duplicate if a concurrent run beat us.
+        const { error } = await db().from("incident_escalations").insert({ incident_id: inc.id, level: level.level, target_role: level.notify, channels: level.channels.join(","), reason, age_minutes: ageMin });
+        if (error) continue;
+        await db().from("incidents").update({ escalation_level: level.level, last_activity_at: touch() }).eq("id", inc.id);
+        await addHistory(inc.id, "escalated", `L${level.level} → ${level.notify} via ${level.channels.join(", ")} — ${reason}`);
+        await dispatchEscalation(inc, level, reason);
+        escalated++;
+      }
+    }
+  } catch { /* best-effort */ }
+  return { escalated };
+}
+
+async function dispatchEscalation(inc: any, level: { notify: "manager" | "admin"; channels: string[] }, reason: string): Promise<void> {
+  if (level.channels.includes("email") && emailConfigured()) {
+    const to = await recipientsForRole(level.notify);
+    const subject = `[Incident ${inc.number}] escalation — ${inc.severity.toUpperCase()}`;
+    const html = `<p>Incident <b>${inc.number}</b> — ${inc.title}</p><p>Severity: ${inc.severity}</p><p>${reason}</p><p>Paged: ${level.notify}. Channels: ${level.channels.join(", ")}.</p>`;
+    for (const r of to) { try { await sendEmail({ to: r.email, subject, html }); } catch { /* non-fatal */ } }
+  }
+  // Slack / SMS are not yet integrated — recorded in history above so the trail is complete.
+}
+
+// ── ANALYTICS / ARCHIVE ────────────────────────────────────────────────────────
+export interface IncidentAnalytics {
+  windowDays: number; total: number; open: number; resolved: number;
+  avgResolutionMin: number | null; mttdMin: number | null; mttrMin: number | null;
+  topTypes: { key: string; label: string; count: number }[];
+  topRootCauses: { key: string; label: string; count: number }[];
+  monthly: { month: string; opened: number; resolved: number }[];
+}
+export async function getIncidentAnalytics(windowDays = 90): Promise<IncidentAnalytics> {
+  try {
+    const since = new Date(Date.now() - windowDays * 86400000).toISOString();
+    const { data } = await db().from("incidents").select("category,root_cause_system,status,started_at,detected_at,resolved_at").gte("started_at", since).limit(20000);
+    const rows = (data ?? []) as any[];
+    const resolved = rows.filter((r) => r.resolved_at);
+    const mttr = meanMinutes(resolved.map((r) => minutesBetween(r.started_at, r.resolved_at)));
+    const mttd = meanMinutes(rows.filter((r) => r.detected_at).map((r) => minutesBetween(r.detected_at, r.started_at)));
+    const monthlyMap = new Map<string, { opened: number; resolved: number }>();
+    for (const r of rows) {
+      const m = String(r.started_at).slice(0, 7);
+      const cur = monthlyMap.get(m) ?? { opened: 0, resolved: 0 };
+      cur.opened++; if (r.resolved_at) cur.resolved++;
+      monthlyMap.set(m, cur);
+    }
+    return {
+      windowDays, total: rows.length,
+      open: rows.filter((r) => ["open", "investigating", "mitigated"].includes(r.status)).length,
+      resolved: resolved.length,
+      avgResolutionMin: mttr, mttrMin: mttr, mttdMin: mttd,
+      topTypes: topBy(rows, (r) => r.category).map((t) => ({ ...t, label: INCIDENT_CATEGORY_LABEL[t.key as IncidentCategory] ?? t.key })),
+      topRootCauses: topBy(rows, (r) => r.root_cause_system).map((t) => ({ ...t, label: ROOT_CAUSE_LABEL[t.key as RootCauseSystem] ?? t.key })),
+      monthly: [...monthlyMap.entries()].map(([month, v]) => ({ month, ...v })).sort((a, b) => a.month.localeCompare(b.month)),
+    };
+  } catch {
+    return { windowDays, total: 0, open: 0, resolved: 0, avgResolutionMin: null, mttdMin: null, mttrMin: null, topTypes: [], topRootCauses: [], monthly: [] };
+  }
+}
+
+// ── KNOWLEDGE BASE (resolve requires root cause + resolution + prevention) ───────
+export async function resolveWithKnowledge(number: string, kb: { rootCause: string; resolution: string; prevention: string }, actor: Actor): Promise<{ ok: boolean; error?: string }> {
+  if (!kb.rootCause?.trim() || !kb.resolution?.trim() || !kb.prevention?.trim()) return { ok: false, error: "Root cause, resolution and prevention are all required to resolve." };
+  try {
+    const id = await incId(number); if (!id) return { ok: false, error: "Incident not found." };
+    await db().from("incidents").update({
+      status: "resolved", resolved_at: touch(), last_activity_at: touch(), updated_at: touch(),
+      root_cause: kb.rootCause.trim(), kb_resolution: kb.resolution.trim(), resolution_notes: kb.resolution.trim(), prevention: kb.prevention.trim(),
+    }).eq("id", id);
+    await addHistory(id, "resolved", `Resolved with KB — cause: ${kb.rootCause.slice(0, 80)}`, actor);
+    await computeBusinessImpact(number);   // snapshot final blast radius
+    return { ok: true };
+  } catch { return { ok: false, error: "Failed to resolve." }; }
 }

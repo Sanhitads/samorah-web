@@ -3,9 +3,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getIncidentsFiltered, type IncidentFilters } from "@/services/incidentService";
+import { getIncidentsFiltered, getSystemHealth, type IncidentFilters } from "@/services/incidentService";
 import { RunCorrelation, IncidentFilterBar } from "@/components/admin/IncidentControls";
-import { TEAM_LABEL } from "@/config/incidents";
+import { HealthStrip } from "@/components/admin/IncidentHealth";
+import { TEAM_LABEL, ROOT_CAUSE_LABEL, type RootCauseSystem } from "@/config/incidents";
 
 /** Incident list — `/admin/incidents`. Filters, search, pagination, export (Phase 2). */
 export const metadata: Metadata = { title: "Incidents", robots: { index: false } };
@@ -31,7 +32,7 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Pr
     createdDays: sp.created ? Number(sp.created) : undefined, resolvedToday: sp.resolved === "today",
     q: sp.q || undefined, page: sp.page ? Number(sp.page) : 1, pageSize: 20,
   };
-  const { rows, total, page, pageSize } = await getIncidentsFiltered(filters);
+  const [{ rows, total, page, pageSize }, health] = await Promise.all([getIncidentsFiltered(filters), getSystemHealth()]);
 
   return (
     <main className="admin">
@@ -41,26 +42,34 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Pr
           <h1 className="admin__title">Incidents</h1>
           <p className="admin__count">Related notifications grouped by root cause — with owners, teams, notes & checklists</p>
         </div>
-        <RunCorrelation />
+        <div className="inc-subnav">
+          <Link href="/admin/incidents/analytics" className="op-item__btn">📊 Health &amp; Analytics</Link>
+          <RunCorrelation />
+        </div>
       </header>
+
+      <HealthStrip health={health} />
 
       <IncidentFilterBar total={total} page={page} pageSize={pageSize} />
 
       {rows.length ? (
         <div className="admin__table-wrap">
           <table className="admin__table">
-            <thead><tr><th>Incident</th><th>Category</th><th>Severity</th><th>Status</th><th>Team</th><th>Orders</th><th>Started</th><th>Last activity</th><th>Assigned</th><th></th></tr></thead>
+            <thead><tr><th>Incident</th><th>Category</th><th>Root cause</th><th>Severity</th><th>Status</th><th>Team</th><th>Orders</th><th>Started</th><th>Assigned</th><th></th></tr></thead>
             <tbody>
               {rows.map((i) => (
                 <tr key={i.id}>
-                  <td><Link href={`/admin/incidents/${i.number}`} className="admin__mono od-link">{i.number}</Link><div className="admin__muted" style={{ fontSize: 12 }}>{i.title}{i.snoozedUntil && new Date(i.snoozedUntil) > new Date() ? " · 💤" : ""}</div></td>
+                  <td>
+                    <Link href={`/admin/incidents/${i.number}`} className="admin__mono od-link">{i.number}</Link>
+                    <div className="admin__muted" style={{ fontSize: 12 }}>{i.title}{i.snoozedUntil && new Date(i.snoozedUntil) > new Date() ? " · 💤" : ""}{i.parentIncidentId ? " · 🔗 grouped" : ""}{i.escalationLevel > 0 ? ` · ⏫ L${i.escalationLevel}` : ""}</div>
+                  </td>
                   <td>{i.categoryLabel}</td>
+                  <td className="admin__muted">{i.rootCauseSystem ? ROOT_CAUSE_LABEL[i.rootCauseSystem as RootCauseSystem] ?? i.rootCauseSystem : "—"}</td>
                   <td><span className="inc-sev" data-s={i.severity}>{SEV_ICON[i.severity]} {i.severity}</span></td>
                   <td><span className="inc-status" data-s={i.status}>{i.status}</span></td>
                   <td className="admin__muted">{i.team ? TEAM_LABEL[i.team as keyof typeof TEAM_LABEL] ?? i.team : "—"}</td>
                   <td className="admin__mono">{i.affectedOrders}</td>
                   <td className="admin__muted">{ago(i.startedAt)}</td>
-                  <td className="admin__muted">{ago(i.lastActivityAt)}</td>
                   <td className="admin__muted">{i.assigneeName ?? "—"}</td>
                   <td><Link href={`/admin/incidents/${i.number}`} className="text-link">Open →</Link></td>
                 </tr>

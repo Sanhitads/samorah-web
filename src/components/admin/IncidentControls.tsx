@@ -92,6 +92,41 @@ export function IncidentNoteForm({ number }: { number: string }) {
   );
 }
 
+// ── Detail: knowledge-base resolve (root cause + resolution + prevention required) ──
+export function IncidentResolve({ number, defaultRootCause }: { number: string; defaultRootCause?: string | null }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [rootCause, setRootCause] = useState(defaultRootCause ?? "");
+  const [resolution, setResolution] = useState("");
+  const [prevention, setPrevention] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const submit = async () => {
+    setErr("");
+    if (!rootCause.trim() || !resolution.trim() || !prevention.trim()) { setErr("All three fields are required to resolve."); return; }
+    setBusy(true);
+    try {
+      const r = await post({ number, action: "resolve", rootCause, resolution, prevention });
+      if (r.ok) { setOpen(false); router.refresh(); }
+      else { const d = await r.json().catch(() => ({})); setErr(d.error ?? "Failed to resolve."); }
+    } finally { setBusy(false); }
+  };
+  if (!open) return <button type="button" className="op-item__btn op-item__btn--primary" onClick={() => setOpen(true)}>✓ Resolve with knowledge base</button>;
+  return (
+    <div className="inc-resolve">
+      <p className="inc-resolve__title">Resolve — capture the knowledge base</p>
+      <label className="inc-resolve__field">Root cause<textarea value={rootCause} onChange={(e) => setRootCause(e.target.value)} placeholder="What actually caused this? (e.g. Razorpay gateway timeout during a provider outage)" rows={2} /></label>
+      <label className="inc-resolve__field">Resolution<textarea value={resolution} onChange={(e) => setResolution(e.target.value)} placeholder="What fixed it? (e.g. Retried refunds after Razorpay recovered; confirmed settlements)" rows={2} /></label>
+      <label className="inc-resolve__field">Prevention<textarea value={prevention} onChange={(e) => setPrevention(e.target.value)} placeholder="How do we prevent recurrence? (e.g. Add gateway-status precheck before bulk refunds)" rows={2} /></label>
+      {err ? <p className="inc-resolve__err">{err}</p> : null}
+      <div className="inc-resolve__actions">
+        <button type="button" className="op-item__btn op-item__btn--primary" disabled={busy} onClick={submit}>{busy ? "Resolving…" : "Resolve incident"}</button>
+        <button type="button" className="op-item__btn" disabled={busy} onClick={() => setOpen(false)}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
 // ── List: filters + search + export ─────────────────────────────────────────────
 export function IncidentFilterBar({ total, page, pageSize }: { total: number; page: number; pageSize: number }) {
   const router = useRouter();
