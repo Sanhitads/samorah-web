@@ -1,8 +1,19 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth/requireStaff";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getNotificationCenter, getNotificationMetrics, getIncident, getNotificationTrends } from "@/services/notificationCenterService";
+import { getIncidentsForAlertKeys } from "@/services/incidentService";
 import { NotificationCenter } from "@/components/admin/NotificationCenter";
+
+async function staffName(userId: string | null): Promise<string | undefined> {
+  if (!userId) return undefined;
+  try {
+    const db = createAdminClient() as unknown as { from: (t: string) => { select: (q: string) => { eq: (c: string, v: string) => { maybeSingle: () => Promise<{ data: { full_name?: string | null } | null }> } } } };
+    const { data } = await db.from("users").select("full_name").eq("id", userId).maybeSingle();
+    return data?.full_name ?? undefined;
+  } catch { return undefined; }
+}
 
 /** Notification center — `/admin/notifications`. Two classes (operational derived + events
  *  recorded) with health header, metrics, incident detection, trends, filters, search,
@@ -19,11 +30,15 @@ const durn = (m: number | null) => (m == null ? "—" : m < 60 ? `${m}m` : `${Ma
 export default async function NotificationsPage() {
   const staff = await requireStaff("editor");
   if (!staff.ok) redirect("/login");
-  const [{ operational, events, resolved, unreadEvents }, metrics, incident, trends] = await Promise.all([
-    getNotificationCenter(), getNotificationMetrics(), getIncident(), getNotificationTrends(),
+  const [{ operational, events, resolved, unreadEvents }, metrics, incident, trends, name] = await Promise.all([
+    getNotificationCenter(), getNotificationMetrics(), getIncident(), getNotificationTrends(), staffName(staff.userId),
   ]);
   const openOps = operational.length;
   const h = HEALTH[metrics.status];
+
+  // Attach the incident number to any notification that's part of one (points to INC-xxxx).
+  const incMap = await getIncidentsForAlertKeys(operational.flatMap((a) => a.items.map((i) => i.alertKey)));
+  for (const a of operational) for (const it of a.items) it.incidentNumber = incMap.get(it.alertKey);
 
   return (
     <main className="admin">
@@ -80,7 +95,7 @@ export default async function NotificationsPage() {
         </div>
       </div>
 
-      <NotificationCenter operational={operational} events={events} resolved={resolved} />
+      <NotificationCenter operational={operational} events={events} resolved={resolved} staffName={name} />
     </main>
   );
 }

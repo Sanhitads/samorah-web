@@ -9,6 +9,7 @@ import { getOrderTimeline } from "@/services/auditService";
 import { hasCapability } from "@/lib/auth/capabilities";
 import { OrderMeta } from "@/components/admin/OrderMeta";
 import { RefundRetryBanner } from "@/components/admin/RefundRetryBanner";
+import { getIncidentForOrder } from "@/services/incidentService";
 
 /**
  * Order detail — `/admin/orders/[orderNumber]`. The single pane of glass for one
@@ -39,6 +40,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
   const items = (order.order_items ?? []) as any[];
   const failedRefunds = (refunds as any[]).filter((r) => r.status === "failed");
   const failedRefund = failedRefunds[0];
+  const incident = await getIncidentForOrder(order.order_number);
 
   return (
     <main className="admin">
@@ -51,6 +53,12 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
           <span className="admin__muted"> · placed {dt(order.placed_at)}{order.invoice_number ? ` · Invoice ${order.invoice_number}` : ""}</span>
         </p>
       </header>
+
+      {incident ? (
+        <Link href={`/admin/incidents/${incident.number}`} className="od-incident">
+          🚨 This order is part of Incident <b>{incident.number}</b> — {incident.title}. <span className="text-link">View incident →</span>
+        </Link>
+      ) : null}
 
       {failedRefund ? (
         <RefundRetryBanner

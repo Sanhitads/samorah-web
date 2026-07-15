@@ -37,6 +37,8 @@ export interface AlertItem {
   assigneeName?: string | null; // "Rahul" — so others don't duplicate
   notId?: string;               // stable support reference "NOT-XXXXX" (point 8.3)
   subsystem?: string;           // searchable subsystem tag (point 1)
+  isSnoozed?: boolean;          // currently snoozed (hidden by default; shown under "Snoozed")
+  incidentNumber?: string;      // "INC-00014" when this notification belongs to an incident
 }
 
 /** Deterministic short support reference for an alert item (review point 8.3). */
@@ -156,13 +158,12 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
       const { data: states } = await db.from("notification_state").select("alert_key,state,assignee_name,snoozed_until").in("alert_key", allItems.map((i) => i.alertKey));
       const byKey = new Map<string, any>((states ?? []).map((s: any) => [String(s.alert_key), s]));
       for (const a of alerts) {
-        a.items = a.items.filter((it) => {
+        for (const it of a.items) {
           const s = byKey.get(it.alertKey);
-          if (s) { it.state = s.state as NotificationState; it.assigneeName = s.assignee_name; }
+          if (s) { it.state = s.state as NotificationState; it.assigneeName = s.assignee_name; it.isSnoozed = !!(s.snoozed_until && new Date(s.snoozed_until).getTime() > nowMs); }
           it.notId = notificationId(it.alertKey);
           it.subsystem = SUBSYSTEM[a.key];
-          return !(s?.snoozed_until && new Date(s.snoozed_until).getTime() > nowMs); // hide snoozed
-        });
+        }
       }
     } catch { /* state is best-effort */ }
   }

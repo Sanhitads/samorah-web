@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { AdminAlert, AlertPriority } from "@/services/notificationCenterService";
+import type { AdminAlert, AlertItem, AlertPriority } from "@/services/notificationCenterService";
 
 const PRIO: Record<AlertPriority, { icon: string; label: string }> = {
   critical: { icon: "🔴", label: "Critical" },
@@ -60,6 +60,17 @@ export function OperationalAlerts({ alerts }: { alerts: AdminAlert[] }) {
     finally { setBusy(null); }
   };
 
+  // Export a group's items to CSV (review option 2).
+  const exportCsv = (a: AdminAlert) => {
+    const rows = [["notification_id", "reference", "detail", "context", "at"], ...a.items.map((i) => [i.notId ?? "", i.primary, i.secondary ?? "", i.meta ?? "", i.at ?? ""])];
+    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    const link = document.createElement("a"); link.href = url; link.download = `${a.key}-${new Date().toISOString().slice(0, 10)}.csv`; link.click(); URL.revokeObjectURL(url);
+  };
+
+  // Details drawer (review option 3) — a focused right-side panel for one item.
+  const [drawer, setDrawer] = useState<{ item: AlertItem; prio: AlertPriority; title: string } | null>(null);
+
   if (!alerts.length) {
     return (
       <div className="no-alerts">
@@ -71,6 +82,7 @@ export function OperationalAlerts({ alerts }: { alerts: AdminAlert[] }) {
   }
 
   return (
+    <>
     <ul className="op-alerts">
       {alerts.map((a) => {
         const expanded = open.has(a.key);
@@ -94,6 +106,9 @@ export function OperationalAlerts({ alerts }: { alerts: AdminAlert[] }) {
                     <span className="op-bulk__label">Bulk:</span>
                     <button type="button" className="op-bulk__btn" onClick={() => setState(a.items.map((i) => i.alertKey), "acknowledged")}>Assign all to me</button>
                     {canRetryAll ? <button type="button" className="op-bulk__btn" disabled={busy === `all:${a.key}`} onClick={() => retryAll(a.key, a.items.map((i) => i.retryOrderNumber).filter(Boolean) as string[])}>{busy === `all:${a.key}` ? "Retrying…" : "Retry all"}</button> : null}
+                    {a.priority !== "critical" && a.priority !== "high" ? <button type="button" className="op-bulk__btn" onClick={() => setState(a.items.map((i) => i.alertKey), "open", 60)}>Snooze all 1h</button> : null}
+                    <button type="button" className="op-bulk__btn" onClick={() => setState(a.items.map((i) => i.alertKey), "resolved")}>Resolve all</button>
+                    <button type="button" className="op-bulk__btn" onClick={() => exportCsv(a)}>Export CSV</button>
                   </div>
                 ) : null}
                 <ul className="op-items">
@@ -102,11 +117,15 @@ export function OperationalAlerts({ alerts }: { alerts: AdminAlert[] }) {
                       <div className="op-item__body">
                         <span className="op-item__primary">{it.primary}{it.secondary ? <span className="op-item__secondary"> · {it.secondary}</span> : null}</span>
                         {it.meta ? <span className="op-item__meta">{it.meta}</span> : null}
-                        {it.notId ? <span className="op-item__id" title="Support reference">{it.notId}</span> : null}
+                        <span className="op-item__tags">
+                          {it.notId ? <span className="op-item__id" title="Support reference">{it.notId}</span> : null}
+                          {it.incidentNumber ? <Link href={`/admin/incidents/${it.incidentNumber}`} className="op-item__inc" title="Part of an incident">🚨 {it.incidentNumber}</Link> : null}
+                        </span>
                       </div>
                       <span className="op-item__time">{ago(it.at)}</span>
                       <div className="op-item__actions">
                         {it.assigneeName ? <span className="op-item__owner" title={`Assigned to ${it.assigneeName}`}>👤 {it.assigneeName}</span> : null}
+                        <button type="button" className="op-item__btn" onClick={() => setDrawer({ item: it, prio: a.priority, title: a.title })}>Details</button>
                         <Link href={it.href} className="op-item__btn">Review</Link>
                         {it.retryOrderNumber ? <button type="button" className="op-item__btn op-item__btn--retry" disabled={busy === it.id} onClick={() => retry(it.id, it.retryOrderNumber as string)}>{busy === it.id ? "Retrying…" : "Retry"}</button> : null}
                         {!it.assigneeName ? <button type="button" className="op-item__btn" onClick={() => setState([it.alertKey], "acknowledged")}>Assign to me</button> : <button type="button" className="op-item__btn" onClick={() => setState([it.alertKey], "open")}>Release</button>}
@@ -134,5 +153,33 @@ export function OperationalAlerts({ alerts }: { alerts: AdminAlert[] }) {
         );
       })}
     </ul>
+
+    {drawer ? (
+      <div className="nc-drawer" role="dialog" aria-modal="true" aria-label="Notification details">
+        <div className="nc-drawer__scrim" onClick={() => setDrawer(null)} />
+        <aside className="nc-drawer__panel">
+          <header className="nc-drawer__head">
+            <span className="nc-drawer__eyebrow">{PRIO[drawer.prio].icon} {drawer.title} · {drawer.item.notId}</span>
+            <button type="button" className="nc-drawer__close" onClick={() => setDrawer(null)} aria-label="Close">✕</button>
+          </header>
+          <dl className="nc-drawer__grid">
+            <div><dt>Reference</dt><dd>{drawer.item.primary}</dd></div>
+            {drawer.item.secondary ? <div><dt>Customer</dt><dd>{drawer.item.secondary}</dd></div> : null}
+            {drawer.item.meta ? <div><dt>Detail</dt><dd>{drawer.item.meta}</dd></div> : null}
+            <div><dt>Occurred</dt><dd>{ago(drawer.item.at) || "—"}</dd></div>
+            {drawer.item.subsystem ? <div><dt>Subsystem</dt><dd>{drawer.item.subsystem}</dd></div> : null}
+            {drawer.item.assigneeName ? <div><dt>Assigned</dt><dd>👤 {drawer.item.assigneeName}</dd></div> : null}
+            {drawer.item.incidentNumber ? <div><dt>Incident</dt><dd><Link href={`/admin/incidents/${drawer.item.incidentNumber}`} className="admin__mono">{drawer.item.incidentNumber}</Link></dd></div> : null}
+          </dl>
+          <div className="nc-drawer__actions">
+            <Link href={drawer.item.href} className="op-item__btn">Open →</Link>
+            {drawer.item.retryOrderNumber ? <button type="button" className="op-item__btn op-item__btn--retry" onClick={() => retry(drawer.item.id, drawer.item.retryOrderNumber as string)}>Retry</button> : null}
+            {!drawer.item.assigneeName ? <button type="button" className="op-item__btn" onClick={() => { setState([drawer.item.alertKey], "acknowledged"); setDrawer(null); }}>Assign to me</button> : null}
+            <Link href={`/admin/audit?search=${encodeURIComponent(drawer.item.primary)}`} className="op-item__btn">Logs</Link>
+          </div>
+        </aside>
+      </div>
+    ) : null}
+    </>
   );
 }

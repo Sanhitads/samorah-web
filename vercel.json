@@ -3,6 +3,7 @@
   "crons": [
     { "path": "/api/cron/fulfillment", "schedule": "*/5 * * * *" },
     { "path": "/api/cron/reservations", "schedule": "*/5 * * * *" },
-    { "path": "/api/cron/retention", "schedule": "0 3 * * *" }
+    { "path": "/api/cron/retention", "schedule": "0 3 * * *" },
+    { "path": "/api/cron/incidents", "schedule": "*/5 * * * *" }
   ]
 }

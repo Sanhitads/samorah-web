@@ -6,6 +6,7 @@ import { getCommandCenter, type Severity, type Urgency } from "@/services/comman
 import { getRecentAuditEvents } from "@/services/auditService";
 import { getSettlementSummary } from "@/services/razorpaySettlementService";
 import { getGa4Insights } from "@/services/ga4DataService";
+import { getIncidentMetrics } from "@/services/incidentService";
 import { ActivityFeed, type ActivityItem } from "@/components/admin/ActivityFeed";
 import { DashboardPersonalize, type WidgetDef } from "@/components/admin/DashboardPersonalize";
 
@@ -83,7 +84,7 @@ const URG_META: Record<Urgency, { icon: string; label: string }> = { overdue: { 
 const WIDGETS: WidgetDef[] = [
   { key: "health", label: "Business Health" }, { key: "seasonal", label: "Seasonal reminder" },
   { key: "hero", label: "Hero KPIs" }, { key: "quickactions", label: "Quick Actions" },
-  { key: "workqueue", label: "Work Queue" }, { key: "alerts", label: "Alerts" },
+  { key: "workqueue", label: "Work Queue" }, { key: "alerts", label: "Alerts" }, { key: "incidents", label: "Incidents" },
   { key: "money", label: "Sales & Revenue" }, { key: "operations", label: "Operations & Cash" },
   { key: "snapshots", label: "Customers & Marketing" }, { key: "inventory", label: "Inventory" },
   { key: "integrations", label: "Integration Status" }, { key: "activity", label: "Activity feed" },
@@ -94,6 +95,7 @@ export default async function AdminDashboard() {
   const [cc, metrics, activityRaw, settlement, ga4] = await Promise.all([
     getCommandCenter(), getOperationalMetrics(), getRecentAuditEvents({ limit: 48 }), getSettlementSummary(), getGa4Insights(),
   ]);
+  const incidents = await getIncidentMetrics();
   const { revenue, inventory, customers, operations, marketing, cashflow, integrations, seasonal, founder, alerts, workQueue, health } = cc;
 
   const alertsBySev: Record<Severity, typeof alerts> = { critical: [], warning: [], info: [] };
@@ -236,6 +238,19 @@ export default async function AdminDashboard() {
           ) : <p className="cc-empty">All clear — no alerts.</p>}
         </section>
       </div>
+
+      {/* Incidents widget — the correlation layer above notifications */}
+      <section data-widget="incidents" className="cc-card">
+        <div className="cc-card__head"><h2 className="cc-card__title">Incidents</h2><Link href="/admin/incidents" className="text-link">All incidents →</Link></div>
+        <div className="cc-inv">
+          <Link href="/admin/incidents" className="cc-inv__bucket" data-tone={incidents.critical ? "critical" : "plain"}><b>{incidents.critical}</b><span>Critical</span></Link>
+          <Link href="/admin/incidents" className="cc-inv__bucket" data-tone={incidents.high ? "warn" : "plain"}><b>{incidents.high}</b><span>High</span></Link>
+          <Link href="/admin/incidents" className="cc-inv__bucket"><b>{incidents.open}</b><span>Open</span></Link>
+          <div className="cc-inv__bucket"><b>{incidents.resolvedToday}</b><span>Resolved today</span></div>
+          <div className="cc-inv__bucket"><b>{incidents.avgResolutionMin == null ? "—" : incidents.avgResolutionMin < 60 ? `${incidents.avgResolutionMin}m` : `${Math.round(incidents.avgResolutionMin / 6) / 10}h`}</b><span>Avg resolution</span></div>
+          <div className="cc-inv__bucket"><b data-tone={incidents.oldestOpenMin && incidents.oldestOpenMin >= 60 ? "warn" : undefined}>{incidents.oldestOpenMin == null ? "—" : incidents.oldestOpenMin < 60 ? `${incidents.oldestOpenMin}m` : `${Math.round(incidents.oldestOpenMin / 6) / 10}h`}</b><span>Oldest open</span></div>
+        </div>
+      </section>
 
       {/* Money band: Sales trend (3) + Revenue breakdown (4) */}
       <div data-widget="money" className="cc-grid cc-grid--2">

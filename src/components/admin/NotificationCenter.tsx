@@ -10,7 +10,7 @@ import type { AdminAlert, AlertPriority, EventNotification } from "@/services/no
 
 interface ResolvedItem { id: string; label: string; orderNumber: string | null; at: string }
 
-type FilterKind = "all" | "prio" | "type" | "class" | "time";
+type FilterKind = "all" | "prio" | "type" | "class" | "time" | "state";
 interface Filter { key: string; label: string; kind: FilterKind; prio?: AlertPriority; match?: (a: AdminAlert) => boolean; days?: number }
 
 const FILTERS: Filter[] = [
@@ -24,6 +24,10 @@ const FILTERS: Filter[] = [
   { key: "payments", label: "Payments", kind: "type", match: (a) => a.key.includes("payment") },
   { key: "shipments", label: "Shipments", kind: "type", match: (a) => a.key.includes("shipment") },
   { key: "inventory", label: "Inventory", kind: "type", match: (a) => a.key === "low_stock" },
+  { key: "mine", label: "Assigned to me", kind: "state" },
+  { key: "unassigned", label: "Unassigned", kind: "state" },
+  { key: "acknowledged", label: "Acknowledged", kind: "state" },
+  { key: "snoozed", label: "Snoozed", kind: "state" },
   { key: "today", label: "Today", kind: "time", days: 1 },
   { key: "week", label: "This week", kind: "time", days: 7 },
 ];
@@ -35,7 +39,7 @@ const resolvedAgo = (iso: string) => { const h = (Date.now() - new Date(iso).get
  * class / time) + search over the enriched operational alerts and events, an Open/History split,
  * and LIVE updates (Supabase realtime channel + 30s poll fallback).
  */
-export function NotificationCenter({ operational, events, resolved }: { operational: AdminAlert[]; events: EventNotification[]; resolved: ResolvedItem[] }) {
+export function NotificationCenter({ operational, events, resolved, staffName }: { operational: AdminAlert[]; events: EventNotification[]; resolved: ResolvedItem[]; staffName?: string }) {
   const router = useRouter();
   const [tab, setTab] = useState<"open" | "history">("open");
   const [filterKey, setFilterKey] = useState("all");
@@ -88,13 +92,19 @@ export function NotificationCenter({ operational, events, resolved }: { operatio
       .filter((a) => (filter.kind === "prio" ? a.priority === filter.prio : true))
       .filter((a) => (filter.kind === "type" && filter.match ? filter.match(a) : true))
       .map((a) => {
-        let items = a.items;
+        // Snooze visibility: hide snoozed items unless the "Snoozed" filter is active.
+        let items = filter.key === "snoozed" ? a.items.filter((i) => i.isSnoozed) : a.items.filter((i) => !i.isSnoozed);
+        if (filter.kind === "state") {
+          if (filter.key === "mine") items = items.filter((i) => i.assigneeName && i.assigneeName === staffName);
+          else if (filter.key === "unassigned") items = items.filter((i) => !i.assigneeName);
+          else if (filter.key === "acknowledged") items = items.filter((i) => i.state === "acknowledged");
+        }
         if (q) items = items.filter((it) => matchText(it.primary, it.secondary, it.meta, it.subsystem, it.notId));
         if (filter.kind === "time") items = items.filter((it) => withinDays(it.at, filter.days));
         return { ...a, items };
       })
-      .filter((a) => (q || filter.kind === "time" ? a.items.length > 0 : true));
-  }, [operational, filter, q, showOps]); // eslint-disable-line react-hooks/exhaustive-deps
+      .filter((a) => (q || filter.kind === "time" || filter.kind === "state" ? a.items.length > 0 : true));
+  }, [operational, filter, q, showOps, staffName]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const unreadEvents = useMemo(() => events.filter((e) => !e.readAt && matchText(e.title, e.body) && (filter.kind !== "time" || withinDays(e.createdAt, filter.days))), [events, q, filter]); // eslint-disable-line react-hooks/exhaustive-deps
   const readEvents = useMemo(() => events.filter((e) => e.readAt && matchText(e.title, e.body)), [events, q]); // eslint-disable-line react-hooks/exhaustive-deps
