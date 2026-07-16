@@ -191,6 +191,24 @@ timeline assembly (incl. retries, replay, DLQ hand-off), channel icons — plus 
 SMS-critical / retention / preset suites. Schema verified live: DLQ transition + reason, DLQ query,
 replay audit fields, correlation binding 3 events into one unit, cursor keyset — self-cleaning.
 
+### End-to-end DLQ run (against the real retry worker, 17/17)
+Driven with a **genuinely failing provider** (Resend to an invalid recipient) rather than a mock:
+
+| Verified | Result |
+|---|---|
+| Backoff guard | a not-yet-due failure is left untouched |
+| Channel guard | `in_app` is never auto-retried (it isn't a provider) |
+| Real failure → retry | attempts 1 → 2, real error captured (`resend 422 validation_error`) |
+| Backoff scheduling | next attempt scheduled per policy; recorded in `retry_history` as `retry-worker` |
+| **Auto-recovery** | a failed Slack row re-dispatched and **delivered** (572 ms) — self-healing works |
+| **Policy exhausted → DLQ** | `status=dead`, `dead_at` stamped, `dead_reason` = the **real provider error** |
+| No further retries | `next_retry_at` cleared once dead |
+| Nothing lost | full `retry_history` preserved through the chain |
+| DLQ view | the dead letter is listed |
+| Idempotency | re-running the worker does not touch dead letters (no retry storm) |
+
+All synthetic rows removed afterwards.
+
 ## Design notes
 - The customer-transactional engine (`notify()`, `notification_dispatches`, order/return emails) is **unchanged**.
 - Operational dispatches are logged to a separate `notification_log` table (additive migration `20260722120000`).
