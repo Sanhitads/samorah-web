@@ -235,6 +235,28 @@ window — nothing is estimated. Window: 7 / 30 / 90 days.
 **Why p95:** an average hides the slow tail. Nearest-rank percentile — note p95 of 20 samples is the
 19th value, so a single 1-in-20 spike is p100, not p95.
 
+---
+
+# Deferred backlog (agreed, not built)
+
+Everything raised in review that was **consciously deferred** — recorded so nothing is lost. Each row
+says who deferred it and why. Nothing here is forgotten; it's queued.
+
+| Item | Raised | Status / why deferred | Notes for when we build it |
+|---|---|---|---|
+| **Bulk operations** (select → delete / retry / archive / mark read) | Ops Center review #4 | Deferred — *"not required today"* (reviewer) | Feed already has stable `group_id`s to select on |
+| **Export** (CSV / Excel / PDF) for audits | Ops Center review #6 | Deferred — outside the "add only" scope of the hardening pass | The incidents module already has a CSV/XLS export route to copy |
+| **SLA tracking on notifications** (target, countdown, overdue) | Ops Center review #8 | Deferred — incidents already carry SLA; notification-level SLA is new scope | Would reuse the incident SLA config shape |
+| **Escalation chain** (Slack → 5m → Email → 10m → SMS → 15m → Phone → Manager → Founder) | Ops Center review #9 | Deferred — *"not necessary before launch"* (reviewer). The incident engine already has a 3-level time policy | Extend `ESCALATION_POLICY`; the ladder is config, the dispatcher already exists |
+| **Attachments** (invoice PDF, screenshot, log, CSV) | Ops Center review #10 | Deferred — needs a storage decision (Supabase Storage vs Cloudinary) + retention rules | Slack Block Kit + Resend both support attachments |
+| **Notification policies in Settings UI** | Ops Center review #13 | Deferred — the `notification_preferences` table + engine support already exist; only the Settings screen is missing | Per-user, scoped by event **or** category; broadcast Slack stays channel-wide |
+| **Notification dependencies** (business event chains: payment failed → order cancelled → refund failed) | Phase 16 priority #3 | Deferred — *"would be nice"* (reviewer). Distinct from channel correlation, which groups by root cause | Would need a causal link between events, not just a shared root cause |
+| **Scheduled / automatic replay** (gateway recovers → auto-replay the DLQ) | Phase 16 priority #5 | Deferred — outside the "build only" list | Risk: a mass auto-replay could re-flood channels; must combine with rate limiting |
+| **Channel configuration from the UI** (webhook URL, retries, digest time, toggles) | Phase 16 priority #8 | Deferred — *"eventually"* (reviewer). Secrets in the DB need care | Non-secret knobs (retries, digest time, toggles) could move first; keep webhook URLs/keys in env |
+| **Full change audit** (who disabled a channel / changed routing) | Phase 16 priority #9 | **Partially built** — acknowledge (`acknowledged_by`) and replay (`replayed_by`) are already attributed; retries record the actor in `retry_history`. Missing: config/routing change history | Routing lives in code config today, so its history is git. An `audit_logs` table exists to extend |
+| **WhatsApp transport** | Phase 5 | Blocked on a dedicated business number (reviewer). Channel structure + renderer are built and dormant | Set `WHATSAPP_*` env → one transport function |
+| **Real SMS delivery** | Phase 5 | Blocked on MSG91 DLT template approval | Set `MSG91_*` env; channel is built, critical-only, and dormant |
+
 ## Design notes
 - The customer-transactional engine (`notify()`, `notification_dispatches`, order/return emails) is **unchanged**.
 - Operational dispatches are logged to a separate `notification_log` table (additive migration `20260722120000`).
