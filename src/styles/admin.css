@@ -1105,3 +1105,8 @@
 .nlog-chealth__metrics div { display: flex; justify-content: space-between; gap: 4px; }
 .nlog-chealth__metrics dt { font-family: var(--font-sans); font-size: 10px; color: var(--smoke, #9a8f82); }
 .nlog-chealth__metrics dd { font-family: var(--font-sans); font-size: 10px; margin: 0; color: var(--ink, #1f1a16); font-variant-numeric: tabular-nums; }
+
+/* Notification analytics */
+.nlog-neg { color: #b3261e; }
+.nlog-trend__bar--failed { background: #b3261e; }
+.nlog-trend__key--failed { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: middle; margin-right: 3px; background: #b3261e; }

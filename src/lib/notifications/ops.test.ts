@@ -6,7 +6,7 @@ import { describe, it, expect } from "vitest";
 import { buildSlackMessage } from "./channels/slack";
 import { buildSmsText, smsChannel } from "./channels/sms";
 import { buildOpsEmailHtml } from "./channels/opsEmail";
-import { retryDecision } from "./opsEngine";
+import { retryDecision, percentile, failureReasonKey } from "./opsEngine";
 import { buildTimeline, type FeedItem, type FeedChannel } from "./feedTypes";
 import {
   OPS_ROUTES, SEVERITY_COLOR, EVENT_CATEGORY, RETENTION_DAYS, retentionClassFor, TEST_PRESETS, CATEGORY_LABEL,
@@ -195,6 +195,42 @@ describe("event timeline", () => {
   it("records a replay out of the DLQ", () => {
     const t = buildTimeline(item({ channels: [ch({ replayedAt: "2026-07-16T09:00:00Z", replayedBy: "Asha" })] }));
     expect(t.find((x) => x.kind === "replay")?.detail).toBe("Asha");
+  });
+});
+
+describe("analytics math", () => {
+  it("percentile uses nearest-rank and handles edges", () => {
+    const v = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+    expect(percentile(v, 50)).toBe(50);
+    expect(percentile(v, 95)).toBe(100);
+    expect(percentile(v, 100)).toBe(100);
+    expect(percentile([42], 95)).toBe(42);
+    expect(percentile([], 95)).toBeNull();
+  });
+  it("percentile does not mutate the caller's array", () => {
+    const v = [3, 1, 2];
+    percentile(v, 50);
+    expect(v).toEqual([3, 1, 2]);
+  });
+  it("p95 exposes the slow tail an average would hide", () => {
+    // Nearest-rank p95 of 20 samples is the 19th value, so it takes 2 outliers (the top 10%) to
+    // surface — a single 1-in-20 spike is p100 by definition, not p95.
+    const v = [...Array(18).fill(100), 5000, 5000];
+    expect(percentile(v, 50)).toBe(100);   // the median stays calm…
+    expect(percentile(v, 95)).toBe(5000);  // …while p95 surfaces the tail
+  });
+  it("failureReasonKey groups provider errors by signature", () => {
+    expect(failureReasonKey('resend 422: {"statusCode":422,"name":"validation_error","message":"Invalid `to` field."}')).toBe("resend 422");
+    expect(failureReasonKey("HTTP 500: upstream boom")).toBe("HTTP 500");
+    expect(failureReasonKey('{"name":"rate_limit_exceeded","message":"slow down"}')).toBe("rate_limit_exceeded");
+    expect(failureReasonKey("channel not configured")).toBe("channel not configured");
+    expect(failureReasonKey(null)).toBe("unknown");
+    expect(failureReasonKey("   ")).toBe("unknown");
+  });
+  it("two identical provider failures group to ONE reason", () => {
+    const a = failureReasonKey('resend 422: {"message":"Invalid `to` field. abc"}');
+    const b = failureReasonKey('resend 422: {"message":"Invalid `to` field. xyz"}');
+    expect(a).toBe(b);   // differing bodies must not fragment the ranking
   });
 });
 

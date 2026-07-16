@@ -209,6 +209,32 @@ Driven with a **genuinely failing provider** (Resend to an invalid recipient) ra
 
 All synthetic rows removed afterwards.
 
+---
+
+# Notification Analytics (`/admin/notifications-log/analytics`)
+
+How the **notifier itself** is performing. Every number derives from `notification_log` rows in the
+window — nothing is estimated. Window: 7 / 30 / 90 days.
+
+| Metric | Definition |
+|---|---|
+| **Delivery rate** | delivered ÷ (delivered + failed + dead). `skipped` is excluded — a dormant channel isn't a failure |
+| **Events / dispatches** | distinct `group_id`s vs individual channel rows |
+| **Failures / DLQ** | current failures, and how many are parked in the Dead Letter Queue |
+| **MTTA** | mean(`acknowledged_at` − `created_at`) over critical alerts — how fast someone owned it |
+| **MTTR** | mean(`last_attempt_at` − `created_at`) for dispatches that **recovered** (delivered after ≥1 retry) |
+| **Mean time to read** | mean(`read_at` − `created_at`) |
+| **Per channel** | sent · failed · DLQ · delivery % · avg · **p50** · **p95** latency · last success |
+| **Top notification types** | volume per event (with failure count), tagged by category |
+| **Top failure reasons** | provider errors grouped by signature via `failureReasonKey()` (e.g. `resend 422`) so a recurring fault is obvious rather than fragmented across unique JSON bodies |
+| **Daily volume** | delivered vs failed per day |
+
+**Test-preset notifications are excluded by default** (they'd flatter delivery stats); toggle
+"Tests included" to see them.
+
+**Why p95:** an average hides the slow tail. Nearest-rank percentile — note p95 of 20 samples is the
+19th value, so a single 1-in-20 spike is p100, not p95.
+
 ## Design notes
 - The customer-transactional engine (`notify()`, `notification_dispatches`, order/return emails) is **unchanged**.
 - Operational dispatches are logged to a separate `notification_log` table (additive migration `20260722120000`).

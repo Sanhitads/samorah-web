@@ -446,6 +446,125 @@ export async function getChannelHealth(): Promise<ChannelHealth[]> {
     return { key, configured, state, lastSuccessAt, lastFailureAt, avgLatencyMs24h: lat.length ? Math.round(lat.reduce((a, b) => a + b, 0) / lat.length) : null, delivered24h, failed24h, dead };
   });
 }
+// ── Analytics (Notification Analytics page) ────────────────────────────────────
+/** PURE — nearest-rank percentile (p50/p95 latency). */
+export function percentile(values: number[], p: number): number | null {
+  if (!values.length) return null;
+  const s = [...values].sort((a, b) => a - b);
+  return s[Math.min(s.length - 1, Math.max(0, Math.ceil((p / 100) * s.length) - 1))];
+}
+/** PURE — collapse a provider error into a groupable reason (so "top failure reasons" is useful
+ *  rather than a list of unique JSON blobs). Deterministic. */
+export function failureReasonKey(error: string | null | undefined): string {
+  if (!error?.trim()) return "unknown";
+  const e = error.replace(/\s+/g, " ").trim();
+  const m = e.match(/^([A-Za-z][\w.-]*)\s+(\d{3})/);        // "resend 422 …", "HTTP 500 …"
+  if (m) return `${m[1]} ${m[2]}`;
+  const j = e.match(/"name"\s*:\s*"([^"]+)"/);               // provider error names
+  if (j) return j[1];
+  return e.slice(0, 60);
+}
+const meanOf = (v: number[]): number | null => (v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null);
+const minsBetween = (a: string, b: string) => (new Date(b).getTime() - new Date(a).getTime()) / 60000;
+
+export interface ChannelAnalytics { channel: string; total: number; delivered: number; failed: number; dead: number; deliveryRate: number | null; avgMs: number | null; p50Ms: number | null; p95Ms: number | null; lastSuccessAt: string | null }
+export interface NotificationAnalytics {
+  windowDays: number; includeTests: boolean;
+  events: number; dispatches: number;
+  delivered: number; failed: number; dead: number; skipped: number; deliveryRate: number | null;
+  mttaMin: number | null; mttrMin: number | null; timeToReadMin: number | null;
+  criticalTotal: number; criticalAcked: number;
+  byChannel: ChannelAnalytics[];
+  topEvents: { key: string; count: number; failed: number }[];
+  topFailures: { key: string; count: number }[];
+  daily: { day: string; total: number; delivered: number; failed: number }[];
+}
+
+/**
+ * Notification analytics — how the NOTIFIER itself is performing. Every number is derived from
+ * notification_log rows in the window; nothing is estimated.
+ *   MTTA = acknowledged_at − created_at (critical alerts: how fast someone owned it)
+ *   MTTR = last_attempt_at − created_at for dispatches that recovered (delivered after ≥1 retry)
+ * Test-preset notifications are excluded by default so they can't flatter delivery stats.
+ */
+export async function getNotificationAnalytics(windowDays = 30, includeTests = false): Promise<NotificationAnalytics> {
+  const empty: NotificationAnalytics = { windowDays, includeTests, events: 0, dispatches: 0, delivered: 0, failed: 0, dead: 0, skipped: 0, deliveryRate: null, mttaMin: null, mttrMin: null, timeToReadMin: null, criticalTotal: 0, criticalAcked: 0, byChannel: [], topEvents: [], topFailures: [], daily: [] };
+  try {
+    const since = new Date(Date.now() - windowDays * 86400000).toISOString();
+    let q = db().from("notification_log").select("group_id,event,channel,status,severity,delivery_ms,error,created_at,read_at,acknowledged_at,last_attempt_at,attempts,entity_type").gte("created_at", since).limit(20000);
+    if (!includeTests) q = q.or("entity_type.is.null,entity_type.neq.test");
+    const { data } = await q;
+    const rows = (data ?? []) as any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
+    if (!rows.length) return empty;
+
+    const delivered = rows.filter((r) => r.status === "delivered");
+    const failed = rows.filter((r) => r.status === "failed");
+    const dead = rows.filter((r) => r.status === "dead");
+    const skipped = rows.filter((r) => r.status === "skipped");
+    const attempted = delivered.length + failed.length + dead.length;
+
+    // Per-channel, incl. latency distribution (the "Slack/Email/SMS latency" ask).
+    const channels = [...new Set(rows.map((r) => r.channel))].sort();
+    const byChannel: ChannelAnalytics[] = channels.map((ch) => {
+      const mine = rows.filter((r) => r.channel === ch);
+      const d = mine.filter((r) => r.status === "delivered");
+      const f = mine.filter((r) => r.status === "failed").length;
+      const dd = mine.filter((r) => r.status === "dead").length;
+      const lat = mine.map((r) => r.delivery_ms).filter((n) => typeof n === "number" && n >= 0) as number[];
+      const att = d.length + f + dd;
+      return {
+        channel: ch, total: mine.length, delivered: d.length, failed: f, dead: dd,
+        deliveryRate: att ? Math.round((d.length / att) * 1000) / 10 : null,
+        avgMs: meanOf(lat), p50Ms: percentile(lat, 50), p95Ms: percentile(lat, 95),
+        lastSuccessAt: d.map((r) => r.created_at).sort().reverse()[0] ?? null,
+      };
+    });
+
+    // Top notification types + top failure reasons.
+    const evMap = new Map<string, { count: number; failed: number }>();
+    for (const r of rows) {
+      const cur = evMap.get(r.event) ?? { count: 0, failed: 0 };
+      cur.count++; if (r.status === "failed" || r.status === "dead") cur.failed++;
+      evMap.set(r.event, cur);
+    }
+    const failMap = new Map<string, number>();
+    for (const r of [...failed, ...dead]) { const k = failureReasonKey(r.error); failMap.set(k, (failMap.get(k) ?? 0) + 1); }
+
+    // Daily trend.
+    const dayMap = new Map<string, { total: number; delivered: number; failed: number }>();
+    for (const r of rows) {
+      const day = String(r.created_at).slice(0, 10);
+      const cur = dayMap.get(day) ?? { total: 0, delivered: 0, failed: 0 };
+      cur.total++;
+      if (r.status === "delivered") cur.delivered++;
+      if (r.status === "failed" || r.status === "dead") cur.failed++;
+      dayMap.set(day, cur);
+    }
+
+    // Response + recovery times.
+    const acked = rows.filter((r) => r.acknowledged_at);
+    const readRows = rows.filter((r) => r.read_at);
+    const recovered = delivered.filter((r) => (r.attempts ?? 1) > 1 && r.last_attempt_at);
+    const crit = rows.filter((r) => r.severity === "critical");
+
+    return {
+      windowDays, includeTests,
+      events: new Set(rows.map((r) => r.group_id)).size, dispatches: rows.length,
+      delivered: delivered.length, failed: failed.length, dead: dead.length, skipped: skipped.length,
+      deliveryRate: attempted ? Math.round((delivered.length / attempted) * 1000) / 10 : null,
+      mttaMin: meanOf(acked.map((r) => minsBetween(r.created_at, r.acknowledged_at))),
+      mttrMin: meanOf(recovered.map((r) => minsBetween(r.created_at, r.last_attempt_at))),
+      timeToReadMin: meanOf(readRows.map((r) => minsBetween(r.created_at, r.read_at))),
+      criticalTotal: new Set(crit.map((r) => r.group_id)).size,
+      criticalAcked: new Set(crit.filter((r) => r.acknowledged_at).map((r) => r.group_id)).size,
+      byChannel,
+      topEvents: [...evMap.entries()].map(([key, v]) => ({ key, ...v })).sort((a, b) => b.count - a.count).slice(0, 10),
+      topFailures: [...failMap.entries()].map(([key, count]) => ({ key, count })).sort((a, b) => b.count - a.count).slice(0, 8),
+      daily: [...dayMap.entries()].map(([day, v]) => ({ day, ...v })).sort((a, b) => a.day.localeCompare(b.day)),
+    };
+  } catch { return empty; }
+}
+
 export interface NotificationStats { today: number; criticalToday: number; delivered: number; failed: number; deliveryRate: number | null; avgDeliveryMs: number | null; unread: number; criticalUnacked: number }
 /** Health of the notifier itself — today's volume, delivery rate, failures, average latency. */
 export async function getNotificationStats(): Promise<NotificationStats> {

@@ -47,6 +47,7 @@ export default async function NotificationOpsPage({ searchParams }: { searchPara
         </div>
         <div className="inc-subnav">
           <MarkAllRead unread={stats.unread} />
+          <Link href="/admin/notifications-log/analytics" className="op-item__btn">📊 Analytics</Link>
           <Link href="/admin/incidents" className="op-item__btn">🚨 Incidents</Link>
         </div>
       </header>
