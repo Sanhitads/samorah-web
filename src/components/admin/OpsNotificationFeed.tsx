@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import type { FeedItem, FeedChannel } from "@/lib/notifications/opsEngine";
 
@@ -24,16 +24,16 @@ export function OpsFilters({ total }: { total: number }) {
   const val = (k: string) => sp.get(k) ?? "";
   const set = (k: string, v: string) => { const p = new URLSearchParams(sp.toString()); if (v) p.set(k, v); else p.delete(k); p.delete("page"); router.push(`${pathname}?${p.toString()}`); };
   return (
-    <div className="nc-filters">
-      <div className="nc-chips">
+    <div className="nlog-filters">
+      <div className="nlog-chips">
         {CATEGORIES.map((c) => (
-          <button key={c.v || "all"} type="button" className={`nc-chip${val("category") === c.v ? " is-active" : ""}`} onClick={() => set("category", c.v)}>{c.l}</button>
+          <button key={c.v || "all"} type="button" className={`nlog-chip${val("category") === c.v ? " is-active" : ""}`} onClick={() => set("category", c.v)}>{c.l}</button>
         ))}
-        <button type="button" className={`nc-chip nc-chip--crit${val("severity") === "critical" ? " is-active" : ""}`} onClick={() => set("severity", val("severity") === "critical" ? "" : "critical")}>🔴 Critical</button>
-        <button type="button" className={`nc-chip${val("unread") === "1" ? " is-active" : ""}`} onClick={() => set("unread", val("unread") === "1" ? "" : "1")}>Unread</button>
-        <button type="button" className={`nc-chip${val("status") === "failed" ? " is-active" : ""}`} onClick={() => set("status", val("status") === "failed" ? "" : "failed")}>Failed</button>
+        <button type="button" className={`nlog-chip nlog-chip--crit${val("severity") === "critical" ? " is-active" : ""}`} onClick={() => set("severity", val("severity") === "critical" ? "" : "critical")}>🔴 Critical</button>
+        <button type="button" className={`nlog-chip${val("unread") === "1" ? " is-active" : ""}`} onClick={() => set("unread", val("unread") === "1" ? "" : "1")}>Unread</button>
+        <button type="button" className={`nlog-chip${val("status") === "failed" ? " is-active" : ""}`} onClick={() => set("status", val("status") === "failed" ? "" : "failed")}>Failed</button>
       </div>
-      <div className="nc-searchrow">
+      <div className="nlog-searchrow">
         <input className="nc-search" type="search" defaultValue={val("q")} placeholder="Search order ID, customer, event, type…" onKeyDown={(e) => { if (e.key === "Enter") set("q", (e.target as HTMLInputElement).value); }} />
         <span className="admin__muted" style={{ fontSize: 12 }}>{total} notification{total === 1 ? "" : "s"}</span>
       </div>
@@ -50,19 +50,48 @@ export function MarkAllRead({ unread }: { unread: number }) {
 // ── Feed + detail drawer ────────────────────────────────────────────────────────
 export function OpsFeed({ items }: { items: FeedItem[] }) {
   const router = useRouter();
-  const [open, setOpen] = useState<FeedItem | null>(null);
+  // Track the OPEN ITEM BY ID and derive it from the live `items` — never hold a snapshot object,
+  // or the drawer would keep rendering the row as it looked when it was clicked.
+  const [openId, setOpenId] = useState<string | null>(null);
+  // …but keep the last-known copy as a fallback so the drawer never blinks out if the row leaves the
+  // filtered page (e.g. it drops off the "Unread" filter the moment we mark it read).
+  const [fallback, setFallback] = useState<FeedItem | null>(null);
+  const [pendingRefresh, setPendingRefresh] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
 
-  const openItem = async (it: FeedItem) => {
-    setOpen(it);
-    if (!it.read) { await post({ action: "read", groupId: it.groupId }); router.refresh(); }
+  const open = openId ? (items.find((i) => i.groupId === openId) ?? fallback) : null;
+
+  const close = () => {
+    setOpenId(null); setFallback(null); setNote(null);
+    // Refresh only AFTER closing, so we never re-render the page underneath an open drawer.
+    if (pendingRefresh) { setPendingRefresh(false); router.refresh(); }
   };
+  const openItem = async (it: FeedItem) => {
+    setOpenId(it.groupId); setFallback(it); setNote(null);
+    if (!it.read) { await post({ action: "read", groupId: it.groupId }); setPendingRefresh(true); }
+  };
+  useEffect(() => {
+    if (!openId) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }); // eslint-disable-line react-hooks/exhaustive-deps
+
   const retry = async (c: FeedChannel) => {
+    setBusy(true); setNote(null);
+    try {
+      const r = await post({ action: "retry", id: c.id });
+      const d = await r.json().catch(() => ({}));
+      setNote(r.ok ? `Retry succeeded — ${c.channel} delivered.` : `Retry failed: ${d.error ?? "unknown"}`);
+      router.refresh();   // drawer stays open and re-derives from fresh data
+    } finally { setBusy(false); }
+  };
+  const ack = async (it: FeedItem) => {
     setBusy(true);
-    try { const r = await post({ action: "retry", id: c.id }); const d = await r.json().catch(() => ({})); router.refresh(); if (!r.ok) alert(`Retry failed: ${d.error ?? "unknown"}`); setOpen(null); }
+    try { const r = await post({ action: "acknowledge", groupId: it.groupId }); if (r.ok) { setNote("Acknowledged."); router.refresh(); } }
     finally { setBusy(false); }
   };
-  const ack = async (it: FeedItem) => { setBusy(true); try { const r = await post({ action: "acknowledge", groupId: it.groupId }); if (r.ok) { router.refresh(); setOpen(null); } } finally { setBusy(false); } };
 
   if (!items.length) {
     return <div className="no-alerts"><span className="no-alerts__check">✓</span><p className="no-alerts__title">No notifications match</p><p className="no-alerts__sub">Operational events (orders, low stock, payment failures, incident escalations, digests) appear here as they fire.</p></div>;
@@ -70,34 +99,35 @@ export function OpsFeed({ items }: { items: FeedItem[] }) {
 
   return (
     <>
-      <ul className="nc-feed">
+      <ul className="nlog-feed">
         {items.map((it) => (
-          <li key={it.groupId} className={`nc-item${it.read ? "" : " is-unread"}`}>
-            <button type="button" className="nc-item__btn" onClick={() => openItem(it)}>
-              <span className="nc-item__time">{time(it.createdAt)}</span>
-              <span className="nc-item__main">
-                <span className="nc-item__title">{SEV[it.severity]} {it.title ?? it.event}{it.entityRef ? <span className="admin__mono nc-item__ref"> {it.entityRef}</span> : null}</span>
-                <span className="nc-item__meta"><span className="nc-cat">{it.category}</span> <span className="admin__mono" style={{ fontSize: 11 }}>{it.event}</span></span>
+          <li key={it.groupId} className={`nlog-item${it.read ? "" : " is-unread"}`}>
+            <button type="button" className="nlog-item__btn" onClick={() => openItem(it)}>
+              <span className="nlog-item__time">{time(it.createdAt)}</span>
+              <span className="nlog-item__main">
+                <span className="nlog-item__title">{SEV[it.severity]} {it.title ?? it.event}{it.entityRef ? <span className="admin__mono nlog-item__ref"> {it.entityRef}</span> : null}</span>
+                <span className="nlog-item__meta"><span className="nlog-cat">{it.category}</span> <span className="admin__mono" style={{ fontSize: 11 }}>{it.event}</span></span>
               </span>
-              <span className="nc-item__chans">{it.channels.map((c) => <span key={c.id} className={`nc-chan nc-chan--${c.status}`} title={`${c.channel}: ${ST_LABEL[c.status]}${c.error ? ` — ${c.error}` : ""}`}>{c.channel}</span>)}</span>
-              <span className={`nc-status nc-status--${it.status}`}>{ST_LABEL[it.status]}</span>
-              {it.severity === "critical" && !it.acknowledgedAt ? <span className="nc-ackflag">needs ack</span> : null}
+              <span className="nlog-item__chans">{it.channels.map((c) => <span key={c.id} className={`nlog-chan nlog-chan--${c.status}`} title={`${c.channel}: ${ST_LABEL[c.status]}${c.error ? ` — ${c.error}` : ""}`}>{c.channel}</span>)}</span>
+              <span className={`nlog-status nlog-status--${it.status}`}>{ST_LABEL[it.status]}</span>
+              {it.severity === "critical" && !it.acknowledgedAt ? <span className="nlog-ackflag">needs ack</span> : null}
             </button>
           </li>
         ))}
       </ul>
 
       {open ? (
-        <div className="nc-drawer" role="dialog" aria-label="Notification detail">
-          <button type="button" className="nc-drawer__scrim" aria-label="Close" onClick={() => setOpen(null)} />
-          <div className="nc-drawer__panel">
-            <div className="nc-drawer__head">
+        <div className="nlog-drawer" role="dialog" aria-modal="true" aria-label="Notification detail">
+          <button type="button" className="nlog-drawer__scrim" aria-label="Close" onClick={close} />
+          <div className="nlog-drawer__panel">
+            <div className="nlog-drawer__head">
               <div>
-                <p className="nc-drawer__title">{SEV[open.severity]} {open.title ?? open.event}</p>
+                <p className="nlog-drawer__title">{SEV[open.severity]} {open.title ?? open.event}</p>
                 <p className="admin__muted" style={{ fontSize: 12 }}><span className="admin__mono">{open.event}</span> · {open.category} · {dt(open.createdAt)}</p>
               </div>
-              <button type="button" className="op-item__btn" onClick={() => setOpen(null)}>Close</button>
+              <button type="button" className="op-item__btn" onClick={close}>Close</button>
             </div>
+            {note ? <p className="nlog-note">{note}</p> : null}
 
             <div className="od-detail">
               <div><dt>Severity</dt><dd>{open.severity}</dd></div>
@@ -106,7 +136,7 @@ export function OpsFeed({ items }: { items: FeedItem[] }) {
               <div><dt>Acknowledged</dt><dd>{open.acknowledgedAt ? `${dt(open.acknowledgedAt)}${open.acknowledgedBy ? ` · ${open.acknowledgedBy}` : ""}` : "—"}</dd></div>
             </div>
 
-            {open.payload?.message ? <p className="nc-drawer__msg">{open.payload.message}</p> : null}
+            {open.payload?.message ? <p className="nlog-drawer__msg">{open.payload.message}</p> : null}
             {open.payload?.fields?.length ? (
               <>
                 <h3 className="od-card__title" style={{ fontSize: "0.95rem", marginTop: 12 }}>Payload</h3>
@@ -115,18 +145,18 @@ export function OpsFeed({ items }: { items: FeedItem[] }) {
             ) : null}
 
             <h3 className="od-card__title" style={{ fontSize: "0.95rem", marginTop: 14 }}>Channels attempted</h3>
-            <ul className="nc-chanlist">
+            <ul className="nlog-chanlist">
               {open.channels.map((c) => (
-                <li key={c.id} className="nc-chanrow">
+                <li key={c.id} className="nlog-chanrow">
                   <div>
-                    <b>{c.channel}</b> <span className={`nc-status nc-status--${c.status}`}>{ST_LABEL[c.status]}</span>
+                    <b>{c.channel}</b> <span className={`nlog-status nlog-status--${c.status}`}>{ST_LABEL[c.status]}</span>
                     <div className="admin__muted" style={{ fontSize: 11 }}>
                       {c.target ? `→ ${c.target} · ` : ""}{c.attempts} attempt{c.attempts === 1 ? "" : "s"}
                       {c.deliveryMs != null ? ` · ${c.deliveryMs} ms` : ""}{c.lastAttemptAt ? ` · ${dt(c.lastAttemptAt)}` : ""}
                     </div>
-                    {c.error ? <div className="nc-err">{c.error}</div> : null}
+                    {c.error ? <div className="nlog-err">{c.error}</div> : null}
                     {c.retryHistory.length ? (
-                      <ul className="nc-retries">
+                      <ul className="nlog-retries">
                         {c.retryHistory.map((h, i) => <li key={i}>↻ {dt(h.at)} — {h.status}{h.error ? `: ${h.error}` : ""} <span className="admin__muted">by {h.by}</span></li>)}
                       </ul>
                     ) : null}

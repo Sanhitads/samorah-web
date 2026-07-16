@@ -60,13 +60,13 @@ export default async function NotificationOpsPage({ searchParams }: { searchPara
       </div>
 
       {/* Channel health */}
-      <section className="nc-channels">
+      <section className="nlog-channels">
         {channels.map((c) => {
           const h = health(c.key, c.configured);
           return (
-            <div key={c.key} className={`nc-chealth nc-chealth--${h.state}`}>
-              <span className="nc-chealth__name">{CHANNEL_LABEL[c.key] ?? c.key}</span>
-              <span className="nc-chealth__state">{h.label}</span>
+            <div key={c.key} className={`nlog-chealth nlog-chealth--${h.state}`}>
+              <span className="nlog-chealth__name">{CHANNEL_LABEL[c.key] ?? c.key}</span>
+              <span className="nlog-chealth__state">{h.label}</span>
             </div>
           );
         })}

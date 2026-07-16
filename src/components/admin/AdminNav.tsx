@@ -66,8 +66,10 @@ const NAV: NavGroup[] = [
 
 export function AdminNav({ role, alertCount = 0 }: { role: string | null; alertCount?: number }) {
   const pathname = usePathname();
+  // Match on SEGMENT boundaries, not a raw prefix — otherwise sibling routes that share a prefix
+  // (e.g. /admin/notifications-log vs /admin/notifications) would both highlight.
   const isActive = (href?: string) =>
-    href ? (href === "/admin" ? pathname === "/admin" : pathname.startsWith(href)) : false;
+    href ? (href === "/admin" ? pathname === "/admin" : pathname === href || pathname.startsWith(`${href}/`)) : false;
 
   return (
     <nav className="ash-nav" aria-label="Admin">
