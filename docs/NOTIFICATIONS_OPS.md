@@ -78,6 +78,59 @@ Until set, `smsChannel.configured()` is false and SMS is cleanly skipped.
 - `src/lib/notifications/ops.test.ts` (11) — Block Kit builder, SMS critical-only guard + one-liner, ops email HTML, and routing invariants (**SMS only on critical events**).
 - Live verification: real Block Kit post to the webhook (HTTP 200 `ok`) + `notification_log` insert/grant, self-cleaning.
 
+---
+
+# Operations Center (`/admin/notifications-log`)
+
+The command view for the engine — "Gmail for Operations".
+
+## Delivery lifecycle (real, not cosmetic)
+`queued → sending → delivered | failed → retrying`. The row is written **before** the attempt with
+status `sending`, then finalised with the terminal status + measured latency — so an in-flight or
+crashed dispatch stays visible instead of vanishing. `queued` is reserved for a future async queue.
+`delivered` = the provider accepted it (Slack 200 / Resend accepted / MSG91 queued).
+
+## Feed grouping
+One `notifyOps()` fan-out shares a `group_id`, so the feed shows **one item per event** with its
+channels — not one row per channel. Filtering finds matching groups first, then loads all their
+channel rows, so a filtered view never shows a partial channel set.
+
+## Features
+| Capability | How |
+|---|---|
+| **Top cards** | Notifications today · Critical alerts · Delivery rate · Failed · Average delivery · Awaiting acknowledgement |
+| **Channel health** | Per-channel Healthy / Dormant / Pending (WhatsApp) from `configured()` |
+| **Filters** | Category chips (Orders/Payments/Inventory/Warehouse/Marketing/Customers/System) + Critical + Unread + Failed. Category is stored on the row → indexed |
+| **Search** | Order id / customer / event / type, server-side, backed by a **pg_trgm GIN index** so ILIKE stays fast at 50k+ rows |
+| **Status** | Full lifecycle per channel + a worst-wins rollup per event |
+| **Retry** | Re-attempt a failed dispatch from the drawer; appends to `retry_history` (at/status/error/by) and bumps `attempts` — never duplicates the feed item |
+| **Statistics** | Delivery rate = delivered/(delivered+failed); average delivery from measured `delivery_ms` — these monitor the notifier itself |
+| **Test presets** | Test New Order · Payment Failure · Critical Incident · Inventory Alert — fire each event's **real payload through its real route**; tagged `test` so retention purges them in 30 days |
+| **Detail drawer** | Event, severity, payload, channels attempted, targets, timestamps, latency, errors, retry history, acknowledge |
+| **Bell badge** | Unread count in the nav (red when a critical alert is unacknowledged); polls 60s + on focus. Mark-all-read + Unread filter |
+| **Acknowledge** | Critical alerts record `acknowledged_at` / `acknowledged_by` |
+
+## Retention (the log cannot grow forever)
+| Class | Kept | Applies to |
+|---|---|---|
+| `high` | **2 years** | critical severity, incident escalations, security |
+| `operational` | **180 days** | everything else |
+| `debug` | **30 days** | test-preset notifications (`entityType: "test"`) |
+
+Every row is stamped with `expires_at` on write; the **purge cron** (`/api/cron/notifications-purge`,
+20:00 UTC nightly) deletes expired rows.
+
+## Scheduled digests
+- **09:00 IST** `/api/cron/notifications-daily` — yesterday's orders, revenue, pending, cancelled, AOV.
+- **18:00 IST** `/api/cron/notifications-digest` — today's operations: orders/revenue, low-stock SKUs,
+  failed payments, open incidents (critical count), pending shipments. Severity escalates to
+  warning/critical when there's something to act on.
+
+## User preferences (`notification_preferences`)
+Per-user channel opt-outs, scoped by `event` **or** `category`. Applied today to **per-user channels**
+(email: an opted-out manager is dropped from the recipient list); broadcast channels (a Slack channel)
+stay channel-wide by nature. WhatsApp/push will honour the same table when they go live.
+
 ## Design notes
 - The customer-transactional engine (`notify()`, `notification_dispatches`, order/return emails) is **unchanged**.
 - Operational dispatches are logged to a separate `notification_log` table (additive migration `20260722120000`).

@@ -96,3 +96,50 @@ export const OPS_ROUTES: Record<OpsEvent, OpsRoute> = {
 /** Events whose severity we treat as SMS-worthy even before the per-payload severity check. Used to
  *  document/verify intent; the SMS channel independently enforces `critical`-only. */
 export const SMS_CRITICAL_EVENTS: OpsEvent[] = ["payment.gateway_down", "inventory.sync_failed", "api.down", "site.down", "security.incident", "database.unavailable"];
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Operations Center — categories, delivery lifecycle, retention, test presets
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** Feed filter categories. Stored on each row so filtering stays indexed at 50k+ rows. */
+export type NotificationCategory = "orders" | "payments" | "inventory" | "warehouse" | "marketing" | "customers" | "system";
+export const CATEGORY_LABEL: Record<NotificationCategory, string> = {
+  orders: "Orders", payments: "Payments", inventory: "Inventory", warehouse: "Warehouse",
+  marketing: "Marketing", customers: "Customers", system: "System",
+};
+export const EVENT_CATEGORY: Record<OpsEvent, NotificationCategory> = {
+  "order.placed": "orders", "order.failed": "orders", "order.high_value": "orders", "order.bulk": "orders",
+  "payment.failed": "payments", "payment.gateway_down": "payments", "refund.failed": "payments", "chargeback": "payments",
+  "inventory.low_stock": "inventory", "inventory.sync_failed": "inventory", "shipment.delayed": "warehouse",
+  "review.negative": "customers", "support.escalation": "customers", "customer.vip": "customers",
+  "newsletter.results": "marketing", "campaign.performance": "marketing", "cart.abandoned_stats": "marketing",
+  "tech.error": "system", "cron.failed": "system", "webhook.failed": "system", "deployment.success": "system", "api.down": "system",
+  "site.down": "system", "security.incident": "system", "database.unavailable": "system",
+  "daily.sales_report": "system", "incident.escalated": "system",
+};
+
+/** Delivery lifecycle. `delivered` = the provider accepted it (Slack 200 / MSG91 queued / Resend accepted). */
+export type DeliveryStatus = "queued" | "sending" | "delivered" | "failed" | "retrying" | "skipped";
+
+/**
+ * RETENTION — the log must not grow forever. Class is derived per notification; a nightly purge
+ * deletes rows past `expires_at`. Critical/incident history is kept for audit; test noise is short.
+ */
+export type RetentionClass = "high" | "operational" | "debug";
+export const RETENTION_DAYS: Record<RetentionClass, number> = { high: 730, operational: 180, debug: 30 };
+/** Deterministic retention class: critical severity or audit-worthy events → high; tests → debug. */
+export function retentionClassFor(event: OpsEvent, severity: OpsSeverity, entityType?: string | null): RetentionClass {
+  if (entityType === "test") return "debug";
+  if (severity === "critical") return "high";
+  if (event === "incident.escalated" || event === "security.incident") return "high";
+  return "operational";
+}
+
+/** Test presets — fire a realistic payload per event so formatting is exercised for real. */
+export interface TestPreset { id: string; label: string; event: OpsEvent; severity: OpsSeverity }
+export const TEST_PRESETS: TestPreset[] = [
+  { id: "new_order", label: "Test New Order", event: "order.placed", severity: "info" },
+  { id: "payment_failure", label: "Test Payment Failure", event: "payment.failed", severity: "warning" },
+  { id: "critical_incident", label: "Test Critical Incident", event: "payment.gateway_down", severity: "critical" },
+  { id: "inventory_alert", label: "Test Inventory Alert", event: "inventory.low_stock", severity: "warning" },
+];

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { GlobalSearchBox } from "./GlobalSearchBox";
+import { NotificationBadge } from "./NotificationBadge";
 
 /**
  * Admin navigation (SLP principle 21) — the persistent module map. Live modules
@@ -88,6 +89,7 @@ export function AdminNav({ role, alertCount = 0 }: { role: string | null; alertC
                     <span className="ash-item__icon" aria-hidden>{item.icon}</span>
                     {item.label}
                     {item.href === "/admin/notifications" && alertCount > 0 ? <span className="ash-alert">{alertCount}</span> : null}
+                    {item.href === "/admin/notifications-log" ? <NotificationBadge /> : null}
                   </Link>
                 </li>
               ) : (

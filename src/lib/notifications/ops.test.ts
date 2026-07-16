@@ -6,7 +6,7 @@ import { describe, it, expect } from "vitest";
 import { buildSlackMessage } from "./channels/slack";
 import { buildSmsText, smsChannel } from "./channels/sms";
 import { buildOpsEmailHtml } from "./channels/opsEmail";
-import { OPS_ROUTES, SEVERITY_COLOR, type OpsEvent } from "@/config/notifications";
+import { OPS_ROUTES, SEVERITY_COLOR, EVENT_CATEGORY, RETENTION_DAYS, retentionClassFor, TEST_PRESETS, CATEGORY_LABEL, type OpsEvent, type NotificationCategory } from "@/config/notifications";
 import type { OpsPayload } from "./opsTypes";
 
 const sample: OpsPayload = {
@@ -78,5 +78,49 @@ describe("routing invariants", () => {
     for (const e of ["payment.gateway_down", "site.down", "security.incident"] as OpsEvent[]) {
       expect(OPS_ROUTES[e].channels).toEqual(expect.arrayContaining(["slack", "sms"]));
     }
+  });
+});
+
+describe("categories (feed filters)", () => {
+  it("every routed event has a known category with a label", () => {
+    for (const e of Object.keys(OPS_ROUTES) as OpsEvent[]) {
+      const cat = EVENT_CATEGORY[e];
+      expect(cat).toBeTruthy();
+      expect(CATEGORY_LABEL[cat as NotificationCategory]).toBeTruthy();
+    }
+  });
+  it("maps events to the expected area", () => {
+    expect(EVENT_CATEGORY["order.placed"]).toBe("orders");
+    expect(EVENT_CATEGORY["payment.gateway_down"]).toBe("payments");
+    expect(EVENT_CATEGORY["inventory.low_stock"]).toBe("inventory");
+    expect(EVENT_CATEGORY["review.negative"]).toBe("customers");
+    expect(EVENT_CATEGORY["cron.failed"]).toBe("system");
+  });
+});
+
+describe("retention policy", () => {
+  it("critical + audit events are kept 2 years", () => {
+    expect(retentionClassFor("payment.gateway_down", "critical")).toBe("high");
+    expect(retentionClassFor("incident.escalated", "warning")).toBe("high");
+    expect(RETENTION_DAYS.high).toBe(730);
+  });
+  it("ordinary operational events are kept 180 days", () => {
+    expect(retentionClassFor("order.placed", "info")).toBe("operational");
+    expect(RETENTION_DAYS.operational).toBe(180);
+  });
+  it("tests are debug-class and purged in 30 days (even when critical)", () => {
+    expect(retentionClassFor("payment.gateway_down", "critical", "test")).toBe("debug");
+    expect(RETENTION_DAYS.debug).toBe(30);
+  });
+});
+
+describe("test presets", () => {
+  it("each preset targets a real routed event", () => {
+    for (const p of TEST_PRESETS) { expect(OPS_ROUTES[p.event]).toBeTruthy(); expect(p.label).toMatch(/^Test /); }
+  });
+  it("the critical-incident preset really is critical (so it exercises SMS routing)", () => {
+    const p = TEST_PRESETS.find((x) => x.id === "critical_incident")!;
+    expect(p.severity).toBe("critical");
+    expect(OPS_ROUTES[p.event].channels).toContain("sms");
   });
 });
