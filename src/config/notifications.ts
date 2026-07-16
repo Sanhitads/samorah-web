@@ -175,6 +175,44 @@ export function correlationKeyFor(event: OpsEvent, entityType?: string | null, e
   return entityType === "incident" && entityRef ? `${event}:incident:${entityRef}` : event;
 }
 
+/**
+ * DEDUPLICATION / NOISE SUPPRESSION. "Gateway down ×27 in 30 seconds" should be ONE Slack post with
+ * a counter, not 27. The first occurrence in a window dispatches (the *leader*); repeats inside the
+ * window bump its counter and are recorded in `notification_occurrences` — so channels stay quiet
+ * while the audit trail keeps every single occurrence.
+ *
+ * Distinct from CORRELATION: correlation groups *different* events sharing a root cause for display;
+ * dedup suppresses *identical* events at dispatch time.
+ */
+export const DEDUP = {
+  enabled: true,
+  windowMinutes: 5,          // repeats within this window collapse onto the leader
+  /** Never dedup these — a report or a deploy notice is meant to arrive every time. */
+  exclude: ["daily.sales_report", "deployment.success"] as OpsEvent[],
+};
+/** The deterministic dedup signature: event + entity + severity. */
+export function dedupKeyFor(event: OpsEvent, severity: OpsSeverity, entityRef?: string | null): string | null {
+  if (!DEDUP.enabled || DEDUP.exclude.includes(event)) return null;
+  return `${event}|${entityRef ?? "-"}|${severity}`;
+}
+
+/**
+ * CHANNEL RATE LIMITING. Dedup catches *identical* floods; this caps a channel regardless of variety
+ * (100 different failing orders would still be 100 Slack posts). Over the limit, a dispatch is
+ * QUEUED (status `queued` + `next_retry_at`) and drained by the existing retry worker — delayed,
+ * **never dropped**. Critical severity bypasses entirely: an emergency must never be throttled.
+ */
+export const RATE_LIMITS: Partial<Record<OpsChannelKey, { maxPerWindow: number; windowMinutes: number }>> = {
+  slack: { maxPerWindow: 20, windowMinutes: 1 },
+  email: { maxPerWindow: 10, windowMinutes: 1 },
+  sms: { maxPerWindow: 3, windowMinutes: 5 },
+  whatsapp: { maxPerWindow: 10, windowMinutes: 1 },
+  push: { maxPerWindow: 30, windowMinutes: 1 },
+  // in_app is intentionally unlimited — it's a DB row, not an outbound provider call.
+};
+/** Severities that bypass rate limiting outright (never drop or delay an emergency). */
+export const RATE_LIMIT_BYPASS: OpsSeverity[] = ["critical"];
+
 /** Channel presentation — icon + label (tiny UX win; the label stays for a11y/tooltips). */
 export const CHANNEL_ICON: Record<OpsChannelKey, string> = {
   in_app: "🔔", email: "✉️", slack: "💬", sms: "📱", whatsapp: "🟢", push: "📲",

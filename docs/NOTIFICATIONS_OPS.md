@@ -237,6 +237,60 @@ window — nothing is estimated. Window: 7 / 30 / 90 days.
 
 ---
 
+# Phase 16 — Operations Enhancements
+
+Additive: the engine, routing model, correlation model and existing columns are unchanged.
+
+## Deduplication / noise suppression
+"Gateway down ×27 in 30 seconds" becomes **one** Slack post with a counter.
+- Key = `event | entity | severity` (`dedupKeyFor`), window `DEDUP.windowMinutes` (5).
+- The first dispatch in the window is the **leader**; repeats bump `occurrence_count` +
+  `last_occurrence_at` and are written to **`notification_occurrences`** — so channels stay quiet
+  while **every occurrence survives in the audit trail**.
+- Reports/deploy notices are excluded — they must arrive every time.
+- Feed shows `↻ Repeated 27× · last 2s ago`.
+- **Distinct from correlation:** correlation groups *different* events sharing a root cause for
+  display; dedup suppresses *identical* events at dispatch time.
+
+## Channel rate limiting
+Dedup catches identical floods; rate limiting caps a channel regardless of variety (100 *different*
+failing orders would still be 100 posts).
+- `RATE_LIMITS` per channel (slack 20/min · email 10/min · sms 3/5min); `in_app` is uncapped (a DB
+  row, not a provider call).
+- Over the cap the dispatch is **queued** (`status='queued'` + `next_retry_at`) and drained by the
+  existing retry worker → **delayed, never dropped**. A queued row spends no attempts and can never
+  reach the DLQ.
+- **`RATE_LIMIT_BYPASS` = critical** — an emergency is never throttled.
+
+## Live feed
+`notification_log` had RLS enabled with **no policies**, so a browser Realtime subscription would
+have silently received nothing. The migration adds a staff `SELECT` policy (`public.is_editor()`)
+and publishes the table to `supabase_realtime`. `OpsLiveFeed` subscribes and refreshes the server
+component — feed, counters, badges and channel status update together. Refreshes are **debounced**
+(a fan-out inserts one row per channel; that's one refresh, not five) and fall back to a 30s poll if
+the socket never connects. The indicator shows Live vs Polling.
+
+## Analytics dashboard → `/admin/notification-analytics`
+Adds to the earlier metrics: **retries/day**, **replay success rate**, **queued (rate limited)**,
+**noise suppressed**, **hourly distribution**, **top noisy alerts** (dedup counters), **failure rate
+by category**, and per-channel **uptime 7/30/90d** (delivery success over the trailing period;
+dormant/queued excluded — a throttled channel isn't down).
+
+## End-to-end retry verification (development only)
+`POST /api/admin/notifications/verify` + a **dev-only** card on the Ops Center.
+Drives the **real** lifecycle with the **real** worker and a **real** provider rejection (email to an
+invalid recipient — not a mock):
+
+```
+sending → failed → retry(1m) → retry(5m) → retry(15m) → DLQ → reconnect → replay → delivered
+```
+Returns a step-by-step report plus a `verified` block (`reachedDlq`, `deliveredOnReplay`, `attempts`,
+`retryHistoryEntries`, `replayAudited`, `nothingLost`). **Time is compressed** — each step advances
+`next_retry_at` into the past; the backoff logic itself is untouched, we only fast-forward the clock.
+Refuses to run in production; cleans up unless `keep: true`.
+
+---
+
 # Deferred backlog (agreed, not built)
 
 Everything raised in review that was **consciously deferred** — recorded so nothing is lost. Each row

@@ -49,8 +49,12 @@ export default async function NotificationAnalyticsPage({ searchParams }: { sear
         <div className="inc-kpi"><span className="inc-kpi__v">{a.events}</span><span className="inc-kpi__k">Events ({a.dispatches} dispatches)</span></div>
         <div className={`inc-kpi${a.failed ? " inc-kpi--alert" : ""}`}><span className="inc-kpi__v">{a.failed}</span><span className="inc-kpi__k">Failures</span></div>
         <div className={`inc-kpi${dlq ? " inc-kpi--alert" : ""}`}><span className="inc-kpi__v">{dlq}</span><span className="inc-kpi__k">In dead letter queue</span></div>
+        <div className="inc-kpi"><span className="inc-kpi__v">{a.retries}</span><span className="inc-kpi__k">Retries ({a.windowDays}d)</span></div>
+        <div className="inc-kpi"><span className="inc-kpi__v">{a.replaySuccessRate == null ? "—" : `${a.replaySuccessRate}%`}</span><span className="inc-kpi__k">Replay success ({a.replaySucceeded}/{a.replayAttempts})</span></div>
         <div className="inc-kpi"><span className="inc-kpi__v">{dur(a.mttaMin)}</span><span className="inc-kpi__k">MTTA — mean time to acknowledge</span></div>
         <div className="inc-kpi"><span className="inc-kpi__v">{dur(a.mttrMin)}</span><span className="inc-kpi__k">MTTR — mean time to recover</span></div>
+        <div className="inc-kpi"><span className="inc-kpi__v">{a.suppressed}</span><span className="inc-kpi__k">Noise suppressed (deduped)</span></div>
+        <div className="inc-kpi"><span className="inc-kpi__v">{a.queued}</span><span className="inc-kpi__k">Queued (rate limited)</span></div>
       </div>
 
       <div className="od-grid">
@@ -60,7 +64,7 @@ export default async function NotificationAnalyticsPage({ searchParams }: { sear
           {a.byChannel.length ? (
             <div className="admin__table-wrap">
               <table className="admin__table">
-                <thead><tr><th>Channel</th><th>Sent</th><th>Failed</th><th>DLQ</th><th>Delivery</th><th>Avg</th><th>p50</th><th>p95</th></tr></thead>
+                <thead><tr><th>Channel</th><th>Sent</th><th>Failed</th><th>DLQ</th><th>Delivery</th><th>Avg</th><th>p50</th><th>p95</th><th>7d</th><th>30d</th><th>90d</th></tr></thead>
                 <tbody>
                   {a.byChannel.map((c) => (
                     <tr key={c.channel}>
@@ -72,13 +76,16 @@ export default async function NotificationAnalyticsPage({ searchParams }: { sear
                       <td className="admin__mono">{ms(c.avgMs)}</td>
                       <td className="admin__mono">{ms(c.p50Ms)}</td>
                       <td className="admin__mono">{ms(c.p95Ms)}</td>
+                      <td className="admin__mono">{c.uptime7 == null ? "—" : `${c.uptime7}%`}</td>
+                      <td className="admin__mono">{c.uptime30 == null ? "—" : `${c.uptime30}%`}</td>
+                      <td className="admin__mono">{c.uptime90 == null ? "—" : `${c.uptime90}%`}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           ) : <p className="admin__muted">No dispatches in window.</p>}
-          <p className="admin__muted" style={{ fontSize: 11, marginTop: 6 }}>Latency is the measured provider round-trip. p95 is the number to watch — an average hides the slow tail.</p>
+          <p className="admin__muted" style={{ fontSize: 11, marginTop: 6 }}>Latency is the measured provider round-trip; p95 is the number to watch — an average hides the slow tail. Uptime = delivery success over the trailing period (dormant/queued excluded — a throttled channel isn&apos;t down).</p>
         </section>
 
         {/* Response */}
@@ -128,6 +135,64 @@ export default async function NotificationAnalyticsPage({ searchParams }: { sear
           <p className="admin__muted" style={{ fontSize: 11, marginTop: 6 }}>Provider errors are grouped by their signature (e.g. <span className="admin__mono">resend 422</span>) so a recurring fault is obvious.</p>
         </section>
       </div>
+
+      <div className="od-grid">
+        <section className="od-card">
+          <h2 className="od-card__title">Top noisy alerts (deduped)</h2>
+          {a.topNoisy.length ? (
+            <ul className="inc-bars">
+              {a.topNoisy.map((n) => {
+                const max = Math.max(1, ...a.topNoisy.map((x) => x.occurrences));
+                return (
+                  <li key={n.key} className="inc-bars__row">
+                    <span className="inc-bars__label" title={n.key}>{n.event}{n.entityRef ? <span className="admin__muted"> · {n.entityRef}</span> : null}</span>
+                    <span className="inc-bars__track"><span className="inc-bars__fill inc-bars__fill--alt" style={{ width: `${(n.occurrences / max) * 100}%` }} /></span>
+                    <span className="inc-bars__n">↻{n.occurrences}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : <p className="admin__muted">🟢 No repeated alerts — nothing is being suppressed.</p>}
+          <p className="admin__muted" style={{ fontSize: 11, marginTop: 6 }}>Identical repeats within {5} min collapse onto one dispatch. These are your loudest signatures — candidates for a suppression rule or a real fix.</p>
+        </section>
+
+        <section className="od-card">
+          <h2 className="od-card__title">Failure rate by category</h2>
+          {a.byCategory.length ? (
+            <div className="admin__table-wrap">
+              <table className="admin__table">
+                <thead><tr><th>Category</th><th>Total</th><th>Failed</th><th>Failure rate</th></tr></thead>
+                <tbody>
+                  {a.byCategory.map((c) => (
+                    <tr key={c.category}>
+                      <td>{c.category}</td>
+                      <td className="admin__mono">{c.total}</td>
+                      <td className={`admin__mono${c.failed ? " nlog-neg" : ""}`}>{c.failed}</td>
+                      <td className={`admin__mono${c.failureRate ? " nlog-neg" : ""}`}>{c.failureRate == null ? "—" : `${c.failureRate}%`}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : <p className="admin__muted">No data.</p>}
+        </section>
+      </div>
+
+      <section className="od-card">
+        <h2 className="od-card__title">Hourly distribution</h2>
+        <div className="inc-trend">
+          {a.hourly.map((h) => {
+            const maxH = Math.max(1, ...a.hourly.map((x) => x.count));
+            return (
+              <div key={h.hour} className="inc-trend__col" title={`${String(h.hour).padStart(2, "0")}:00 — ${h.count} dispatches`}>
+                <span className="inc-trend__bars"><span className="inc-trend__bar inc-trend__bar--opened" style={{ height: `${(h.count / maxH) * 100}%` }} /></span>
+                <span className="inc-trend__m">{String(h.hour).padStart(2, "0")}</span>
+              </div>
+            );
+          })}
+        </div>
+        <p className="admin__muted" style={{ fontSize: 11, marginTop: 6 }}>When notifications actually fire (server local time) — useful for spotting a noisy cron or a nightly batch.</p>
+      </section>
 
       <section className="od-card">
         <h2 className="od-card__title">Daily volume</h2>

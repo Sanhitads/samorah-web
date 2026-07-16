@@ -6,11 +6,11 @@ import { describe, it, expect } from "vitest";
 import { buildSlackMessage } from "./channels/slack";
 import { buildSmsText, smsChannel } from "./channels/sms";
 import { buildOpsEmailHtml } from "./channels/opsEmail";
-import { retryDecision, percentile, failureReasonKey } from "./opsEngine";
+import { retryDecision, percentile, failureReasonKey, rateLimitDecision } from "./opsEngine";
 import { buildTimeline, type FeedItem, type FeedChannel } from "./feedTypes";
 import {
   OPS_ROUTES, SEVERITY_COLOR, EVENT_CATEGORY, RETENTION_DAYS, retentionClassFor, TEST_PRESETS, CATEGORY_LABEL,
-  RETRY_POLICY, backoffFor, CORRELATION, correlationKeyFor, CHANNEL_ICON,
+  RETRY_POLICY, backoffFor, CORRELATION, correlationKeyFor, CHANNEL_ICON, DEDUP, dedupKeyFor, RATE_LIMITS,
   type OpsEvent, type NotificationCategory, type OpsChannelKey,
 } from "@/config/notifications";
 import type { OpsPayload } from "./opsTypes";
@@ -175,7 +175,7 @@ describe("event timeline", () => {
     groupId: "g1", event: "order.placed", category: "orders", severity: "info", title: "New Order",
     entityType: "order", entityRef: "SAM-1", createdAt: "2026-07-16T08:31:00Z", read: true,
     readAt: "2026-07-16T08:32:00Z", acknowledgedAt: null, acknowledgedBy: null, payload: {},
-    channels: [ch()], status: "delivered", correlationId: null, correlatedCount: 1, correlatedRefs: [], ...o,
+    channels: [ch()], status: "delivered", correlationId: null, correlatedCount: 1, correlatedRefs: [], occurrenceCount: 1, lastOccurrenceAt: null, ...o,
   });
 
   it("tells the story in chronological order", () => {
@@ -195,6 +195,64 @@ describe("event timeline", () => {
   it("records a replay out of the DLQ", () => {
     const t = buildTimeline(item({ channels: [ch({ replayedAt: "2026-07-16T09:00:00Z", replayedBy: "Asha" })] }));
     expect(t.find((x) => x.kind === "replay")?.detail).toBe("Asha");
+  });
+});
+
+describe("deduplication / noise suppression", () => {
+  it("keys on event + entity + severity", () => {
+    expect(dedupKeyFor("payment.gateway_down", "critical", "INC-1")).toBe("payment.gateway_down|INC-1|critical");
+    expect(dedupKeyFor("payment.gateway_down", "critical")).toBe("payment.gateway_down|-|critical");
+  });
+  it("identical repeats share a key (so they collapse)", () => {
+    expect(dedupKeyFor("api.down", "critical", "gw")).toBe(dedupKeyFor("api.down", "critical", "gw"));
+  });
+  it("a DIFFERENT entity or severity is a different alert (must NOT collapse)", () => {
+    expect(dedupKeyFor("payment.failed", "warning", "ORD-1")).not.toBe(dedupKeyFor("payment.failed", "warning", "ORD-2"));
+    expect(dedupKeyFor("payment.failed", "warning", "ORD-1")).not.toBe(dedupKeyFor("payment.failed", "critical", "ORD-1"));
+  });
+  it("reports and deploy notices are never deduped — they must arrive every time", () => {
+    expect(dedupKeyFor("daily.sales_report", "info")).toBeNull();
+    expect(dedupKeyFor("deployment.success", "info")).toBeNull();
+  });
+  it("the window is configured", () => { expect(DEDUP.windowMinutes).toBeGreaterThan(0); });
+});
+
+describe("channel rate limiting", () => {
+  const now = Date.parse("2026-07-16T12:00:00Z");
+  it("allows dispatches under the cap", () => {
+    expect(rateLimitDecision("slack", "info", 0, now).limited).toBe(false);
+    expect(rateLimitDecision("slack", "info", (RATE_LIMITS.slack!.maxPerWindow) - 1, now).limited).toBe(false);
+  });
+  it("QUEUES (never drops) once the cap is reached", () => {
+    const d = rateLimitDecision("slack", "info", RATE_LIMITS.slack!.maxPerWindow, now);
+    expect(d.limited).toBe(true);
+    expect(d.reason).toMatch(/queued/);
+    expect(new Date(d.retryAt!).getTime()).toBeGreaterThan(now);   // it WILL be sent later
+  });
+  it("CRITICAL always bypasses — an emergency is never throttled", () => {
+    expect(rateLimitDecision("slack", "critical", 9999, now).limited).toBe(false);
+    expect(rateLimitDecision("sms", "critical", 9999, now).limited).toBe(false);
+  });
+  it("in_app is uncapped (a DB row, not a provider call)", () => {
+    expect(rateLimitDecision("in_app", "info", 9999, now).limited).toBe(false);
+  });
+  it("SMS is capped tightest of the outbound channels", () => {
+    expect(RATE_LIMITS.sms!.maxPerWindow).toBeLessThan(RATE_LIMITS.slack!.maxPerWindow);
+  });
+});
+
+describe("rate-limited dispatches are queued, not failed", () => {
+  const now = Date.parse("2026-07-16T12:00:00Z");
+  it("a queued row is retried once its window clears — and can never reach the DLQ", () => {
+    const q = { status: "queued", attempts: 0, channel: "slack", nextRetryAt: new Date(now - 1000).toISOString(), error: null };
+    expect(retryDecision(q, now).action).toBe("retry");
+    // Even with attempts at/over the policy max, `queued` must never be declared dead.
+    expect(retryDecision({ ...q, attempts: 99 }, now).action).toBe("retry");
+  });
+  it("a queued row waits while its window is still open", () => {
+    const d = retryDecision({ status: "queued", attempts: 0, channel: "slack", nextRetryAt: new Date(now + 30_000).toISOString(), error: null }, now);
+    expect(d.action).toBe("wait");
+    expect(d.reason).toMatch(/rate-limit/);
   });
 });
 

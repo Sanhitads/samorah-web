@@ -3,7 +3,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { getNotificationFeed, getNotificationStats, getChannelHealth, getDeadLetterCount } from "@/lib/notifications/opsEngine";
-import { OpsFilters, OpsFeed, OpsTester, MarkAllRead } from "@/components/admin/OpsNotificationFeed";
+import { OpsFilters, OpsFeed, OpsTester, MarkAllRead, OpsVerifier } from "@/components/admin/OpsNotificationFeed";
+import { OpsLiveFeed } from "@/components/admin/OpsLiveFeed";
 import { TEST_PRESETS, CHANNEL_ICON, type OpsChannelKey } from "@/config/notifications";
 
 /** Notification Operations Center — the live command view for the multi-channel engine. */
@@ -46,8 +47,9 @@ export default async function NotificationOpsPage({ searchParams }: { searchPara
           <p className="admin__count">Every operational notification, every channel — delivery, failures and retries in one place.</p>
         </div>
         <div className="inc-subnav">
+          <OpsLiveFeed />
           <MarkAllRead unread={stats.unread} />
-          <Link href="/admin/notifications-log/analytics" className="op-item__btn">📊 Analytics</Link>
+          <Link href="/admin/notification-analytics" className="op-item__btn">📊 Analytics</Link>
           <Link href="/admin/incidents" className="op-item__btn">🚨 Incidents</Link>
         </div>
       </header>
@@ -91,6 +93,14 @@ export default async function NotificationOpsPage({ searchParams }: { searchPara
           <OpsTester presets={TEST_PRESETS} />
         </section>
         <section className="od-card">
+          {process.env.NODE_ENV !== "production" ? (
+            <>
+              <h2 className="od-card__title">Retry verification <span className="nlog-devtag">dev only</span></h2>
+              <p className="admin__muted" style={{ fontSize: 12, marginBottom: 8 }}>Drives the real lifecycle against a real failing provider: sending → retry ×3 (1m/5m/15m) → DLQ → reconnect → replay → delivered. Time is compressed; the backoff logic is untouched.</p>
+              <OpsVerifier />
+              <hr style={{ border: 0, borderTop: "1px solid var(--ad-hair)", margin: "14px 0" }} />
+            </>
+          ) : null}
           <h2 className="od-card__title">Retention policy</h2>
           <div className="od-detail">
             <div><dt>Critical / audit</dt><dd>2 years</dd></div>

@@ -21,6 +21,9 @@ export interface FeedItem {
   acknowledgedAt: string | null; acknowledgedBy: string | null;
   payload: any; channels: FeedChannel[]; status: DeliveryStatus; // eslint-disable-line @typescript-eslint/no-explicit-any
   correlationId: string | null; correlatedCount: number; correlatedRefs: CorrelatedRef[];
+  /** Dedup: how many identical occurrences collapsed onto this one dispatch, and when the last
+   *  one arrived. 1 = never repeated. Every occurrence is preserved in notification_occurrences. */
+  occurrenceCount: number; lastOccurrenceAt: string | null;
 }
 
 /** Roll a group's channel rows into one overall status (worst-wins, so failures surface). */

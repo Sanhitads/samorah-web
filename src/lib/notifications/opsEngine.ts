@@ -21,6 +21,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import {
   OPS_ROUTES, EVENT_CATEGORY, RETENTION_DAYS, retentionClassFor,
   RETRY_POLICY, backoffFor, CORRELATION, correlationKeyFor,
+  DEDUP, dedupKeyFor, RATE_LIMITS, RATE_LIMIT_BYPASS,
   type OpsEvent, type OpsChannelKey, type OpsSeverity, type NotificationCategory, type DeliveryStatus,
 } from "@/config/notifications";
 import type { OpsChannel, OpsPayload, OpsDispatchResult } from "./opsTypes";
@@ -66,7 +67,7 @@ export async function resolveEmailRecipients(event: OpsEvent, category: Notifica
   } catch { return []; }
 }
 
-interface LogCtx { groupId: string; event: OpsEvent; payload: OpsPayload; severity: OpsSeverity; category: NotificationCategory; retentionClass: string; expiresAt: string; correlationId: string | null; correlationKey: string | null }
+interface LogCtx { groupId: string; event: OpsEvent; payload: OpsPayload; severity: OpsSeverity; category: NotificationCategory; retentionClass: string; expiresAt: string; correlationId: string | null; correlationKey: string | null; dedupKey: string | null }
 
 /**
  * CORRELATION — repeated failures from one root cause share a correlation_id, so the feed collapses
@@ -95,7 +96,7 @@ async function openLog(c: LogCtx, channel: OpsChannelKey, status: DeliveryStatus
       entity_type: c.payload.entityType ?? null, entity_ref: c.payload.entityRef ?? null,
       attempts: status === "sending" ? 1 : 0, last_attempt_at: new Date().toISOString(),
       retention_class: c.retentionClass, expires_at: c.expiresAt,
-      correlation_id: c.correlationId, correlation_key: c.correlationKey,
+      correlation_id: c.correlationId, correlation_key: c.correlationKey, dedup_key: c.dedupKey,
     }).select("id").single();
     return data?.id ?? null;
   } catch (e) { console.error("openLog failed", e); return null; }
@@ -118,7 +119,59 @@ async function closeLog(logId: string | null, r: OpsDispatchResult, deliveryMs: 
   } catch (e) { console.error("closeLog failed", e); }
 }
 
-export interface NotifyOpsResult { results: OpsDispatchResult[]; anyFailed: boolean; groupId: string }
+/**
+ * DEDUP — find a leader dispatch with the same signature inside the window. If one exists we do NOT
+ * dispatch again; we bump its counter and preserve this occurrence in notification_occurrences.
+ */
+async function resolveDedup(event: OpsEvent, payload: OpsPayload, severity: OpsSeverity, nowMs: number): Promise<{ key: string | null; leaderGroupId: string | null }> {
+  const key = dedupKeyFor(event, severity, payload.entityRef);
+  if (!key) return { key: null, leaderGroupId: null };
+  try {
+    const since = new Date(nowMs - DEDUP.windowMinutes * 60000).toISOString();
+    const { data } = await db().from("notification_log").select("group_id").eq("dedup_key", key).gte("created_at", since).order("created_at", { ascending: false }).limit(1);
+    return { key, leaderGroupId: ((data ?? []) as any[])[0]?.group_id ?? null }; // eslint-disable-line @typescript-eslint/no-explicit-any
+  } catch { return { key, leaderGroupId: null }; }
+}
+
+/** Record a suppressed repeat: the audit keeps every occurrence, the channels stay quiet. */
+async function recordOccurrence(leaderGroupId: string, key: string, event: OpsEvent, payload: OpsPayload, severity: OpsSeverity): Promise<number> {
+  const at = new Date().toISOString();
+  try {
+    await db().from("notification_occurrences").insert({ leader_group_id: leaderGroupId, dedup_key: key, event, severity, entity_type: payload.entityType ?? null, entity_ref: payload.entityRef ?? null, payload: { message: payload.message ?? null, fields: payload.fields ?? [] } });
+    // Bump the leader's counter on every row of its fan-out so the feed shows "Repeated xN".
+    const { data } = await db().from("notification_log").select("id,occurrence_count").eq("group_id", leaderGroupId);
+    const rows = (data ?? []) as any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
+    const next = (rows[0]?.occurrence_count ?? 1) + 1;
+    for (const r of rows) await db().from("notification_log").update({ occurrence_count: next, last_occurrence_at: at }).eq("id", r.id);
+    return next;
+  } catch { return 1; }
+}
+
+/**
+ * RATE LIMITING — is this channel over its cap right now? Critical bypasses. Over the cap we do not
+ * drop: the caller queues the dispatch for the retry worker to drain.
+ */
+/** PURE — the rate-limit verdict given how many dispatches this channel already used in its window.
+ *  `used` is supplied by the caller so this stays testable without a DB. */
+export function rateLimitDecision(channel: OpsChannelKey, severity: OpsSeverity, used: number, nowMs: number): { limited: boolean; retryAt?: string; reason?: string } {
+  const cfg = RATE_LIMITS[channel];
+  if (!cfg) return { limited: false };                                   // uncapped (e.g. in_app)
+  if (RATE_LIMIT_BYPASS.includes(severity)) return { limited: false };   // an emergency is never throttled
+  if (used < cfg.maxPerWindow) return { limited: false };
+  return { limited: true, retryAt: new Date(nowMs + cfg.windowMinutes * 60000).toISOString(), reason: `rate limit: ${used}/${cfg.maxPerWindow} per ${cfg.windowMinutes}m — queued, will send when the window clears` };
+}
+
+async function rateLimited(channel: OpsChannelKey, severity: OpsSeverity, nowMs: number): Promise<{ limited: boolean; retryAt?: string; reason?: string }> {
+  const cfg = RATE_LIMITS[channel];
+  if (!cfg || RATE_LIMIT_BYPASS.includes(severity)) return { limited: false };   // skip the query entirely
+  try {
+    const since = new Date(nowMs - cfg.windowMinutes * 60000).toISOString();
+    const { data } = await db().from("notification_log").select("id").eq("channel", channel).in("status", ["delivered", "failed", "sending", "dead"]).gte("created_at", since).limit(cfg.maxPerWindow + 1);
+    return rateLimitDecision(channel, severity, (data ?? []).length, nowMs);
+  } catch { return { limited: false }; }   // never block a dispatch because the counter failed
+}
+
+export interface NotifyOpsResult { results: OpsDispatchResult[]; anyFailed: boolean; groupId: string; suppressed?: boolean; occurrenceCount?: number }
 
 /** Fan a business event out to its configured channels. `opts.channels` overrides the route (used
  *  by incident escalation, which derives channels from the escalation policy level). */
@@ -131,11 +184,19 @@ export async function notifyOps(event: OpsEvent, payload: OpsPayload, opts?: { c
   const retentionClass = retentionClassFor(event, severity, payload.entityType);
   const expiresAt = new Date(Date.now() + RETENTION_DAYS[retentionClass] * 86400000).toISOString();
 
+  // DEDUP — an identical event already dispatched inside the window? Bump its counter, record the
+  // occurrence for audit, and send nothing. This is what stops "Gateway down ×27" flooding Slack.
+  const dedup = await resolveDedup(event, payload, severity, Date.now());
+  if (dedup.key && dedup.leaderGroupId) {
+    const count = await recordOccurrence(dedup.leaderGroupId, dedup.key, event, payload, severity);
+    return { results: [], anyFailed: false, groupId: dedup.leaderGroupId, suppressed: true, occurrenceCount: count };
+  }
+
   // Per-user preferences for the (per-user) email channel.
   if (channels.includes("email") && !payload.emailTo?.length) payload = { ...payload, emailTo: await resolveEmailRecipients(event, category) };
   const correlation = await resolveCorrelation(event, payload, Date.now());
 
-  const ctx: LogCtx = { groupId, event, payload, severity, category, retentionClass, expiresAt, correlationId: correlation.id, correlationKey: correlation.key };
+  const ctx: LogCtx = { groupId, event, payload, severity, category, retentionClass, expiresAt, correlationId: correlation.id, correlationKey: correlation.key, dedupKey: dedup.key };
   const results: OpsDispatchResult[] = [];
   for (const key of channels) {
     const channel = OPS_CHANNELS[key];
@@ -145,6 +206,15 @@ export async function notifyOps(event: OpsEvent, payload: OpsPayload, opts?: { c
       results.push(r);
       const id = await openLog(ctx, key, "skipped");
       await closeLog(id, r, null);   // records the reason it was skipped
+      continue;
+    }
+    // RATE LIMIT — over the cap, queue instead of dispatching. The retry worker drains it, so the
+    // notification is DELAYED, never dropped. Critical bypasses (see RATE_LIMIT_BYPASS).
+    const rl = await rateLimited(key, severity, Date.now());
+    if (rl.limited) {
+      const id = await openLog(ctx, key, "queued");
+      if (id) await db().from("notification_log").update({ error: rl.reason, next_retry_at: rl.retryAt }).eq("id", id);
+      results.push({ channel: key, status: "skipped", error: rl.reason });
       continue;
     }
     const logId = await openLog(ctx, key, "sending");   // visible in-flight
@@ -161,8 +231,18 @@ export async function notifyOps(event: OpsEvent, payload: OpsPayload, opts?: { c
 // ── Retry policy + Dead Letter Queue ───────────────────────────────────────────
 /** PURE — what the auto-retry worker should do with a row right now. Exhausting the policy is the
  *  ONLY way into the DLQ, so nothing can silently disappear as a permanent "failed". */
+/** The active retry policy, exposed read-only (used by the verification report + docs). */
+export const RETRY_POLICY_INFO = { maxAttempts: RETRY_POLICY.maxAttempts, backoffMinutes: RETRY_POLICY.backoffMinutes, autoRetryChannels: RETRY_POLICY.autoRetryChannels };
+
 export type RetryAction = "wait" | "retry" | "dead";
 export function retryDecision(row: { status: string; attempts: number; channel: string; nextRetryAt?: string | null; error?: string | null }, nowMs: number): { action: RetryAction; reason?: string } {
+  // `queued` = rate-limited, waiting for its window to clear. It is NOT a failure: it has spent no
+  // attempts and can never go to the DLQ — it just gets sent once the window opens.
+  if (row.status === "queued") {
+    if (!RETRY_POLICY.autoRetryChannels.includes(row.channel as OpsChannelKey)) return { action: "wait", reason: "channel is not auto-retried" };
+    if (row.nextRetryAt && nowMs < new Date(row.nextRetryAt).getTime()) return { action: "wait", reason: "rate-limit window not elapsed" };
+    return { action: "retry" };
+  }
   if (row.status !== "failed") return { action: "wait", reason: "not failed" };
   if (!RETRY_POLICY.autoRetryChannels.includes(row.channel as OpsChannelKey)) return { action: "wait", reason: "channel is not auto-retried" };
   if (row.attempts >= RETRY_POLICY.maxAttempts) return { action: "dead", reason: row.error ?? "retry policy exhausted" };
@@ -227,7 +307,8 @@ export async function runRetryWorker(limit = 50): Promise<{ retried: number; del
   let retried = 0, delivered = 0, dead = 0;
   try {
     const nowIso = new Date().toISOString();
-    const { data } = await db().from("notification_log").select("*").eq("status", "failed").not("next_retry_at", "is", null).lte("next_retry_at", nowIso).order("next_retry_at", { ascending: true }).limit(limit);
+    // `failed` → backoff retries; `queued` → rate-limited dispatches waiting for their window.
+    const { data } = await db().from("notification_log").select("*").in("status", ["failed", "queued"]).not("next_retry_at", "is", null).lte("next_retry_at", nowIso).order("next_retry_at", { ascending: true }).limit(limit);
     for (const row of (data ?? []) as any[]) { // eslint-disable-line @typescript-eslint/no-explicit-any
       const d = retryDecision({ status: row.status, attempts: row.attempts ?? 1, channel: row.channel, nextRetryAt: row.next_retry_at, error: row.error }, Date.now());
       if (d.action === "wait") continue;
@@ -383,6 +464,7 @@ function buildUnitItem(key: string, rs: any[], isCorr: boolean, preferGroupId?: 
     readAt: chRows.map((r) => r.read_at).filter(Boolean).sort()[0] ?? null,
     acknowledgedAt: first.acknowledged_at ?? null, acknowledgedBy: first.acknowledged_by ?? null,
     payload: first.payload, channels, status: rollup(channels),
+    occurrenceCount: first.occurrence_count ?? 1, lastOccurrenceAt: first.last_occurrence_at ?? null,
     correlationId: isCorr ? key : null,
     correlatedCount: groupList.length,
     correlatedRefs: groupList.slice(0, 50).map((g) => ({ groupId: g.gid, ref: g.grs[0]?.entity_ref ?? null, at: g.at, status: rollup(g.grs.map((r: any) => ({ status: r.status as DeliveryStatus }))) })), // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -467,7 +549,7 @@ export function failureReasonKey(error: string | null | undefined): string {
 const meanOf = (v: number[]): number | null => (v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null);
 const minsBetween = (a: string, b: string) => (new Date(b).getTime() - new Date(a).getTime()) / 60000;
 
-export interface ChannelAnalytics { channel: string; total: number; delivered: number; failed: number; dead: number; deliveryRate: number | null; avgMs: number | null; p50Ms: number | null; p95Ms: number | null; lastSuccessAt: string | null }
+export interface ChannelAnalytics { channel: string; total: number; delivered: number; failed: number; dead: number; deliveryRate: number | null; avgMs: number | null; p50Ms: number | null; p95Ms: number | null; lastSuccessAt: string | null; uptime7: number | null; uptime30: number | null; uptime90: number | null }
 export interface NotificationAnalytics {
   windowDays: number; includeTests: boolean;
   events: number; dispatches: number;
@@ -477,7 +559,13 @@ export interface NotificationAnalytics {
   byChannel: ChannelAnalytics[];
   topEvents: { key: string; count: number; failed: number }[];
   topFailures: { key: string; count: number }[];
-  daily: { day: string; total: number; delivered: number; failed: number }[];
+  daily: { day: string; total: number; delivered: number; failed: number; retries: number }[];
+  // Phase 16 additions
+  retries: number; queued: number; suppressed: number;
+  replayAttempts: number; replaySucceeded: number; replaySuccessRate: number | null;
+  hourly: { hour: number; count: number }[];                              // 0–23 distribution
+  topNoisy: { key: string; occurrences: number; event: string; entityRef: string | null }[];
+  byCategory: { category: string; total: number; failed: number; failureRate: number | null }[];
 }
 
 /**
@@ -488,10 +576,10 @@ export interface NotificationAnalytics {
  * Test-preset notifications are excluded by default so they can't flatter delivery stats.
  */
 export async function getNotificationAnalytics(windowDays = 30, includeTests = false): Promise<NotificationAnalytics> {
-  const empty: NotificationAnalytics = { windowDays, includeTests, events: 0, dispatches: 0, delivered: 0, failed: 0, dead: 0, skipped: 0, deliveryRate: null, mttaMin: null, mttrMin: null, timeToReadMin: null, criticalTotal: 0, criticalAcked: 0, byChannel: [], topEvents: [], topFailures: [], daily: [] };
+  const empty: NotificationAnalytics = { windowDays, includeTests, events: 0, dispatches: 0, delivered: 0, failed: 0, dead: 0, skipped: 0, deliveryRate: null, mttaMin: null, mttrMin: null, timeToReadMin: null, criticalTotal: 0, criticalAcked: 0, byChannel: [], topEvents: [], topFailures: [], daily: [], retries: 0, queued: 0, suppressed: 0, replayAttempts: 0, replaySucceeded: 0, replaySuccessRate: null, hourly: [], topNoisy: [], byCategory: [] };
   try {
     const since = new Date(Date.now() - windowDays * 86400000).toISOString();
-    let q = db().from("notification_log").select("group_id,event,channel,status,severity,delivery_ms,error,created_at,read_at,acknowledged_at,last_attempt_at,attempts,entity_type").gte("created_at", since).limit(20000);
+    let q = db().from("notification_log").select("group_id,event,channel,status,severity,category,delivery_ms,error,created_at,read_at,acknowledged_at,last_attempt_at,attempts,entity_type,entity_ref,retry_history,occurrence_count,replayed_at,dedup_key").gte("created_at", since).limit(20000);
     if (!includeTests) q = q.or("entity_type.is.null,entity_type.neq.test");
     const { data } = await q;
     const rows = (data ?? []) as any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -504,6 +592,15 @@ export async function getNotificationAnalytics(windowDays = 30, includeTests = f
     const attempted = delivered.length + failed.length + dead.length;
 
     // Per-channel, incl. latency distribution (the "Slack/Email/SMS latency" ask).
+    /** Uptime = delivery success rate over the trailing N days (skipped/queued excluded — a dormant
+     *  or throttled channel is not "down"). Null when the channel had no attempts in the period. */
+    const uptimeFor = (ch: string, days: number): number | null => {
+      const from = Date.now() - days * 86400000;
+      const m = rows.filter((r) => r.channel === ch && new Date(r.created_at).getTime() >= from && ["delivered", "failed", "dead"].includes(r.status));
+      if (!m.length) return null;
+      return Math.round((m.filter((r) => r.status === "delivered").length / m.length) * 1000) / 10;
+    };
+
     const channels = [...new Set(rows.map((r) => r.channel))].sort();
     const byChannel: ChannelAnalytics[] = channels.map((ch) => {
       const mine = rows.filter((r) => r.channel === ch);
@@ -517,6 +614,7 @@ export async function getNotificationAnalytics(windowDays = 30, includeTests = f
         deliveryRate: att ? Math.round((d.length / att) * 1000) / 10 : null,
         avgMs: meanOf(lat), p50Ms: percentile(lat, 50), p95Ms: percentile(lat, 95),
         lastSuccessAt: d.map((r) => r.created_at).sort().reverse()[0] ?? null,
+        uptime7: uptimeFor(ch, Math.min(7, windowDays)), uptime30: uptimeFor(ch, Math.min(30, windowDays)), uptime90: uptimeFor(ch, Math.min(90, windowDays)),
       };
     });
 
@@ -530,15 +628,38 @@ export async function getNotificationAnalytics(windowDays = 30, includeTests = f
     const failMap = new Map<string, number>();
     for (const r of [...failed, ...dead]) { const k = failureReasonKey(r.error); failMap.set(k, (failMap.get(k) ?? 0) + 1); }
 
-    // Daily trend.
-    const dayMap = new Map<string, { total: number; delivered: number; failed: number }>();
+    // Daily trend (incl. retries/day) + hourly distribution.
+    const dayMap = new Map<string, { total: number; delivered: number; failed: number; retries: number }>();
+    const hourMap = new Map<number, number>();
     for (const r of rows) {
       const day = String(r.created_at).slice(0, 10);
-      const cur = dayMap.get(day) ?? { total: 0, delivered: 0, failed: 0 };
+      const cur = dayMap.get(day) ?? { total: 0, delivered: 0, failed: 0, retries: 0 };
       cur.total++;
       if (r.status === "delivered") cur.delivered++;
       if (r.status === "failed" || r.status === "dead") cur.failed++;
+      cur.retries += Array.isArray(r.retry_history) ? r.retry_history.length : 0;
       dayMap.set(day, cur);
+      const h = new Date(r.created_at).getHours();
+      hourMap.set(h, (hourMap.get(h) ?? 0) + 1);
+    }
+
+    // Retries / replays / queued / suppressed.
+    const retries = rows.reduce((s, r) => s + (Array.isArray(r.retry_history) ? r.retry_history.length : 0), 0);
+    const replayEntries = rows.flatMap((r) => (Array.isArray(r.retry_history) ? r.retry_history : []).filter((h: any) => typeof h?.by === "string" && h.by.includes("(replay)"))); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const replaySucceeded = replayEntries.filter((h: any) => h.status === "delivered").length; // eslint-disable-line @typescript-eslint/no-explicit-any
+    const queued = rows.filter((r) => r.status === "queued").length;
+    const suppressed = rows.reduce((s, r) => s + Math.max(0, (r.occurrence_count ?? 1) - 1), 0);
+
+    // Noisiest alerts (dedup counters) + failure rate by category.
+    const topNoisy = rows.filter((r) => (r.occurrence_count ?? 1) > 1)
+      .map((r) => ({ key: r.dedup_key ?? r.event, occurrences: r.occurrence_count as number, event: r.event as string, entityRef: (r.entity_ref ?? null) as string | null }))
+      .sort((a, b) => b.occurrences - a.occurrences).slice(0, 8);
+    const catMap = new Map<string, { total: number; failed: number }>();
+    for (const r of rows) {
+      const c = r.category ?? "system";
+      const cur = catMap.get(c) ?? { total: 0, failed: 0 };
+      cur.total++; if (r.status === "failed" || r.status === "dead") cur.failed++;
+      catMap.set(c, cur);
     }
 
     // Response + recovery times.
@@ -561,6 +682,12 @@ export async function getNotificationAnalytics(windowDays = 30, includeTests = f
       topEvents: [...evMap.entries()].map(([key, v]) => ({ key, ...v })).sort((a, b) => b.count - a.count).slice(0, 10),
       topFailures: [...failMap.entries()].map(([key, count]) => ({ key, count })).sort((a, b) => b.count - a.count).slice(0, 8),
       daily: [...dayMap.entries()].map(([day, v]) => ({ day, ...v })).sort((a, b) => a.day.localeCompare(b.day)),
+      retries, queued, suppressed,
+      replayAttempts: replayEntries.length, replaySucceeded,
+      replaySuccessRate: replayEntries.length ? Math.round((replaySucceeded / replayEntries.length) * 1000) / 10 : null,
+      hourly: Array.from({ length: 24 }, (_, h) => ({ hour: h, count: hourMap.get(h) ?? 0 })),
+      topNoisy,
+      byCategory: [...catMap.entries()].map(([category, v]) => ({ category, total: v.total, failed: v.failed, failureRate: v.total ? Math.round((v.failed / v.total) * 1000) / 10 : null })).sort((a, b) => b.total - a.total),
     };
   } catch { return empty; }
 }

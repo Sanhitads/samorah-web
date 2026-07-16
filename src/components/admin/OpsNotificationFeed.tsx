@@ -19,6 +19,7 @@ const CATEGORIES = [
 const ST_LABEL: Record<string, string> = { queued: "Queued", sending: "Sending", delivered: "Delivered", failed: "Failed", retrying: "Retrying", skipped: "Skipped", dead: "Dead letter" };
 const SEV: Record<string, string> = { info: "🟢", warning: "🟡", critical: "🔴" };
 const time = (iso: string) => new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+const rel = (iso: string) => { const s = (Date.now() - new Date(iso).getTime()) / 1000; return s < 60 ? `${Math.max(0, Math.floor(s))}s ago` : s < 3600 ? `${Math.floor(s / 60)}m ago` : `${Math.floor(s / 3600)}h ago`; };
 const dt = (iso: string) => new Date(iso).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
 // ── Filters + search ────────────────────────────────────────────────────────────
@@ -129,6 +130,7 @@ export function OpsFeed({ items }: { items: FeedItem[] }) {
                 <span className="nlog-item__title">
                   {SEV[it.severity]} {it.title ?? it.event}
                   {it.entityRef ? <span className="admin__mono nlog-item__ref"> {it.entityRef}</span> : null}
+                  {it.occurrenceCount > 1 ? <span className="nlog-rep" title={`Repeated ${it.occurrenceCount} times — identical repeats were suppressed to keep channels quiet; every occurrence is kept in the audit trail`}>↻ Repeated {it.occurrenceCount}×{it.lastOccurrenceAt ? ` · last ${rel(it.lastOccurrenceAt)}` : ""}</span> : null}
                   {it.correlatedCount > 1 ? <span className="nlog-corr" title={`${it.correlatedCount} correlated events from one root cause`}>×{it.correlatedCount} affected</span> : null}
                 </span>
                 <span className="nlog-item__meta"><span className="nlog-cat">{it.category}</span> <span className="admin__mono" style={{ fontSize: 11 }}>{it.event}</span></span>
@@ -232,6 +234,48 @@ export function OpsFeed({ items }: { items: FeedItem[] }) {
         </div>
       ) : null}
     </>
+  );
+}
+
+// ── Dev-only end-to-end retry verification ──────────────────────────────────────
+type VerifyStep = { step: number; phase: string; status: string; attempts: number; error: string | null; note: string };
+export function OpsVerifier() {
+  const [busy, setBusy] = useState(false);
+  const [rep, setRep] = useState<{ verified: Record<string, unknown>; report: VerifyStep[]; lifecycle: string; note: string } | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const run = async () => {
+    setBusy(true); setErr(null); setRep(null);
+    try {
+      const r = await fetch("/api/admin/notifications/verify", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) setRep(d); else setErr(d.error ?? "verification failed");
+    } finally { setBusy(false); }
+  };
+  return (
+    <div className="nt">
+      <button type="button" className="op-item__btn op-item__btn--primary" disabled={busy} onClick={run}>{busy ? "Running…" : "▶ Run retry verification"}</button>
+      {err ? <p className="inc-resolve__err">{err}</p> : null}
+      {rep ? (
+        <>
+          <p className="admin__mono" style={{ fontSize: 11, marginTop: 6 }}>{rep.lifecycle}</p>
+          <ul className="nlog-verify">
+            {rep.report.map((s) => (
+              <li key={s.step} className={`nlog-verify__row nlog-verify__row--${s.status}`}>
+                <span className="nlog-verify__phase">{s.phase}</span>
+                <span className={`nlog-status nlog-status--${s.status}`}>{s.status}</span>
+                <span className="admin__muted" style={{ fontSize: 11 }}>attempt {s.attempts} · {s.note}</span>
+              </li>
+            ))}
+          </ul>
+          <ul className="nt__results">
+            {Object.entries(rep.verified).map(([k, v]) => (
+              <li key={k} className={`nt__result nt__result--${v === true ? "delivered" : v === false ? "failed" : "skipped"}`}><b>{k}</b>: {String(v)}</li>
+            ))}
+          </ul>
+          <p className="admin__muted" style={{ fontSize: 11 }}>{rep.note}</p>
+        </>
+      ) : null}
+    </div>
   );
 }
 
