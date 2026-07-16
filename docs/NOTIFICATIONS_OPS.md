@@ -291,6 +291,36 @@ Refuses to run in production; cleans up unless `keep: true`.
 
 ---
 
+# Pre-launch readiness — verified
+
+The five items agreed as launch-critical, and how each was **proven** (not assumed):
+
+| Item | Status | Evidence |
+|---|---|---|
+| **Notification Analytics Dashboard** | ✅ shipped | `/admin/notification-analytics` — delivery rate, failures, DLQ depth, retries, replay success, MTTA/MTTR, per-channel avg/p50/**p95** latency + uptime 7/30/90d, top types, top failure reasons, top noisy alerts, failure rate by category, hourly + daily trends. Rendering against real traffic. |
+| **Alert Deduplication** | ✅ shipped + **live-verified** | Dropped a real SKU below threshold, ran the alert cron **twice**: run 1 alerted (real Slack post), run 2 **suppressed** — counter went to “Repeated 2×”, dedup key stored, the suppressed repeat preserved in `notification_occurrences`. Stock restored. |
+| **Rate Limiting** | ✅ shipped + **live-verified** | Filled Slack’s 1-min window (20/20), fired a real digest → its Slack dispatch was **queued, not sent** (`rate limit: 21/20 per 1m`) with a scheduled send. Delayed, never dropped. Critical bypasses. |
+| **Live Notification Feed** | ✅ shipped | Realtime subscription + staff RLS policy + publication; **always** polls (45s) as a freshness guarantee — see the design note below. |
+| **End-to-End Retry Verification** | ✅ shipped | `POST /api/admin/notifications/verify` + a dev-only card. The underlying ladder was separately proven live 17/17 (real worker, real Resend rejection, real DLQ, real replay). |
+
+**Live-feed design note (a real trap):** a Supabase Realtime channel reports `SUBSCRIBED` even when
+RLS filters every row out — so “connected” is **not** proof events will arrive. Polling only while
+disconnected would leave a green “Live” badge on a page that never updates. The poll therefore runs
+unconditionally; realtime is an accelerator, not the guarantee.
+
+---
+
+# Deferred to post-launch (agreed with the reviewer)
+
+| Item | Why deferring is safe — and arguably better |
+|---|---|
+| **P8 + P9 — config UI + change audit** | **No impact now.** Config lives in code; pre-launch you deploy constantly, so a UI buys nothing. It only bites later (silencing a noisy channel at 2am without a deploy). Deferring is *better*: config-in-code is versioned, reviewed, and git **is** the audit trail — and you don’t yet know which knobs you’ll want, so building the UI now means guessing. P9 is already half-done: ack (`acknowledged_by`), replay (`replayed_by`) and retries (`retry_history.by`) are all attributed; only config-change history is missing, which is meaningless until config is mutable. |
+| **P3 — notification dependencies** | **No impact now**, and doing it pre-launch is a *bad risk trade*: it requires threading a “caused by” reference through the **order and refund services** — touching the payment path for a debugging visualisation. The value is largely covered already: correlation groups by root cause, and the incident engine groups cross-system cascades. |
+
+Neither deferral loses data, breaks a flow, or hides a failure.
+
+---
+
 # Deferred backlog (agreed, not built)
 
 Everything raised in review that was **consciously deferred** — recorded so nothing is lost. Each row
