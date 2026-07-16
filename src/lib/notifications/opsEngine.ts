@@ -356,35 +356,55 @@ export async function getNotificationFeed(f: FeedFilters = {}): Promise<FeedPage
     const unitRows = new Map<string, any[]>(); // eslint-disable-line @typescript-eslint/no-explicit-any
     for (const r of rows) { const k = r.correlation_id ?? r.group_id; if (!unitRows.has(k)) unitRows.set(k, []); unitRows.get(k)!.push(r); }
 
-    const items: FeedItem[] = page.map((key) => {
-      const rs = unitRows.get(key) ?? [];
-      // Group the unit's rows by group_id → each group is one underlying event.
-      const groups = new Map<string, any[]>(); // eslint-disable-line @typescript-eslint/no-explicit-any
-      for (const r of rs) { if (!groups.has(r.group_id)) groups.set(r.group_id, []); groups.get(r.group_id)!.push(r); }
-      const groupList = [...groups.entries()]
-        .map(([gid, grs]) => ({ gid, grs, at: grs.map((x) => x.created_at).sort()[0] as string }))
-        .sort((a, b) => b.at.localeCompare(a.at));   // newest event first
-      const latest = groupList[0];
-      const chRows = (latest?.grs ?? []).slice().sort((a, b) => String(a.channel).localeCompare(String(b.channel)));
-      const first = chRows[0] ?? {};
-      const channels = chRows.map(mapChannel);
-      return {
-        groupId: latest?.gid ?? key, event: first.event, category: first.category ?? "system", severity: first.severity ?? "info",
-        title: first.title ?? null, entityType: first.entity_type ?? null, entityRef: first.entity_ref ?? null,
-        createdAt: latest?.at ?? first.created_at, read: chRows.every((r) => !!r.read_at),
-        readAt: chRows.map((r) => r.read_at).filter(Boolean).sort()[0] ?? null,
-        acknowledgedAt: first.acknowledged_at ?? null, acknowledgedBy: first.acknowledged_by ?? null,
-        payload: first.payload, channels, status: rollup(channels),
-        correlationId: unitIsCorr.get(key) ? key : null,
-        correlatedCount: groupList.length,
-        correlatedRefs: groupList.slice(0, 50).map((g) => ({ gid: g.gid, grs: g.grs, at: g.at }))
-          .map((g) => ({ groupId: g.gid, ref: g.grs[0]?.entity_ref ?? null, at: g.at, status: rollup(g.grs.map((r: any) => ({ status: r.status as DeliveryStatus }))) })), // eslint-disable-line @typescript-eslint/no-explicit-any
-      };
-    });
+    const items: FeedItem[] = page.map((key) => buildUnitItem(key, unitRows.get(key) ?? [], !!unitIsCorr.get(key)));
 
     const lastKey = page[page.length - 1];
     return { items, nextCursor: hasMore ? (unitCursor.get(lastKey) ?? null) : null, hasMore };
   } catch { return { items: [], nextCursor: null, hasMore: false }; }
+}
+
+/** Build ONE feed item from a unit's rows (a unit = a correlation, or a single group). Shared by the
+ *  feed and the single-item refresh, so the drawer and the list can never disagree. */
+function buildUnitItem(key: string, rs: any[], isCorr: boolean, preferGroupId?: string): FeedItem { // eslint-disable-line @typescript-eslint/no-explicit-any
+  // Group the unit's rows by group_id → each group is one underlying event.
+  const groups = new Map<string, any[]>(); // eslint-disable-line @typescript-eslint/no-explicit-any
+  for (const r of rs) { if (!groups.has(r.group_id)) groups.set(r.group_id, []); groups.get(r.group_id)!.push(r); }
+  const groupList = [...groups.entries()]
+    .map(([gid, grs]) => ({ gid, grs, at: grs.map((x) => x.created_at).sort()[0] as string }))
+    .sort((a, b) => b.at.localeCompare(a.at));   // newest event first
+  const shown = (preferGroupId ? groupList.find((g) => g.gid === preferGroupId) : null) ?? groupList[0];
+  const chRows = (shown?.grs ?? []).slice().sort((a, b) => String(a.channel).localeCompare(String(b.channel)));
+  const first = chRows[0] ?? {};
+  const channels = chRows.map(mapChannel);
+  return {
+    groupId: shown?.gid ?? key, event: first.event, category: first.category ?? "system", severity: first.severity ?? "info",
+    title: first.title ?? null, entityType: first.entity_type ?? null, entityRef: first.entity_ref ?? null,
+    createdAt: shown?.at ?? first.created_at, read: chRows.every((r) => !!r.read_at),
+    readAt: chRows.map((r) => r.read_at).filter(Boolean).sort()[0] ?? null,
+    acknowledgedAt: first.acknowledged_at ?? null, acknowledgedBy: first.acknowledged_by ?? null,
+    payload: first.payload, channels, status: rollup(channels),
+    correlationId: isCorr ? key : null,
+    correlatedCount: groupList.length,
+    correlatedRefs: groupList.slice(0, 50).map((g) => ({ groupId: g.gid, ref: g.grs[0]?.entity_ref ?? null, at: g.at, status: rollup(g.grs.map((r: any) => ({ status: r.status as DeliveryStatus }))) })), // eslint-disable-line @typescript-eslint/no-explicit-any
+  };
+}
+
+/**
+ * Fetch ONE feed item fresh, independent of the current filters. The drawer uses this after a
+ * retry/replay/ack: a successful replay stops the row being `dead`, so it drops out of the DLQ view
+ * — without this the drawer would keep showing the pre-action snapshot.
+ */
+export async function getNotificationItem(groupId: string): Promise<FeedItem | null> {
+  try {
+    const { data: seed } = await db().from("notification_log").select("correlation_id").eq("group_id", groupId).limit(1);
+    const corr = ((seed ?? []) as any[])[0]?.correlation_id ?? null; // eslint-disable-line @typescript-eslint/no-explicit-any
+    const { data } = corr
+      ? await db().from("notification_log").select("*").eq("correlation_id", corr).limit(5000)
+      : await db().from("notification_log").select("*").eq("group_id", groupId).limit(100);
+    const rows = (data ?? []) as any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
+    if (!rows.length) return null;
+    return buildUnitItem(corr ?? groupId, rows, !!corr, groupId);
+  } catch { return null; }
 }
 
 // ── Channel health metrics ─────────────────────────────────────────────────────

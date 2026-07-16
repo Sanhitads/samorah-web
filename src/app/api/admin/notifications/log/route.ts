@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { retryDispatch, replayDeadLetter, markRead, markAllRead, acknowledgeCritical, getUnreadCount } from "@/lib/notifications/opsEngine";
+import { retryDispatch, replayDeadLetter, markRead, markAllRead, acknowledgeCritical, getUnreadCount, getNotificationItem } from "@/lib/notifications/opsEngine";
 
 /**
  * Operations Center actions — retry a failed dispatch, mark read / mark all read, acknowledge a
@@ -18,9 +18,13 @@ async function staffName(userId: string | null): Promise<string> {
   } catch { return "Staff"; }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const staff = await requireStaff("editor");
   if (!staff.ok) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+  // ?groupId= → one item, fresh and filter-independent (the drawer needs this after a retry/replay:
+  // a successful replay leaves the DLQ view, so the list alone can only offer a stale snapshot).
+  const groupId = new URL(request.url).searchParams.get("groupId");
+  if (groupId) { const item = await getNotificationItem(groupId); return item ? NextResponse.json({ item }) : NextResponse.json({ error: "Not found." }, { status: 404 }); }
   return NextResponse.json(await getUnreadCount());
 }
 

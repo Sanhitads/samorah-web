@@ -39,8 +39,11 @@ const VERB: Record<string, string> = { delivered: "sent", failed: "failed", skip
 export function buildTimeline(item: FeedItem): TimelineEvent[] {
   const ev: TimelineEvent[] = [{ at: item.createdAt, kind: "created", label: "Created", detail: item.event }];
   for (const c of item.channels) {
-    if (c.lastAttemptAt) {
-      // A dead channel's LAST ATTEMPT is a failure; the DLQ hand-off below is its own step, so
+    // `last_attempt_at` IS the latest retry once a row has been retried, so rendering both would
+    // show that attempt twice. When there are retries, the history below tells the story; the
+    // original dispatch is represented by "Created".
+    if (c.lastAttemptAt && c.retryHistory.length === 0) {
+      // A dead channel's last attempt is a failure; the DLQ hand-off below is its own step, so
       // don't render both as "dead".
       const kind = c.status === "dead" ? "failed" : c.status;
       ev.push({ at: c.lastAttemptAt, kind, label: `${c.channel} ${VERB[kind] ?? kind}`, detail: c.error ?? c.target ?? null });

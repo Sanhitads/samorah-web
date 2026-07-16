@@ -65,7 +65,10 @@ export function OpsFeed({ items }: { items: FeedItem[] }) {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
 
-  const open = openId ? (items.find((i) => i.groupId === openId) ?? fallback) : null;
+  // The drawer's own copy is authoritative: it's fetched fresh on open and after every action, and
+  // is filter-independent (a replayed row leaves the DLQ view but must still render its new state).
+  // The list entry is only the instant-render seed until that fetch lands.
+  const open = openId ? (fallback ?? items.find((i) => i.groupId === openId) ?? null) : null;
 
   const close = () => {
     setOpenId(null); setFallback(null); setNote(null);
@@ -73,8 +76,9 @@ export function OpsFeed({ items }: { items: FeedItem[] }) {
     if (pendingRefresh) { setPendingRefresh(false); router.refresh(); }
   };
   const openItem = async (it: FeedItem) => {
-    setOpenId(it.groupId); setFallback(it); setNote(null);
+    setOpenId(it.groupId); setFallback(it); setNote(null);   // seed = instant render
     if (!it.read) { await post({ action: "read", groupId: it.groupId }); setPendingRefresh(true); }
+    await refreshOpen(it.groupId);                            // then the authoritative copy
   };
   useEffect(() => {
     if (!openId) return;
@@ -83,18 +87,30 @@ export function OpsFeed({ items }: { items: FeedItem[] }) {
     return () => window.removeEventListener("keydown", onKey);
   }); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /** Pull this ONE item fresh, independent of the current filters. Essential after a replay: the row
+   *  stops being `dead` and leaves the DLQ view, so the list can only offer a stale snapshot. */
+  const refreshOpen = async (groupId: string) => {
+    try {
+      const r = await fetch(`/api/admin/notifications/log?groupId=${encodeURIComponent(groupId)}`);
+      if (!r.ok) return;
+      const d = await r.json().catch(() => ({}));
+      if (d.item) setFallback(d.item as FeedItem);
+    } catch { /* keep whatever we have */ }
+  };
+
   const retry = async (c: FeedChannel, replay = false) => {
     setBusy(true); setNote(null);
     try {
       const r = await post({ action: replay ? "replay" : "retry", id: c.id });
       const d = await r.json().catch(() => ({}));
       setNote(r.ok ? `${replay ? "Replay" : "Retry"} succeeded — ${c.channel} delivered.` : `${replay ? "Replay" : "Retry"} failed: ${d.error ?? "unknown"}${d.status === "dead" ? " — returned to the Dead Letter Queue." : ""}`);
-      router.refresh();   // drawer stays open and re-derives from fresh data
+      if (openId) await refreshOpen(openId);   // show the real outcome even if it left this filter
+      router.refresh();
     } finally { setBusy(false); }
   };
   const ack = async (it: FeedItem) => {
     setBusy(true);
-    try { const r = await post({ action: "acknowledge", groupId: it.groupId }); if (r.ok) { setNote("Acknowledged."); router.refresh(); } }
+    try { const r = await post({ action: "acknowledge", groupId: it.groupId }); if (r.ok) { setNote("Acknowledged."); await refreshOpen(it.groupId); router.refresh(); } }
     finally { setBusy(false); }
   };
 
