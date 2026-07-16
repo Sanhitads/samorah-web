@@ -223,6 +223,24 @@ export const RATE_LIMITS: Partial<Record<OpsChannelKey, { maxPerWindow: number; 
 /** Severities that bypass rate limiting outright (never drop or delay an emergency). */
 export const RATE_LIMIT_BYPASS: OpsSeverity[] = ["critical"];
 
+/**
+ * SCHEDULED (AUTOMATIC) REPLAY. When a channel recovers, its dead letters should not need a human.
+ * "Recovered" is a deterministic signal: recent successful deliveries and no recent failures.
+ *
+ * Loop safety: only dead letters that have NEVER been replayed are auto-replayed (`replayed_at IS
+ * NULL`). So each gets exactly ONE automatic attempt, ever — if it fails again it stays in the DLQ
+ * for a human. Without this an auto-replay would re-attempt the same dead letter every run forever.
+ * Bounded per run so a recovery can't re-flood the channel.
+ */
+export const AUTO_REPLAY = {
+  enabled: true,
+  maxPerRun: 10,            // never mass-replay a backlog into a just-recovered channel
+  healthLookbackMinutes: 15, // window used to judge "the channel is back"
+  minSuccesses: 2,           // …this many recent deliveries, and
+  maxRecentFailures: 0,      // …no recent failures
+  maxAgeHours: 72,           // don't resurrect ancient alerts nobody cares about any more
+};
+
 /** Channel presentation — icon + label (tiny UX win; the label stays for a11y/tooltips). */
 export const CHANNEL_ICON: Record<OpsChannelKey, string> = {
   in_app: "🔔", email: "✉️", slack: "💬", sms: "📱", whatsapp: "🟢", push: "📲",

@@ -21,7 +21,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import {
   OPS_ROUTES, EVENT_CATEGORY, RETENTION_DAYS, retentionClassFor,
   RETRY_POLICY, backoffFor, CORRELATION, correlationKeyFor,
-  DEDUP, dedupKeyFor, dedupWindowFor, RATE_LIMITS, RATE_LIMIT_BYPASS,
+  DEDUP, dedupKeyFor, dedupWindowFor, RATE_LIMITS, RATE_LIMIT_BYPASS, AUTO_REPLAY,
   type OpsEvent, type OpsChannelKey, type OpsSeverity, type NotificationCategory, type DeliveryStatus,
 } from "@/config/notifications";
 import type { OpsChannel, OpsPayload, OpsDispatchResult } from "./opsTypes";
@@ -338,6 +338,44 @@ export async function replayDeadLetter(logId: string, actor: string): Promise<{ 
   } catch (e) { return { ok: false, error: e instanceof Error ? e.message : "replay failed" }; }
 }
 
+/** PURE — has a channel recovered? Deterministic: enough recent successes and no recent failures. */
+export function channelRecovered(recentDelivered: number, recentFailed: number): boolean {
+  return recentDelivered >= AUTO_REPLAY.minSuccesses && recentFailed <= AUTO_REPLAY.maxRecentFailures;
+}
+
+/**
+ * SCHEDULED REPLAY (cron) — when a channel is demonstrably back, replay its dead letters without a
+ * human. Bounded per run, age-capped, and strictly ONE automatic attempt per dead letter
+ * (`replayed_at IS NULL`) so a permanently-broken message can never loop forever.
+ */
+export async function runAutoReplay(): Promise<{ channelsRecovered: string[]; replayed: number; delivered: number; stillDead: number }> {
+  const out = { channelsRecovered: [] as string[], replayed: 0, delivered: 0, stillDead: 0 };
+  if (!AUTO_REPLAY.enabled) return out;
+  try {
+    const since = new Date(Date.now() - AUTO_REPLAY.healthLookbackMinutes * 60000).toISOString();
+    const minAge = new Date(Date.now() - AUTO_REPLAY.maxAgeHours * 3600000).toISOString();
+    // Which channels currently hold never-replayed dead letters worth reviving?
+    const { data: deadRows } = await db().from("notification_log").select("id,channel,created_at").eq("status", "dead").is("replayed_at", null).gte("created_at", minAge).order("created_at", { ascending: true }).limit(200);
+    const dead = (deadRows ?? []) as any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
+    if (!dead.length) return out;
+
+    const { data: recentRows } = await db().from("notification_log").select("channel,status").gte("created_at", since).in("status", ["delivered", "failed"]).limit(2000);
+    const recent = (recentRows ?? []) as any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
+
+    for (const channel of [...new Set(dead.map((d) => d.channel))]) {
+      const mine = recent.filter((r) => r.channel === channel);
+      if (!channelRecovered(mine.filter((r) => r.status === "delivered").length, mine.filter((r) => r.status === "failed").length)) continue;
+      out.channelsRecovered.push(channel);
+      for (const row of dead.filter((d) => d.channel === channel).slice(0, AUTO_REPLAY.maxPerRun)) {
+        const r = await replayDeadLetter(row.id, "auto-replay");
+        out.replayed++;
+        if (r.status === "delivered") out.delivered++; else out.stillDead++;
+      }
+    }
+  } catch (e) { console.error("auto replay failed", e); }
+  return out;
+}
+
 export async function getDeadLetterCount(): Promise<number> {
   try { const { data } = await db().from("notification_log").select("id").eq("status", "dead").limit(1000); return (data ?? []).length; } catch { return 0; }
 }
@@ -490,42 +528,54 @@ export async function getNotificationItem(groupId: string): Promise<FeedItem | n
 }
 
 // ── Channel health metrics ─────────────────────────────────────────────────────
-export type ChannelState = "healthy" | "degraded" | "failing" | "dormant" | "pending";
+export type ChannelState = "healthy" | "degraded" | "failing" | "maintenance" | "dormant" | "pending";
 export interface ChannelHealth {
   key: OpsChannelKey; configured: boolean; state: ChannelState;
   lastSuccessAt: string | null; lastFailureAt: string | null;
   avgLatencyMs24h: number | null; delivered24h: number; failed24h: number; dead: number;
+  /** P6 — the channel is down but work is already scheduled: show "Maintenance · retry scheduled"
+   *  rather than a bare "Failed", which reads as data loss when nothing has actually been lost. */
+  pendingRetries: number; queued: number; retryScheduledAt: string | null;
 }
 /** Per-channel observability: last success, last failure, 24h latency + volumes, current state. */
 export async function getChannelHealth(): Promise<ChannelHealth[]> {
   const keys = Object.keys(OPS_CHANNELS) as OpsChannelKey[];
   const since24 = new Date(Date.now() - 86400000).toISOString();
   const since30d = new Date(Date.now() - 30 * 86400000).toISOString();
-  let recent: any[] = [], window: any[] = []; // eslint-disable-line @typescript-eslint/no-explicit-any
+  let recent: any[] = [], window: any[] = [], pending: any[] = []; // eslint-disable-line @typescript-eslint/no-explicit-any
   try {
-    const [a, b] = await Promise.all([
+    const [a, b, c] = await Promise.all([
       db().from("notification_log").select("channel,status,created_at").gte("created_at", since30d).in("status", ["delivered", "failed", "dead"]).order("created_at", { ascending: false }).limit(5000),
       db().from("notification_log").select("channel,status,delivery_ms").gte("created_at", since24).limit(5000),
+      db().from("notification_log").select("channel,status,next_retry_at").in("status", ["failed", "queued"]).not("next_retry_at", "is", null).limit(2000),
     ]);
     recent = (a.data ?? []) as any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
     window = (b.data ?? []) as any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
+    pending = (c.data ?? []) as any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
   } catch { /* fall through to unconfigured/empty metrics */ }
 
   return keys.map((key) => {
     const configured = OPS_CHANNELS[key].configured();
     const mine = recent.filter((r) => r.channel === key);
     const win = window.filter((r) => r.channel === key);
+    const pend = pending.filter((r) => r.channel === key);
     const lastSuccessAt = mine.find((r) => r.status === "delivered")?.created_at ?? null;   // recent[] is desc
     const lastFailureAt = mine.find((r) => r.status === "failed" || r.status === "dead")?.created_at ?? null;
     const delivered24h = win.filter((r) => r.status === "delivered").length;
     const failed24h = win.filter((r) => r.status === "failed" || r.status === "dead").length;
     const dead = mine.filter((r) => r.status === "dead").length;
     const lat = win.map((r) => r.delivery_ms).filter((n) => typeof n === "number" && n >= 0) as number[];
+    const pendingRetries = pend.filter((r) => r.status === "failed").length;
+    const queued = pend.filter((r) => r.status === "queued").length;
+    const retryScheduledAt = pend.map((r) => r.next_retry_at).filter(Boolean).sort()[0] ?? null;
+    // A failing channel with work already scheduled is in MAINTENANCE, not lost: the retries are
+    // queued and will drain when it recovers. Saying "Failed" here reads as data loss.
     const state: ChannelState = !configured
       ? (key === "whatsapp" ? "pending" : "dormant")
-      : failed24h > 0 && delivered24h === 0 ? "failing"
+      : failed24h > 0 && delivered24h === 0
+        ? (pendingRetries > 0 || queued > 0 ? "maintenance" : "failing")
         : failed24h > 0 ? "degraded" : "healthy";
-    return { key, configured, state, lastSuccessAt, lastFailureAt, avgLatencyMs24h: lat.length ? Math.round(lat.reduce((a, b) => a + b, 0) / lat.length) : null, delivered24h, failed24h, dead };
+    return { key, configured, state, lastSuccessAt, lastFailureAt, avgLatencyMs24h: lat.length ? Math.round(lat.reduce((a, b) => a + b, 0) / lat.length) : null, delivered24h, failed24h, dead, pendingRetries, queued, retryScheduledAt };
   });
 }
 // ── Analytics (Notification Analytics page) ────────────────────────────────────

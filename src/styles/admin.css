@@ -1123,3 +1123,5 @@
 .nlog-verify { list-style: none; margin: 8px 0 0; padding: 0; }
 .nlog-verify__row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 5px 0; border-top: 1px solid var(--ad-hair); font-family: var(--font-sans); font-size: 12px; }
 .nlog-verify__phase { font-weight: 700; min-width: 110px; color: var(--ink, #1f1a16); }
+.nlog-chealth--maintenance { border-color: #d9c9ee; background: #f8f4fd; }
+.nlog-chealth--maintenance .nlog-chealth__state { color: #6b3fa0; }

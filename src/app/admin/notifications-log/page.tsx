@@ -11,7 +11,8 @@ import { TEST_PRESETS, CHANNEL_ICON, type OpsChannelKey } from "@/config/notific
 export const metadata: Metadata = { title: "Notification Ops", robots: { index: false } };
 export const dynamic = "force-dynamic";
 
-const STATE_LABEL: Record<string, string> = { healthy: "Healthy", degraded: "Degraded", failing: "Failing", pending: "Pending", dormant: "Dormant" };
+const STATE_LABEL: Record<string, string> = { healthy: "Healthy", degraded: "Degraded", failing: "Failing", maintenance: "Maintenance", pending: "Pending", dormant: "Dormant" };
+const at = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : null);
 const CHANNEL_LABEL: Record<string, string> = { in_app: "In-App", email: "Email", slack: "Slack", sms: "SMS", whatsapp: "WhatsApp", push: "Push" };
 const ms = (n: number | null) => (n == null ? "—" : n < 1000 ? `${n} ms` : `${(n / 1000).toFixed(1)} sec`);
 const ago = (iso: string | null) => {
@@ -69,13 +70,15 @@ export default async function NotificationOpsPage({ searchParams }: { searchPara
         {channels.map((c) => (
           <div key={c.key} className={`nlog-chealth nlog-chealth--${c.state}`}>
             <span className="nlog-chealth__name">{CHANNEL_ICON[c.key as OpsChannelKey]} {CHANNEL_LABEL[c.key] ?? c.key}</span>
-            <span className="nlog-chealth__state">{STATE_LABEL[c.state] ?? c.state}</span>
+            <span className="nlog-chealth__state">{STATE_LABEL[c.state] ?? c.state}{c.state === "maintenance" ? " · retry scheduled" : ""}</span>
             {c.configured ? (
               <dl className="nlog-chealth__metrics">
                 <div><dt>Last ok</dt><dd>{ago(c.lastSuccessAt)}</dd></div>
                 <div><dt>Last fail</dt><dd>{ago(c.lastFailureAt)}</dd></div>
                 <div><dt>Latency 24h</dt><dd>{ms(c.avgLatencyMs24h)}</dd></div>
                 <div><dt>24h</dt><dd>{c.delivered24h}✓ {c.failed24h}✗</dd></div>
+                {c.pendingRetries + c.queued > 0 ? <div><dt>Scheduled</dt><dd>{c.pendingRetries + c.queued} · {at(c.retryScheduledAt) ?? "soon"}</dd></div> : null}
+                {c.dead > 0 ? <div><dt>DLQ</dt><dd>{c.dead}</dd></div> : null}
               </dl>
             ) : null}
           </div>

@@ -6,11 +6,11 @@ import { describe, it, expect } from "vitest";
 import { buildSlackMessage } from "./channels/slack";
 import { buildSmsText, smsChannel } from "./channels/sms";
 import { buildOpsEmailHtml } from "./channels/opsEmail";
-import { retryDecision, percentile, failureReasonKey, rateLimitDecision } from "./opsEngine";
+import { retryDecision, percentile, failureReasonKey, rateLimitDecision, channelRecovered } from "./opsEngine";
 import { buildTimeline, type FeedItem, type FeedChannel } from "./feedTypes";
 import {
   OPS_ROUTES, SEVERITY_COLOR, EVENT_CATEGORY, RETENTION_DAYS, retentionClassFor, TEST_PRESETS, CATEGORY_LABEL,
-  RETRY_POLICY, backoffFor, CORRELATION, correlationKeyFor, CHANNEL_ICON, DEDUP, dedupKeyFor, RATE_LIMITS,
+  RETRY_POLICY, backoffFor, CORRELATION, correlationKeyFor, CHANNEL_ICON, DEDUP, dedupKeyFor, dedupWindowFor, RATE_LIMITS, AUTO_REPLAY,
   type OpsEvent, type NotificationCategory, type OpsChannelKey,
 } from "@/config/notifications";
 import type { OpsPayload } from "./opsTypes";
@@ -253,6 +253,35 @@ describe("rate-limited dispatches are queued, not failed", () => {
     const d = retryDecision({ status: "queued", attempts: 0, channel: "slack", nextRetryAt: new Date(now + 30_000).toISOString(), error: null }, now);
     expect(d.action).toBe("wait");
     expect(d.reason).toMatch(/rate-limit/);
+  });
+});
+
+describe("scheduled replay — channel recovery", () => {
+  it("declares recovery only on real evidence: enough successes AND no failures", () => {
+    expect(channelRecovered(AUTO_REPLAY.minSuccesses, 0)).toBe(true);
+    expect(channelRecovered(AUTO_REPLAY.minSuccesses + 5, 0)).toBe(true);
+  });
+  it("does NOT declare recovery while failures are still happening", () => {
+    expect(channelRecovered(50, 1)).toBe(false);   // still flapping → don't mass-replay into it
+  });
+  it("does NOT declare recovery on silence (no traffic is not proof of health)", () => {
+    expect(channelRecovered(0, 0)).toBe(false);
+  });
+  it("is bounded so a recovery cannot re-flood a channel", () => {
+    expect(AUTO_REPLAY.maxPerRun).toBeGreaterThan(0);
+    expect(AUTO_REPLAY.maxPerRun).toBeLessThanOrEqual(25);
+    expect(AUTO_REPLAY.maxAgeHours).toBeGreaterThan(0);   // don't resurrect ancient alerts
+  });
+});
+
+describe("per-event dedup windows", () => {
+  it("a STANDING condition collapses for hours, not minutes", () => {
+    // Low stock stays true until restocked; a 5-min window would re-post ~48×/day per SKU.
+    expect(dedupWindowFor("inventory.low_stock")).toBeGreaterThanOrEqual(60);
+    expect(dedupWindowFor("inventory.low_stock")).toBeGreaterThan(DEDUP.windowMinutes);
+  });
+  it("a TRANSIENT failure keeps the short default window", () => {
+    expect(dedupWindowFor("payment.failed")).toBe(DEDUP.windowMinutes);
   });
 });
 
