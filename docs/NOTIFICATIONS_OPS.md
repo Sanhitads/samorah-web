@@ -131,6 +131,66 @@ Per-user channel opt-outs, scoped by `event` **or** `category`. Applied today to
 (email: an opted-out manager is dropped from the recipient list); broadcast channels (a Slack channel)
 stay channel-wide by nature. WhatsApp/push will honour the same table when they go live.
 
+---
+
+# Production hardening (resilience · observability · scale)
+
+Additive to everything above — the event model (`group_id`), routing, preferences, retry and the
+feed are unchanged.
+
+## Dead Letter Queue (+ automatic retry)
+Previously a permanent failure sat as `failed` forever and **nothing auto-retried**. Now:
+
+```
+send → failed → (1m) retry → (5m) retry → (15m) retry → policy exhausted → DEAD LETTER QUEUE
+                                                                              ↕ manual replay
+```
+- `RETRY_POLICY` (config): `maxAttempts: 4`, backoff `[1, 5, 15]` minutes, and `autoRetryChannels`
+  (in-app is never "retried" — it isn't a provider; `skipped` is never retried — it isn't a failure).
+- **Worker**: `/api/cron/notifications-retry` every 5 min → `runRetryWorker()`. A transient Slack /
+  Resend outage self-heals with no human involved.
+- **DLQ** = the terminal `dead` status — deliberately a *state*, not a separate table, so the row keeps
+  its `group_id`, payload, retry history and drill-down. It carries `dead_at` + `dead_reason`.
+  **Nothing is ever discarded.**
+- **Replay**: `replayDeadLetter()` (drawer button / `action: "replay"`). One attempt — success revives
+  the row and clears the dead flags; failure returns it to the DLQ. Audited via
+  `replayed_at`/`replayed_by` plus `retry_history`.
+- A banner surfaces the DLQ; the `☠ Dead letters` chip filters to it.
+
+## Event timeline
+`buildTimeline()` (pure) assembles the chronological story from data already stored — creation →
+per-channel dispatch → retries → replay → DLQ → read → acknowledged — rendered in the drawer.
+
+## Channel health metrics
+`getChannelHealth()` per channel: **last successful delivery**, **last failure**, **average latency
+(24h)**, 24h delivered/failed volumes, DLQ count, and a state:
+`healthy` · `degraded` (some failures) · `failing` (failures and zero deliveries) · `dormant` · `pending` (WhatsApp).
+
+## Cursor pagination
+The feed was scanning up to 2000 ids and slicing in JS. It now uses a **keyset cursor on
+`created_at`** (index `notification_log_cursor_idx`), `limit` ≤ 100, with `nextCursor`/`hasMore` —
+no offsets, safe at 50k+. Changing any filter resets the cursor.
+
+## Notification correlation
+Repeated failures from one root cause share a `correlation_id`, so **50 payment failures collapse into
+one feed item** ("×50 affected") while every event stays drillable in the drawer.
+- `correlationKeyFor()` (pure, config-driven): only noisy failure events correlate — reports never do.
+  The key includes the root incident when known (`payment.failed:incident:INC-00042`).
+- A new event joins the newest correlation with the same key inside `CORRELATION.windowMinutes` (15).
+- Feed unit = `correlation_id ?? group_id`.
+- *Known trade-off:* a correlation whose events straddle a page boundary can appear on both pages
+  (it always shows its true total). Cosmetic — never data loss.
+
+## Presentation
+Severity is a coloured left rail (green/amber/red — the notification model is 3-level `info/warning/
+critical`; no 4th "high" level was invented). Channels render with icons (label shown ≥1100px).
+
+## Tests
+`ops.test.ts` (31): retry decisions incl. backoff/exhaustion/channel guards, correlation keys,
+timeline assembly (incl. retries, replay, DLQ hand-off), channel icons — plus the earlier routing /
+SMS-critical / retention / preset suites. Schema verified live: DLQ transition + reason, DLQ query,
+replay audit fields, correlation binding 3 events into one unit, cursor keyset — self-cleaning.
+
 ## Design notes
 - The customer-transactional engine (`notify()`, `notification_dispatches`, order/return emails) is **unchanged**.
 - Operational dispatches are logged to a separate `notification_log` table (additive migration `20260722120000`).

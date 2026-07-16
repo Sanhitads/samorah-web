@@ -118,8 +118,10 @@ export const EVENT_CATEGORY: Record<OpsEvent, NotificationCategory> = {
   "daily.sales_report": "system", "incident.escalated": "system",
 };
 
-/** Delivery lifecycle. `delivered` = the provider accepted it (Slack 200 / MSG91 queued / Resend accepted). */
-export type DeliveryStatus = "queued" | "sending" | "delivered" | "failed" | "retrying" | "skipped";
+/** Delivery lifecycle. `delivered` = the provider accepted it (Slack 200 / MSG91 queued / Resend
+ *  accepted). `dead` = the retry policy was exhausted → the Dead Letter Queue (never discarded;
+ *  it keeps its reason + retry history and can be replayed manually). */
+export type DeliveryStatus = "queued" | "sending" | "delivered" | "failed" | "retrying" | "skipped" | "dead";
 
 /**
  * RETENTION — the log must not grow forever. Class is derived per notification; a nightly purge
@@ -134,6 +136,49 @@ export function retentionClassFor(event: OpsEvent, severity: OpsSeverity, entity
   if (event === "incident.escalated" || event === "security.incident") return "high";
   return "operational";
 }
+
+/**
+ * RETRY POLICY + DEAD LETTER QUEUE. A failed dispatch is retried with backoff by the retry worker;
+ * once `maxAttempts` is exhausted it moves to the DLQ (status `dead`) rather than silently sitting
+ * as "failed" forever. Nothing is deleted — the DLQ keeps the reason + full retry history and
+ * supports manual replay. Manual retry from the drawer is unaffected by this policy.
+ */
+export const RETRY_POLICY = {
+  maxAttempts: 4,                    // 1 initial + 3 automatic retries, then DLQ
+  backoffMinutes: [1, 5, 15],        // delay before attempt 2, 3, 4
+  /** Channels worth auto-retrying. `skipped` (unconfigured) is never retried — it isn't a failure. */
+  autoRetryChannels: ["slack", "email", "sms", "whatsapp", "push"] as OpsChannelKey[],
+};
+/** Backoff delay (minutes) before the given attempt number, clamped to the last configured step. */
+export function backoffFor(attempt: number): number {
+  const b = RETRY_POLICY.backoffMinutes;
+  return b[Math.min(Math.max(attempt - 1, 0), b.length - 1)];
+}
+
+/**
+ * CORRELATION — repeated failures caused by one root incident (a Razorpay outage producing 50
+ * payment failures) share a correlation_id, so the feed collapses them into ONE item with a count
+ * while every underlying event stays drillable. Deterministic: the key is derived, never guessed.
+ */
+export const CORRELATION = {
+  enabled: true,
+  windowMinutes: 15,   // a new event joins an existing correlation formed within this window
+  minCount: 3,         // the feed only collapses once this many events share a correlation
+  /** Only noisy/failure-ish events correlate; one-off reports never collapse. */
+  events: ["payment.failed", "payment.gateway_down", "refund.failed", "order.failed",
+    "inventory.low_stock", "inventory.sync_failed", "shipment.delayed",
+    "tech.error", "cron.failed", "webhook.failed", "api.down"] as OpsEvent[],
+};
+/** The deterministic correlation key: the event, plus its root incident when one is known. */
+export function correlationKeyFor(event: OpsEvent, entityType?: string | null, entityRef?: string | null): string | null {
+  if (!CORRELATION.enabled || !CORRELATION.events.includes(event)) return null;
+  return entityType === "incident" && entityRef ? `${event}:incident:${entityRef}` : event;
+}
+
+/** Channel presentation — icon + label (tiny UX win; the label stays for a11y/tooltips). */
+export const CHANNEL_ICON: Record<OpsChannelKey, string> = {
+  in_app: "🔔", email: "✉️", slack: "💬", sms: "📱", whatsapp: "🟢", push: "📲",
+};
 
 /** Test presets — fire a realistic payload per event so formatting is exercised for real. */
 export interface TestPreset { id: string; label: string; event: OpsEvent; severity: OpsSeverity }

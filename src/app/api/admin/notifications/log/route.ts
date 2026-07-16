@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { retryDispatch, markRead, markAllRead, acknowledgeCritical, getUnreadCount } from "@/lib/notifications/opsEngine";
+import { retryDispatch, replayDeadLetter, markRead, markAllRead, acknowledgeCritical, getUnreadCount } from "@/lib/notifications/opsEngine";
 
 /**
  * Operations Center actions — retry a failed dispatch, mark read / mark all read, acknowledge a
@@ -35,6 +35,11 @@ export async function POST(request: Request) {
       if (!b.id) return NextResponse.json({ error: "id required." }, { status: 400 });
       const r = await retryDispatch(b.id, await staffName(staff.userId));
       return r.ok ? NextResponse.json({ ok: true, status: r.status }) : NextResponse.json({ error: r.error ?? "Retry failed.", status: r.status }, { status: 400 });
+    }
+    case "replay": {   // manual replay out of the Dead Letter Queue
+      if (!b.id) return NextResponse.json({ error: "id required." }, { status: 400 });
+      const r = await replayDeadLetter(b.id, await staffName(staff.userId));
+      return r.ok ? NextResponse.json({ ok: true, status: r.status }) : NextResponse.json({ error: r.error ?? "Replay failed.", status: r.status }, { status: 400 });
     }
     case "read": return b.groupId ? NextResponse.json(await markRead(b.groupId)) : NextResponse.json({ error: "groupId required." }, { status: 400 });
     case "read_all": return NextResponse.json(await markAllRead());

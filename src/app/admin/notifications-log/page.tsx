@@ -2,38 +2,40 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth/requireStaff";
-import { getNotificationFeed, getNotificationStats, channelStatus } from "@/lib/notifications/opsEngine";
+import { getNotificationFeed, getNotificationStats, getChannelHealth, getDeadLetterCount } from "@/lib/notifications/opsEngine";
 import { OpsFilters, OpsFeed, OpsTester, MarkAllRead } from "@/components/admin/OpsNotificationFeed";
-import { TEST_PRESETS } from "@/config/notifications";
+import { TEST_PRESETS, CHANNEL_ICON, type OpsChannelKey } from "@/config/notifications";
 
 /** Notification Operations Center — the live command view for the multi-channel engine. */
 export const metadata: Metadata = { title: "Notification Ops", robots: { index: false } };
 export const dynamic = "force-dynamic";
 
-/** Channel health wording: live → Healthy; WhatsApp is Pending (awaiting its number), others Dormant. */
-function health(key: string, configured: boolean): { label: string; state: "healthy" | "pending" | "dormant" } {
-  if (configured) return { label: "Healthy", state: "healthy" };
-  if (key === "whatsapp") return { label: "Pending", state: "pending" };
-  return { label: "Dormant", state: "dormant" };
-}
+const STATE_LABEL: Record<string, string> = { healthy: "Healthy", degraded: "Degraded", failing: "Failing", pending: "Pending", dormant: "Dormant" };
 const CHANNEL_LABEL: Record<string, string> = { in_app: "In-App", email: "Email", slack: "Slack", sms: "SMS", whatsapp: "WhatsApp", push: "Push" };
 const ms = (n: number | null) => (n == null ? "—" : n < 1000 ? `${n} ms` : `${(n / 1000).toFixed(1)} sec`);
+const ago = (iso: string | null) => {
+  if (!iso) return "never";
+  const m = (Date.now() - new Date(iso).getTime()) / 60000;
+  return m < 1 ? "just now" : m < 60 ? `${Math.floor(m)}m ago` : m < 1440 ? `${Math.floor(m / 60)}h ago` : `${Math.floor(m / 1440)}d ago`;
+};
 
 export default async function NotificationOpsPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const staff = await requireStaff("editor");
   if (!staff.ok) redirect("/login");
   const sp = await searchParams;
 
-  const [stats, feed] = await Promise.all([
+  const [stats, feed, channels, dlqCount] = await Promise.all([
     getNotificationStats(),
     getNotificationFeed({
       category: sp.category || undefined, severity: sp.severity || undefined, status: sp.status || undefined,
-      q: sp.q || undefined, unread: sp.unread === "1", page: sp.page ? Number(sp.page) : 1, pageSize: 25,
+      q: sp.q || undefined, unread: sp.unread === "1", dlq: sp.dlq === "1",
+      cursor: sp.cursor || null, limit: 25,
     }),
+    getChannelHealth(),
+    getDeadLetterCount(),
   ]);
-  const channels = channelStatus();
-  const pages = Math.max(1, Math.ceil(feed.total / feed.pageSize));
-  const qs = (p: number) => { const u = new URLSearchParams(sp as Record<string, string>); u.set("page", String(p)); return `?${u.toString()}`; };
+  const nextHref = () => { const u = new URLSearchParams(sp as Record<string, string>); if (feed.nextCursor) u.set("cursor", feed.nextCursor); return `?${u.toString()}`; };
+  const firstHref = () => { const u = new URLSearchParams(sp as Record<string, string>); u.delete("cursor"); const s = u.toString(); return s ? `?${s}` : "?"; };
 
   return (
     <main className="admin">
@@ -59,18 +61,27 @@ export default async function NotificationOpsPage({ searchParams }: { searchPara
         <div className={`inc-kpi${stats.criticalUnacked ? " inc-kpi--alert" : ""}`}><span className="inc-kpi__v">{stats.criticalUnacked}</span><span className="inc-kpi__k">Awaiting acknowledgement</span></div>
       </div>
 
-      {/* Channel health */}
+      {/* Channel health — state + last success/failure + 24h latency */}
       <section className="nlog-channels">
-        {channels.map((c) => {
-          const h = health(c.key, c.configured);
-          return (
-            <div key={c.key} className={`nlog-chealth nlog-chealth--${h.state}`}>
-              <span className="nlog-chealth__name">{CHANNEL_LABEL[c.key] ?? c.key}</span>
-              <span className="nlog-chealth__state">{h.label}</span>
-            </div>
-          );
-        })}
+        {channels.map((c) => (
+          <div key={c.key} className={`nlog-chealth nlog-chealth--${c.state}`}>
+            <span className="nlog-chealth__name">{CHANNEL_ICON[c.key as OpsChannelKey]} {CHANNEL_LABEL[c.key] ?? c.key}</span>
+            <span className="nlog-chealth__state">{STATE_LABEL[c.state] ?? c.state}</span>
+            {c.configured ? (
+              <dl className="nlog-chealth__metrics">
+                <div><dt>Last ok</dt><dd>{ago(c.lastSuccessAt)}</dd></div>
+                <div><dt>Last fail</dt><dd>{ago(c.lastFailureAt)}</dd></div>
+                <div><dt>Latency 24h</dt><dd>{ms(c.avgLatencyMs24h)}</dd></div>
+                <div><dt>24h</dt><dd>{c.delivered24h}✓ {c.failed24h}✗</dd></div>
+              </dl>
+            ) : null}
+          </div>
+        ))}
       </section>
+
+      {dlqCount > 0 ? (
+        <Link href="?dlq=1" className="nlog-dlqbanner">☠ {dlqCount} notification{dlqCount === 1 ? "" : "s"} in the Dead Letter Queue — retries exhausted. Review &amp; replay →</Link>
+      ) : null}
 
       <div className="od-grid">
         <section className="od-card">
@@ -91,15 +102,15 @@ export default async function NotificationOpsPage({ searchParams }: { searchPara
 
       {/* Feed */}
       <section className="od-card">
-        <h2 className="od-card__title">Feed</h2>
-        <OpsFilters total={feed.total} />
+        <h2 className="od-card__title">{sp.dlq === "1" ? "Dead Letter Queue" : "Feed"}</h2>
+        <OpsFilters shown={feed.items.length} dlq={sp.dlq === "1"} />
         <OpsFeed items={feed.items} />
-        {pages > 1 ? (
+        {(feed.hasMore || sp.cursor) ? (
           <div className="inc-listbar" style={{ marginTop: 12 }}>
-            <span className="admin__muted">Page {feed.page} / {pages}</span>
+            <span className="admin__muted">Showing {feed.items.length}{feed.hasMore ? " · more available" : " · end of results"}</span>
             <span className="inc-listbar__right">
-              {feed.page > 1 ? <Link className="op-item__btn" href={qs(feed.page - 1)}>← Prev</Link> : null}
-              {feed.page < pages ? <Link className="op-item__btn" href={qs(feed.page + 1)}>Next →</Link> : null}
+              {sp.cursor ? <Link className="op-item__btn" href={firstHref()}>⇤ Newest</Link> : null}
+              {feed.hasMore ? <Link className="op-item__btn" href={nextHref()}>Older →</Link> : null}
             </span>
           </div>
         ) : null}

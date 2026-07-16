@@ -6,7 +6,13 @@ import { describe, it, expect } from "vitest";
 import { buildSlackMessage } from "./channels/slack";
 import { buildSmsText, smsChannel } from "./channels/sms";
 import { buildOpsEmailHtml } from "./channels/opsEmail";
-import { OPS_ROUTES, SEVERITY_COLOR, EVENT_CATEGORY, RETENTION_DAYS, retentionClassFor, TEST_PRESETS, CATEGORY_LABEL, type OpsEvent, type NotificationCategory } from "@/config/notifications";
+import { retryDecision } from "./opsEngine";
+import { buildTimeline, type FeedItem, type FeedChannel } from "./feedTypes";
+import {
+  OPS_ROUTES, SEVERITY_COLOR, EVENT_CATEGORY, RETENTION_DAYS, retentionClassFor, TEST_PRESETS, CATEGORY_LABEL,
+  RETRY_POLICY, backoffFor, CORRELATION, correlationKeyFor, CHANNEL_ICON,
+  type OpsEvent, type NotificationCategory, type OpsChannelKey,
+} from "@/config/notifications";
 import type { OpsPayload } from "./opsTypes";
 
 const sample: OpsPayload = {
@@ -111,6 +117,90 @@ describe("retention policy", () => {
   it("tests are debug-class and purged in 30 days (even when critical)", () => {
     expect(retentionClassFor("payment.gateway_down", "critical", "test")).toBe("debug");
     expect(RETENTION_DAYS.debug).toBe(30);
+  });
+});
+
+describe("retry policy → Dead Letter Queue", () => {
+  const now = Date.parse("2026-07-16T12:00:00Z");
+  const row = (o: Partial<{ status: string; attempts: number; channel: string; nextRetryAt: string | null; error: string | null }> = {}) =>
+    ({ status: "failed", attempts: 1, channel: "slack", nextRetryAt: null, error: "500", ...o });
+
+  it("retries a due failure", () => { expect(retryDecision(row(), now).action).toBe("retry"); });
+  it("waits while the backoff has not elapsed", () => {
+    const d = retryDecision(row({ nextRetryAt: new Date(now + 60000).toISOString() }), now);
+    expect(d.action).toBe("wait"); expect(d.reason).toMatch(/backoff/);
+  });
+  it("moves to the DLQ once the policy is exhausted — carrying the reason", () => {
+    const d = retryDecision(row({ attempts: RETRY_POLICY.maxAttempts, error: "channel_not_found" }), now);
+    expect(d.action).toBe("dead"); expect(d.reason).toBe("channel_not_found");
+  });
+  it("never auto-retries a non-failure or a skipped/in-app row", () => {
+    expect(retryDecision(row({ status: "delivered" }), now).action).toBe("wait");
+    expect(retryDecision(row({ status: "skipped" }), now).action).toBe("wait");
+    expect(retryDecision(row({ channel: "in_app" }), now).action).toBe("wait");   // in_app is not a provider
+  });
+  it("backoff escalates then clamps to the last step", () => {
+    expect(backoffFor(1)).toBe(RETRY_POLICY.backoffMinutes[0]);
+    expect(backoffFor(2)).toBe(RETRY_POLICY.backoffMinutes[1]);
+    expect(backoffFor(99)).toBe(RETRY_POLICY.backoffMinutes[RETRY_POLICY.backoffMinutes.length - 1]);
+  });
+  it("policy allows a real number of attempts before giving up", () => {
+    expect(RETRY_POLICY.maxAttempts).toBeGreaterThan(1);
+    expect(RETRY_POLICY.autoRetryChannels).not.toContain("in_app" as OpsChannelKey);
+  });
+});
+
+describe("correlation keys", () => {
+  it("only noisy failure events correlate", () => {
+    expect(correlationKeyFor("payment.failed")).toBe("payment.failed");
+    expect(correlationKeyFor("daily.sales_report")).toBeNull();   // reports never collapse
+    expect(correlationKeyFor("order.placed")).toBeNull();
+  });
+  it("keys on the root incident when one is known", () => {
+    expect(correlationKeyFor("payment.failed", "incident", "INC-00042")).toBe("payment.failed:incident:INC-00042");
+  });
+  it("is deterministic and window-bounded", () => {
+    expect(correlationKeyFor("api.down")).toBe(correlationKeyFor("api.down"));
+    expect(CORRELATION.windowMinutes).toBeGreaterThan(0);
+  });
+});
+
+describe("event timeline", () => {
+  const ch = (o: Partial<FeedChannel> = {}): FeedChannel => ({
+    id: "c1", channel: "slack", status: "delivered", target: "ops", error: null, attempts: 1,
+    deliveryMs: 120, lastAttemptAt: "2026-07-16T08:31:00Z", nextRetryAt: null, deadAt: null, deadReason: null,
+    replayedAt: null, replayedBy: null, retryHistory: [], ...o,
+  });
+  const item = (o: Partial<FeedItem> = {}): FeedItem => ({
+    groupId: "g1", event: "order.placed", category: "orders", severity: "info", title: "New Order",
+    entityType: "order", entityRef: "SAM-1", createdAt: "2026-07-16T08:31:00Z", read: true,
+    readAt: "2026-07-16T08:32:00Z", acknowledgedAt: null, acknowledgedBy: null, payload: {},
+    channels: [ch()], status: "delivered", correlationId: null, correlatedCount: 1, correlatedRefs: [], ...o,
+  });
+
+  it("tells the story in chronological order", () => {
+    const t = buildTimeline(item({ acknowledgedAt: "2026-07-16T08:45:00Z", acknowledgedBy: "Asha" }));
+    expect(t.map((x) => x.kind)).toEqual(["created", "delivered", "read", "acknowledged"]);
+    expect(t.map((x) => x.at)).toEqual([...t.map((x) => x.at)].sort());   // sorted
+    expect(t[3].detail).toBe("Asha");
+  });
+  it("includes retries and the DLQ hand-off", () => {
+    const t = buildTimeline(item({
+      channels: [ch({ status: "dead", error: "500", deadAt: "2026-07-16T08:50:00Z", deadReason: "retry policy exhausted", lastAttemptAt: "2026-07-16T08:49:00Z", retryHistory: [{ at: "2026-07-16T08:35:00Z", status: "failed", error: "500", by: "retry-worker" }] })],
+      readAt: null, read: false,
+    }));
+    expect(t.map((x) => x.kind)).toEqual(expect.arrayContaining(["created", "retry", "dead"]));
+    expect(t.find((x) => x.kind === "dead")?.detail).toBe("retry policy exhausted");
+  });
+  it("records a replay out of the DLQ", () => {
+    const t = buildTimeline(item({ channels: [ch({ replayedAt: "2026-07-16T09:00:00Z", replayedBy: "Asha" })] }));
+    expect(t.find((x) => x.kind === "replay")?.detail).toBe("Asha");
+  });
+});
+
+describe("channel icons", () => {
+  it("every channel has an icon", () => {
+    for (const k of Object.keys(CHANNEL_ICON) as OpsChannelKey[]) expect(CHANNEL_ICON[k]).toBeTruthy();
   });
 });
 

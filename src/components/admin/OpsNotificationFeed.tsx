@@ -2,7 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import type { FeedItem, FeedChannel } from "@/lib/notifications/opsEngine";
+// Import from the CLIENT-SAFE module, never from opsEngine — the engine is server-only
+// (node:crypto + the service-role Supabase client) and must not reach the browser bundle.
+import { buildTimeline, type FeedItem, type FeedChannel } from "@/lib/notifications/feedTypes";
+import { CHANNEL_ICON, type OpsChannelKey } from "@/config/notifications";
 
 /** Operations Center client pieces — filters/search, the feed, the detail drawer (retry + ack),
  *  and the realistic test presets. Server page supplies the data. */
@@ -13,16 +16,17 @@ const CATEGORIES = [
   { v: "inventory", l: "Inventory" }, { v: "warehouse", l: "Warehouse" }, { v: "marketing", l: "Marketing" },
   { v: "customers", l: "Customers" }, { v: "system", l: "System" },
 ];
-const ST_LABEL: Record<string, string> = { queued: "Queued", sending: "Sending", delivered: "Delivered", failed: "Failed", retrying: "Retrying", skipped: "Skipped" };
+const ST_LABEL: Record<string, string> = { queued: "Queued", sending: "Sending", delivered: "Delivered", failed: "Failed", retrying: "Retrying", skipped: "Skipped", dead: "Dead letter" };
 const SEV: Record<string, string> = { info: "🟢", warning: "🟡", critical: "🔴" };
 const time = (iso: string) => new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
 const dt = (iso: string) => new Date(iso).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
 // ── Filters + search ────────────────────────────────────────────────────────────
-export function OpsFilters({ total }: { total: number }) {
+export function OpsFilters({ shown, dlq }: { shown: number; dlq: boolean }) {
   const router = useRouter(); const pathname = usePathname(); const sp = useSearchParams();
   const val = (k: string) => sp.get(k) ?? "";
-  const set = (k: string, v: string) => { const p = new URLSearchParams(sp.toString()); if (v) p.set(k, v); else p.delete(k); p.delete("page"); router.push(`${pathname}?${p.toString()}`); };
+  // Any filter change restarts the keyset scan — a cursor from the old filter set is meaningless.
+  const set = (k: string, v: string) => { const p = new URLSearchParams(sp.toString()); if (v) p.set(k, v); else p.delete(k); p.delete("cursor"); router.push(`${pathname}?${p.toString()}`); };
   return (
     <div className="nlog-filters">
       <div className="nlog-chips">
@@ -32,10 +36,11 @@ export function OpsFilters({ total }: { total: number }) {
         <button type="button" className={`nlog-chip nlog-chip--crit${val("severity") === "critical" ? " is-active" : ""}`} onClick={() => set("severity", val("severity") === "critical" ? "" : "critical")}>🔴 Critical</button>
         <button type="button" className={`nlog-chip${val("unread") === "1" ? " is-active" : ""}`} onClick={() => set("unread", val("unread") === "1" ? "" : "1")}>Unread</button>
         <button type="button" className={`nlog-chip${val("status") === "failed" ? " is-active" : ""}`} onClick={() => set("status", val("status") === "failed" ? "" : "failed")}>Failed</button>
+        <button type="button" className={`nlog-chip nlog-chip--dlq${dlq ? " is-active" : ""}`} onClick={() => set("dlq", dlq ? "" : "1")}>☠ Dead letters</button>
       </div>
       <div className="nlog-searchrow">
         <input className="nc-search" type="search" defaultValue={val("q")} placeholder="Search order ID, customer, event, type…" onKeyDown={(e) => { if (e.key === "Enter") set("q", (e.target as HTMLInputElement).value); }} />
-        <span className="admin__muted" style={{ fontSize: 12 }}>{total} notification{total === 1 ? "" : "s"}</span>
+        <span className="admin__muted" style={{ fontSize: 12 }}>Showing {shown}</span>
       </div>
     </div>
   );
@@ -78,12 +83,12 @@ export function OpsFeed({ items }: { items: FeedItem[] }) {
     return () => window.removeEventListener("keydown", onKey);
   }); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const retry = async (c: FeedChannel) => {
+  const retry = async (c: FeedChannel, replay = false) => {
     setBusy(true); setNote(null);
     try {
-      const r = await post({ action: "retry", id: c.id });
+      const r = await post({ action: replay ? "replay" : "retry", id: c.id });
       const d = await r.json().catch(() => ({}));
-      setNote(r.ok ? `Retry succeeded — ${c.channel} delivered.` : `Retry failed: ${d.error ?? "unknown"}`);
+      setNote(r.ok ? `${replay ? "Replay" : "Retry"} succeeded — ${c.channel} delivered.` : `${replay ? "Replay" : "Retry"} failed: ${d.error ?? "unknown"}${d.status === "dead" ? " — returned to the Dead Letter Queue." : ""}`);
       router.refresh();   // drawer stays open and re-derives from fresh data
     } finally { setBusy(false); }
   };
@@ -101,14 +106,24 @@ export function OpsFeed({ items }: { items: FeedItem[] }) {
     <>
       <ul className="nlog-feed">
         {items.map((it) => (
-          <li key={it.groupId} className={`nlog-item${it.read ? "" : " is-unread"}`}>
+          <li key={it.groupId} className={`nlog-item nlog-item--${it.severity}${it.read ? "" : " is-unread"}`}>
             <button type="button" className="nlog-item__btn" onClick={() => openItem(it)}>
               <span className="nlog-item__time">{time(it.createdAt)}</span>
               <span className="nlog-item__main">
-                <span className="nlog-item__title">{SEV[it.severity]} {it.title ?? it.event}{it.entityRef ? <span className="admin__mono nlog-item__ref"> {it.entityRef}</span> : null}</span>
+                <span className="nlog-item__title">
+                  {SEV[it.severity]} {it.title ?? it.event}
+                  {it.entityRef ? <span className="admin__mono nlog-item__ref"> {it.entityRef}</span> : null}
+                  {it.correlatedCount > 1 ? <span className="nlog-corr" title={`${it.correlatedCount} correlated events from one root cause`}>×{it.correlatedCount} affected</span> : null}
+                </span>
                 <span className="nlog-item__meta"><span className="nlog-cat">{it.category}</span> <span className="admin__mono" style={{ fontSize: 11 }}>{it.event}</span></span>
               </span>
-              <span className="nlog-item__chans">{it.channels.map((c) => <span key={c.id} className={`nlog-chan nlog-chan--${c.status}`} title={`${c.channel}: ${ST_LABEL[c.status]}${c.error ? ` — ${c.error}` : ""}`}>{c.channel}</span>)}</span>
+              <span className="nlog-item__chans">
+                {it.channels.map((c) => (
+                  <span key={c.id} className={`nlog-chan nlog-chan--${c.status}`} title={`${c.channel}: ${ST_LABEL[c.status]}${c.error ? ` — ${c.error}` : ""}`}>
+                    <span aria-hidden>{CHANNEL_ICON[c.channel as OpsChannelKey] ?? "•"}</span><span className="nlog-chan__l">{c.channel}</span>
+                  </span>
+                ))}
+              </span>
               <span className={`nlog-status nlog-status--${it.status}`}>{ST_LABEL[it.status]}</span>
               {it.severity === "critical" && !it.acknowledgedAt ? <span className="nlog-ackflag">needs ack</span> : null}
             </button>
@@ -144,24 +159,52 @@ export function OpsFeed({ items }: { items: FeedItem[] }) {
               </>
             ) : null}
 
+            {/* Correlation drill-down — the affected events behind a collapsed item */}
+            {open.correlatedCount > 1 ? (
+              <>
+                <h3 className="od-card__title" style={{ fontSize: "0.95rem", marginTop: 14 }}>Affected events ({open.correlatedCount})</h3>
+                <p className="admin__muted" style={{ fontSize: 11, marginBottom: 6 }}>Correlated to one root cause — collapsed in the feed to cut noise; every event is listed here.</p>
+                <ul className="nlog-affected">
+                  {open.correlatedRefs.map((r) => (
+                    <li key={r.groupId}><span className="admin__mono">{r.ref ?? r.groupId.slice(0, 8)}</span><span className={`nlog-status nlog-status--${r.status}`}>{ST_LABEL[r.status]}</span><span className="admin__muted">{dt(r.at)}</span></li>
+                  ))}
+                </ul>
+              </>
+            ) : null}
+
+            {/* Event timeline */}
+            <h3 className="od-card__title" style={{ fontSize: "0.95rem", marginTop: 14 }}>Timeline</h3>
+            <ul className="nlog-timeline">
+              {buildTimeline(open).map((t, i) => (
+                <li key={i} className={`nlog-tl nlog-tl--${t.kind}`}>
+                  <span className="nlog-tl__time">{time(t.at)}</span>
+                  <span className="nlog-tl__dot" aria-hidden />
+                  <span className="nlog-tl__body"><b>{t.label}</b>{t.detail ? <span className="admin__muted"> — {t.detail}</span> : null}</span>
+                </li>
+              ))}
+            </ul>
+
             <h3 className="od-card__title" style={{ fontSize: "0.95rem", marginTop: 14 }}>Channels attempted</h3>
             <ul className="nlog-chanlist">
               {open.channels.map((c) => (
                 <li key={c.id} className="nlog-chanrow">
                   <div>
-                    <b>{c.channel}</b> <span className={`nlog-status nlog-status--${c.status}`}>{ST_LABEL[c.status]}</span>
+                    <b>{CHANNEL_ICON[c.channel as OpsChannelKey] ?? ""} {c.channel}</b> <span className={`nlog-status nlog-status--${c.status}`}>{ST_LABEL[c.status]}</span>
                     <div className="admin__muted" style={{ fontSize: 11 }}>
                       {c.target ? `→ ${c.target} · ` : ""}{c.attempts} attempt{c.attempts === 1 ? "" : "s"}
                       {c.deliveryMs != null ? ` · ${c.deliveryMs} ms` : ""}{c.lastAttemptAt ? ` · ${dt(c.lastAttemptAt)}` : ""}
+                      {c.nextRetryAt && c.status === "failed" ? ` · next retry ${dt(c.nextRetryAt)}` : ""}
                     </div>
                     {c.error ? <div className="nlog-err">{c.error}</div> : null}
+                    {c.status === "dead" ? <div className="nlog-dead">☠ Dead letter — {c.deadReason ?? "retry policy exhausted"}{c.replayedAt ? ` · last replay ${dt(c.replayedAt)} by ${c.replayedBy ?? "—"}` : ""}</div> : null}
                     {c.retryHistory.length ? (
                       <ul className="nlog-retries">
                         {c.retryHistory.map((h, i) => <li key={i}>↻ {dt(h.at)} — {h.status}{h.error ? `: ${h.error}` : ""} <span className="admin__muted">by {h.by}</span></li>)}
                       </ul>
                     ) : null}
                   </div>
-                  {c.status === "failed" || c.status === "sending" ? <button type="button" className="op-item__btn op-item__btn--primary" disabled={busy} onClick={() => retry(c)}>Retry</button> : null}
+                  {c.status === "dead" ? <button type="button" className="op-item__btn op-item__btn--primary" disabled={busy} onClick={() => retry(c, true)}>Replay</button>
+                    : c.status === "failed" || c.status === "sending" ? <button type="button" className="op-item__btn op-item__btn--primary" disabled={busy} onClick={() => retry(c)}>Retry</button> : null}
                 </li>
               ))}
             </ul>

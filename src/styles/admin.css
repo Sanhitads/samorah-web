@@ -1060,3 +1060,48 @@
 .nlog-retries { list-style: none; margin: 6px 0 0; padding: 0; font-size: 11px; color: var(--smoke, #6b6259); }
 .nlog-retries li { padding: 2px 0; }
 .nlog-note { font-family: var(--font-sans); font-size: 12px; padding: 7px 10px; border-radius: 6px; background: #eef2f9; color: #3a5a8a; margin-bottom: 10px; }
+
+/* ─── Hardening: DLQ · timeline · correlation · severity · channel metrics ─── */
+/* Severity as a left rail — scannable without shouting (matches the luxury restraint). */
+.nlog-item--info { box-shadow: inset 3px 0 0 #2f855a; }
+.nlog-item--warning { box-shadow: inset 3px 0 0 #c8901f; }
+.nlog-item--critical { box-shadow: inset 3px 0 0 #b3261e; }
+.nlog-chan { display: inline-flex; align-items: center; gap: 3px; }
+.nlog-chan__l { display: none; }
+@media (min-width: 1100px) { .nlog-chan__l { display: inline; } }
+.nlog-chan--dead { background: #2b2b2b; color: #fff; }
+.nlog-status--dead { background: #2b2b2b; color: #fff; }
+.nlog-corr { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #eef2f9; color: #3a5a8a; font-size: 10px; font-weight: 700; }
+
+/* DLQ */
+.nlog-dlqbanner { display: block; padding: 10px 14px; margin-bottom: 12px; border-radius: 8px; background: #2b2b2b; color: #fff; font-family: var(--font-sans); font-size: 13px; text-decoration: none; }
+.nlog-dlqbanner:hover { background: #1f1f1f; }
+.nlog-chip--dlq.is-active { background: #2b2b2b; border-color: #2b2b2b; color: #fff; }
+.nlog-dead { margin-top: 4px; font-size: 11px; color: #fff; background: #2b2b2b; padding: 4px 7px; border-radius: 4px; }
+
+/* Event timeline */
+.nlog-timeline { list-style: none; margin: 6px 0 0; padding: 0; }
+.nlog-tl { display: grid; grid-template-columns: 52px 14px 1fr; align-items: start; gap: 8px; padding: 5px 0; font-family: var(--font-sans); font-size: 12.5px; position: relative; }
+.nlog-tl__time { color: var(--smoke, #6b6259); font-size: 11px; font-variant-numeric: tabular-nums; padding-top: 2px; }
+.nlog-tl__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--smoke, #9a8f82); margin: 5px 3px 0; }
+.nlog-tl--created .nlog-tl__dot { background: #4a6da7; }
+.nlog-tl--delivered .nlog-tl__dot { background: #1f7a4d; }
+.nlog-tl--failed .nlog-tl__dot, .nlog-tl--retry .nlog-tl__dot { background: #b3261e; }
+.nlog-tl--dead .nlog-tl__dot { background: #2b2b2b; }
+.nlog-tl--acknowledged .nlog-tl__dot { background: #6b3fa0; }
+.nlog-tl__body { color: var(--ink, #1f1a16); }
+.nlog-tl:not(:last-child) .nlog-tl__dot::after { content: ""; position: absolute; left: 55px; top: 13px; width: 1px; height: 100%; background: var(--ad-hair); }
+
+/* Correlation drill-down */
+.nlog-affected { list-style: none; margin: 0; padding: 0; max-height: 220px; overflow-y: auto; }
+.nlog-affected li { display: flex; align-items: center; gap: 8px; justify-content: space-between; padding: 5px 0; border-top: 1px solid var(--ad-hair); font-family: var(--font-sans); font-size: 12px; }
+
+/* Channel health metrics */
+.nlog-chealth--degraded { border-color: #f0dfb0; background: #fdf8ea; }
+.nlog-chealth--degraded .nlog-chealth__state { color: #8a6d1a; }
+.nlog-chealth--failing { border-color: #f0c2be; background: #fdf0ef; }
+.nlog-chealth--failing .nlog-chealth__state { color: #b3261e; }
+.nlog-chealth__metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; margin: 6px 0 0; }
+.nlog-chealth__metrics div { display: flex; justify-content: space-between; gap: 4px; }
+.nlog-chealth__metrics dt { font-family: var(--font-sans); font-size: 10px; color: var(--smoke, #9a8f82); }
+.nlog-chealth__metrics dd { font-family: var(--font-sans); font-size: 10px; margin: 0; color: var(--ink, #1f1a16); font-variant-numeric: tabular-nums; }
