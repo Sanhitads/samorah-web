@@ -186,7 +186,13 @@ export function correlationKeyFor(event: OpsEvent, entityType?: string | null, e
  */
 export const DEDUP = {
   enabled: true,
-  windowMinutes: 5,          // repeats within this window collapse onto the leader
+  windowMinutes: 5,          // default: repeats within this window collapse onto the leader
+  /**
+   * Per-event window overrides. A STANDING condition (stock is low until someone restocks) must not
+   * re-alert every cron tick — a 5-minute window would mean ~48 identical Slack posts a day. A
+   * TRANSIENT failure keeps the short window so a genuine new burst still surfaces quickly.
+   */
+  windowOverrides: { "inventory.low_stock": 720, "inventory.sync_failed": 60, "shipment.delayed": 240 } as Partial<Record<OpsEvent, number>>,
   /** Never dedup these — a report or a deploy notice is meant to arrive every time. */
   exclude: ["daily.sales_report", "deployment.success"] as OpsEvent[],
 };
@@ -194,6 +200,10 @@ export const DEDUP = {
 export function dedupKeyFor(event: OpsEvent, severity: OpsSeverity, entityRef?: string | null): string | null {
   if (!DEDUP.enabled || DEDUP.exclude.includes(event)) return null;
   return `${event}|${entityRef ?? "-"}|${severity}`;
+}
+/** How long repeats of this event collapse for (minutes). */
+export function dedupWindowFor(event: OpsEvent): number {
+  return DEDUP.windowOverrides[event] ?? DEDUP.windowMinutes;
 }
 
 /**

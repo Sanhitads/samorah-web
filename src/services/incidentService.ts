@@ -9,7 +9,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail, emailConfigured } from "@/lib/email";
 import { notifyOps } from "@/lib/notifications/opsEngine";
 import type { OpsPayload } from "@/lib/notifications/opsTypes";
-import type { OpsChannelKey } from "@/config/notifications";
+import type { OpsChannelKey, OpsEvent } from "@/config/notifications";
 import {
   INCIDENT_RULES, INCIDENT_CATEGORY_LABEL, CATEGORY_TEAM, INCIDENT_CHECKLISTS,
   SUBSYSTEMS, SUBSYSTEM_LABEL, ROOT_CAUSE_LABEL, ESCALATION_POLICY, ESCALATION_MIN_SEVERITY, CROSS_SYSTEM_WINDOW_MIN,
@@ -102,6 +102,37 @@ async function seedChecklist(incidentId: string, category: IncidentCategory): Pr
 
 export interface CorrelationResult { created: number; merged: number; attached: number; resolved: number; suppressed: number }
 
+/**
+ * A newly-opened incident is the authoritative signal that a SUBSYSTEM is down — map it to the
+ * matching operational event so ops get paged through the notification engine (Slack, and SMS when
+ * it's critical infra). Best-effort: alerting must never break correlation.
+ */
+async function emitIncidentOpened(number: string, category: string, rootCauseSystem: string, severity: IncidentSeverity, events: number, windowMin: number): Promise<void> {
+  const EVENT_FOR: Record<string, OpsEvent | undefined> = {
+    payment_gateway: "payment.gateway_down",
+    inventory: "inventory.sync_failed",
+    shipment: "shipment.delayed",
+    email: "tech.error",
+    refund: "refund.failed",
+  };
+  const opsEvent = EVENT_FOR[category];
+  if (!opsEvent) return;
+  const base = process.env.NEXT_PUBLIC_SITE_URL || "";
+  try {
+    await notifyOps(opsEvent, {
+      title: `${INCIDENT_CATEGORY_LABEL[category as IncidentCategory] ?? category} incident opened`,
+      message: `${events} correlated failures within ${windowMin} min — incident ${number} is open.`,
+      severity: severity === "critical" ? "critical" : "warning",
+      fields: [
+        { label: "Incident", value: number }, { label: "Root cause", value: ROOT_CAUSE_LABEL[rootCauseSystem as RootCauseSystem] ?? rootCauseSystem },
+        { label: "Events", value: `${events} in ${windowMin}m` }, { label: "Severity", value: severity },
+      ],
+      url: base ? `${base}/admin/incidents/${number}` : undefined,
+      entityType: "incident", entityRef: number,
+    });
+  } catch { /* alerting must never break correlation */ }
+}
+
 /** Seed the configurable runbook (guided workflow) for a new incident's category (Phase 4). */
 async function seedRunbook(incidentId: string, category: IncidentCategory): Promise<void> {
   const steps = INCIDENT_RUNBOOKS[category];
@@ -189,6 +220,7 @@ export async function correlateIncidents(): Promise<CorrelationResult> {
       if (eff.context !== "static" && eff.context !== "businessHours") await addHistory(incidentId, "threshold_context", `Effective threshold ${eff.threshold} — ${eff.context} ×${eff.multiplier}`);
       await addHistory(incidentId, "priority_set", `${PRIORITY_LABEL[priority]} (severity ${severity} × impact ${impactLevel}); SLA ${slaMin}m`);
       await applyAutoAssignment(incidentId, { category: rule.category, rootCauseSystem: rc.system, revenue: 0, severity });
+      await emitIncidentOpened(newInc.number, rule.category, rc.system, severity, rows.length, rule.windowMinutes);
       created++;
     }
 

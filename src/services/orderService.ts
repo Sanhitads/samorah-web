@@ -20,6 +20,7 @@ import { logEvent } from "@/services/auditService";
 import { incrementCouponUsage } from "@/services/couponService";
 import { trackServerPurchase } from "@/lib/analytics/server";
 import type { RepriceResult } from "@/lib/repricing";
+import { notifyOps } from "@/lib/notifications/opsEngine";
 
 export interface OrderAddress {
   fullName: string;
@@ -244,6 +245,25 @@ export async function recordPaymentAttempt(a: {
     });
   } catch (e) {
     console.error("recordPaymentAttempt failed", e); // never block finalization on the log
+  }
+  // Operational alert on a real payment failure. Best-effort: alerting must NEVER affect payment
+  // finalization. Dedup collapses a burst of these into one Slack post with a counter.
+  if (a.status === "failed") {
+    try {
+      const base = process.env.NEXT_PUBLIC_SITE_URL || "";
+      await notifyOps("payment.failed", {
+        title: "Payment Failure",
+        message: "A payment could not be captured and needs review.",
+        fields: [
+          { label: "Gateway", value: "Razorpay" },
+          { label: "Reason", value: a.errorDescription || a.errorCode || "unknown" },
+          { label: "Razorpay order", value: a.razorpayOrderId },
+          { label: "Source", value: a.source },
+        ],
+        url: base ? `${base}/admin/orders` : undefined,
+        entityType: "payment", entityRef: a.razorpayOrderId,
+      });
+    } catch { /* alerting must never break the payment path */ }
   }
 }
 

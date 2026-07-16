@@ -20,6 +20,7 @@ import { logEvent } from "@/services/auditService";
 import { toPaise } from "@/lib/money";
 import { RAZORPAY } from "@/config/commerce";
 import { trackServerRefund } from "@/lib/analytics/server";
+import { notifyOps } from "@/lib/notifications/opsEngine";
 
 export interface IssueRefundInput {
   orderId: string;
@@ -106,6 +107,22 @@ export async function issueRefund(input: IssueRefundInput): Promise<IssueRefundR
       notes: gw.errorDescription ?? "Gateway refund failed",
       metadata: { method: "gateway", amount: input.amount, errorCode: gw.errorCode },
     });
+    // Operational alert — best-effort; must never affect the refund outcome returned to the caller.
+    try {
+      const base = process.env.NEXT_PUBLIC_SITE_URL || "";
+      await notifyOps("refund.failed", {
+        title: "Refund Failed",
+        message: "A gateway refund failed and needs review.",
+        fields: [
+          { label: "Order", value: input.orderId },
+          { label: "Amount", value: `₹${Number(input.amount ?? 0).toLocaleString("en-IN")}` },
+          { label: "Gateway", value: "Razorpay" },
+          { label: "Reason", value: gw.errorDescription ?? gw.errorCode ?? "gateway_failed" },
+        ],
+        url: base ? `${base}/admin/orders/${input.orderId}` : undefined,
+        entityType: "refund", entityRef: input.orderId,
+      });
+    } catch { /* alerting must never break the refund path */ }
     return { ok: false, refundId, status: "failed", method, reason: gw.errorDescription ?? "gateway_failed" };
   }
 

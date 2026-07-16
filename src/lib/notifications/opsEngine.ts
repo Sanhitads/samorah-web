@@ -21,7 +21,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import {
   OPS_ROUTES, EVENT_CATEGORY, RETENTION_DAYS, retentionClassFor,
   RETRY_POLICY, backoffFor, CORRELATION, correlationKeyFor,
-  DEDUP, dedupKeyFor, RATE_LIMITS, RATE_LIMIT_BYPASS,
+  DEDUP, dedupKeyFor, dedupWindowFor, RATE_LIMITS, RATE_LIMIT_BYPASS,
   type OpsEvent, type OpsChannelKey, type OpsSeverity, type NotificationCategory, type DeliveryStatus,
 } from "@/config/notifications";
 import type { OpsChannel, OpsPayload, OpsDispatchResult } from "./opsTypes";
@@ -127,7 +127,7 @@ async function resolveDedup(event: OpsEvent, payload: OpsPayload, severity: OpsS
   const key = dedupKeyFor(event, severity, payload.entityRef);
   if (!key) return { key: null, leaderGroupId: null };
   try {
-    const since = new Date(nowMs - DEDUP.windowMinutes * 60000).toISOString();
+    const since = new Date(nowMs - dedupWindowFor(event) * 60000).toISOString();   // per-event window
     const { data } = await db().from("notification_log").select("group_id").eq("dedup_key", key).gte("created_at", since).order("created_at", { ascending: false }).limit(1);
     return { key, leaderGroupId: ((data ?? []) as any[])[0]?.group_id ?? null }; // eslint-disable-line @typescript-eslint/no-explicit-any
   } catch { return { key, leaderGroupId: null }; }

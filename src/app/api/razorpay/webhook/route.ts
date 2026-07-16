@@ -131,6 +131,8 @@ export async function POST(request: Request) {
     }
     if (result.mismatch) {
       await markLog("failed", result.reason ?? "amount/currency mismatch");
+      // A mismatch means money moved but the order can't be trusted — ops must look NOW.
+      await emitOrderFailed(orderId, result.reason ?? "amount/currency mismatch").catch(() => { /* never break the webhook */ });
       return NextResponse.json({ received: true }); // ack; flagged for review, don't retry
     }
     // created=false on a found order → replay of an already-finalized order.
@@ -140,7 +142,34 @@ export async function POST(request: Request) {
   } catch (e) {
     console.error("webhook persistOrder failed", e);
     await markLog("failed", e instanceof Error ? e.message : "unknown");
+    // The webhook is the source of truth for orders — a throw here means an order may not exist
+    // despite a captured payment. Alert #tech (best-effort; the 500 must still reach Razorpay).
+    await emitWebhookFailed(eventType, orderId, e instanceof Error ? e.message : "unknown").catch(() => { /* never break the webhook */ });
     // 500 → Razorpay retries; persistOrder is idempotent, so retries are safe.
     return NextResponse.json({ error: "processing failed" }, { status: 500 });
   }
+}
+
+/** Order finalization failed despite a captured payment — money moved, the order didn't. */
+async function emitOrderFailed(razorpayOrderId: string, reason: string): Promise<void> {
+  const base = process.env.NEXT_PUBLIC_SITE_URL || "";
+  await notifyOps("order.failed", {
+    title: "Order Failed After Payment",
+    message: "A payment was captured but the order could not be finalized — needs review now.",
+    fields: [{ label: "Razorpay order", value: razorpayOrderId }, { label: "Reason", value: reason }],
+    url: base ? `${base}/admin/orders` : undefined,
+    entityType: "order", entityRef: razorpayOrderId,
+  });
+}
+
+/** Webhook processing threw — the authoritative path is broken. */
+async function emitWebhookFailed(eventType: string, razorpayOrderId: string | undefined, reason: string): Promise<void> {
+  const base = process.env.NEXT_PUBLIC_SITE_URL || "";
+  await notifyOps("webhook.failed", {
+    title: "Razorpay Webhook Failed",
+    message: "Webhook processing threw — Razorpay will retry, but the order may be unfinalized.",
+    fields: [{ label: "Event", value: eventType }, { label: "Razorpay order", value: razorpayOrderId ?? "—" }, { label: "Error", value: reason }],
+    url: base ? `${base}/admin/webhooks` : undefined,
+    entityType: "webhook", entityRef: razorpayOrderId ?? eventType,
+  });
 }
