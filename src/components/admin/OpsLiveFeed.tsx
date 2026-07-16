@@ -36,8 +36,14 @@ export function OpsLiveFeed() {
       .on("postgres_changes" as never, { event: "*", schema: "public", table: "notification_log" } as never, bump)
       .subscribe((status: string) => { connected = status === "SUBSCRIBED"; setLive(connected); });
 
-    // Safety net: if realtime never connects (RLS/publication/network), keep the page fresh anyway.
-    const poll = setInterval(() => { if (!connected) router.refresh(); }, 30_000);
+    // Safety net — ALWAYS poll, even when "connected".
+    // A Supabase channel subscribes successfully even if RLS filters every row out, so `SUBSCRIBED`
+    // is NOT proof that events will arrive. Polling only while disconnected would leave a silently
+    // filtered subscription showing a green "Live" badge on a page that never updates — worse than
+    // no realtime at all. Realtime gives instant updates; this guarantees freshness regardless.
+    // (Fixed interval on purpose: `connected` is captured at creation time, so a ternary here would
+    // silently never take effect. 45s costs one request/min and is worth the guarantee.)
+    const poll = setInterval(() => router.refresh(), 45_000);
 
     return () => { if (timer) clearTimeout(timer); clearInterval(poll); supabase.removeChannel(channel); };
   }, [router]);
