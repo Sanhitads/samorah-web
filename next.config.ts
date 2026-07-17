@@ -22,8 +22,9 @@ const nextConfig: NextConfig = {
     // Cloudinary is the primary image CDN (BRD §2.3).
     remotePatterns: [{ protocol: "https", hostname: "res.cloudinary.com" }],
   },
-  // TODO(Phase 16 — Security): wire ESLint into builds once the codebase is linted.
-  eslint: { ignoreDuringBuilds: true },
+  // ESLint runs in the build. It is scoped to the Rules of Hooks (see eslint.config.mjs) — the one
+  // bug class tsc and vitest are blind to, and the one that shipped a crashing checkout.
+  eslint: { dirs: ["src"] },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

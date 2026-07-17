@@ -92,6 +92,7 @@ export function CheckoutView() {
   const [payError, setPayError] = useState("");
   const [showCode, setShowCode] = useState(false);
   const [codeInput, setCodeInput] = useState("");
+  const [codeError, setCodeError] = useState("");
   // Only the CODE is persisted — never its computed discount (that is always re-derived by
   // calculateOrderTotals). A restored code is re-validated on mount; see below.
   const couponCode = useCheckoutStore((s) => s.couponCode);
@@ -187,7 +188,6 @@ export function CheckoutView() {
     if (Object.keys(found).length === 0) void pay();
   };
 
-  const [codeError, setCodeError] = useState("");
   // Validate the code server-side for the specific reason (expired / invalid / min not met),
   // firing coupon_rejected with that reason (review point 8). Falls back to client apply on error.
   const applyCode = async () => {
