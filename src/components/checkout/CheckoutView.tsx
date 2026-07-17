@@ -5,6 +5,7 @@ import Script from "next/script";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useEffect, useRef } from "react";
 import { COMPOSITION_DISCOUNT_PCT, useCartStore, type CartItem } from "@/store/useCartStore";
+import { useCheckoutStore } from "@/store/useCheckoutStore";
 import {
   calculateOrderTotals,
   addressSchema,
@@ -40,7 +41,6 @@ const ADDRESS_FIELDS: { name: keyof AddressForm; label: string; type?: string; h
   { name: "city", label: "City", half: true },
   { name: "pincode", label: "PIN code", half: true, placeholder: "6-digit" },
 ];
-const EMPTY: AddressForm = { fullName: "", email: "", phone: "", line1: "", line2: "", city: "", state: "", pincode: "" };
 
 const TRUST = [
   "Secure Razorpay Payment",
@@ -66,20 +66,35 @@ export function CheckoutView() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  const [ship, setShip] = useState<AddressForm>(EMPTY);
-  const [billSame, setBillSame] = useState(true);
-  const [bill, setBill] = useState<AddressForm>(EMPTY);
-  const [wantGst, setWantGst] = useState(false);
-  const [biz, setBiz] = useState({ companyName: "", gstin: "" });
-  const [notes, setNotes] = useState("");
-  const [consent, setConsent] = useState(false);
+  // Customer-ENTERED inputs live in useCheckoutStore (sessionStorage) so a cart round-trip or a
+  // refresh doesn't wipe a filled-in address. Money stays derived from calculateOrderTotals — the
+  // store holds NO totals. Reading persisted state is safe here: the `mounted` gate below means
+  // none of it renders before hydration (BRD §7.1).
+  const ship = useCheckoutStore((s) => s.ship);
+  const setShip = useCheckoutStore((s) => s.setShip);
+  const billSame = useCheckoutStore((s) => s.billSame);
+  const setBillSame = useCheckoutStore((s) => s.setBillSame);
+  const bill = useCheckoutStore((s) => s.bill);
+  const setBill = useCheckoutStore((s) => s.setBill);
+  const wantGst = useCheckoutStore((s) => s.wantGst);
+  const setWantGst = useCheckoutStore((s) => s.setWantGst);
+  const biz = useCheckoutStore((s) => s.biz);
+  const setBiz = useCheckoutStore((s) => s.setBiz);
+  const notes = useCheckoutStore((s) => s.notes);
+  const setNotes = useCheckoutStore((s) => s.setNotes);
+  const consent = useCheckoutStore((s) => s.consent);       // not persisted — re-affirmed each time
+  const setConsent = useCheckoutStore((s) => s.setConsent);
+  const resetCheckout = useCheckoutStore((s) => s.reset);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [paying, setPaying] = useState(false);
   const [paid, setPaid] = useState(false);
   const [payError, setPayError] = useState("");
   const [showCode, setShowCode] = useState(false);
   const [codeInput, setCodeInput] = useState("");
-  const [couponCode, setCouponCode] = useState("");
+  // Only the CODE is persisted — never its computed discount (that is always re-derived by
+  // calculateOrderTotals). A restored code is re-validated on mount; see below.
+  const couponCode = useCheckoutStore((s) => s.couponCode);
+  const setCouponCode = useCheckoutStore((s) => s.setCouponCode);
 
   // Place of supply = the delivery (shipping) state (GST §12/13).
   const totals = useMemo(
@@ -104,6 +119,28 @@ export function CheckoutView() {
   useEffect(() => {
     if (couponApplied) trackApplyCoupon(couponCode.toUpperCase(), totals.total);
   }, [couponApplied, couponCode, totals.total]);
+
+  // Cart emptied → drop the entered inputs and their PII from sessionStorage. Guarded on `paid` so
+  // the post-payment success screen (where the cart is legitimately empty) isn't affected.
+  useEffect(() => {
+    if (mounted && items.length === 0 && !paid) resetCheckout();
+  }, [mounted, items.length, paid, resetCheckout]);
+
+  // A RESTORED coupon is only a code — re-validate it rather than trust it. Prices, expiry and
+  // minimums can all have changed since it was typed, and the discount is never persisted.
+  const revalidatedRef = useRef(false);
+  useEffect(() => {
+    if (!mounted || revalidatedRef.current || !couponCode || items.length === 0) return;
+    revalidatedRef.current = true;
+    (async () => {
+      try {
+        const subtotalPaise = Math.round(items.reduce((s, i) => s + i.price * i.qty, 0) * 100);
+        const res = await fetch("/api/coupons/apply", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: couponCode.toUpperCase(), subtotalPaise }) });
+        const d = (await res.json()) as { ok?: boolean; reason?: string };
+        if (!d.ok) { setCouponCode(""); setCodeError(d.reason ?? "This code is no longer valid."); }
+      } catch { /* network hiccup → leave it; the client-side re-price still decides the money */ }
+    })();
+  }, [mounted, couponCode, items, setCouponCode]);
 
   if (!mounted) return <div className="checkout checkout--loading" aria-busy="true" />;
   if (items.length === 0 && !paid) {
@@ -241,6 +278,7 @@ export function CheckoutView() {
               const wl = new Set(useWishlistStore.getState().items.map((w) => w.productId));
               for (const it of items) if (wl.has(it.productId)) trackWishlistPurchased({ item_id: it.productId, item_name: it.name, item_variant: [it.vessel, it.size].filter(Boolean).join(" · ") || undefined, price: it.price, quantity: it.qty });
               clearCart();
+              resetCheckout(); // order placed → the entered address/PII has served its purpose
               router.push(`/order/${vd.orderNumber}?t=${encodeURIComponent(vd.token)}`);
               return;
             }

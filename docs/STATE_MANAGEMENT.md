@@ -45,6 +45,7 @@ components now use it.
 | `useCartStore` | CartView (mount guard) · CheckoutView (mount guard) · CartDrawer (`useStore`) · BundleBuilder (`useStore`) |
 | `useCompositionStore` | BundleBuilder (`useStore`) · AddToComposition (`useStore`) |
 | `useWishlistStore` | wishlist page (mount guard) · AccountSync (`getState()`, imperative) |
+| `useCheckoutStore` | CheckoutView (mount guard — its sole reader) |
 
 ## §7.2 The 8 stores — 4 built, 4 not
 
@@ -54,14 +55,36 @@ components now use it.
 | `useWishlistStore` | ✅ persisted |
 | `useUserStore` | ✅ in-memory |
 | `useUIStore` | ✅ in-memory |
-| `useCheckoutStore` | ❌ — checkout state lives in `CheckoutView` local `useState` |
+| `useCheckoutStore` | ✅ persisted (`samorah_checkout_v1`, **sessionStorage**) — inputs only, see below |
 | `useProductStore` | ❌ — filters/sort are URL-driven (better for SEO + shareable links) |
 | `useSearchStore` | ❌ — not built |
 | `useNotificationStore` | ❌ — not built (customer-facing; the admin notification engine is separate) |
 | `useCompositionStore` | ➕ **not in the BRD** — project-specific (Discovery Composition), persisted |
 
-The missing four are unbuilt features or deliberate alternatives, not defects. Empty stores added
+The missing three are unbuilt features or deliberate alternatives, not defects. Empty stores added
 only to match a list would be worse than no stores.
+
+### `useCheckoutStore` — inputs only, and why the BRD's field list is not followed
+
+Built to survive a cart→checkout round-trip or a refresh without wiping a filled-in address. It holds
+**only what the customer typed**; every deviation from the BRD's field list is deliberate:
+
+| Deviation | Why |
+|---|---|
+| **No derived state** — no subtotal, tax, shipping, discount, total, order id, payment status, invoice, webhook state | `calculateOrderTotals()` stays the **single money module**. Persisting its output invites drift between the store and the module, and stale money surviving a refresh is exactly the bug the one-money-module rule exists to prevent. |
+| **No wizard fields** (`step`/`nextStep`/`prevStep`) | Checkout is a single page. There are no steps. |
+| **Coupon CODE persisted, discount never** | The code is re-validated server-side on restore (`/api/coupons/apply`); prices, expiry and minimums can all change between tabs. The discount is always re-derived. |
+| **`consent` not persisted** | Silently restoring a ticked consent box is not a defensible record of agreement. It re-affirms each session. |
+| **sessionStorage, not localStorage** | It holds name, phone, email, address. DPDP data-minimisation: the PII dies with the tab instead of lingering on a shared device. |
+| **No gift message / shipping method / payment method** | These inputs **do not exist** in this checkout — shipping is derived (free/standard), payment is Razorpay-only, and `notes` already covers order notes. Adding fields no UI writes would be dead state. Add them here *if and when* those inputs ship. |
+
+**Cleared on:** successful placement (next to `clearCart()`), emptied cart (effect), explicit `reset()`.
+**Deliberately NOT cleared on** payment-modal dismissal: a customer who closes Razorpay to fix a typo
+or retry a card has not abandoned checkout, and destroying their typed address there would defeat the
+store's entire purpose. The cart-empty and success paths already cover real terminal states.
+
+Contract is pinned by `src/store/useCheckoutStore.test.ts` (CHK-001…007) — notably CHK-004, which
+fails if any derived/money field ever gets persisted.
 
 ## §7.3 Cart persistence
 
