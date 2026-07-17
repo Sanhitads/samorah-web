@@ -22,9 +22,12 @@ const nextConfig: NextConfig = {
     // Cloudinary is the primary image CDN (BRD §2.3).
     remotePatterns: [{ protocol: "https", hostname: "res.cloudinary.com" }],
   },
-  // ESLint runs in the build. It is scoped to the Rules of Hooks (see eslint.config.mjs) — the one
-  // bug class tsc and vitest are blind to, and the one that shipped a crashing checkout.
-  eslint: { dirs: ["src"] },
+  // Next's build-time ESLint runner cannot see our flat config: hasEslintConfiguration() only looks
+  // for `.eslintrc*` / package.json#eslintConfig, so with eslint.config.mjs it decides ESLint is
+  // unconfigured and HANGS the build on an interactive "How would you like to configure ESLint?"
+  // prompt. `next lint` is deprecated in 15.5 and gone in 16 anyway, so linting is a separate step:
+  // `npm run build` runs it before next build (see package.json), which is also what Vercel runs.
+  eslint: { ignoreDuringBuilds: true },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

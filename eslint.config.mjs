@@ -19,6 +19,11 @@ export default [
   { ignores: [".next/**", "node_modules/**", "supabase/functions/**", "public/**"] },
   {
     files: ["src/**/*.{ts,tsx}"],
+    // The codebase's `eslint-disable @typescript-eslint/no-explicit-any` comments are legitimate —
+    // they'd bite the moment those rules are switched on. This config registers those rules without
+    // enabling them, which would otherwise report all ~146 as "unused" on every build. Warning noise
+    // at that volume just teaches everyone to ignore warnings, including the real ones.
+    linterOptions: { reportUnusedDisableDirectives: "off" },
     languageOptions: {
       parser: tsParser,
       parserOptions: { ecmaFeatures: { jsx: true }, sourceType: "module" },

@@ -6,7 +6,7 @@ import { AssetImage } from "@/components/ui/AssetImage";
 import { useStore } from "@/hooks/useStore";
 import { useCartStore } from "@/store/useCartStore";
 import { useUIStore } from "@/store/useUIStore";
-import { useCompositionStore } from "@/store/useCompositionStore";
+import { useCompositionStore, type CompositionItem } from "@/store/useCompositionStore";
 import { trackBundleStarted, trackBundleCompleted, trackBundleAbandoned } from "@/lib/analytics/events";
 import { isGradientPlaceholder, gradientClass } from "@/lib/product";
 import {
@@ -27,11 +27,15 @@ import {
  * "Add to Composition" action. A sticky panel tracks the vessel, progress, and
  * the automatic 15% discount, then adds the set to the cart.
  */
+/** Stable identity for the pre-hydration fallback: a fresh `[]` each render would change every
+ *  downstream useMemo's deps on every render, quietly defeating the memo. */
+const NO_ITEMS: CompositionItem[] = [];
+
 export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
   // Persisted composition state (BRD §24.1 / §7.1) — `composing` below branches the whole page on
   // it, so it must not be read during SSR. Defaults match the empty server-rendered state.
   const vessel = useStore(useCompositionStore, (s) => s.vessel) ?? null;
-  const items = useStore(useCompositionStore, (s) => s.items) ?? [];
+  const items = useStore(useCompositionStore, (s) => s.items) ?? NO_ITEMS;
   const editingId = useStore(useCompositionStore, (s) => s.editingId) ?? null;
   const setVessel = useCompositionStore((s) => s.setVessel);
   const addCandle = useCompositionStore((s) => s.addCandle);
