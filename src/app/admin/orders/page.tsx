@@ -2,9 +2,17 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { hasCapability } from "@/lib/auth/capabilities";
-import { getOrdersOverview, HIGH_VALUE_THRESHOLD } from "@/services/orderAdminService";
+import {
+  getOrdersOverview, getOrdersSummary, getStaffOptions, getCourierOptions,
+  HIGH_VALUE_THRESHOLD, type OrderFilter,
+} from "@/services/orderAdminService";
 import { OrderActions } from "@/components/admin/OrderActions";
 import { refundBadge } from "@/lib/fulfillment/derive";
+import {
+  orderAge, priorityBadge, paymentMethodLabel, opsFlags,
+  SORT_OPTIONS, PRIORITY_FILTERS, PAYMENT_METHOD_FILTERS, DATE_RANGES,
+  SAVED_VIEWS, savedViewHref, isViewActive, type OrderSort,
+} from "@/lib/admin/orderList";
 
 /**
  * Order Management — `/admin/orders`. The COMMERCIAL view of orders: status,
@@ -31,7 +39,14 @@ function paymentBadge(paymentStatus: string, isCod: boolean, latestRefundStatus:
 const ORDER_STATUSES = ["pending", "confirmed", "processing", "packed", "shipped", "delivered", "cancelled", "returned", "rto"];
 const PAYMENT_STATUSES = ["pending", "paid", "failed", "refunded", "partially_refunded"];
 
-export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ search?: string; status?: string; payment?: string }> }) {
+interface OrdersSearchParams {
+  search?: string; status?: string; payment?: string; paymentMethod?: string;
+  priority?: string; courier?: string; assignedTo?: string; tag?: string;
+  gift?: string; range?: string; awaiting?: string; refundQueue?: string;
+  needsAttention?: string; sort?: string;
+}
+
+export default async function OrdersPage({ searchParams }: { searchParams: Promise<OrdersSearchParams> }) {
   const staff = await requireStaff("editor");
   if (!staff.ok) redirect("/login");
   // Actions are per-capability: someone may cancel, refund, both, or neither.
@@ -41,9 +56,29 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   const canExport = hasCapability(staff.role, "data.export");
 
   const sp = await searchParams;
-  const filter = { search: sp.search, status: sp.status, payment: sp.payment };
-  const orders = await getOrdersOverview(filter);
-  const qs = new URLSearchParams(Object.entries(filter).filter(([, v]) => v) as [string, string][]).toString();
+  const filter: OrderFilter = {
+    search: sp.search, status: sp.status, payment: sp.payment, paymentMethod: sp.paymentMethod,
+    priority: sp.priority, courier: sp.courier, assignedTo: sp.assignedTo, tag: sp.tag,
+    gift: sp.gift === "1", range: sp.range, awaiting: sp.awaiting === "1",
+    refundQueue: sp.refundQueue === "1", needsAttention: sp.needsAttention === "1",
+    sort: sp.sort as OrderSort | undefined,
+  };
+  const [orders, summary, staffOptions, courierOptions] = await Promise.all([
+    getOrdersOverview(filter),
+    getOrdersSummary(filter),
+    getStaffOptions(),
+    getCourierOptions(),
+  ]);
+
+  const activeEntries = Object.entries(sp).filter(([, v]) => v) as [string, string][];
+  const qs = new URLSearchParams(activeEntries).toString();
+  const anyFilter = activeEntries.length > 0;
+  const money = (n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+  const current = sp as Record<string, string | undefined>;
+  // View-only params (set by saved views, not by the filter form) — carried through an Apply so a
+  // user can refine WITHIN a view instead of dropping out of it.
+  const passthrough: [string, string][] = ([["awaiting", sp.awaiting], ["refundQueue", sp.refundQueue], ["needsAttention", sp.needsAttention], ["tag", sp.tag]] as const)
+    .filter(([, v]) => v) as [string, string][];
 
   return (
     <main className="admin">
@@ -51,23 +86,66 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         <p className="admin__eyebrow">Order Management · {staff.role}</p>
         <h1 className="admin__title">Orders</h1>
         <p className="admin__count">
-          {orders.length} {orders.length === 1 ? "order" : "orders"}
+          {orders.length} shown{orders.length >= 100 ? " (first 100)" : ""}
           {canManage ? "" : " · view only (no cancel/refund capability)"}
         </p>
       </header>
 
+      {/* Summary strip — numbers over EXACTLY the current filter (review point 10). */}
+      <div className="oms-strip">
+        <div className="oms-stat"><span className="oms-stat__n">{summary.count}{summary.capped ? "+" : ""}</span><span className="oms-stat__l">Orders</span></div>
+        <div className="oms-stat"><span className="oms-stat__n">{money(summary.revenue)}</span><span className="oms-stat__l">Revenue (paid)</span></div>
+        <div className="oms-stat" data-tone={summary.pending ? "warn" : undefined}><span className="oms-stat__n">{summary.pending}</span><span className="oms-stat__l">Pending</span></div>
+        <div className="oms-stat"><span className="oms-stat__n">{summary.refunds}</span><span className="oms-stat__l">Refunded</span></div>
+        <div className="oms-stat"><span className="oms-stat__n">{summary.cancellations}</span><span className="oms-stat__l">Cancelled</span></div>
+      </div>
+
+      {/* Saved views — pure filter presets (review point 9). */}
+      <div className="osv">
+        {SAVED_VIEWS.map((v) => (
+          <a key={v.key} href={savedViewHref(v)} className="osv__chip" data-active={isViewActive(v, current) ? "1" : undefined}>{v.label}</a>
+        ))}
+        {anyFilter ? <a href="/admin/orders" className="osv__chip osv__chip--clear">Clear all</a> : null}
+      </div>
+
       <form className="adm-filters" method="get">
         <input className="adm-filters__search" type="search" name="search" defaultValue={sp.search ?? ""} placeholder="Search order #, email, name…" />
-        <select name="status" defaultValue={sp.status ?? ""}>
+        <select name="status" defaultValue={sp.status ?? ""} aria-label="Status">
           <option value="">All statuses</option>
           {ORDER_STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s] ?? s}</option>)}
         </select>
-        <select name="payment" defaultValue={sp.payment ?? ""}>
+        <select name="payment" defaultValue={sp.payment ?? ""} aria-label="Payment status">
           <option value="">All payments</option>
           {PAYMENT_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
+        <select name="paymentMethod" defaultValue={sp.paymentMethod ?? ""} aria-label="Payment method">
+          <option value="">Any method</option>
+          {PAYMENT_METHOD_FILTERS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+        </select>
+        <select name="priority" defaultValue={sp.priority ?? ""} aria-label="Priority">
+          <option value="">Any priority</option>
+          {PRIORITY_FILTERS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+        </select>
+        <select name="courier" defaultValue={sp.courier ?? ""} aria-label="Courier">
+          <option value="">Any courier</option>
+          {courierOptions.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <select name="assignedTo" defaultValue={sp.assignedTo ?? ""} aria-label="Assigned staff">
+          <option value="">Anyone</option>
+          {staffOptions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+        <select name="range" defaultValue={sp.range ?? ""} aria-label="Date range">
+          <option value="">All time</option>
+          {DATE_RANGES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+        </select>
+        <select name="sort" defaultValue={sp.sort ?? ""} aria-label="Sort">
+          <option value="">Sort: Newest</option>
+          {SORT_OPTIONS.filter((s) => s.key !== "newest").map((s) => <option key={s.key} value={s.key}>Sort: {s.label}</option>)}
+        </select>
+        <label className="adm-filters__check"><input type="checkbox" name="gift" value="1" defaultChecked={sp.gift === "1"} /> Gift</label>
+        {passthrough.map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
         <button type="submit" className="ff-btn ff-btn--primary">Apply</button>
-        {sp.search || sp.status || sp.payment ? <a href="/admin/orders" className="ff-btn">Clear</a> : null}
+        {anyFilter ? <a href="/admin/orders" className="ff-btn">Clear</a> : null}
         {canExport ? <a className="ff-btn adm-filters__export" href={`/api/admin/orders/export${qs ? `?${qs}` : ""}`}>Export CSV</a> : null}
       </form>
 
@@ -86,22 +164,34 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
           <tbody>
             {orders.map((o) => {
               const badge = paymentBadge(o.paymentStatus, o.isCod, o.latestRefundStatus);
+              const pri = priorityBadge(o.priority);
+              const flags = opsFlags(o);
+              const method = paymentMethodLabel(o.paymentMethod, o.isCod);
               return (
                 <tr key={o.orderNumber}>
                   <td className="admin__mono">
                     <a href={`/admin/orders/${o.orderNumber}`} className="od-link">{o.orderNumber}</a>
                     <div className="adm-badges">
+                      {pri ? <span className="adm-badge" data-b={pri.b}>{pri.label}</span> : null}
                       {o.total >= HIGH_VALUE_THRESHOLD ? <span className="adm-badge" data-b="high">High value</span> : null}
                       {o.hasGstin ? <span className="adm-badge" data-b="gst">GST</span> : null}
-                      {o.isGift ? <span className="adm-badge" data-b="gift">Gift</span> : null}
+                      {flags.map((f) => <span key={f.f} className="adm-badge" data-b={f.f}>{f.label}</span>)}
                       {o.isCod ? <span className="adm-badge" data-b="cod">COD</span> : null}
-                      {o.tags.map((t) => <span key={t} className="adm-badge">{t}</span>)}
+                      {o.tags.filter((t) => t !== "Wholesale").map((t) => <span key={t} className="adm-badge">{t}</span>)}
                     </div>
+                    <span className="oms-age">{orderAge(o.placedAt)}</span>
                   </td>
-                  <td>{o.customerName}</td>
-                  <td><span className="ff-status" data-s={o.status}>{STATUS_LABEL[o.status] ?? o.status}</span></td>
+                  <td>
+                    {o.customerName}
+                    {o.assignedName ? <span className="oms-assignee">→ {o.assignedName}</span> : null}
+                  </td>
+                  <td>
+                    <span className="ff-status" data-s={o.status}>{STATUS_LABEL[o.status] ?? o.status}</span>
+                    {o.courierName ? <span className="oms-courier">{o.courierName}</span> : null}
+                  </td>
                   <td>
                     <span className="om-pay" data-tone={badge.tone}>{badge.label}</span>
+                    {method && method !== badge.label ? <span className="oms-method">{method}</span> : null}
                     {o.refundAmount > 0 ? <span className="admin__muted"> · ₹{o.refundAmount.toFixed(2)}</span> : null}
                   </td>
                   <td className="admin__mono">₹{o.total.toFixed(2)}</td>
@@ -123,7 +213,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
               );
             })}
             {orders.length === 0 ? (
-              <tr><td colSpan={canManage ? 6 : 5} className="admin__empty">No orders yet.</td></tr>
+              <tr><td colSpan={canManage ? 6 : 5} className="admin__empty">No orders match this view.</td></tr>
             ) : null}
           </tbody>
         </table>

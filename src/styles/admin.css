@@ -376,6 +376,32 @@
 .adm-badge[data-b="gst"] { background: rgba(90,130,180,0.16); color: #3d5a80; }
 .adm-badge[data-b="gift"] { background: rgba(168,68,58,0.1); color: #8a3d2f; }
 .adm-badge[data-b="cod"] { background: rgba(60,120,70,0.12); color: #2f6b3c; }
+/* Orders-list Screen-1 badges — priority + operational flags (same grammar, new tones) */
+.adm-badge[data-b="vip"] { background: rgba(201,169,110,0.32); color: #7a5a24; font-weight: 600; }
+.adm-badge[data-b="rush"] { background: rgba(168,68,58,0.16); color: #8a3d2f; font-weight: 600; }
+.adm-badge[data-b="highp"] { background: rgba(201,169,110,0.18); color: #8a6d3b; }
+.adm-badge[data-b="refunded"] { background: rgba(107,98,89,0.16); color: #6b6259; }
+.adm-badge[data-b="cancelled"] { background: rgba(168,68,58,0.14); color: #8a3d2f; }
+.adm-badge[data-b="returned"] { background: rgba(107,98,89,0.16); color: #6b6259; }
+.adm-badge[data-b="wholesale"] { background: rgba(90,130,180,0.16); color: #3d5a80; }
+/* Inline row context (age / assignee / courier / method) — quiet, never competes with the data */
+.oms-age { display: block; font-family: var(--font-sans); font-size: 10px; color: var(--smoke, #6b6259); margin-top: 4px; }
+.oms-assignee { display: block; font-family: var(--font-sans); font-size: 11px; color: var(--ad-gold, #8a6d3b); margin-top: 2px; }
+.oms-courier { display: block; font-family: var(--font-sans); font-size: 10px; color: var(--smoke, #6b6259); margin-top: 4px; }
+.oms-method { display: inline-block; margin-left: 6px; font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--smoke, #6b6259); }
+/* Summary strip (review point 10) */
+.oms-strip { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+.oms-stat { flex: 1 1 120px; min-width: 110px; border: 1px solid var(--ad-hair); border-radius: 5px; padding: 10px 14px; background: rgba(31,26,22,0.015); }
+.oms-stat__n { display: block; font-family: var(--font-serif); font-size: 1.3rem; color: var(--ink, #1f1a16); line-height: 1.1; }
+.oms-stat__l { display: block; font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--smoke, #6b6259); margin-top: 4px; }
+.oms-stat[data-tone="warn"] .oms-stat__n { color: #8a6d3b; }
+/* Saved views (review point 9) */
+.osv { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.osv__chip { padding: 5px 12px; font-family: var(--font-sans); font-size: 11px; letter-spacing: 0.04em; color: var(--smoke, #6b6259); background: #fff; border: 1px solid var(--ad-hair); border-radius: 999px; text-decoration: none; transition: background 0.15s ease, color 0.15s ease; }
+.osv__chip:hover { background: var(--soft-beige, #efe9e0); }
+.osv__chip[data-active="1"] { background: #000; color: #faf7f2; border-color: #000; }
+.osv__chip--clear { color: #8a3d2f; }
+.adm-filters__check { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-sans); font-size: 12px; color: var(--ink, #1f1a16); }
 .om-meta-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
 
 /* ── Activity colour coding (OS Point 18) ── */

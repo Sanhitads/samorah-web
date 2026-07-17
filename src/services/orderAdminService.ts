@@ -5,6 +5,7 @@
  */
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logEvent } from "@/services/auditService";
+import { sortColumn, rangeStart, type OrderSort } from "@/lib/admin/orderList";
 
 export interface OrderOverviewRow {
   id: string;
@@ -13,9 +14,14 @@ export interface OrderOverviewRow {
   email: string;
   status: string; // order_status
   paymentStatus: string; // payment_status
+  paymentMethod: string | null; // captured instrument (upi/card/…); shown ALONGSIDE status
   isCod: boolean;
   isGift: boolean;
   hasGstin: boolean; // B2B tax invoice requested
+  priority: string; // normal | high | urgent | vip
+  courierName: string | null;
+  assignedTo: string | null; // users.id
+  assignedName: string | null; // resolved display name (null when unassigned)
   tags: string[];
   total: number;
   refundAmount: number;
@@ -27,8 +33,54 @@ export interface OrderOverviewRow {
 export interface OrderFilter {
   search?: string; // order number or email
   status?: string;
-  payment?: string;
+  payment?: string; // payment_status
+  paymentMethod?: string; // instrument (upi/card/netbanking/wallet/cod)
+  priority?: string;
+  courier?: string;
+  assignedTo?: string; // users.id
+  tag?: string; // one ops_tag (e.g. "Wholesale")
+  gift?: boolean;
+  range?: string; // today | 7d | 30d (created_at lower bound)
+  awaiting?: boolean; // paid & pre-ship — the "Pending Shipment" view
+  refundQueue?: boolean; // has an open (initiated/processing) refund
+  needsAttention?: boolean; // on_hold | failed payment | NDR
+  sort?: OrderSort;
   limit?: number;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type LooseClient = any;
+
+/** Pre-resolve order ids with an OPEN refund (for the Refund Queue view). Returns null when the
+ *  filter isn't active, or [] when active-but-empty (caller must then match nothing). */
+async function resolveRefundQueueIds(loose: LooseClient, f: OrderFilter): Promise<string[] | null> {
+  if (!f.refundQueue) return null;
+  const { data } = await loose.from("refunds").select("order_id").in("status", ["initiated", "processing"]);
+  return [...new Set((data ?? []).map((r: { order_id: string }) => r.order_id))] as string[];
+}
+
+/** Apply every OrderFilter predicate to a PostgREST query. Shared by the list and the summary so
+ *  the two can never drift — the numbers in the strip always describe exactly the rows below it. */
+function applyOrderFilters(q: LooseClient, f: OrderFilter, refundQueueIds: string[] | null): LooseClient {
+  if (f.status) q = q.eq("status", f.status);
+  if (f.payment) q = q.eq("payment_status", f.payment);
+  if (f.paymentMethod) q = f.paymentMethod === "cod" ? q.eq("is_cod", true) : q.eq("payment_method", f.paymentMethod);
+  if (f.priority) q = q.eq("priority", f.priority);
+  if (f.courier) q = q.eq("courier_name", f.courier);
+  if (f.assignedTo) q = q.eq("assigned_to", f.assignedTo);
+  if (f.gift) q = q.eq("is_gift", true);
+  if (f.tag) q = q.contains("ops_tags", [f.tag]);
+  if (f.awaiting) q = q.eq("payment_status", "paid").in("status", ["confirmed", "processing", "packed"]);
+  if (f.needsAttention) q = q.or("fulfillment_status.eq.on_hold,payment_status.eq.failed,ndr_status.not.is.null");
+  // Empty id set → match nothing (an impossible UUID), never `in.()` which PostgREST rejects.
+  if (refundQueueIds) q = q.in("id", refundQueueIds.length ? refundQueueIds : ["00000000-0000-0000-0000-000000000000"]);
+  const start = rangeStart(f.range);
+  if (start) q = q.gte("created_at", start);
+  if (f.search) {
+    const s = f.search.trim().replace(/[%,]/g, "");
+    q = q.or(`order_number.ilike.%${s}%,email.ilike.%${s}%,ship_full_name.ilike.%${s}%`);
+  }
+  return q;
 }
 /** High-value threshold for the "High Value" badge (rupees). */
 export const HIGH_VALUE_THRESHOLD = 5000;
@@ -134,28 +186,24 @@ export async function getOperationalMetrics(): Promise<OperationalMetrics> {
   };
 }
 
-/** Recent orders, newest first, filtered + searched, for the management list. */
+/** Recent orders, filtered + searched + sorted, for the management list. */
 export async function getOrdersOverview(filter: OrderFilter | number = {}): Promise<OrderOverviewRow[]> {
   const f: OrderFilter = typeof filter === "number" ? { limit: filter } : filter;
-  // Loose: refund_amount / refunds aren't in the generated types yet.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const loose = createAdminClient() as any;
+  // Loose: refund_amount / refunds / board columns aren't in the generated types yet.
+  const loose = createAdminClient() as LooseClient;
+  const refundQueueIds = await resolveRefundQueueIds(loose, f);
+  const { column, ascending } = sortColumn(f.sort);
   let q = loose
     .from("orders")
     .select(
-      "id,order_number,email,ship_full_name,status,payment_status,is_cod,is_gift,buyer_gstin,ops_tags,total_amount,refund_amount,razorpay_payment_id,created_at",
+      "id,order_number,email,ship_full_name,status,payment_status,payment_method,is_cod,is_gift,buyer_gstin,priority,courier_name,assigned_to,ops_tags,total_amount,refund_amount,razorpay_payment_id,created_at",
     )
-    .order("created_at", { ascending: false })
+    .order(column, { ascending })
     .limit(f.limit ?? 100);
-  if (f.status) q = q.eq("status", f.status);
-  if (f.payment) q = q.eq("payment_status", f.payment);
-  if (f.search) {
-    const s = f.search.trim().replace(/[%,]/g, "");
-    q = q.or(`order_number.ilike.%${s}%,email.ilike.%${s}%,ship_full_name.ilike.%${s}%`);
-  }
+  q = applyOrderFilters(q, f, refundQueueIds);
   const { data, error } = await q;
   if (error) throw error;
-  const orders = (data ?? []) as { id: string }[];
+  const orders = (data ?? []) as { id: string; assigned_to: string | null }[];
 
   // Latest non-failed refund status per order, in one query (point 4).
   const ids = orders.map((o) => o.id);
@@ -170,6 +218,14 @@ export async function getOrdersOverview(filter: OrderFilter | number = {}): Prom
     for (const r of refunds ?? []) if (!refundStatus.has(r.order_id)) refundStatus.set(r.order_id, r.status);
   }
 
+  // Resolve assignee display names in one query (id → name), for the "Assigned" column.
+  const assignedIds = [...new Set(orders.map((o) => o.assigned_to).filter(Boolean) as string[])];
+  const nameById = new Map<string, string>();
+  if (assignedIds.length) {
+    const { data: staff } = await loose.from("users").select("id,full_name,email").in("id", assignedIds);
+    for (const u of staff ?? []) nameById.set(u.id, u.full_name || u.email);
+  }
+
   return orders.map((o) => {
     const r = o as unknown as {
       id: string;
@@ -178,9 +234,13 @@ export async function getOrdersOverview(filter: OrderFilter | number = {}): Prom
       ship_full_name: string | null;
       status: string;
       payment_status: string;
+      payment_method: string | null;
       is_cod: boolean;
       is_gift: boolean;
       buyer_gstin: string | null;
+      priority: string | null;
+      courier_name: string | null;
+      assigned_to: string | null;
       ops_tags: string[] | null;
       total_amount: number;
       refund_amount: number | null;
@@ -194,9 +254,14 @@ export async function getOrdersOverview(filter: OrderFilter | number = {}): Prom
       email: r.email,
       status: r.status,
       paymentStatus: r.payment_status,
+      paymentMethod: r.payment_method ?? null,
       isCod: r.is_cod,
       isGift: Boolean(r.is_gift),
       hasGstin: Boolean(r.buyer_gstin),
+      priority: r.priority ?? "normal",
+      courierName: r.courier_name ?? null,
+      assignedTo: r.assigned_to ?? null,
+      assignedName: r.assigned_to ? nameById.get(r.assigned_to) ?? null : null,
       tags: Array.isArray(r.ops_tags) ? r.ops_tags : [],
       total: Number(r.total_amount),
       refundAmount: Number(r.refund_amount ?? 0),
@@ -205,6 +270,63 @@ export async function getOrdersOverview(filter: OrderFilter | number = {}): Prom
       placedAt: r.created_at,
     };
   });
+}
+
+export interface OrdersSummary {
+  count: number;
+  revenue: number; // gross paid + partially-refunded totals (₹)
+  pending: number; // status pending or payment pending
+  refunds: number; // orders with any refund
+  cancellations: number;
+  capped: boolean; // true when the matching set exceeded the aggregation cap
+}
+
+/**
+ * Headline numbers for the summary strip, computed over EXACTLY the current filter (same
+ * `applyOrderFilters`), so the strip can never disagree with the rows. Aggregated in JS over a
+ * bounded fetch of lightweight columns — correct and simple at a luxury brand's scale. If the set
+ * ever exceeds the cap, `capped` is surfaced (shown as "2000+"); moving to a SQL aggregate RPC is
+ * the documented next step, not silent under-counting.
+ */
+export async function getOrdersSummary(filter: OrderFilter = {}): Promise<OrdersSummary> {
+  const loose = createAdminClient() as LooseClient;
+  const refundQueueIds = await resolveRefundQueueIds(loose, filter);
+  const CAP = 2000;
+  let q = loose.from("orders").select("total_amount,status,payment_status,refund_amount").limit(CAP + 1);
+  q = applyOrderFilters(q, filter, refundQueueIds);
+  const { data, error } = await q;
+  if (error) throw error;
+  const all = (data ?? []) as { total_amount: number; status: string; payment_status: string; refund_amount: number | null }[];
+  const capped = all.length > CAP;
+  const rows = capped ? all.slice(0, CAP) : all;
+
+  let revenue = 0, pending = 0, refunds = 0, cancellations = 0;
+  for (const r of rows) {
+    if (r.payment_status === "paid" || r.payment_status === "partially_refunded") revenue += Number(r.total_amount);
+    if (r.status === "pending" || r.payment_status === "pending") pending += 1;
+    if (Number(r.refund_amount ?? 0) > 0) refunds += 1;
+    if (r.status === "cancelled") cancellations += 1;
+  }
+  return { count: rows.length, revenue, pending, refunds, cancellations, capped };
+}
+
+export interface StaffOption { id: string; name: string; }
+/** Staff who can be assigned an order (role ≥ editor). Used for the filter + assignee resolution. */
+export async function getStaffOptions(): Promise<StaffOption[]> {
+  const loose = createAdminClient() as LooseClient;
+  const { data } = await loose
+    .from("users")
+    .select("id,full_name,email,role")
+    .in("role", ["editor", "manager", "admin", "super_admin"])
+    .order("full_name");
+  return (data ?? []).map((u: { id: string; full_name: string | null; email: string }) => ({ id: u.id, name: u.full_name || u.email }));
+}
+
+/** Distinct courier names seen on orders, for the courier filter dropdown. */
+export async function getCourierOptions(): Promise<string[]> {
+  const loose = createAdminClient() as LooseClient;
+  const { data } = await loose.from("orders").select("courier_name").not("courier_name", "is", null).limit(500);
+  return [...new Set((data ?? []).map((o: { courier_name: string | null }) => o.courier_name).filter(Boolean) as string[])].sort();
 }
 
 // ── Order annotations + resend (Phase 2 admin enhancements) ──────────────────
