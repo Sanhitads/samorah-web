@@ -304,6 +304,19 @@ export async function getShipmentForOrderNumber(orderNumber: string): Promise<{ 
   return { order, shipment };
 }
 
+/** The shipment for an order id, with its tracking events — for the Order Detail shipment section.
+ *  Additive reader over the existing shipments table (no new logic, no N+1: one row + its events). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function getShipmentByOrderId(orderId: string): Promise<any> {
+  const db = adminLoose();
+  const { data } = await db
+    .from("shipments")
+    .select("id,provider,status,courier_name,awb,tracking_url,label_url,cod_amount,payment_mode,created_at,updated_at, shipment_events(status,customer_status,location,created_at)")
+    .eq("order_id", orderId)
+    .maybeSingle();
+  return data ?? null;
+}
+
 export interface DispatchInfo {
   order_number: string;
   ship_full_name: string | null;

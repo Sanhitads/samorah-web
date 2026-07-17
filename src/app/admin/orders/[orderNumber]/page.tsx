@@ -6,10 +6,13 @@ import { getOrderByNumber } from "@/services/orderService";
 import { getOrderRefunds } from "@/services/refundService";
 import { getOrderNotifications } from "@/services/notificationService";
 import { getOrderTimeline } from "@/services/auditService";
+import { getShipmentByOrderId } from "@/services/shipmentService";
+import { getReturnsForOrder } from "@/services/returnService";
 import { hasCapability } from "@/lib/auth/capabilities";
 import { OrderMeta } from "@/components/admin/OrderMeta";
 import { RefundRetryBanner } from "@/components/admin/RefundRetryBanner";
 import { getIncidentForOrder } from "@/services/incidentService";
+import { orderHealth } from "@/lib/admin/orderHealth";
 
 /**
  * Order detail — `/admin/orders/[orderNumber]`. The single pane of glass for one
@@ -32,15 +35,29 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
   const order = (await getOrderByNumber(orderNumber)) as any;
   if (!order) notFound();
 
-  const [refunds, notifications, timeline] = await Promise.all([
+  const [refunds, notifications, timeline, shipment, returns, incident] = await Promise.all([
     getOrderRefunds(order.id),
     getOrderNotifications(order.id),
     getOrderTimeline(order.id),
+    getShipmentByOrderId(order.id),
+    getReturnsForOrder(order.id),
+    getIncidentForOrder(order.order_number),
   ]);
   const items = (order.order_items ?? []) as any[];
   const failedRefunds = (refunds as any[]).filter((r) => r.status === "failed");
   const failedRefund = failedRefunds[0];
-  const incident = await getIncidentForOrder(order.order_number);
+
+  // Order Health (Phase 3) — computed from the state we already loaded; never stored.
+  const health = orderHealth({
+    status: order.status,
+    paymentStatus: order.payment_status,
+    fraudReview: order.fraud_review ?? null, // Phase 2 column; null until that migration lands
+    hasOpenIncident: Boolean(incident),
+    refundPending: (refunds as any[]).some((r) => r.status === "initiated" || r.status === "processing"),
+    ndrStatus: order.ndr_status ?? null,
+    fulfillmentStatus: order.fulfillment_status ?? null,
+    shipmentException: shipment ? ["exception", "delayed", "lost", "damaged"].includes(shipment.status) : false,
+  });
 
   return (
     <main className="admin">
@@ -48,7 +65,8 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
         <p className="admin__eyebrow"><Link href="/admin/orders" className="od-back">← Orders</Link></p>
         <h1 className="admin__title">{order.order_number}</h1>
         <p className="admin__count">
-          <span className="ff-status" data-s={order.status}>{order.status}</span>
+          <span className="oh-badge" data-h={health.tone} title={health.reason}>{health.dot} {health.label}</span>
+          <span className="ff-status" data-s={order.status} style={{ marginLeft: 8 }}>{order.status}</span>
           <span className="om-pay" data-tone={order.payment_status === "paid" ? "paid" : order.payment_status?.includes("refund") ? "refunded" : "pending"} style={{ marginLeft: 8 }}>{order.payment_status}</span>
           <span className="admin__muted"> · placed {dt(order.placed_at)}{order.invoice_number ? ` · Invoice ${order.invoice_number}` : ""}</span>
         </p>
@@ -118,6 +136,35 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
         </div>
       </section>
 
+      {/* Shipment (reuses the shipments domain) */}
+      <section className="od-section">
+        <h2 className="od-card__title">Shipment</h2>
+        {shipment ? (
+          <div className="od-ship">
+            <div className="od-ship__row">
+              <span className="ff-status" data-s={shipment.status}>{shipment.status}</span>
+              <span className="admin__muted">{shipment.provider}{shipment.courier_name ? ` · ${shipment.courier_name}` : ""}</span>
+              {shipment.awb ? <span className="admin__mono">AWB {shipment.awb}</span> : null}
+              {shipment.tracking_url ? <a href={shipment.tracking_url} target="_blank" rel="noopener noreferrer" className="text-link">Track →</a> : null}
+            </div>
+            {(shipment.shipment_events ?? []).length ? (
+              <ol className="od-ship__events">
+                {(shipment.shipment_events as any[])
+                  .slice()
+                  .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                  .map((e, i) => (
+                    <li key={i}><span className="admin__muted">{dt(e.created_at)}</span> {e.customer_status || e.status}{e.location ? <span className="admin__muted"> · {e.location}</span> : null}</li>
+                  ))}
+              </ol>
+            ) : null}
+          </div>
+        ) : (
+          <p className="admin__muted">
+            No shipment created yet{order.courier_name ? ` · courier on order: ${order.courier_name}${order.awb_number ? `, AWB ${order.awb_number}` : ""}` : ""}.
+          </p>
+        )}
+      </section>
+
       <div className="od-grid">
         {/* Refunds */}
         <section className="od-card" id="refunds" style={{ scrollMarginTop: 20 }}>
@@ -125,6 +172,18 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
           {refunds.length ? refunds.map((r) => (
             <div key={r.id} className="od-line"><span>{inr(r.amount)} · {r.method}</span><span className="om-pay" data-tone={r.status === "processed" ? "paid" : r.status === "failed" ? "failed" : "refundprog"}>{r.status}</span><span className="admin__muted">{dt(r.created_at)}</span></div>
           )) : <p className="admin__muted">No refunds.</p>}
+        </section>
+
+        {/* Returns (reuses the returns domain) */}
+        <section className="od-card">
+          <h2 className="od-card__title">Returns ({returns.length})</h2>
+          {returns.length ? returns.map((r) => (
+            <div key={r.id} className="od-line">
+              <span>{r.rma ?? "RMA"}{r.reason ? ` · ${r.reason}` : ""}{r.refundAmount > 0 ? ` · ${inr(r.refundAmount)}` : ""}</span>
+              <span className="ff-status" data-s={r.status}>{r.status}</span>
+              <span className="admin__muted">{dt(r.createdAt)}</span>
+            </div>
+          )) : <p className="admin__muted">No returns.</p>}
         </section>
 
         {/* Internal: tags + note + resend */}

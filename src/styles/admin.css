@@ -386,6 +386,18 @@
 .od-addr { font-family: var(--font-sans); font-size: 13px; margin-top: 8px; line-height: 1.5; }
 .od-line { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--ad-hair); font-family: var(--font-sans); font-size: 13px; }
 .od-line:last-child { border-bottom: none; }
+/* Order Health badge (Phase 3) — computed indicator; tones map to the existing palette */
+.oh-badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-family: var(--font-sans); font-size: 11px; letter-spacing: 0.03em; border: 1px solid transparent; }
+.oh-badge[data-h="healthy"] { background: rgba(60,120,70,0.12); color: #2f6b3c; }
+.oh-badge[data-h="attention"] { background: rgba(201,169,110,0.2); color: #8a6d3b; }
+.oh-badge[data-h="delayed"] { background: rgba(201,140,80,0.18); color: #a85f24; }
+.oh-badge[data-h="refund"] { background: rgba(90,130,180,0.16); color: #3d5a80; }
+.oh-badge[data-h="incident"] { background: rgba(168,68,58,0.14); color: #8a3d2f; }
+.oh-badge[data-h="fraud"] { background: #1f1a16; color: #f0d9a8; }
+/* Shipment section on order detail */
+.od-ship__row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; font-family: var(--font-sans); font-size: 13px; }
+.od-ship__events { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.od-ship__events li { font-family: var(--font-sans); font-size: 12px; color: var(--ink, #1f1a16); }
 .od-timeline { list-style: none; margin: 0; padding: 0; }
 .od-tl { display: grid; grid-template-columns: 130px 1fr auto; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--ad-hair); font-family: var(--font-sans); font-size: 13px; align-items: baseline; }
 .od-tl:last-child { border-bottom: none; }

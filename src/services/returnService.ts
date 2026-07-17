@@ -269,3 +269,23 @@ export async function getReturnsQueue(limit = 100): Promise<ReturnRow[]> {
     createdAt: r.created_at,
   }));
 }
+
+/** Returns for ONE order (Order Detail returns section). Additive reader over the existing table;
+ *  one indexed query by order_id, no new logic. */
+export async function getReturnsForOrder(orderId: string): Promise<Array<{ id: string; rma: string | null; status: string; reason: string | null; refundAmount: number; createdAt: string }>> {
+  const db = loose();
+  const { data } = await db
+    .from("returns")
+    .select("id,rma_number,status,reason,refund_amount,created_at")
+    .eq("order_id", orderId)
+    .order("created_at", { ascending: false });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data ?? []).map((r: any) => ({
+    id: r.id,
+    rma: r.rma_number ?? null,
+    status: r.status as string,
+    reason: r.reason ?? null,
+    refundAmount: Number(r.refund_amount ?? 0),
+    createdAt: r.created_at,
+  }));
+}
