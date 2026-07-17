@@ -109,3 +109,20 @@ extending them to orders, not new engines.
 Per the launch rules, each future feature must ship with: unit + integration + permission + audit +
 regression tests; no N+1 / no duplicated joins; reuse of the existing Incident / Notification /
 Refund / Shipment / Audit domains; **no parallel systems**; real (non-mocked) business logic.
+
+---
+
+## Technical Debt
+
+### Integration Test Harness
+
+**Reason.** The project's current test coverage is: **unit tests** (pure logic — health precedence,
+bulk validation, tag math, flag badges, money/GST), **service tests** (pure service helpers), **live
+verification** (query shapes checked directly against the DB), and **manual QA**. There is no
+harness that spins up a database and asserts flows end-to-end.
+
+**Future.** Add automated **database-backed integration tests** (seed → act via the real
+services/APIs → assert DB state + audit events + permission gates).
+
+**Priority: Medium.** Not launch-blocking — the unit + service + live-verification + manual-QA layers
+cover the launch surface; this hardens regression safety as the codebase grows.
