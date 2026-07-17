@@ -17,10 +17,13 @@ import { useEffect, useState } from "react";
  *   if (!items) return null; // first render only (or render a skeleton)
  */
 export function useStore<T, F>(
-  store: (selector: (state: T) => F) => F,
+  // `unknown` (not F) on the store's callback/return: a zustand bound store is an overloaded
+  // generic callable, and constraining it to F made inference collapse to `{}` — which is why this
+  // hook silently failed to type-check and went unused while the mismatch it prevents shipped.
+  store: (selector: (state: T) => unknown) => unknown,
   selector: (state: T) => F,
 ): F | undefined {
-  const result = store(selector);
+  const result = store(selector) as F;
   const [data, setData] = useState<F>();
 
   useEffect(() => {

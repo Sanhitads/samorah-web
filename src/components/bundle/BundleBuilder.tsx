@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { AssetImage } from "@/components/ui/AssetImage";
+import { useStore } from "@/hooks/useStore";
 import { useCartStore } from "@/store/useCartStore";
 import { useUIStore } from "@/store/useUIStore";
 import { useCompositionStore } from "@/store/useCompositionStore";
@@ -45,7 +46,9 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
   const [pendingVessel, setPendingVessel] = useState<string | null>(null);
 
   const addItem = useCartStore((s) => s.addItem);
-  const cartItems = useCartStore((s) => s.items);
+  // Persisted cart state — must go through the hydration-safe hook (BRD §24.1). Actions
+  // (addItem/removeItem) are stable references and safe to read directly.
+  const cartItems = useStore(useCartStore, (s) => s.items) ?? [];
   const removeItem = useCartStore((s) => s.removeItem);
   const openCart = useUIStore((s) => s.openCart);
   const reduce = useReducedMotion();

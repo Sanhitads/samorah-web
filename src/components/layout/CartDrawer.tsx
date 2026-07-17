@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Minus, Plus, X } from "lucide-react";
 import { useOverlay } from "@/hooks/useOverlay";
+import { useStore } from "@/hooks/useStore";
 import {
   COMPOSITION_DISCOUNT_PCT,
   selectCartCount,
@@ -47,8 +48,12 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
   const reduceMotion = useReducedMotion();
   const ref = useOverlay(open, onClose);
 
-  const items = useCartStore((s) => s.items);
-  const count = useCartStore(selectCartCount);
+  // The cart is a PERSISTED store: it is empty during SSR and full after the client hydrates from
+  // localStorage. Reading it directly would render two different trees and crash the whole page —
+  // and this drawer lives in StoreChrome, so that crash would hit EVERY storefront route the moment
+  // a customer had anything in their bag. `useStore` (BRD §24.1) returns undefined until mounted.
+  const items = useStore(useCartStore, (s) => s.items) ?? [];
+  const count = useStore(useCartStore, selectCartCount) ?? 0;
   const summary = buildCartSummary(items);
   const subtotal = summary.subtotal;
   const compositionDiscount = summary.discount;
