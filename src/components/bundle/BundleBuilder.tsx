@@ -28,9 +28,11 @@ import {
  * the automatic 15% discount, then adds the set to the cart.
  */
 export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
-  const vessel = useCompositionStore((s) => s.vessel);
-  const items = useCompositionStore((s) => s.items);
-  const editingId = useCompositionStore((s) => s.editingId);
+  // Persisted composition state (BRD §24.1 / §7.1) — `composing` below branches the whole page on
+  // it, so it must not be read during SSR. Defaults match the empty server-rendered state.
+  const vessel = useStore(useCompositionStore, (s) => s.vessel) ?? null;
+  const items = useStore(useCompositionStore, (s) => s.items) ?? [];
+  const editingId = useStore(useCompositionStore, (s) => s.editingId) ?? null;
   const setVessel = useCompositionStore((s) => s.setVessel);
   const addCandle = useCompositionStore((s) => s.addCandle);
   const removeCandle = useCompositionStore((s) => s.removeCandle);

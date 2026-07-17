@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useStore } from "@/hooks/useStore";
 import { useCompositionStore } from "@/store/useCompositionStore";
 import { BUNDLE_SIZE, BUNDLE_SIZE_LABEL, vesselLabel } from "@/lib/bundle";
 
@@ -33,8 +34,11 @@ export function AddToComposition({
   selectedVessel: string;
   selectedSize: string;
 }) {
-  const storeVessel = useCompositionStore((s) => s.vessel);
-  const items = useCompositionStore((s) => s.items);
+  // Persisted composition state (BRD §24.1 / §7.1) — the whole render branches on this (`active`,
+  // `vessel`, and an early `return null`), so reading it directly would make the PDP hydrate a
+  // different tree than the server sent and crash the page. Defaults match the empty server state.
+  const storeVessel = useStore(useCompositionStore, (s) => s.vessel) ?? null;
+  const items = useStore(useCompositionStore, (s) => s.items) ?? [];
   const addCandle = useCompositionStore((s) => s.addCandle);
   const removeCandle = useCompositionStore((s) => s.removeCandle);
   const setVessel = useCompositionStore((s) => s.setVessel);
