@@ -16,7 +16,7 @@ import { validateBulk, type BulkAction, type UndoRecord } from "@/lib/admin/orde
  */
 export const runtime = "nodejs";
 
-const SAFE_ACTIONS: BulkAction[] = ["assign", "priority", "addTags", "removeTags", "note", "restore"];
+const SAFE_ACTIONS: BulkAction[] = ["assign", "priority", "addTags", "removeTags", "note", "markFraud", "markWholesale", "linkIncident", "restore"];
 
 export async function POST(request: Request) {
   const staff = await requireCapability("fulfillment.triage");
@@ -31,6 +31,9 @@ export async function POST(request: Request) {
     priority?: string;
     tags?: string[];
     note?: string;
+    fraudState?: string;
+    wholesaleState?: string;
+    incidentNumber?: string;
     restore?: UndoRecord[];
   };
   try {
@@ -44,7 +47,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unknown or unsafe bulk action." }, { status: 400 });
   }
 
-  const valid = validateBulk({ action, staffId: body.staffId, priority: body.priority, tags: body.tags, note: body.note });
+  const valid = validateBulk({ action, staffId: body.staffId, priority: body.priority, tags: body.tags, note: body.note, fraudState: body.fraudState, wholesaleState: body.wholesaleState, incidentNumber: body.incidentNumber });
   if (!valid.ok) return NextResponse.json({ error: valid.reason }, { status: 400 });
 
   // Resolve the target set.
@@ -65,6 +68,9 @@ export async function POST(request: Request) {
     priority: body.priority,
     tags: body.tags,
     note: body.note,
+    fraudState: body.fraudState,
+    wholesaleState: body.wholesaleState,
+    incidentNumber: body.incidentNumber,
     restore: body.restore,
     actorId: staff.userId ?? undefined,
   });

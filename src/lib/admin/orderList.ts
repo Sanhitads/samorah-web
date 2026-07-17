@@ -131,9 +131,46 @@ export function opsFlags(o: OrderFlagInput): OrderFlag[] {
   if (o.status === "returned" || o.status === "rto") flags.push({ label: o.status === "rto" ? "RTO" : "Returned", f: "returned" });
   if (o.refundAmount > 0 || o.latestRefundStatus) flags.push({ label: "Refunded", f: "refunded" });
   if (o.isGift) flags.push({ label: "Gift", f: "gift" });
-  if (o.tags.includes("Wholesale")) flags.push({ label: "Wholesale", f: "wholesale" });
+  // Wholesale is now a first-class column (Phase 2) with its own badge — no longer derived from tags.
   return flags;
 }
+
+// ── Fraud review (Phase 2 flag) ──────────────────────────────────────────────
+export type FlagBadge = { label: string; b: string } | null;
+export function fraudBadge(state: string | null | undefined): FlagBadge {
+  switch (state) {
+    case "pending_review": return { label: "Fraud: Pending", b: "fraudp" };
+    case "under_investigation": return { label: "Fraud: Investigating", b: "fraudi" };
+    case "confirmed_fraud": return { label: "Fraud: Confirmed", b: "fraudc" };
+    case "cleared": return { label: "Fraud: Cleared", b: "fraudok" };
+    default: return null; // 'none'
+  }
+}
+/** Full set for the flag editor / bulk picker. */
+export const FRAUD_STATES = [
+  { value: "none", label: "Not flagged" },
+  { value: "pending_review", label: "Pending review" },
+  { value: "under_investigation", label: "Under investigation" },
+  { value: "cleared", label: "Cleared" },
+  { value: "confirmed_fraud", label: "Confirmed fraud" },
+];
+/** The subset offered as a list filter (excludes 'none'). */
+export const FRAUD_FILTERS = FRAUD_STATES.filter((s) => s.value !== "none");
+
+// ── Wholesale (Phase 2 flag) ─────────────────────────────────────────────────
+export function wholesaleBadge(state: string | null | undefined): FlagBadge {
+  switch (state) {
+    case "wholesale_order": return { label: "Wholesale", b: "wholesale" };
+    case "b2b_customer": return { label: "B2B", b: "b2b" };
+    default: return null; // 'none'
+  }
+}
+export const WHOLESALE_STATES = [
+  { value: "none", label: "Not wholesale" },
+  { value: "wholesale_order", label: "Wholesale order" },
+  { value: "b2b_customer", label: "B2B customer" },
+];
+export const WHOLESALE_FILTERS = WHOLESALE_STATES.filter((s) => s.value !== "none");
 
 // ── Saved views ──────────────────────────────────────────────────────────────
 /**

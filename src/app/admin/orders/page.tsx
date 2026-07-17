@@ -10,8 +10,8 @@ import { OrderActions } from "@/components/admin/OrderActions";
 import { OrdersBulkProvider, OrderCheckbox } from "@/components/admin/OrdersBulk";
 import { refundBadge } from "@/lib/fulfillment/derive";
 import {
-  orderAge, priorityBadge, paymentMethodLabel, opsFlags,
-  SORT_OPTIONS, PRIORITY_FILTERS, PAYMENT_METHOD_FILTERS, DATE_RANGES,
+  orderAge, priorityBadge, paymentMethodLabel, opsFlags, fraudBadge, wholesaleBadge,
+  SORT_OPTIONS, PRIORITY_FILTERS, PAYMENT_METHOD_FILTERS, DATE_RANGES, FRAUD_FILTERS, WHOLESALE_FILTERS,
   SAVED_VIEWS, savedViewHref, isViewActive, type OrderSort,
 } from "@/lib/admin/orderList";
 
@@ -44,7 +44,7 @@ interface OrdersSearchParams {
   search?: string; status?: string; payment?: string; paymentMethod?: string;
   priority?: string; courier?: string; assignedTo?: string; tag?: string;
   gift?: string; range?: string; awaiting?: string; refundQueue?: string;
-  needsAttention?: string; sort?: string;
+  needsAttention?: string; sort?: string; fraudReview?: string; wholesale?: string; hasIncident?: string;
 }
 
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<OrdersSearchParams> }) {
@@ -62,6 +62,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     priority: sp.priority, courier: sp.courier, assignedTo: sp.assignedTo, tag: sp.tag,
     gift: sp.gift === "1", range: sp.range, awaiting: sp.awaiting === "1",
     refundQueue: sp.refundQueue === "1", needsAttention: sp.needsAttention === "1",
+    fraudReview: sp.fraudReview, wholesale: sp.wholesale, hasIncident: sp.hasIncident === "1",
     sort: sp.sort as OrderSort | undefined,
   };
   const [orders, summary, staffOptions, courierOptions] = await Promise.all([
@@ -139,11 +140,22 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
           <option value="">All time</option>
           {DATE_RANGES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
         </select>
+        <select name="fraudReview" defaultValue={sp.fraudReview ?? ""} aria-label="Fraud review">
+          <option value="">Any fraud state</option>
+          <option value="any">Any flagged</option>
+          {FRAUD_FILTERS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+        </select>
+        <select name="wholesale" defaultValue={sp.wholesale ?? ""} aria-label="Wholesale">
+          <option value="">Any wholesale</option>
+          <option value="any">Any wholesale</option>
+          {WHOLESALE_FILTERS.map((w) => <option key={w.value} value={w.value}>{w.label}</option>)}
+        </select>
         <select name="sort" defaultValue={sp.sort ?? ""} aria-label="Sort">
           <option value="">Sort: Newest</option>
           {SORT_OPTIONS.filter((s) => s.key !== "newest").map((s) => <option key={s.key} value={s.key}>Sort: {s.label}</option>)}
         </select>
         <label className="adm-filters__check"><input type="checkbox" name="gift" value="1" defaultChecked={sp.gift === "1"} /> Gift</label>
+        <label className="adm-filters__check"><input type="checkbox" name="hasIncident" value="1" defaultChecked={sp.hasIncident === "1"} /> Incident</label>
         {passthrough.map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
         <button type="submit" className="ff-btn ff-btn--primary">Apply</button>
         {anyFilter ? <a href="/admin/orders" className="ff-btn">Clear</a> : null}
@@ -176,6 +188,8 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
               const pri = priorityBadge(o.priority);
               const flags = opsFlags(o);
               const method = paymentMethodLabel(o.paymentMethod, o.isCod);
+              const fraud = fraudBadge(o.fraudReview);
+              const whole = wholesaleBadge(o.wholesale);
               return (
                 <tr key={o.orderNumber}>
                   <td className="obulk-td"><OrderCheckbox orderNumber={o.orderNumber} /></td>
@@ -186,8 +200,13 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
                       {o.total >= HIGH_VALUE_THRESHOLD ? <span className="adm-badge" data-b="high">High value</span> : null}
                       {o.hasGstin ? <span className="adm-badge" data-b="gst">GST</span> : null}
                       {flags.map((f) => <span key={f.f} className="adm-badge" data-b={f.f}>{f.label}</span>)}
+                      {fraud ? <span className="adm-badge" data-b={fraud.b}>{fraud.label}</span> : null}
+                      {whole ? <span className="adm-badge" data-b={whole.b}>{whole.label}</span> : null}
+                      {o.hasIncident ? (o.incidentNumber
+                        ? <a href={`/admin/incidents/${o.incidentNumber}`} className="adm-badge" data-b="incident">⚠ {o.incidentNumber}</a>
+                        : <span className="adm-badge" data-b="incident">Incident</span>) : null}
                       {o.isCod ? <span className="adm-badge" data-b="cod">COD</span> : null}
-                      {o.tags.filter((t) => t !== "Wholesale").map((t) => <span key={t} className="adm-badge">{t}</span>)}
+                      {o.tags.map((t) => <span key={t} className="adm-badge">{t}</span>)}
                     </div>
                     <span className="oms-age">{orderAge(o.placedAt)}</span>
                   </td>
@@ -197,6 +216,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
                   </td>
                   <td>
                     <span className="ff-status" data-s={o.status}>{STATUS_LABEL[o.status] ?? o.status}</span>
+                    {o.health.state !== "healthy" ? <span className="oh-badge oh-badge--sm" data-h={o.health.tone} title={o.health.reason}>{o.health.dot} {o.health.label}</span> : null}
                     {o.courierName ? <span className="oms-courier">{o.courierName}</span> : null}
                   </td>
                   <td>

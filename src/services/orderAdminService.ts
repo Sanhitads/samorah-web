@@ -7,6 +7,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { logEvent } from "@/services/auditService";
 import { sortColumn, rangeStart, type OrderSort } from "@/lib/admin/orderList";
 import { mergeTags, removeTagsFrom, type BulkAction, type UndoRecord, type BulkUndo } from "@/lib/admin/orderBulk";
+import { orderHealth, type HealthBadge } from "@/lib/admin/orderHealth";
+import { getOpenIncidentOrderNumbers } from "@/services/incidentService";
 
 export interface OrderOverviewRow {
   id: string;
@@ -24,6 +26,11 @@ export interface OrderOverviewRow {
   assignedTo: string | null; // users.id
   assignedName: string | null; // resolved display name (null when unassigned)
   tags: string[];
+  fraudReview: string; // Phase 2 flag
+  wholesale: string; // Phase 2 flag
+  incidentNumber: string | null; // manual incident link
+  hasIncident: boolean; // open incident (soft link or manual)
+  health: HealthBadge; // Phase 3 computed indicator
   total: number;
   refundAmount: number;
   latestRefundStatus: string | null; // ledger sub-state (review point 4)
@@ -41,6 +48,9 @@ export interface OrderFilter {
   assignedTo?: string; // users.id
   tag?: string; // one ops_tag (e.g. "Wholesale")
   gift?: boolean;
+  fraudReview?: string; // Phase 2 flag filter (specific state, or "any")
+  wholesale?: string; // Phase 2 flag filter (specific state, or "any")
+  hasIncident?: boolean; // only orders with an open incident
   range?: string; // today | 7d | 30d (created_at lower bound)
   awaiting?: boolean; // paid & pre-ship — the "Pending Shipment" view
   refundQueue?: boolean; // has an open (initiated/processing) refund
@@ -62,8 +72,9 @@ async function resolveRefundQueueIds(loose: LooseClient, f: OrderFilter): Promis
 }
 
 /** Apply every OrderFilter predicate to a PostgREST query. Shared by the list and the summary so
- *  the two can never drift — the numbers in the strip always describe exactly the rows below it. */
-function applyOrderFilters(q: LooseClient, f: OrderFilter, refundQueueIds: string[] | null): LooseClient {
+ *  the two can never drift — the numbers in the strip always describe exactly the rows below it.
+ *  `incidentNumbers` (the open-incident order-number set) is resolved once by the caller. */
+function applyOrderFilters(q: LooseClient, f: OrderFilter, refundQueueIds: string[] | null, incidentNumbers: string[] | null = null): LooseClient {
   if (f.status) q = q.eq("status", f.status);
   if (f.payment) q = q.eq("payment_status", f.payment);
   if (f.paymentMethod) q = f.paymentMethod === "cod" ? q.eq("is_cod", true) : q.eq("payment_method", f.paymentMethod);
@@ -72,6 +83,13 @@ function applyOrderFilters(q: LooseClient, f: OrderFilter, refundQueueIds: strin
   if (f.assignedTo) q = q.eq("assigned_to", f.assignedTo);
   if (f.gift) q = q.eq("is_gift", true);
   if (f.tag) q = q.contains("ops_tags", [f.tag]);
+  if (f.fraudReview) q = f.fraudReview === "any" ? q.neq("fraud_review", "none") : q.eq("fraud_review", f.fraudReview);
+  if (f.wholesale) q = f.wholesale === "any" ? q.neq("wholesale", "none") : q.eq("wholesale", f.wholesale);
+  if (f.hasIncident) {
+    // An open incident = a manual link (incident_number) OR a soft link (order in the resolved set).
+    const nums = (incidentNumbers ?? []).filter((n) => /^[\w-]+$/.test(n));
+    q = nums.length ? q.or(`incident_number.not.is.null,order_number.in.(${nums.join(",")})`) : q.not("incident_number", "is", null);
+  }
   if (f.awaiting) q = q.eq("payment_status", "paid").in("status", ["confirmed", "processing", "packed"]);
   if (f.needsAttention) q = q.or("fulfillment_status.eq.on_hold,payment_status.eq.failed,ndr_status.not.is.null");
   if (f.orderNumbers?.length) q = q.in("order_number", f.orderNumbers.slice(0, 5000));
@@ -195,18 +213,22 @@ export async function getOrdersOverview(filter: OrderFilter | number = {}): Prom
   // Loose: refund_amount / refunds / board columns aren't in the generated types yet.
   const loose = createAdminClient() as LooseClient;
   const refundQueueIds = await resolveRefundQueueIds(loose, f);
+  const incidentFilterNumbers = f.hasIncident ? [...(await getOpenIncidentOrderNumbers())] : null;
   const { column, ascending } = sortColumn(f.sort);
   let q = loose
     .from("orders")
     .select(
-      "id,order_number,email,ship_full_name,status,payment_status,payment_method,is_cod,is_gift,buyer_gstin,priority,courier_name,assigned_to,ops_tags,total_amount,refund_amount,razorpay_payment_id,created_at",
+      "id,order_number,email,ship_full_name,status,payment_status,payment_method,is_cod,is_gift,buyer_gstin,priority,courier_name,assigned_to,ops_tags,fraud_review,wholesale,incident_number,ndr_status,fulfillment_status,total_amount,refund_amount,razorpay_payment_id,created_at",
     )
     .order(column, { ascending })
     .limit(f.limit ?? 100);
-  q = applyOrderFilters(q, f, refundQueueIds);
+  q = applyOrderFilters(q, f, refundQueueIds, incidentFilterNumbers);
   const { data, error } = await q;
   if (error) throw error;
-  const orders = (data ?? []) as { id: string; assigned_to: string | null }[];
+  const orders = (data ?? []) as { id: string; assigned_to: string | null; order_number: string }[];
+
+  // Open-incident set for THIS page (soft link) — one batch query, never per-row.
+  const softIncident = await getOpenIncidentOrderNumbers(orders.map((o) => o.order_number));
 
   // Latest non-failed refund status per order, in one query (point 4).
   const ids = orders.map((o) => o.id);
@@ -245,11 +267,27 @@ export async function getOrdersOverview(filter: OrderFilter | number = {}): Prom
       courier_name: string | null;
       assigned_to: string | null;
       ops_tags: string[] | null;
+      fraud_review: string | null;
+      wholesale: string | null;
+      incident_number: string | null;
+      ndr_status: string | null;
+      fulfillment_status: string | null;
       total_amount: number;
       refund_amount: number | null;
       razorpay_payment_id: string | null;
       created_at: string;
     };
+    const latestRefundStatus = refundStatus.get(r.id) ?? null;
+    const hasIncident = Boolean(r.incident_number) || softIncident.has(r.order_number);
+    const health = orderHealth({
+      status: r.status,
+      paymentStatus: r.payment_status,
+      fraudReview: r.fraud_review,
+      hasOpenIncident: hasIncident,
+      refundPending: latestRefundStatus === "initiated" || latestRefundStatus === "processing",
+      ndrStatus: r.ndr_status,
+      fulfillmentStatus: r.fulfillment_status,
+    });
     return {
       id: r.id,
       orderNumber: r.order_number,
@@ -266,9 +304,14 @@ export async function getOrdersOverview(filter: OrderFilter | number = {}): Prom
       assignedTo: r.assigned_to ?? null,
       assignedName: r.assigned_to ? nameById.get(r.assigned_to) ?? null : null,
       tags: Array.isArray(r.ops_tags) ? r.ops_tags : [],
+      fraudReview: r.fraud_review ?? "none",
+      wholesale: r.wholesale ?? "none",
+      incidentNumber: r.incident_number ?? null,
+      hasIncident,
+      health,
       total: Number(r.total_amount),
       refundAmount: Number(r.refund_amount ?? 0),
-      latestRefundStatus: refundStatus.get(r.id) ?? null,
+      latestRefundStatus,
       hasPayment: Boolean(r.razorpay_payment_id),
       placedAt: r.created_at,
     };
@@ -294,9 +337,10 @@ export interface OrdersSummary {
 export async function getOrdersSummary(filter: OrderFilter = {}): Promise<OrdersSummary> {
   const loose = createAdminClient() as LooseClient;
   const refundQueueIds = await resolveRefundQueueIds(loose, filter);
+  const incidentFilterNumbers = filter.hasIncident ? [...(await getOpenIncidentOrderNumbers())] : null;
   const CAP = 2000;
   let q = loose.from("orders").select("total_amount,status,payment_status,refund_amount").limit(CAP + 1);
-  q = applyOrderFilters(q, filter, refundQueueIds);
+  q = applyOrderFilters(q, filter, refundQueueIds, incidentFilterNumbers);
   const { data, error } = await q;
   if (error) throw error;
   const all = (data ?? []) as { total_amount: number; status: string; payment_status: string; refund_amount: number | null }[];
@@ -348,8 +392,9 @@ export async function resolveTargetsByNumbers(orderNumbers: string[]): Promise<B
 export async function resolveTargetsByFilter(filter: OrderFilter, cap = 2000): Promise<BulkTarget[]> {
   const loose = createAdminClient() as LooseClient;
   const refundQueueIds = await resolveRefundQueueIds(loose, filter);
+  const incidentFilterNumbers = filter.hasIncident ? [...(await getOpenIncidentOrderNumbers())] : null;
   let q = loose.from("orders").select("id,order_number").limit(cap);
-  q = applyOrderFilters(q, filter, refundQueueIds);
+  q = applyOrderFilters(q, filter, refundQueueIds, incidentFilterNumbers);
   const { data } = await q;
   return (data ?? []).map((r: { id: string; order_number: string }) => ({ id: r.id, orderNumber: r.order_number }));
 }
@@ -361,6 +406,9 @@ export interface BulkActionInput {
   priority?: string;
   tags?: string[];
   note?: string;
+  fraudState?: string;
+  wholesaleState?: string;
+  incidentNumber?: string;
   restore?: UndoRecord[]; // action === "restore"
   actorId?: string;
 }
@@ -386,11 +434,11 @@ export async function applyBulkAction(input: BulkActionInput): Promise<BulkActio
   const now = () => new Date().toISOString();
 
   // One batch read of current values — for undo capture + audit previous_state (not needed for note).
-  const prevById = new Map<string, { assigned_to: string | null; priority: string | null; ops_tags: string[] }>();
+  const prevById = new Map<string, { assigned_to: string | null; priority: string | null; ops_tags: string[]; fraud_review: string | null; wholesale: string | null; incident_number: string | null }>();
   const ids = targets.map((t) => t.id);
   if (ids.length && action !== "note") {
-    const { data } = await loose.from("orders").select("id,assigned_to,priority,ops_tags").in("id", ids);
-    for (const r of data ?? []) prevById.set(r.id, { assigned_to: r.assigned_to ?? null, priority: r.priority ?? null, ops_tags: Array.isArray(r.ops_tags) ? r.ops_tags : [] });
+    const { data } = await loose.from("orders").select("id,assigned_to,priority,ops_tags,fraud_review,wholesale,incident_number").in("id", ids);
+    for (const r of data ?? []) prevById.set(r.id, { assigned_to: r.assigned_to ?? null, priority: r.priority ?? null, ops_tags: Array.isArray(r.ops_tags) ? r.ops_tags : [], fraud_review: r.fraud_review ?? null, wholesale: r.wholesale ?? null, incident_number: r.incident_number ?? null });
   }
 
   for (const t of targets) {
@@ -419,6 +467,18 @@ export async function applyBulkAction(input: BulkActionInput): Promise<BulkActio
         event = "order.tagged"; notes = `− ${(input.tags ?? []).join(", ")}`;
       } else if (action === "note") {
         event = "order.note_added"; notes = input.note ?? ""; // audit-only; never clobbers ops_note
+      } else if (action === "markFraud") {
+        patch = { fraud_review: input.fraudState, updated_at: now() };
+        undoPatch = { fraud_review: prev?.fraud_review ?? "none" };
+        event = "order.fraud_review_set"; notes = `fraud review → ${input.fraudState}`;
+      } else if (action === "markWholesale") {
+        patch = { wholesale: input.wholesaleState, updated_at: now() };
+        undoPatch = { wholesale: prev?.wholesale ?? "none" };
+        event = "order.wholesale_set"; notes = `wholesale → ${input.wholesaleState}`;
+      } else if (action === "linkIncident") {
+        patch = { incident_number: input.incidentNumber, updated_at: now() };
+        undoPatch = { incident_number: prev?.incident_number ?? null };
+        event = "order.incident_linked"; notes = `linked ${input.incidentNumber}`;
       } else if (action === "restore") {
         const rec = (input.restore ?? []).find((r) => r.orderNumber === t.orderNumber);
         if (!rec) { failed.push({ orderNumber: t.orderNumber, reason: "no undo record" }); continue; }
@@ -462,6 +522,9 @@ export async function setOrderTags(id: string, tags: string[], actorId?: string)
   await logEvent({ orderId: id, entityType: "order", entityId: id, event: "order.tagged", actorId, notes: clean.join(", ") || "(cleared)" });
   return { ok: true };
 }
+
+// Note: single-order flag changes reuse the bulk engine (applyBulkAction with one target) so there
+// is ONE audited mutation path for fraud/wholesale/incident — no parallel setter to drift.
 
 /** Re-send the order confirmation email (via the notification engine, inline). */
 export async function resendConfirmation(id: string, actorId?: string): Promise<{ ok: boolean; reason?: string }> {

@@ -8,11 +8,14 @@
  * discovered in production.
  */
 
-export type BulkAction = "assign" | "priority" | "addTags" | "removeTags" | "note" | "restore";
+export type BulkAction =
+  | "assign" | "priority" | "addTags" | "removeTags" | "note"
+  | "markFraud" | "markWholesale" | "linkIncident" // Phase 2 schema-backed flags
+  | "restore";
 
 /** Actions that change a stored column → reversible via a captured previous value. `note` writes an
  *  immutable audit event (no undo); `restore` IS the undo. */
-export const REVERSIBLE: BulkAction[] = ["assign", "priority", "addTags", "removeTags"];
+export const REVERSIBLE: BulkAction[] = ["assign", "priority", "addTags", "removeTags", "markFraud", "markWholesale", "linkIncident"];
 
 export const BULK_PRIORITIES = ["normal", "high", "urgent", "vip"] as const;
 export const MAX_TAGS = 20;
@@ -33,12 +36,18 @@ export function removeTagsFrom(existing: string[], remove: string[]): string[] {
   return existing.filter((t) => !drop.has(t));
 }
 
+export const FRAUD_VALUES = ["none", "pending_review", "under_investigation", "cleared", "confirmed_fraud"] as const;
+export const WHOLESALE_VALUES = ["none", "wholesale_order", "b2b_customer"] as const;
+
 export interface BulkValidateInput {
   action: BulkAction;
   staffId?: string;
   priority?: string;
   tags?: string[];
   note?: string;
+  fraudState?: string;
+  wholesaleState?: string;
+  incidentNumber?: string;
 }
 /** Validate the params for an action before any DB work. Returns a reason when invalid. */
 export function validateBulk(i: BulkValidateInput): { ok: true } | { ok: false; reason: string } {
@@ -53,6 +62,14 @@ export function validateBulk(i: BulkValidateInput): { ok: true } | { ok: false; 
       return i.tags && i.tags.length ? { ok: true } : { ok: false, reason: "Enter at least one tag." };
     case "note":
       return i.note && i.note.trim().length ? { ok: true } : { ok: false, reason: "Enter a note." };
+    case "markFraud":
+      return i.fraudState && (FRAUD_VALUES as readonly string[]).includes(i.fraudState)
+        ? { ok: true } : { ok: false, reason: "Pick a valid fraud-review state." };
+    case "markWholesale":
+      return i.wholesaleState && (WHOLESALE_VALUES as readonly string[]).includes(i.wholesaleState)
+        ? { ok: true } : { ok: false, reason: "Pick a valid wholesale state." };
+    case "linkIncident":
+      return i.incidentNumber && i.incidentNumber.trim().length ? { ok: true } : { ok: false, reason: "Enter an incident number." };
     case "restore":
       return { ok: true };
   }
@@ -67,6 +84,9 @@ export function bulkConfirmText(action: BulkAction, count: number, detail: strin
     case "addTags": return `Add tag(s) “${detail}” to ${n}?`;
     case "removeTags": return `Remove tag(s) “${detail}” from ${n}?`;
     case "note": return `Add an internal note to ${n}?`;
+    case "markFraud": return `Set fraud review of ${n} to ${detail}?`;
+    case "markWholesale": return `Set wholesale of ${n} to ${detail}?`;
+    case "linkIncident": return `Link ${n} to incident ${detail}?`;
     case "restore": return `Undo the last change on ${n}?`;
   }
 }

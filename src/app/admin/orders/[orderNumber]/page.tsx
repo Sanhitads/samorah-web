@@ -10,9 +10,11 @@ import { getShipmentByOrderId } from "@/services/shipmentService";
 import { getReturnsForOrder } from "@/services/returnService";
 import { hasCapability } from "@/lib/auth/capabilities";
 import { OrderMeta } from "@/components/admin/OrderMeta";
+import { OrderFlags } from "@/components/admin/OrderFlags";
 import { RefundRetryBanner } from "@/components/admin/RefundRetryBanner";
 import { getIncidentForOrder } from "@/services/incidentService";
 import { orderHealth } from "@/lib/admin/orderHealth";
+import { fraudBadge, wholesaleBadge } from "@/lib/admin/orderList";
 
 /**
  * Order detail — `/admin/orders/[orderNumber]`. The single pane of glass for one
@@ -58,6 +60,8 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
     fulfillmentStatus: order.fulfillment_status ?? null,
     shipmentException: shipment ? ["exception", "delayed", "lost", "damaged"].includes(shipment.status) : false,
   });
+  const fraudB = fraudBadge(order.fraud_review);
+  const wholeB = wholesaleBadge(order.wholesale);
 
   return (
     <main className="admin">
@@ -66,6 +70,8 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
         <h1 className="admin__title">{order.order_number}</h1>
         <p className="admin__count">
           <span className="oh-badge" data-h={health.tone} title={health.reason}>{health.dot} {health.label}</span>
+          {fraudB ? <span className="adm-badge" data-b={fraudB.b} style={{ marginLeft: 8 }}>{fraudB.label}</span> : null}
+          {wholeB ? <span className="adm-badge" data-b={wholeB.b} style={{ marginLeft: 8 }}>{wholeB.label}</span> : null}
           <span className="ff-status" data-s={order.status} style={{ marginLeft: 8 }}>{order.status}</span>
           <span className="om-pay" data-tone={order.payment_status === "paid" ? "paid" : order.payment_status?.includes("refund") ? "refunded" : "pending"} style={{ marginLeft: 8 }}>{order.payment_status}</span>
           <span className="admin__muted"> · placed {dt(order.placed_at)}{order.invoice_number ? ` · Invoice ${order.invoice_number}` : ""}</span>
@@ -189,6 +195,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
         {/* Internal: tags + note + resend */}
         {hasCapability(staff.role, "fulfillment.triage") ? (
           <OrderMeta orderId={order.id} note={order.ops_note ?? null} tags={Array.isArray(order.ops_tags) ? order.ops_tags : []} canResend={hasCapability(staff.role, "fulfillment.operate")} />
+        ) : null}
+
+        {/* Operational flags (Phase 2) — fraud review / wholesale / incident link */}
+        {hasCapability(staff.role, "fulfillment.triage") ? (
+          <OrderFlags orderNumber={order.order_number} fraudReview={order.fraud_review ?? "none"} wholesale={order.wholesale ?? "none"} incidentNumber={order.incident_number ?? null} />
         ) : null}
 
         {/* Notifications */}

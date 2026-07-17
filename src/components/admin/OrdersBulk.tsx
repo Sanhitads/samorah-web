@@ -3,6 +3,7 @@
 import { createContext, useContext, useMemo, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { parseTags, bulkConfirmText, BULK_PRIORITIES, type BulkAction, type BulkUndo } from "@/lib/admin/orderBulk";
+import { FRAUD_STATES, WHOLESALE_STATES } from "@/lib/admin/orderList";
 
 /**
  * Safe bulk-operations layer (Phase 1). A client island wrapped around the server-rendered orders
@@ -128,6 +129,9 @@ function BulkBar({
   const [priority, setPriority] = useState("high");
   const [tagInput, setTagInput] = useState("");
   const [note, setNote] = useState("");
+  const [fraudState, setFraudState] = useState("pending_review");
+  const [wholesaleState, setWholesaleState] = useState("wholesale_order");
+  const [incidentNumber, setIncidentNumber] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [undo, setUndo] = useState<BulkUndo | null>(null);
@@ -178,6 +182,9 @@ function BulkBar({
     else if (active === "addTags") { const tags = parseTags(tagInput); post({ action: "addTags", tags }, bulkConfirmText("addTags", count, tags.join(", "))); }
     else if (active === "removeTags") { const tags = parseTags(tagInput); post({ action: "removeTags", tags }, bulkConfirmText("removeTags", count, tags.join(", "))); }
     else if (active === "note") post({ action: "note", note: note.trim() }, bulkConfirmText("note", count, ""));
+    else if (active === "markFraud") post({ action: "markFraud", fraudState }, bulkConfirmText("markFraud", count, fraudState));
+    else if (active === "markWholesale") post({ action: "markWholesale", wholesaleState }, bulkConfirmText("markWholesale", count, wholesaleState));
+    else if (active === "linkIncident") post({ action: "linkIncident", incidentNumber: incidentNumber.trim() }, bulkConfirmText("linkIncident", count, incidentNumber.trim()));
     else if (active === "export") exportSelected();
   };
 
@@ -196,6 +203,9 @@ function BulkBar({
         <button type="button" className="ff-btn" disabled={busy} onClick={() => setActive("addTags")}>Add tags</button>
         <button type="button" className="ff-btn" disabled={busy} onClick={() => setActive("removeTags")}>Remove tags</button>
         <button type="button" className="ff-btn" disabled={busy} onClick={() => setActive("note")}>Add note</button>
+        <button type="button" className="ff-btn" disabled={busy} onClick={() => setActive("markFraud")}>Fraud review</button>
+        <button type="button" className="ff-btn" disabled={busy} onClick={() => setActive("markWholesale")}>Wholesale</button>
+        <button type="button" className="ff-btn" disabled={busy} onClick={() => setActive("linkIncident")}>Link incident</button>
         {canExport ? <button type="button" className="ff-btn" disabled={busy} onClick={() => setActive("export")}>Export</button> : null}
       </div>
 
@@ -217,6 +227,19 @@ function BulkBar({
           ) : null}
           {active === "note" ? (
             <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Internal note (audited)" aria-label="Note" />
+          ) : null}
+          {active === "markFraud" ? (
+            <select value={fraudState} onChange={(e) => setFraudState(e.target.value)} aria-label="Fraud review state">
+              {FRAUD_STATES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
+          ) : null}
+          {active === "markWholesale" ? (
+            <select value={wholesaleState} onChange={(e) => setWholesaleState(e.target.value)} aria-label="Wholesale state">
+              {WHOLESALE_STATES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
+          ) : null}
+          {active === "linkIncident" ? (
+            <input value={incidentNumber} onChange={(e) => setIncidentNumber(e.target.value)} placeholder="Incident number e.g. INC-2026-001" aria-label="Incident number" />
           ) : null}
           {active === "export" ? <span className="admin__muted">Export {count} order{count === 1 ? "" : "s"} as CSV</span> : null}
           <button type="button" className="ff-btn ff-btn--primary" disabled={busy} onClick={apply}>{busy ? "…" : active === "export" ? "Download" : "Apply"}</button>

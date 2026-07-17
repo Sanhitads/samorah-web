@@ -511,6 +511,26 @@ export async function getIncidentForOrder(orderNumber: string): Promise<{ number
   } catch { return null; }
 }
 
+/**
+ * BATCH: order_numbers that have an OPEN incident (soft link). One query, for the orders-list
+ * badge + Health computation + the incident filter — never per-row (no N+1). Pass a scope to limit
+ * to a page's numbers; omit to fetch all open-incident orders (for the filter), capped.
+ */
+export async function getOpenIncidentOrderNumbers(orderNumbers?: string[]): Promise<Set<string>> {
+  try {
+    let q = db()
+      .from("incident_notifications")
+      .select("order_number, incidents!inner(status)")
+      .in("incidents.status", ["open", "investigating", "mitigated"])
+      .not("order_number", "is", null);
+    if (orderNumbers?.length) q = q.in("order_number", orderNumbers);
+    const { data } = await q.limit(2000);
+    return new Set((data ?? []).map((r: { order_number: string | null }) => r.order_number).filter(Boolean) as string[]);
+  } catch {
+    return new Set();
+  }
+}
+
 // ── Metrics ──────────────────────────────────────────────────────────────────
 export interface IncidentMetrics { critical: number; high: number; open: number; resolvedToday: number; avgResolutionMin: number | null; oldestOpenMin: number | null }
 export async function getIncidentMetrics(): Promise<IncidentMetrics> {

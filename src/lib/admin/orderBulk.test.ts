@@ -32,7 +32,20 @@ describe("bulk operation logic (Phase 1 — safe, non-destructive)", () => {
   it("only column-changing actions are reversible (note is not)", () => {
     expect(REVERSIBLE).toContain("assign");
     expect(REVERSIBLE).toContain("addTags");
+    expect(REVERSIBLE).toContain("markFraud");
+    expect(REVERSIBLE).toContain("markWholesale");
+    expect(REVERSIBLE).toContain("linkIncident");
     expect(REVERSIBLE).not.toContain("note");
+  });
+
+  it("validates the Phase-2 flag actions against their allowed values", () => {
+    expect(validateBulk({ action: "markFraud", fraudState: "confirmed_fraud" }).ok).toBe(true);
+    expect(validateBulk({ action: "markFraud", fraudState: "bogus" }).ok).toBe(false);
+    expect(validateBulk({ action: "markFraud" }).ok).toBe(false);
+    expect(validateBulk({ action: "markWholesale", wholesaleState: "b2b_customer" }).ok).toBe(true);
+    expect(validateBulk({ action: "markWholesale", wholesaleState: "nope" }).ok).toBe(false);
+    expect(validateBulk({ action: "linkIncident", incidentNumber: "INC-2026-001" }).ok).toBe(true);
+    expect(validateBulk({ action: "linkIncident", incidentNumber: "  " }).ok).toBe(false);
   });
 
   it("confirm text names the count + detail", () => {

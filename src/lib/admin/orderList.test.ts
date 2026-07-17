@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   sortColumn, orderAge, priorityBadge, paymentMethodLabel, opsFlags,
+  fraudBadge, wholesaleBadge, FRAUD_FILTERS, WHOLESALE_FILTERS,
   SAVED_VIEWS, savedViewHref, isViewActive, rangeStart, type OrderFlagInput,
 } from "@/lib/admin/orderList";
 
@@ -63,13 +64,29 @@ describe("orders-list vocabulary", () => {
     expect(opsFlags({ ...base, refundAmount: 200 })).toEqual([{ label: "Refunded", f: "refunded" }]);
     expect(opsFlags({ ...base, latestRefundStatus: "processing" })).toEqual([{ label: "Refunded", f: "refunded" }]);
     expect(opsFlags({ ...base, isGift: true })).toEqual([{ label: "Gift", f: "gift" }]);
-    expect(opsFlags({ ...base, tags: ["Wholesale", "Fragile"] })).toEqual([{ label: "Wholesale", f: "wholesale" }]);
     expect(opsFlags({ ...base, status: "rto" })).toEqual([{ label: "RTO", f: "returned" }]);
   });
 
+  it("wholesale is NOT derived from tags anymore (it's a first-class column)", () => {
+    expect(opsFlags({ ...base, tags: ["Wholesale", "Fragile"] })).toEqual([]);
+  });
+
   it("stacks multiple flags in a deterministic order", () => {
-    const flags = opsFlags({ status: "cancelled", refundAmount: 500, latestRefundStatus: null, isGift: true, tags: ["Wholesale"] });
-    expect(flags.map((f) => f.f)).toEqual(["cancelled", "refunded", "gift", "wholesale"]);
+    const flags = opsFlags({ status: "cancelled", refundAmount: 500, latestRefundStatus: null, isGift: true, tags: [] });
+    expect(flags.map((f) => f.f)).toEqual(["cancelled", "refunded", "gift"]);
+  });
+
+  it("fraud + wholesale badges map states; 'none' shows nothing", () => {
+    expect(fraudBadge("pending_review")).toEqual({ label: "Fraud: Pending", b: "fraudp" });
+    expect(fraudBadge("confirmed_fraud")).toEqual({ label: "Fraud: Confirmed", b: "fraudc" });
+    expect(fraudBadge("none")).toBeNull();
+    expect(fraudBadge(null)).toBeNull();
+    expect(wholesaleBadge("wholesale_order")).toEqual({ label: "Wholesale", b: "wholesale" });
+    expect(wholesaleBadge("b2b_customer")).toEqual({ label: "B2B", b: "b2b" });
+    expect(wholesaleBadge("none")).toBeNull();
+    // filters exclude 'none'
+    expect(FRAUD_FILTERS.find((f) => f.value === "none")).toBeUndefined();
+    expect(WHOLESALE_FILTERS.find((f) => f.value === "none")).toBeUndefined();
   });
 
   // ── saved views ──
