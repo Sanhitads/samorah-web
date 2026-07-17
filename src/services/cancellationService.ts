@@ -14,13 +14,19 @@ import { logEvent } from "@/services/auditService";
 import { callRpc } from "@/lib/supabase/rpc";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { CancellationEmailInput } from "@/lib/email";
+import { customerSafePhrase } from "@/lib/admin/orderDialogs";
 
 export type CancellationType = "customer" | "warehouse_exception" | "fraud" | "admin";
 
 export interface CancelOrderInput {
   orderNumber: string;
-  reason?: string;
+  reason?: string; // LEGACY single field — kept for back-compat; treated as the internal note
+  customerReason?: string; // customer-facing text (goes in the email). Falls back to a safe phrase.
+  internalNote?: string; // internal only — recorded in the audit stream, NEVER emailed
+  reasonCategory?: string; // taxonomy top-level (analytics)
+  subReason?: string; // taxonomy detail (analytics + drives the safe customer phrase)
   cancellationType?: CancellationType; // the typed cause (review point 1)
+  notifyEmail?: boolean; // default true; false → cancel silently (no customer email)
   releaseInventory?: boolean;
   issueRefund?: boolean;
   refundAmount?: number; // rupees; defaults to the full remaining balance
@@ -49,6 +55,14 @@ export async function cancelOrder(input: CancelOrderInput): Promise<CancelOrderR
     razorpay_payment_id: string | null;
   };
 
+  // Split the two audiences. `cancel_reason` is emailed to the CUSTOMER verbatim by the worker, so
+  // it must carry only the customer-safe phrase — never an internal note like "suspected fraud".
+  // The internal note lives in the audit stream, seen by staff, never sent out. (Fixes the leak
+  // where a single field was both recorded AND emailed.)
+  const type = input.cancellationType ?? "admin";
+  const internalNote = input.internalNote ?? input.reason ?? null; // legacy `reason` = internal
+  const customerFacing = input.customerReason ?? (input.subReason ? customerSafePhrase(type, input.subReason) : null);
+
   const cancel = await callRpc<{
     ok: boolean;
     already_cancelled?: boolean;
@@ -58,8 +72,8 @@ export async function cancelOrder(input: CancelOrderInput): Promise<CancelOrderR
   }>("cancel_order", {
     p: {
       order_id: o.id,
-      reason: input.reason ?? null,
-      cancellation_type: input.cancellationType ?? "admin",
+      reason: customerFacing, // → cancel_reason → the customer email; safe text only
+      cancellation_type: type,
       actor_id: input.actorId ?? null,
       release_inventory: Boolean(input.releaseInventory),
     },
@@ -77,8 +91,15 @@ export async function cancelOrder(input: CancelOrderInput): Promise<CancelOrderR
     actorId: input.actorId,
     previousState: cancel.previous_status,
     newState: "cancelled",
-    notes: input.reason ?? undefined,
-    metadata: { restocked: cancel.restocked ?? 0, releaseInventory: Boolean(input.releaseInventory), cancellationType: input.cancellationType ?? "admin" },
+    notes: internalNote ?? undefined, // INTERNAL — the audit trail, not the customer
+    metadata: {
+      restocked: cancel.restocked ?? 0,
+      releaseInventory: Boolean(input.releaseInventory),
+      cancellationType: type,
+      reasonCategory: input.reasonCategory ?? type,
+      subReason: input.subReason ?? null,
+      customerReason: customerFacing,
+    },
   });
 
   // Optional, explicit refund — only for orders that actually took money.
@@ -98,11 +119,16 @@ export async function cancelOrder(input: CancelOrderInput): Promise<CancelOrderR
     }
   }
 
-  // Notify the customer (async, via the fulfillment worker). Idempotent per order.
-  try {
-    await callRpc<void>("queue_fulfillment_job", { p_order_id: o.id, p_job_type: "cancellation_email" });
-  } catch (e) {
-    console.error("queue cancellation_email failed", e); // never block the cancel
+  // Notify the customer (async, via the fulfillment worker). Idempotent per order. Skipped when the
+  // operator unticks Email — e.g. an internal admin cancellation the customer needn't hear about.
+  // (SMS/WhatsApp are recorded as an intent in the audit metadata above but not yet delivered — no
+  // customer template / WhatsApp number exists; the channel structure is ready for that later.)
+  if (input.notifyEmail !== false) {
+    try {
+      await callRpc<void>("queue_fulfillment_job", { p_order_id: o.id, p_job_type: "cancellation_email" });
+    } catch (e) {
+      console.error("queue cancellation_email failed", e); // never block the cancel
+    }
   }
 
   return { ok: true, previousStatus: cancel.previous_status, restocked: cancel.restocked, refund };

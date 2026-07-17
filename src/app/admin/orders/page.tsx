@@ -201,6 +201,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
                         orderNumber={o.orderNumber}
                         status={o.status}
                         paymentStatus={o.paymentStatus}
+                        paymentMethod={o.paymentMethod}
                         total={o.total}
                         refundAmount={o.refundAmount}
                         hasPayment={o.hasPayment}

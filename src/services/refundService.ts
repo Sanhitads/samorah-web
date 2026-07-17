@@ -25,7 +25,9 @@ import { notifyOps } from "@/lib/notifications/opsEngine";
 export interface IssueRefundInput {
   orderId: string;
   amount: number; // rupees; the amount to refund (defaults to full remaining if omitted upstream)
-  reason?: string;
+  reason?: string; // customer-facing reason (stored in the ledger)
+  internalNote?: string; // internal finance note — audit metadata only, never customer-facing
+  refundType?: string; // full | partial | shipping (for analytics)
   actorId?: string;
   paymentId?: string | null; // razorpay_payment_id; null → manual refund
 }
@@ -77,7 +79,7 @@ export async function issueRefund(input: IssueRefundInput): Promise<IssueRefundR
       actorId: input.actorId,
       newState: "processing",
       notes: `Manual refund ₹${input.amount.toFixed(2)}${input.reason ? ` — ${input.reason}` : ""}`,
-      metadata: { method: "manual", amount: input.amount },
+      metadata: { method: "manual", amount: input.amount, refundType: input.refundType ?? null, internalNote: input.internalNote ?? null },
     });
     return { ok: true, refundId, status: "processing", method };
   }
@@ -140,7 +142,7 @@ export async function issueRefund(input: IssueRefundInput): Promise<IssueRefundR
     actorId: input.actorId,
     newState: status,
     notes: `Refund ₹${input.amount.toFixed(2)} via Razorpay${input.reason ? ` — ${input.reason}` : ""}`,
-    metadata: { method: "gateway", amount: input.amount, razorpayRefundId: gw.refundId },
+    metadata: { method: "gateway", amount: input.amount, razorpayRefundId: gw.refundId, refundType: input.refundType ?? null, internalNote: input.internalNote ?? null },
   });
   // Authoritative server-side `refund` (review priority B), keyed by order_number so it
   // matches the purchase transaction in GA4. Non-blocking.

@@ -17,7 +17,12 @@ export async function POST(request: Request) {
   let body: {
     orderNumber?: string;
     reason?: string;
+    customerReason?: string;
+    internalNote?: string;
+    reasonCategory?: string;
+    subReason?: string;
     cancellationType?: CancellationType;
+    notifyEmail?: boolean;
     releaseInventory?: boolean;
     issueRefund?: boolean;
     refundAmount?: number;
@@ -36,7 +41,12 @@ export async function POST(request: Request) {
   const result = await cancelOrder({
     orderNumber: body.orderNumber,
     reason: body.reason,
+    customerReason: body.customerReason,
+    internalNote: body.internalNote,
+    reasonCategory: body.reasonCategory,
+    subReason: body.subReason,
     cancellationType: body.cancellationType,
+    notifyEmail: body.notifyEmail,
     releaseInventory: body.releaseInventory,
     issueRefund: Boolean(body.issueRefund) && mayRefund,
     refundAmount: body.refundAmount,

@@ -136,6 +136,48 @@
 .om-check input { margin-top: 2px; }
 .om-modal__actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
 
+/* ── Cancel/Refund dialogs — enriched (Screens 2–3) ── */
+.om-modal__card--wide { max-width: 520px; }
+.om-field__hint { font-style: normal; text-transform: none; letter-spacing: 0; color: var(--smoke, #6b6259); font-size: 10px; }
+.om-field__ro { background: rgba(31,26,22,0.04) !important; color: var(--smoke, #6b6259); }
+.om-reason-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.om-guard-note { font-family: var(--font-sans); font-size: 12px; color: #8a6d3b; background: rgba(201,169,110,0.12); border: 1px solid rgba(201,169,110,0.4); border-radius: 5px; padding: 8px 10px; margin-bottom: 12px; line-height: 1.5; }
+/* Impact preview */
+.om-impact { border: 1px solid var(--ad-hair); border-radius: 5px; padding: 10px 12px; margin: 6px 0 12px; background: rgba(31,26,22,0.015); }
+.om-impact__title { font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--smoke, #6b6259); margin-bottom: 8px; }
+.om-impact__row { display: flex; justify-content: space-between; gap: 12px; font-family: var(--font-sans); font-size: 12px; padding: 3px 0; }
+.om-impact__label { color: var(--ink, #1f1a16); }
+.om-impact__val { text-align: right; }
+.om-impact__row[data-tone="ok"] .om-impact__val { color: #2f6b3c; }
+.om-impact__row[data-tone="warn"] .om-impact__val { color: #8a6d3b; }
+.om-impact__row[data-tone="muted"] .om-impact__val { color: var(--smoke, #6b6259); }
+.om-impact__foot { font-family: var(--font-sans); font-size: 11px; color: #8a6d3b; margin-top: 8px; }
+/* Notify channels */
+.om-channels { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 12px; }
+.om-channels__label { font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--smoke, #6b6259); }
+.om-channel { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-sans); font-size: 12px; color: var(--ink, #1f1a16); }
+.om-channel--soon { color: var(--smoke, #6b6259); }
+.om-channel--soon em { font-style: normal; font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ad-gold, #8a6d3b); }
+/* Segmented refund type */
+.om-seg { display: inline-flex; border: 1px solid var(--ad-hair); border-radius: 5px; overflow: hidden; margin-bottom: 12px; }
+.om-seg__btn { padding: 7px 14px; font-family: var(--font-sans); font-size: 12px; background: #fff; border: none; border-right: 1px solid var(--ad-hair); cursor: pointer; color: var(--ink, #1f1a16); }
+.om-seg__btn:last-child { border-right: none; }
+.om-seg__btn[data-active="1"] { background: #000; color: #faf7f2; }
+.om-seg__btn:disabled { opacity: 0.4; cursor: not-allowed; }
+/* Breakdown + gateway + history */
+.om-breakdown { margin: 0 0 12px; font-family: var(--font-sans); font-size: 12px; }
+.om-breakdown > div { display: flex; justify-content: space-between; padding: 3px 0; }
+.om-breakdown > div > dt { color: var(--smoke, #6b6259); }
+.om-breakdown__grand { border-top: 1px solid var(--ad-hair); margin-top: 4px; padding-top: 6px !important; font-weight: 600; }
+.om-breakdown__grand > dt { color: var(--ink, #1f1a16) !important; }
+.om-gateway { font-family: var(--font-sans); font-size: 12px; color: var(--smoke, #6b6259); margin-bottom: 12px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.om-tl-wrap { margin-bottom: 12px; }
+.om-tl-wrap summary { font-family: var(--font-sans); font-size: 11px; color: var(--ad-gold, #8a6d3b); cursor: pointer; }
+.om-tl-mini, .om-hist { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.om-tl-mini li { font-family: var(--font-sans); font-size: 11px; color: var(--ink, #1f1a16); }
+.om-hist li { display: flex; justify-content: space-between; gap: 8px; align-items: center; font-family: var(--font-sans); font-size: 12px; }
+.om-guard { border: 1px solid rgba(168,68,58,0.4); border-radius: 5px; padding: 10px; background: rgba(168,68,58,0.05); }
+
 /* ── Fulfillment Board context (principles 11–17) ── */
 .admin__table--board { min-width: 1080px; }
 .admin__table--board tbody td { vertical-align: top; }

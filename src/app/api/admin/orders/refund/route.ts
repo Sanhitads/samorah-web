@@ -17,7 +17,7 @@ export async function POST(request: Request) {
   const staff = await requireCapability("order.refund");
   if (!staff.ok) return NextResponse.json({ error: "Forbidden — you lack the order.refund capability." }, { status: 403 });
 
-  let body: { orderNumber?: string; amount?: number; reason?: string };
+  let body: { orderNumber?: string; amount?: number; reason?: string; internalNote?: string; refundType?: string };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -47,6 +47,8 @@ export async function POST(request: Request) {
     orderId: o.id,
     amount,
     reason: body.reason,
+    internalNote: body.internalNote,
+    refundType: body.refundType,
     actorId: staff.userId ?? undefined,
     paymentId: o.razorpay_payment_id,
   });
