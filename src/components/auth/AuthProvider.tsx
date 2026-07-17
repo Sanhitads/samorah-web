@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { useUserStore } from "@/store/useUserStore";
+import { useCheckoutStore } from "@/store/useCheckoutStore";
 import { track } from "@/lib/analytics/events";
 import { getDeviceId } from "@/lib/account/device";
 
@@ -53,6 +54,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (!session) {
         clearUser();
+        // Sign-out must not leave the previous customer's typed address in this tab for whoever
+        // signs in next on a shared device. Gated on SIGNED_OUT, NOT on `!session`: this callback
+        // also fires INITIAL_SESSION with a null session on every GUEST page load, and clearing
+        // there would wipe a guest's checkout on arrival — the exact opposite of the store's job.
+        if (event === "SIGNED_OUT") useCheckoutStore.getState().reset();
         return;
       }
       setSession(session);

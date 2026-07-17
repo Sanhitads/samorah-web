@@ -59,6 +59,8 @@ export type AnalyticsEvent =
   | "review_expanded" | "review_photo_view" | "review_helpful" | "review_sort"
   // ── checkout funnel granularity (review point 17) ──
   | "address_completed" | "shipping_selected" | "payment_selected" | "payment_retry" | "payment_timeout"
+  // fired when a persisted checkout comes back from sessionStorage (refresh / cart round-trip)
+  | "checkout_restored"
   // ── user ──
   | "login" | "sign_up" | "generate_lead" | "newsletter_signup" | "contact_form_submit"
   // ── marketing ──

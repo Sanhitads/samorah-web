@@ -116,6 +116,9 @@ interface Candidate {
  *  active registry — the server injects the DB-loaded set; defaults to config. */
 export function computePromotions(lines: PromoLine[], couponCode?: string, coupons: Coupon[] = COUPONS): PromotionResult {
   const candidates: Candidate[] = [];
+  // Codes that never even entered the running (vs. those skipped for a stacking clash below).
+  // Reported so callers can say WHY a code stopped applying instead of guessing "not recognised".
+  const preSkipped: { code: string; reason: string }[] = [];
 
   // Composition candidate — 15% per complete set, per line.
   const groups = new Map<string, PromoLine[]>();
@@ -163,6 +166,11 @@ export function computePromotions(lines: PromoLine[], couponCode?: string, coupo
           return { amount: amt };
         },
       });
+    } else {
+      // Real case: a coupon applied to a 3-item cart, then an item is removed and the cart drops
+      // below the minimum. The money is already right (no candidate ⇒ no discount) — this is so the
+      // UI can explain it rather than claim the code is unknown.
+      preSkipped.push({ code: coupon.code, reason: `minimum order of ₹${(coupon.minSubtotal ?? 0).toLocaleString("en-IN")} not met` });
     }
   }
 
@@ -171,7 +179,7 @@ export function computePromotions(lines: PromoLine[], couponCode?: string, coupo
   const byLine: Record<string, number> = {};
   const applied: PromotionSnapshot[] = [];
   const accepted: { meta: PromotionMeta; kind: PromotionKind }[] = [];
-  const skipped: { code: string; reason: string }[] = [];
+  const skipped: { code: string; reason: string }[] = [...preSkipped];
   let freeShipping = false;
 
   for (const c of candidates) {

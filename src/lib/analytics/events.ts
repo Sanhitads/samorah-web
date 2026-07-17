@@ -97,6 +97,14 @@ export const trackBundleStarted = (): void => track("bundle_started", {});
 export const trackBundleCompleted = (value: number, size: number): void => track("bundle_completed", { currency: CURRENCY, value, quantity: size });
 export const trackBundleAbandoned = (size: number): void => track("bundle_abandoned", { quantity: size });
 
+/**
+ * A persisted checkout came back from sessionStorage — the customer refreshed, crashed, or went
+ * back to the cart and returned. Measures how often recovery actually happens and whether a
+ * recovered checkout converts; `coupon` is the restored CODE, never a discount.
+ */
+export const trackCheckoutRestored = (coupon?: string, itemCount?: number): void =>
+  track("checkout_restored", { coupon, item_count: itemCount });
+
 // ── Coupon lifecycle (review point 9) ──
 export const trackCouponRejected = (coupon: string, reason?: string): void => track("coupon_rejected", { coupon, reason });
 export const trackCouponRemoved = (coupon: string): void => track("coupon_removed", { coupon });

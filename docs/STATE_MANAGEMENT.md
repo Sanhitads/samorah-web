@@ -77,14 +77,68 @@ Built to survive a cart→checkout round-trip or a refresh without wiping a fill
 | **`consent` not persisted** | Silently restoring a ticked consent box is not a defensible record of agreement. It re-affirms each session. |
 | **sessionStorage, not localStorage** | It holds name, phone, email, address. DPDP data-minimisation: the PII dies with the tab instead of lingering on a shared device. |
 | **No gift message / shipping method / payment method** | These inputs **do not exist** in this checkout — shipping is derived (free/standard), payment is Razorpay-only, and `notes` already covers order notes. Adding fields no UI writes would be dead state. Add them here *if and when* those inputs ship. |
+| **No transient UI state** | Validation errors, `paying`/`paid` flags, API status and the coupon input buffer stay in `CheckoutView`'s local `useState`. Persisting "Enter a valid email" would resurrect an error about a field the customer has since fixed; persisting `paying` would restore a spinner for a request that is long dead. |
 
-**Cleared on:** successful placement (next to `clearCart()`), emptied cart (effect), explicit `reset()`.
+#### Lifetime
+
+Three independent bounds, because sessionStorage alone is not one:
+
+| Bound | Mechanism |
+|---|---|
+| Dies with the tab | sessionStorage |
+| **Expires 24h after the last edit** | `savedAt` stamp + TTL enforced in `expiringSessionStorage` |
+| Cleared on terminal events | successful placement · emptied cart · **sign-out** · explicit `reset()` |
+
+The TTL exists because sessionStorage is **not** as short-lived as it sounds: a browser crash or an
+"restore tabs" reopen days later brings it back. `savedAt` is re-stamped on every write, so an
+actively-edited checkout never expires mid-session, and a 3-day-old restored tab starts clean.
+
+The TTL is enforced at the **storage boundary** (`getItem`), not by callers, so nothing can read past
+it — and stale data is **removed, not ignored**. Leaving day-old PII readable while pretending not to
+see it would satisfy the letter of the rule and none of its purpose.
+
+**Sign-out clearing** lives in `AuthProvider`'s `onAuthStateChange`, gated on `event === "SIGNED_OUT"`
+— **not** on `!session`. That callback also fires `INITIAL_SESSION` with a null session on *every
+guest page load*; clearing there would wipe a guest's checkout on arrival, which is the exact
+opposite of this store's job. It sits in AuthProvider rather than `useAuth.signOut()` because
+AuthProvider already owns store↔session sync and catches *every* sign-out path (explicit, expired,
+revoked from another device), not just the button.
+
 **Deliberately NOT cleared on** payment-modal dismissal: a customer who closes Razorpay to fix a typo
 or retry a card has not abandoned checkout, and destroying their typed address there would defeat the
 store's entire purpose. The cart-empty and success paths already cover real terminal states.
 
-Contract is pinned by `src/store/useCheckoutStore.test.ts` (CHK-001…007) — notably CHK-004, which
-fails if any derived/money field ever gets persisted.
+#### Intentionally unsupported
+
+| Behaviour | Decision |
+|---|---|
+| **Cross-tab sync** | **Not supported.** sessionStorage is per-tab, so two checkout tabs are independent: a coupon applied in Tab A is invisible to Tab B. Accepted — checkout in two tabs at once is rare, and the tab-scoping is the same property that gives us the privacy bound. Syncing would mean localStorage + a `storage` listener, trading that bound away. **Not a divergence risk for money:** each tab derives its own totals from the shared (localStorage) cart via `calculateOrderTotals`, so neither tab can show a stale price — only a stale *input*. |
+| **Schema migration** (`v1 → v2`) | **No `migrate` function, by design.** On a version bump zustand discards the record and falls back to defaults (verified in CHK-012 — it degrades, it does not crash or half-load). Migrating a tab-scoped, 24h-lived, entirely re-typable input cache is code that must stay correct against shapes it can no longer test, for a worst case of "a customer mid-checkout during a deploy retypes an address." Bump the version and let it discard. |
+| **`consent` restore** | Never persisted (above). |
+
+#### Restore is input-only — totals always recompute
+
+The restore path **cannot** carry stale money, because the store has no money in it. On restore:
+
+```
+restore ship / bill / GST / notes / couponCode   ← inputs only
+        ↓
+read the CURRENT cart (useCartStore)
+        ↓
+calculateOrderTotals(items, ship.state, { couponCode })   ← single money module
+```
+
+`CheckoutView` derives `totals` in a `useMemo` keyed on `[items, ship.state, couponCode]`, and `items`
+is the live cart. Remove a product and the totals re-derive from what is actually in the cart now.
+The coupon is no exception: only the **code** survives, and `computePromotions` re-tests its minimum
+against the current subtotal every time — a code that no longer qualifies contributes ₹0 and reports
+why (`promotionsSkipped`). Pinned by `coupon-registry.test.ts` ("an item removed after applying").
+
+`checkout_restored` (GA4) fires once per page life when inputs actually come back — an all-empty
+record left by a `reset()` is not a restore (CHK-014).
+
+Contract pinned by `src/store/useCheckoutStore.test.ts` (CHK-001…015) — notably **CHK-004**, an exact
+persisted-key allowlist that fails if any derived/money field or UI flag is ever added.
 
 ## §7.3 Cart persistence
 

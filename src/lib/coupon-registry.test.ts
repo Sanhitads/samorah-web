@@ -29,6 +29,22 @@ describe("DB-driven coupon registry (injected into the engine)", () => {
     expect(t.discount).toBe(0);
   });
 
+  // The restore scenario: a customer applies a code to a 3-item cart, goes back, removes an item,
+  // and returns to checkout. Only the CODE is restored — the discount must be re-earned against the
+  // CURRENT cart, and a code that no longer qualifies must say so rather than read as unknown.
+  it("an item removed after applying → discount recomputes against the current cart, with a reason", () => {
+    const three = [line(400), line(500), line(300)]; // ₹1200 ≥ ₹999 → qualifies
+    const two = [line(400), line(500)];              // ₹900  < ₹999 → no longer qualifies
+
+    const before = computeOrderTotals(three, { couponCode: "WELCOME10", couponRegistry: [WELCOME] });
+    expect(before.discount).toBe(toPaise(120)); // 10% of ₹1200
+
+    const after = computeOrderTotals(two, { couponCode: "WELCOME10", couponRegistry: [WELCOME] });
+    expect(after.discount).toBe(0);              // the old ₹120 does NOT survive the smaller cart
+    expect(after.promotions).toHaveLength(0);
+    expect(after.promotionsSkipped).toContainEqual({ code: "WELCOME10", reason: "minimum order of ₹999 not met" });
+  });
+
   it("fixed coupon subtracts its rupee value (capped at the cart)", () => {
     const FIFTY: Coupon = { ...WELCOME, code: "FLAT50", type: "fixed", value: 50, minSubtotal: undefined, maxDiscount: undefined };
     const t = computeOrderTotals([line(2000)], { couponCode: "FLAT50", couponRegistry: [FIFTY] });

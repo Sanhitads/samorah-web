@@ -18,7 +18,7 @@ import { COMMERCE } from "@/config/commerce";
 import { composeComposition } from "@/lib/bundle";
 import { formatPaise, formatPaise2 } from "@/lib/money";
 import { readStoredUtm } from "@/lib/utm";
-import { trackBeginCheckout, trackAddPaymentInfo, trackApplyCoupon, trackCouponRejected, trackPaymentSelected, trackPaymentStarted, trackPaymentSuccess, trackPaymentFailed, trackCheckoutError, trackWishlistPurchased } from "@/lib/analytics/events";
+import { trackBeginCheckout, trackAddPaymentInfo, trackApplyCoupon, trackCouponRejected, trackCheckoutRestored, trackPaymentSelected, trackPaymentStarted, trackPaymentSuccess, trackPaymentFailed, trackCheckoutError, trackWishlistPurchased } from "@/lib/analytics/events";
 import { useWishlistStore } from "@/store/useWishlistStore";
 import type { AnalyticsItem } from "@/lib/analytics/types";
 import { StateSelect } from "./StateSelect";
@@ -85,6 +85,7 @@ export function CheckoutView() {
   const consent = useCheckoutStore((s) => s.consent);       // not persisted — re-affirmed each time
   const setConsent = useCheckoutStore((s) => s.setConsent);
   const resetCheckout = useCheckoutStore((s) => s.reset);
+  const restored = useCheckoutStore((s) => s.restored);     // not persisted — drives checkout_restored
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [paying, setPaying] = useState(false);
   const [paid, setPaid] = useState(false);
@@ -102,6 +103,11 @@ export function CheckoutView() {
     [items, ship.state, couponCode],
   );
   const couponApplied = couponCode ? totals.promotions.some((p) => p.code === couponCode.toUpperCase()) : false;
+  // A known code that stopped qualifying (cart fell below its minimum, or it can't stack with the
+  // composition discount) is NOT an unknown code — say which, so the customer can act on it.
+  const couponSkipped = couponCode && !couponApplied
+    ? totals.promotionsSkipped.find((p) => p.code === couponCode.toUpperCase())
+    : undefined;
 
   // GA4 ecommerce items for this checkout (no PII).
   const analyticsItems = useMemo<AnalyticsItem[]>(
@@ -125,6 +131,16 @@ export function CheckoutView() {
   useEffect(() => {
     if (mounted && items.length === 0 && !paid) resetCheckout();
   }, [mounted, items.length, paid, resetCheckout]);
+
+  // The customer's inputs came back from storage (refresh, crash, or a trip back to the cart).
+  // The flag is CONSUMED, not just read: the store is created once per page load but CheckoutView
+  // can mount several times (cart ↔ checkout is client-side nav), and a ref would re-arm on each
+  // mount and over-count. Consuming ties the event to the rehydration that actually happened.
+  useEffect(() => {
+    if (!mounted || !restored) return;
+    trackCheckoutRestored(couponCode || undefined, items.length);
+    useCheckoutStore.setState({ restored: false });
+  }, [mounted, restored, couponCode, items.length]);
 
   // A RESTORED coupon is only a code — re-validate it rather than trust it. Prices, expiry and
   // minimums can all have changed since it was typed, and the discount is never persisted.
@@ -528,6 +544,8 @@ export function CheckoutView() {
             )}
             {codeError ? (
               <p className="checkout__code-error">{codeError}</p>
+            ) : couponSkipped ? (
+              <p className="checkout__code-error">Code {couponCode} no longer applies — {couponSkipped.reason}.</p>
             ) : couponCode && !couponApplied ? (
               <p className="checkout__code-error">That code isn’t recognised.</p>
             ) : null}
