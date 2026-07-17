@@ -28,9 +28,13 @@ describe("order health (Phase 3 — computed, never stored)", () => {
     expect(orderHealth({ ...base, ndrStatus: "re_attempt_scheduled" }).state).toBe("attention");
   });
 
-  it("a CLEARED fraud review is not a health concern (only active reviews flag)", () => {
+  it("the DB default 'none' is NOT fraud — a plain order stays healthy", () => {
+    // Regression: "none" is a truthy string, so an over-eager active-check flagged EVERY order as
+    // Fraud Review. The default and a cleared review are both non-concerns.
+    expect(orderHealth({ ...base, fraudReview: "none" }).state).toBe("healthy");
     expect(orderHealth({ ...base, fraudReview: "cleared" }).state).toBe("healthy");
     expect(orderHealth({ ...base, fraudReview: "confirmed_fraud" }).state).toBe("fraud");
+    expect(orderHealth({ ...base, fraudReview: "pending_review" }).state).toBe("fraud");
   });
 
   it("works BEFORE the fraud_review column exists (undefined → never flags fraud)", () => {

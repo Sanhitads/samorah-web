@@ -33,9 +33,10 @@ export interface HealthBadge {
   reason: string; // one-line WHY, for a tooltip / detail line
 }
 
-/** A fraud-review state only flags health while it's ACTIVE — a cleared review is not a concern. */
+/** A fraud-review state only flags health while it's ACTIVE. "none" is the default (not flagged) and
+ *  "cleared" is resolved — neither is a concern. Only pending/investigating/confirmed raise it. */
 function fraudActive(v: string | null | undefined): boolean {
-  return !!v && v !== "cleared";
+  return !!v && v !== "none" && v !== "cleared";
 }
 
 const META: Record<HealthState, Omit<HealthBadge, "reason">> = {
