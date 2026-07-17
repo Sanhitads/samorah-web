@@ -48,3 +48,6 @@ supabase/.temp
 # Never commit env backups (they contain secrets)
 *.bak
 .env*.local.bak
+
+# Dev-server build dir (isolated from production .next)
+.next-dev/

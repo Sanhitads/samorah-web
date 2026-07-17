@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { PHASE_DEVELOPMENT_SERVER } from "next/constants";
 
 // Baseline security headers (full CSP is added in the Security phase, BRD §23.3 / Phase 16).
 const securityHeaders = [
@@ -16,7 +17,13 @@ const securityHeaders = [
   },
 ];
 
-const nextConfig: NextConfig = {
+// Config is a function of `phase` so the DEV server and a production BUILD write to DIFFERENT
+// directories and can never collide. `next dev` → `.next-dev`; `next build` / `next start` (and
+// Vercel, which runs `next build`) → the default `.next`. This permanently prevents the
+// "routes-manifest.json ENOENT → 500" that happens when a `next build` overwrites the `.next` a
+// running dev server is serving from. Production is unaffected (it only ever uses `.next`).
+export default (phase: string): NextConfig => ({
+  distDir: phase === PHASE_DEVELOPMENT_SERVER ? ".next-dev" : ".next",
   reactStrictMode: true,
   images: {
     // Cloudinary is the primary image CDN (BRD §2.3).
@@ -31,6 +38,4 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
-};
-
-export default nextConfig;
+});
