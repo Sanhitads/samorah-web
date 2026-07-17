@@ -456,6 +456,19 @@
 .osv__chip[data-active="1"] { background: #000; color: #faf7f2; border-color: #000; }
 .osv__chip--clear { color: #8a3d2f; }
 .adm-filters__check { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-sans); font-size: 12px; color: var(--ink, #1f1a16); }
+/* ── Safe bulk operations (Phase 1) ── */
+.obulk-th, .obulk-td { width: 30px; text-align: center; }
+.obulk-check { cursor: pointer; }
+.obulk-hint { display: flex; gap: 12px; margin-top: 10px; }
+.obulk-link { background: none; border: none; padding: 0; font-family: var(--font-sans); font-size: 12px; color: var(--ad-gold, #8a6d3b); cursor: pointer; text-decoration: underline; }
+.obulk-link:hover { opacity: 0.7; }
+.obulk-link--clear { color: #8a3d2f; }
+.obulk-bar { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 70; background: #fff; border: 1px solid var(--ad-hair); border-radius: 8px; box-shadow: 0 18px 50px rgba(31,26,22,0.22); padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; max-width: calc(100vw - 32px); }
+.obulk-bar__head { display: flex; align-items: center; gap: 12px; font-family: var(--font-sans); font-size: 13px; color: var(--ink, #1f1a16); }
+.obulk-bar__actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.obulk-bar__form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 8px; border-top: 1px solid var(--ad-hair); }
+.obulk-bar__form select, .obulk-bar__form input { padding: 7px 10px; font-family: var(--font-sans); font-size: 13px; border: 1px solid var(--ad-hair); border-radius: 4px; min-width: 180px; }
+.obulk-bar__msg { display: flex; align-items: center; gap: 10px; font-family: var(--font-sans); font-size: 12px; color: #2f6b3c; }
 .om-meta-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
 
 /* ── Activity colour coding (OS Point 18) ── */

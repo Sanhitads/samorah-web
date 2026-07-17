@@ -6,6 +6,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logEvent } from "@/services/auditService";
 import { sortColumn, rangeStart, type OrderSort } from "@/lib/admin/orderList";
+import { mergeTags, removeTagsFrom, type BulkAction, type UndoRecord, type BulkUndo } from "@/lib/admin/orderBulk";
 
 export interface OrderOverviewRow {
   id: string;
@@ -44,6 +45,7 @@ export interface OrderFilter {
   awaiting?: boolean; // paid & pre-ship — the "Pending Shipment" view
   refundQueue?: boolean; // has an open (initiated/processing) refund
   needsAttention?: boolean; // on_hold | failed payment | NDR
+  orderNumbers?: string[]; // explicit set (export-selected)
   sort?: OrderSort;
   limit?: number;
 }
@@ -72,6 +74,7 @@ function applyOrderFilters(q: LooseClient, f: OrderFilter, refundQueueIds: strin
   if (f.tag) q = q.contains("ops_tags", [f.tag]);
   if (f.awaiting) q = q.eq("payment_status", "paid").in("status", ["confirmed", "processing", "packed"]);
   if (f.needsAttention) q = q.or("fulfillment_status.eq.on_hold,payment_status.eq.failed,ndr_status.not.is.null");
+  if (f.orderNumbers?.length) q = q.in("order_number", f.orderNumbers.slice(0, 5000));
   // Empty id set → match nothing (an impossible UUID), never `in.()` which PostgREST rejects.
   if (refundQueueIds) q = q.in("id", refundQueueIds.length ? refundQueueIds : ["00000000-0000-0000-0000-000000000000"]);
   const start = rangeStart(f.range);
@@ -327,6 +330,115 @@ export async function getCourierOptions(): Promise<string[]> {
   const loose = createAdminClient() as LooseClient;
   const { data } = await loose.from("orders").select("courier_name").not("courier_name", "is", null).limit(500);
   return [...new Set((data ?? []).map((o: { courier_name: string | null }) => o.courier_name).filter(Boolean) as string[])].sort();
+}
+
+// ── Safe bulk operations (Phase 1) ───────────────────────────────────────────
+export interface BulkTarget { id: string; orderNumber: string; }
+
+/** Resolve id+number pairs for an explicit selection (Select Current Page). */
+export async function resolveTargetsByNumbers(orderNumbers: string[]): Promise<BulkTarget[]> {
+  if (!orderNumbers.length) return [];
+  const loose = createAdminClient() as LooseClient;
+  const { data } = await loose.from("orders").select("id,order_number").in("order_number", orderNumbers.slice(0, 5000));
+  return (data ?? []).map((r: { id: string; order_number: string }) => ({ id: r.id, orderNumber: r.order_number }));
+}
+
+/** Resolve id+number pairs for the whole current filter (Select All Filtered) — same
+ *  applyOrderFilters as the list, capped, so the selection matches exactly what's shown. */
+export async function resolveTargetsByFilter(filter: OrderFilter, cap = 2000): Promise<BulkTarget[]> {
+  const loose = createAdminClient() as LooseClient;
+  const refundQueueIds = await resolveRefundQueueIds(loose, filter);
+  let q = loose.from("orders").select("id,order_number").limit(cap);
+  q = applyOrderFilters(q, filter, refundQueueIds);
+  const { data } = await q;
+  return (data ?? []).map((r: { id: string; order_number: string }) => ({ id: r.id, orderNumber: r.order_number }));
+}
+
+export interface BulkActionInput {
+  action: BulkAction;
+  targets: BulkTarget[];
+  staffId?: string;
+  priority?: string;
+  tags?: string[];
+  note?: string;
+  restore?: UndoRecord[]; // action === "restore"
+  actorId?: string;
+}
+export interface BulkActionResult {
+  done: number;
+  failed: { orderNumber: string; reason: string }[];
+  undo?: BulkUndo; // present for reversible actions — feeds the client's Undo button
+}
+
+/**
+ * Apply a NON-DESTRUCTIVE bulk action, one record at a time so a single bad row is SKIPPED, not
+ * fatal to the batch (an explicit requirement). Reversible actions capture each order's prior value
+ * into an undo descriptor. Current values are batch-read once up front (no per-row read); the writes
+ * are per-row because each order's next value can differ (tags), and per-row isolation is what makes
+ * "skip failures" possible. Every record writes an audit event → full history + timeline.
+ */
+export async function applyBulkAction(input: BulkActionInput): Promise<BulkActionResult> {
+  const loose = createAdminClient() as LooseClient;
+  const { action, targets, actorId } = input;
+  const failed: { orderNumber: string; reason: string }[] = [];
+  const undoRecords: UndoRecord[] = [];
+  let done = 0;
+  const now = () => new Date().toISOString();
+
+  // One batch read of current values — for undo capture + audit previous_state (not needed for note).
+  const prevById = new Map<string, { assigned_to: string | null; priority: string | null; ops_tags: string[] }>();
+  const ids = targets.map((t) => t.id);
+  if (ids.length && action !== "note") {
+    const { data } = await loose.from("orders").select("id,assigned_to,priority,ops_tags").in("id", ids);
+    for (const r of data ?? []) prevById.set(r.id, { assigned_to: r.assigned_to ?? null, priority: r.priority ?? null, ops_tags: Array.isArray(r.ops_tags) ? r.ops_tags : [] });
+  }
+
+  for (const t of targets) {
+    try {
+      const prev = prevById.get(t.id);
+      let patch: Record<string, unknown> | null = null;
+      let undoPatch: Record<string, unknown> | null = null;
+      let event = "order.updated";
+      let notes = "";
+
+      if (action === "assign") {
+        patch = { assigned_to: input.staffId ?? null, updated_at: now() };
+        undoPatch = { assigned_to: prev?.assigned_to ?? null };
+        event = "order.assigned"; notes = `assigned via bulk`;
+      } else if (action === "priority") {
+        patch = { priority: input.priority, updated_at: now() };
+        undoPatch = { priority: prev?.priority ?? "normal" };
+        event = "order.priority_set"; notes = `priority → ${input.priority}`;
+      } else if (action === "addTags") {
+        patch = { ops_tags: mergeTags(prev?.ops_tags ?? [], input.tags ?? []), updated_at: now() };
+        undoPatch = { ops_tags: prev?.ops_tags ?? [] };
+        event = "order.tagged"; notes = `+ ${(input.tags ?? []).join(", ")}`;
+      } else if (action === "removeTags") {
+        patch = { ops_tags: removeTagsFrom(prev?.ops_tags ?? [], input.tags ?? []), updated_at: now() };
+        undoPatch = { ops_tags: prev?.ops_tags ?? [] };
+        event = "order.tagged"; notes = `− ${(input.tags ?? []).join(", ")}`;
+      } else if (action === "note") {
+        event = "order.note_added"; notes = input.note ?? ""; // audit-only; never clobbers ops_note
+      } else if (action === "restore") {
+        const rec = (input.restore ?? []).find((r) => r.orderNumber === t.orderNumber);
+        if (!rec) { failed.push({ orderNumber: t.orderNumber, reason: "no undo record" }); continue; }
+        patch = { ...rec.patch, updated_at: now() };
+        event = "order.bulk_undo"; notes = "reverted";
+      }
+
+      if (patch) {
+        const { error } = await loose.from("orders").update(patch).eq("id", t.id);
+        if (error) { failed.push({ orderNumber: t.orderNumber, reason: error.message }); continue; }
+      }
+      await logEvent({ orderId: t.id, entityType: "order", entityId: t.id, event, actorType: actorId ? "staff" : "system", actorId, notes, metadata: { bulk: true, action } });
+      if (undoPatch) undoRecords.push({ orderNumber: t.orderNumber, patch: undoPatch });
+      done++;
+    } catch (e) {
+      failed.push({ orderNumber: t.orderNumber, reason: e instanceof Error ? e.message : "failed" });
+    }
+  }
+
+  return { done, failed, undo: undoRecords.length ? { action, records: undoRecords } : undefined };
 }
 
 // ── Order annotations + resend (Phase 2 admin enhancements) ──────────────────

@@ -17,10 +17,23 @@ export async function GET(request: Request) {
   if (!staff.ok) return new Response("Forbidden — data.export capability required.", { status: 403 });
 
   const url = new URL(request.url);
+  const p = url.searchParams;
+  const numbers = p.get("numbers"); // explicit selection (Export Selected)
   const filter: OrderFilter = {
-    search: url.searchParams.get("search") ?? undefined,
-    status: url.searchParams.get("status") ?? undefined,
-    payment: url.searchParams.get("payment") ?? undefined,
+    search: p.get("search") ?? undefined,
+    status: p.get("status") ?? undefined,
+    payment: p.get("payment") ?? undefined,
+    paymentMethod: p.get("paymentMethod") ?? undefined,
+    priority: p.get("priority") ?? undefined,
+    courier: p.get("courier") ?? undefined,
+    assignedTo: p.get("assignedTo") ?? undefined,
+    tag: p.get("tag") ?? undefined,
+    gift: p.get("gift") === "1",
+    range: p.get("range") ?? undefined,
+    awaiting: p.get("awaiting") === "1",
+    refundQueue: p.get("refundQueue") === "1",
+    needsAttention: p.get("needsAttention") === "1",
+    orderNumbers: numbers ? numbers.split(",").map((s) => s.trim()).filter(Boolean) : undefined,
     limit: 5000,
   };
   const rows = await getOrdersOverview(filter);

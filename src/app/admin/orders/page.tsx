@@ -7,6 +7,7 @@ import {
   HIGH_VALUE_THRESHOLD, type OrderFilter,
 } from "@/services/orderAdminService";
 import { OrderActions } from "@/components/admin/OrderActions";
+import { OrdersBulkProvider, OrderCheckbox } from "@/components/admin/OrdersBulk";
 import { refundBadge } from "@/lib/fulfillment/derive";
 import {
   orderAge, priorityBadge, paymentMethodLabel, opsFlags,
@@ -149,10 +150,18 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         {canExport ? <a className="ff-btn adm-filters__export" href={`/api/admin/orders/export${qs ? `?${qs}` : ""}`}>Export CSV</a> : null}
       </form>
 
+      <OrdersBulkProvider
+        pageNumbers={orders.map((o) => o.orderNumber)}
+        filteredCount={summary.count}
+        filter={filter as Record<string, unknown>}
+        staff={staffOptions}
+        canExport={canExport}
+      >
       <div className="admin__table-wrap">
         <table className="admin__table">
           <thead>
             <tr>
+              <th className="obulk-th" aria-label="Select"></th>
               <th>Order</th>
               <th>Customer</th>
               <th>Status</th>
@@ -169,6 +178,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
               const method = paymentMethodLabel(o.paymentMethod, o.isCod);
               return (
                 <tr key={o.orderNumber}>
+                  <td className="obulk-td"><OrderCheckbox orderNumber={o.orderNumber} /></td>
                   <td className="admin__mono">
                     <a href={`/admin/orders/${o.orderNumber}`} className="od-link">{o.orderNumber}</a>
                     <div className="adm-badges">
@@ -214,11 +224,12 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
               );
             })}
             {orders.length === 0 ? (
-              <tr><td colSpan={canManage ? 6 : 5} className="admin__empty">No orders match this view.</td></tr>
+              <tr><td colSpan={canManage ? 7 : 6} className="admin__empty">No orders match this view.</td></tr>
             ) : null}
           </tbody>
         </table>
       </div>
+      </OrdersBulkProvider>
     </main>
   );
 }
