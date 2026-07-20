@@ -451,6 +451,11 @@
 .od-ship__row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; font-family: var(--font-sans); font-size: 13px; }
 .od-ship__events { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
 .od-ship__events li { font-family: var(--font-sans); font-size: 12px; color: var(--ink, #1f1a16); }
+/* Gift section — the full message, legible for copying onto the card */
+.od-gift { border: 1px solid rgba(168,68,58,0.28); background: rgba(168,68,58,0.04); border-radius: 6px; padding: 16px 18px; }
+.od-gift__meta { display: flex; flex-wrap: wrap; gap: 18px; font-family: var(--font-sans); font-size: 13px; margin-bottom: 10px; }
+.od-gift__meta b { font-weight: 400; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--smoke, #6b6259); margin-right: 6px; }
+.od-gift__msg { margin: 0; padding: 12px 16px; border-left: 3px solid rgba(168,68,58,0.4); background: #fff; border-radius: 3px; font-family: var(--font-serif); font-size: 15px; line-height: 1.6; color: var(--ink, #1f1a16); white-space: pre-wrap; }
 .od-timeline { list-style: none; margin: 0; padding: 0; }
 .od-tl { display: grid; grid-template-columns: 130px 1fr auto; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--ad-hair); font-family: var(--font-sans); font-size: 13px; align-items: baseline; }
 .od-tl:last-child { border-bottom: none; }

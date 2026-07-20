@@ -123,6 +123,20 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
         </section>
       </div>
 
+      {/* Gift — the full message an operator copies onto the gift card (never truncated here) */}
+      {order.is_gift ? (
+        <section className="od-section od-gift">
+          <h2 className="od-card__title">🎁 Gift</h2>
+          <div className="od-gift__meta">
+            {order.gift_recipient ? <span><b>To</b> {order.gift_recipient}</span> : null}
+            {order.gift_occasion ? <span><b>Occasion</b> {order.gift_occasion}</span> : null}
+          </div>
+          {order.gift_note ? (
+            <blockquote className="od-gift__msg">{order.gift_note}</blockquote>
+          ) : <p className="admin__muted">Gift order — no message provided.</p>}
+        </section>
+      ) : null}
+
       {/* Items */}
       <section className="od-section">
         <h2 className="od-card__title">Items ({items.length})</h2>
