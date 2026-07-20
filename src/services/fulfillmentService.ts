@@ -180,6 +180,7 @@ export interface FulfillmentFilter {
   wholesale?: string;
   gift?: boolean;
   range?: string;    // today | 7d | 30d
+  breached?: boolean; // SLA-breached only (the morning triage view)
   limit?: number;
 }
 
@@ -354,6 +355,7 @@ export async function getFulfillmentQueue(opts: FulfillmentFilter = {}): Promise
   let filtered = opts.queue ? rows.filter((r) => r.queue === opts.queue) : rows;
   if (opts.courier) filtered = filtered.filter((r) => r.courierName === opts.courier);
   if (opts.collection) filtered = filtered.filter((r) => r.collections.includes(opts.collection as string));
+  if (opts.breached) filtered = filtered.filter((r) => r.sla.state === "breached");
   return filtered.sort((a, b) => {
     const pr = EFFECTIVE_RANK[a.effectivePriority] - EFFECTIVE_RANK[b.effectivePriority];
     if (pr !== 0) return pr;

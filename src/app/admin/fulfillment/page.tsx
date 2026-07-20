@@ -45,7 +45,7 @@ function sla(placedAt: string, now: number): string {
 
 interface FulfillmentSearchParams {
   queue?: string; search?: string; picker?: string; courier?: string; collection?: string;
-  priority?: string; payment?: string; wholesale?: string; gift?: string; range?: string;
+  priority?: string; payment?: string; wholesale?: string; gift?: string; range?: string; breached?: string;
 }
 const PRIORITY_FILTERS = [{ v: "vip", l: "VIP" }, { v: "urgent", l: "Urgent" }, { v: "high", l: "High" }, { v: "normal", l: "Normal" }];
 const DATE_RANGES = [{ v: "today", l: "Today" }, { v: "7d", l: "Last 7 days" }, { v: "30d", l: "Last 30 days" }];
@@ -59,6 +59,7 @@ export default async function FulfillmentDashboard({ searchParams }: { searchPar
   const filter: FulfillmentFilter = {
     queue, search: sp.search, picker: sp.picker, courier: sp.courier, collection: sp.collection,
     priority: sp.priority, payment: sp.payment, wholesale: sp.wholesale, gift: sp.gift === "1", range: sp.range,
+    breached: sp.breached === "1",
   };
   const [rows, counts, staffOptions, courierOptions, metrics, assignment, capacity] = await Promise.all([
     getFulfillmentQueue(filter), getQueueCounts(), getStaffOptions(), getCourierOptions(),
@@ -90,7 +91,7 @@ export default async function FulfillmentDashboard({ searchParams }: { searchPar
 
       {/* Operations summary (point 16) + assignment balance (point 18) */}
       <div className="oms-strip">
-        <a href={tabHref()} className="oms-stat oms-stat--link" data-tone={counts.breached ? "over" : undefined}><span className="oms-stat__n">{counts.breached}</span><span className="oms-stat__l">Breached SLA</span></a>
+        <a href={sp.breached === "1" ? "/admin/fulfillment" : "/admin/fulfillment?breached=1"} className="oms-stat oms-stat--link" data-tone={counts.breached ? "over" : undefined} data-active={sp.breached === "1" ? "1" : undefined}><span className="oms-stat__n">{counts.breached}</span><span className="oms-stat__l">Breached SLA{sp.breached === "1" ? " ✕" : ""}</span></a>
         <div className="oms-stat"><span className="oms-stat__n">{metrics.ordersWaiting}</span><span className="oms-stat__l">Awaiting</span></div>
         <div className="oms-stat"><span className="oms-stat__n">{metrics.avgPickMinutes != null ? `${metrics.avgPickMinutes}m` : "—"}</span><span className="oms-stat__l">Avg pick</span></div>
         <div className="oms-stat"><span className="oms-stat__n">{metrics.avgPackMinutes != null ? `${metrics.avgPackMinutes}m` : "—"}</span><span className="oms-stat__l">Avg pack</span></div>

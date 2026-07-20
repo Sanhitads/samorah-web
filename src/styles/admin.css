@@ -249,6 +249,7 @@
 .oms-stat--link { text-decoration: none; cursor: pointer; }
 .oms-stat--link:hover { background: rgba(31,26,22,0.04); }
 .oms-stat[data-tone="over"] .oms-stat__n { color: #8a3d2f; }
+.oms-stat--link[data-active="1"] { border-color: #8a3d2f; background: rgba(168,68,58,0.06); }
 /* Pick panel */
 .pick-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .pick-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--ad-hair); font-family: var(--font-sans); font-size: 13px; }
