@@ -342,6 +342,29 @@ export async function getQueueCounts(): Promise<Record<WorkQueue, number>> {
   return counts;
 }
 
+/** Active-order load per assignee (point 18) — so a lead can rebalance before someone drowns. */
+export async function getAssignmentBalance(): Promise<{ balance: { id: string; name: string; count: number }[]; unassigned: number }> {
+  const db = loose();
+  const { data } = await db.from("orders").select("assigned_to,status").eq("payment_status", "paid").limit(1000);
+  const live = (data ?? []).filter((o: any) => !TERMINAL_ORDER.has(o.status));
+  const counts = new Map<string, number>();
+  let unassigned = 0;
+  for (const o of live) {
+    if (o.assigned_to) counts.set(o.assigned_to, (counts.get(o.assigned_to) ?? 0) + 1);
+    else unassigned++;
+  }
+  const ids = [...counts.keys()];
+  const names = new Map<string, string>();
+  if (ids.length) {
+    const { data: u } = await db.from("users").select("id,full_name").in("id", ids);
+    for (const x of u ?? []) names.set(x.id, x.full_name ?? "");
+  }
+  const balance = [...counts.entries()]
+    .map(([id, count]) => ({ id, name: names.get(id) || "—", count }))
+    .sort((a, b) => b.count - a.count);
+  return { balance, unassigned };
+}
+
 // ── Board context mutators (principles 11–13, 15) ────────────────────────────
 async function orderIdByNumber(db: any, orderNumber: string): Promise<string | null> {
   const { data } = await db.from("orders").select("id").eq("order_number", orderNumber).maybeSingle();

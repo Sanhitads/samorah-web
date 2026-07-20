@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth/requireStaff";
-import { getFulfillmentQueue, getQueueCounts, type FulfillmentFilter } from "@/services/fulfillmentService";
-import { getStaffOptions, getCourierOptions } from "@/services/orderAdminService";
+import { getFulfillmentQueue, getQueueCounts, getAssignmentBalance, type FulfillmentFilter } from "@/services/fulfillmentService";
+import { getStaffOptions, getCourierOptions, getOperationalMetrics } from "@/services/orderAdminService";
 import { FulfillmentActions } from "@/components/admin/FulfillmentActions";
 import { PriorityControl, AssigneeControl, TagsControl } from "@/components/admin/BoardControls";
 import { BoardBulk } from "@/components/admin/BoardBulk";
@@ -59,8 +59,9 @@ export default async function FulfillmentDashboard({ searchParams }: { searchPar
     queue, search: sp.search, picker: sp.picker, courier: sp.courier, collection: sp.collection,
     priority: sp.priority, payment: sp.payment, wholesale: sp.wholesale, gift: sp.gift === "1", range: sp.range,
   };
-  const [rows, counts, staffOptions, courierOptions] = await Promise.all([
+  const [rows, counts, staffOptions, courierOptions, metrics, assignment] = await Promise.all([
     getFulfillmentQueue(filter), getQueueCounts(), getStaffOptions(), getCourierOptions(),
+    getOperationalMetrics(), getAssignmentBalance(),
   ]);
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const now = Date.now();
@@ -85,6 +86,24 @@ export default async function FulfillmentDashboard({ searchParams }: { searchPar
         <h1 className="admin__title">Fulfillment Queue</h1>
         <p className="admin__count">{rows.length} {rows.length === 1 ? "order" : "orders"}{queue ? ` in ${WORK_QUEUES.find((q) => q.key === queue)?.label}` : ""} · sorted by priority</p>
       </header>
+
+      {/* Operations summary (point 16) + assignment balance (point 18) */}
+      <div className="oms-strip">
+        <div className="oms-stat"><span className="oms-stat__n">{metrics.ordersWaiting}</span><span className="oms-stat__l">Awaiting</span></div>
+        <div className="oms-stat"><span className="oms-stat__n">{metrics.avgPickMinutes != null ? `${metrics.avgPickMinutes}m` : "—"}</span><span className="oms-stat__l">Avg pick</span></div>
+        <div className="oms-stat"><span className="oms-stat__n">{metrics.avgPackMinutes != null ? `${metrics.avgPackMinutes}m` : "—"}</span><span className="oms-stat__l">Avg pack</span></div>
+        <div className="oms-stat" data-tone={metrics.oldestWaitingHours != null && metrics.oldestWaitingHours >= 24 ? "warn" : undefined}><span className="oms-stat__n">{metrics.oldestWaitingHours != null ? `${metrics.oldestWaitingHours}h` : "—"}</span><span className="oms-stat__l">Oldest wait</span></div>
+        <div className="oms-stat" data-tone={metrics.ordersOnHold ? "warn" : undefined}><span className="oms-stat__n">{metrics.ordersOnHold}</span><span className="oms-stat__l">On hold</span></div>
+      </div>
+
+      <div className="ff-balance" aria-label="Picker workload">
+        <span className="ff-balance__label">Workload</span>
+        {assignment.balance.length === 0 ? <span className="admin__muted">nobody assigned yet</span> : null}
+        {assignment.balance.map((b) => (
+          <a key={b.id} href={`/admin/fulfillment?picker=${b.id}`} className="ff-balance__chip" data-heavy={b.count >= 15 ? "1" : undefined}>{b.name} <b>{b.count}</b></a>
+        ))}
+        {assignment.unassigned ? <span className="ff-balance__chip ff-balance__chip--none">Unassigned <b>{assignment.unassigned}</b></span> : null}
+      </div>
 
       <nav className="ff-queues" aria-label="Work queues">
         <Link href={tabHref()} className="ff-queue" data-active={!queue ? "1" : "0"}>All <span className="ff-queue__n">{total}</span></Link>

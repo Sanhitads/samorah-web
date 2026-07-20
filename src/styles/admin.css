@@ -216,6 +216,15 @@
 .bc-slabadge[data-tone="ok"]   { background: rgba(60, 120, 70, 0.12); color: #2f6b3c; }
 .bc-slabadge[data-tone="warn"] { background: rgba(201, 140, 80, 0.2); color: #a85f24; }
 .bc-slabadge[data-tone="over"] { background: rgba(168, 68, 58, 0.16); color: #8a3d2f; font-weight: 600; }
+/* Picker workload balance (point 18) */
+.ff-balance { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 14px; }
+.ff-balance__label { font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--smoke, #6b6259); margin-right: 4px; }
+.ff-balance__chip { padding: 4px 11px; font-family: var(--font-sans); font-size: 12px; color: var(--ink, #1f1a16); background: #fff; border: 1px solid var(--ad-hair); border-radius: 999px; text-decoration: none; }
+.ff-balance__chip:hover { background: var(--soft-beige, #efe9e0); }
+.ff-balance__chip b { color: var(--ad-gold, #8a6d3b); }
+.ff-balance__chip[data-heavy="1"] { border-color: rgba(168,68,58,0.4); }
+.ff-balance__chip[data-heavy="1"] b { color: #8a3d2f; }
+.ff-balance__chip--none { color: var(--smoke, #6b6259); }
 .bc-inv { font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.04em; margin-top: 4px; }
 .bc-inv[data-inv="allocated"] { color: #2f6b3c; }
 .bc-inv[data-inv="missing"] { color: #8a3d2f; font-weight: 600; }
