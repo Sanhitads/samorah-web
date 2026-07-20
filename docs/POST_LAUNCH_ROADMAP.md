@@ -126,3 +126,37 @@ services/APIs → assert DB state + audit events + permission gates).
 
 **Priority: Medium.** Not launch-blocking — the unit + service + live-verification + manual-QA layers
 cover the launch surface; this hardens regression safety as the codebase grows.
+
+---
+
+## P5 — Warehouse Operations (Fulfillment)
+
+Advanced warehouse automation, deferred from the launch fulfillment build. The launch scope covered
+SLA, search, filters, analytics, structured hold reasons, shipping milestones, pick progress, packing
+checklist, QC record, and safe bulk ops — everything an operator needs to run the floor by hand.
+These items automate/optimise that floor and need hardware, algorithms, or data we don't have yet.
+
+| Feature | Why deferred | Dependencies | Complexity | Phase |
+|---|---|---|---|---|
+| **Batch Picking Optimization** | Group orders sharing SKUs into one walk. The *bulk start-picking* primitive ships at launch; the *optimization* (which orders to batch, in what order) needs a real algorithm + volume to be worth it. | pick data (launch), warehouse locations (below) | L | WhOps-1 |
+| **Route Optimization** (pick path) | "Shelf A → B → C" walking path needs **warehouse bin/rack/shelf locations, which don't exist** (see Dependency below). Blocked until location data is modelled + populated. | **Warehouse Location data** | L | WhOps-2 |
+| **Barcode Scanner Integration** (scan verification) | Scan product → confirm it matches the order → reduce mis-picks. Needs scanner hardware + a scan-verify flow + SKU/barcode wiring (variants have `barcode`, unused). | scanner hardware, `variants.barcode` wiring | M | WhOps-1 |
+| **RFID** | Tag-level tracking. Hardware + tag economics only justified at scale. | RFID hardware/tags | XL | WhOps-3 |
+| **Warehouse Heat Maps** | Visualise pick density by location. Needs location data + enough pick history. | Warehouse Location data, pick history | M | WhOps-3 |
+| **AI Pick Optimization** | ML-driven pick sequencing/slotting. Needs location data + a large pick-event history to train on. | Warehouse Location data, pick history at volume | XL | WhOps-3 |
+| **Wave Picking** | Release work in timed waves by courier cutoff. Needs volume + cutoff modelling to matter. | courier cutoffs, volume | L | WhOps-2 |
+| **Voice Picking** | Hands-free pick instructions. Hardware + integration; only pays off at scale. | voice hardware, WMS integration | XL | WhOps-3 |
+| **Warehouse Robotics** | Automated storage/retrieval. Major capex; far-future. | robotics hardware/capex | XL | WhOps-3 |
+
+### Dependency: Warehouse Location data (blocks several of the above)
+
+**Status: does not exist.** There is **no bin/rack/shelf/aisle location** stored for any product or
+variant anywhere in the schema — not on `variants`, `products`, or any inventory table (there is no
+`warehouse_inventory`/`stock_location` table; stock is a single scalar `variants.stock`). The Phase-3
+"show warehouse location" board feature and the location-dependent optimizations above (route
+optimization, heat maps, AI pick) are **blocked on this**.
+
+**To unblock:** add per-variant location — a column on `variants` for single-warehouse, or a
+`variant_locations` (variant × warehouse → bin/rack/shelf) table for multi-warehouse — then populate
+it (a real warehouse-mapping exercise, not just a migration). **Complexity: M** (schema) **+ ongoing
+data entry. Recommended phase: WhOps-1** (it gates the rest).
