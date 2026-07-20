@@ -382,6 +382,26 @@ export async function getAssignmentBalance(): Promise<{ balance: { id: string; n
   return { balance, unassigned };
 }
 
+/** Warehouse daily capacity utilisation (point 17) — today's paid orders vs the configured daily
+ *  capacity across active warehouses. `capacity` is null until set (daily_capacity is untracked by
+ *  default), so the panel honestly shows "not set" rather than a fake percentage. */
+export async function getWarehouseCapacity(): Promise<{ capacity: number | null; used: number; remaining: number | null; pct: number | null }> {
+  const db = loose();
+  const { data: whs } = await db.from("warehouses").select("daily_capacity").eq("active", true);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const totalCap = (whs ?? []).reduce((s: number, w: any) => s + (w.daily_capacity ?? 0), 0);
+  const capacity = totalCap > 0 ? totalCap : null;
+  const start = new Date(); start.setHours(0, 0, 0, 0);
+  const { count } = await db.from("orders").select("id", { count: "exact", head: true }).eq("payment_status", "paid").gte("placed_at", start.toISOString());
+  const used = count ?? 0;
+  return {
+    capacity,
+    used,
+    remaining: capacity != null ? Math.max(0, capacity - used) : null,
+    pct: capacity != null ? Math.round((used / capacity) * 100) : null,
+  };
+}
+
 // ── Pick progress (Priority-1 #2) ────────────────────────────────────────────
 export interface PickItem { id: string; name: string; sku: string | null; quantity: number; pickedQty: number; }
 

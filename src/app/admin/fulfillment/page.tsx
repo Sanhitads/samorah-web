@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth/requireStaff";
-import { getFulfillmentQueue, getQueueCounts, getAssignmentBalance, type FulfillmentFilter } from "@/services/fulfillmentService";
+import { getFulfillmentQueue, getQueueCounts, getAssignmentBalance, getWarehouseCapacity, type FulfillmentFilter } from "@/services/fulfillmentService";
 import { getStaffOptions, getCourierOptions, getOperationalMetrics } from "@/services/orderAdminService";
 import { FulfillmentActions } from "@/components/admin/FulfillmentActions";
 import { PriorityControl, AssigneeControl, TagsControl } from "@/components/admin/BoardControls";
@@ -60,9 +60,9 @@ export default async function FulfillmentDashboard({ searchParams }: { searchPar
     queue, search: sp.search, picker: sp.picker, courier: sp.courier, collection: sp.collection,
     priority: sp.priority, payment: sp.payment, wholesale: sp.wholesale, gift: sp.gift === "1", range: sp.range,
   };
-  const [rows, counts, staffOptions, courierOptions, metrics, assignment] = await Promise.all([
+  const [rows, counts, staffOptions, courierOptions, metrics, assignment, capacity] = await Promise.all([
     getFulfillmentQueue(filter), getQueueCounts(), getStaffOptions(), getCourierOptions(),
-    getOperationalMetrics(), getAssignmentBalance(),
+    getOperationalMetrics(), getAssignmentBalance(), getWarehouseCapacity(),
   ]);
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const now = Date.now();
@@ -95,6 +95,10 @@ export default async function FulfillmentDashboard({ searchParams }: { searchPar
         <div className="oms-stat"><span className="oms-stat__n">{metrics.avgPackMinutes != null ? `${metrics.avgPackMinutes}m` : "—"}</span><span className="oms-stat__l">Avg pack</span></div>
         <div className="oms-stat" data-tone={metrics.oldestWaitingHours != null && metrics.oldestWaitingHours >= 24 ? "warn" : undefined}><span className="oms-stat__n">{metrics.oldestWaitingHours != null ? `${metrics.oldestWaitingHours}h` : "—"}</span><span className="oms-stat__l">Oldest wait</span></div>
         <div className="oms-stat" data-tone={metrics.ordersOnHold ? "warn" : undefined}><span className="oms-stat__n">{metrics.ordersOnHold}</span><span className="oms-stat__l">On hold</span></div>
+        <div className="oms-stat" data-tone={capacity.pct != null && capacity.pct >= 90 ? "warn" : undefined}>
+          <span className="oms-stat__n">{capacity.pct != null ? `${capacity.pct}%` : "—"}</span>
+          <span className="oms-stat__l">{capacity.capacity != null ? `Capacity · ${capacity.used}/${capacity.capacity}` : "Capacity (unset)"}</span>
+        </div>
       </div>
 
       <div className="ff-balance" aria-label="Picker workload">
