@@ -354,3 +354,50 @@ export async function getReturnDetail(returnId: string): Promise<{ ret: any; ite
   ret.warehouse_decision_by_name = ret.warehouse_decision_by ? names.get(ret.warehouse_decision_by) ?? null : null;
   return { ret, items: items ?? [], attachments: attachments ?? [] };
 }
+
+export interface EvidenceInput {
+  kind: "image" | "video";
+  url: string;
+  publicId?: string | null;
+  caption?: string | null;
+  source?: "admin" | "customer";
+}
+
+/**
+ * Attach one piece of customer evidence (photo / video) to a return. The bytes are already in
+ * Cloudinary (reusing the media provider) — this records the row in `return_attachments` and audits
+ * it. `source` distinguishes admin-attached (CS forwards what a customer emailed) from a future
+ * customer-portal upload; both write the same table.
+ */
+export async function attachReturnEvidence(returnId: string, ev: EvidenceInput, actorId?: string): Promise<{ ok: boolean; id?: string; reason?: string }> {
+  const db = loose();
+  const { data: ret } = await db.from("returns").select("id,order_id,rma_number").eq("id", returnId).maybeSingle();
+  if (!ret) return { ok: false, reason: "return_not_found" };
+  const row = {
+    return_id: returnId, kind: ev.kind, url: ev.url, public_id: ev.publicId ?? null,
+    caption: ev.caption ?? null, uploaded_by: actorId ?? null, source: ev.source ?? "admin",
+  };
+  const { data, error } = await db.from("return_attachments").insert(row).select("id").maybeSingle();
+  if (error) return { ok: false, reason: error.message };
+  await logEvent({ orderId: ret.order_id, entityType: "return", entityId: returnId, event: "return.evidence_added", actorType: actorId ? "staff" : "system", actorId, notes: `${ret.rma_number}: ${ev.kind} evidence attached${ev.caption ? ` — ${ev.caption}` : ""}`, metadata: { kind: ev.kind, source: ev.source ?? "admin" } });
+  return { ok: true, id: data?.id };
+}
+
+/** Remove one evidence attachment. Deletes the row (source of truth) then best-effort destroys the
+ *  Cloudinary asset; a failed destroy never blocks the removal. Audited. */
+export async function deleteReturnEvidence(attachmentId: string, actorId?: string): Promise<{ ok: boolean; reason?: string }> {
+  const db = loose();
+  const { data: att } = await db.from("return_attachments").select("id,return_id,public_id,kind").eq("id", attachmentId).maybeSingle();
+  if (!att) return { ok: false, reason: "attachment_not_found" };
+  const { data: ret } = await db.from("returns").select("order_id,rma_number").eq("id", att.return_id).maybeSingle();
+  const { error } = await db.from("return_attachments").delete().eq("id", attachmentId);
+  if (error) return { ok: false, reason: error.message };
+  if (att.public_id) {
+    try {
+      const { cloudinaryProvider } = await import("@/services/media/cloudinaryProvider");
+      await cloudinaryProvider.destroy(att.public_id);
+    } catch (e) { console.error("evidence destroy failed", e); }
+  }
+  await logEvent({ orderId: ret?.order_id, entityType: "return", entityId: att.return_id, event: "return.evidence_removed", actorType: actorId ? "staff" : "system", actorId, notes: `${ret?.rma_number ?? "return"}: ${att.kind} evidence removed`, metadata: { attachmentId } });
+  return { ok: true };
+}

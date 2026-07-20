@@ -8,6 +8,7 @@ import { getReturnTimeline } from "@/services/auditService";
 import { Timeline } from "@/components/admin/Timeline";
 import { ReturnActions } from "@/components/admin/ReturnActions";
 import { ReturnManage } from "@/components/admin/ReturnManage";
+import { ReturnEvidence } from "@/components/admin/ReturnEvidence";
 import { nextReturnStates, type ReturnStatus } from "@/lib/returns/state";
 import { RESOLUTIONS, INSPECTION_RESULTS, WAREHOUSE_DECISIONS, DAMAGE_GRADES, REFUND_METHODS, labelOf } from "@/lib/returns/resolution";
 
@@ -44,8 +45,6 @@ export default async function ReturnDetailPage({ params }: { params: Promise<{ i
   const canOperate = hasCapability(staff.role, "returns.operate");
   const canApprove = hasCapability(staff.role, "returns.approve");
   const nextStates = nextReturnStates(ret.status as ReturnStatus);
-  const images = (attachments as { kind: string; url: string; caption: string | null }[]).filter((a) => a.kind === "image");
-  const videos = (attachments as { kind: string; url: string; caption: string | null }[]).filter((a) => a.kind === "video");
 
   return (
     <main className="admin">
@@ -127,24 +126,8 @@ export default async function ReturnDetailPage({ params }: { params: Promise<{ i
         </section>
       </div>
 
-      {/* Evidence */}
-      <section className="od-section">
-        <h2 className="od-card__title">Customer evidence ({attachments.length})</h2>
-        {attachments.length === 0 ? <p className="admin__muted">No evidence attached.</p> : null}
-        {images.length ? (
-          <div className="ret-evidence">
-            {images.map((a, i) => (
-              <a key={i} href={a.url} target="_blank" rel="noopener noreferrer" className="ret-evidence__thumb" title={a.caption ?? "Open full image"}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={a.url} alt={a.caption ?? "Return evidence"} />
-              </a>
-            ))}
-          </div>
-        ) : null}
-        {videos.map((a, i) => (
-          <p key={i}><a href={a.url} target="_blank" rel="noopener noreferrer" className="text-link">▶ Video{a.caption ? ` · ${a.caption}` : ""}</a></p>
-        ))}
-      </section>
+      {/* Evidence — gallery + admin upload + lightbox */}
+      <ReturnEvidence returnId={ret.id} attachments={attachments} canOperate={canOperate} />
 
       {/* Notes */}
       <div className="od-grid">
