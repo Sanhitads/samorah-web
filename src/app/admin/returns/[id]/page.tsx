@@ -7,6 +7,7 @@ import { getReturnDetail } from "@/services/returnService";
 import { getReturnTimeline } from "@/services/auditService";
 import { Timeline } from "@/components/admin/Timeline";
 import { ReturnActions } from "@/components/admin/ReturnActions";
+import { ReturnManage } from "@/components/admin/ReturnManage";
 import { nextReturnStates, type ReturnStatus } from "@/lib/returns/state";
 import { RESOLUTIONS, INSPECTION_RESULTS, WAREHOUSE_DECISIONS, DAMAGE_GRADES, REFUND_METHODS, labelOf } from "@/lib/returns/resolution";
 
@@ -41,6 +42,7 @@ export default async function ReturnDetailPage({ params }: { params: Promise<{ i
   const { ret, items, attachments } = detail;
   const timeline = await getReturnTimeline(id);
   const canOperate = hasCapability(staff.role, "returns.operate");
+  const canApprove = hasCapability(staff.role, "returns.approve");
   const nextStates = nextReturnStates(ret.status as ReturnStatus);
   const images = (attachments as { kind: string; url: string; caption: string | null }[]).filter((a) => a.kind === "image");
   const videos = (attachments as { kind: string; url: string; caption: string | null }[]).filter((a) => a.kind === "video");
@@ -156,10 +158,25 @@ export default async function ReturnDetailPage({ params }: { params: Promise<{ i
         </section>
       </div>
 
+      {/* Resolution-Center setters */}
+      {canOperate || canApprove ? (
+        <ReturnManage
+          returnId={ret.id}
+          canApprove={canApprove}
+          canOperate={canOperate}
+          current={{
+            resolution: ret.resolution ?? "", refundMethod: ret.refund_method ?? "",
+            inspectionResult: ret.inspection_result ?? "", inspectionNote: ret.inspection_note ?? "",
+            warehouseDecision: ret.warehouse_decision ?? "", damage: ret.damage_classification ?? "",
+            internalNote: ret.notes ?? "", customerMessage: ret.customer_message ?? "",
+          }}
+        />
+      ) : null}
+
       {/* Lifecycle actions */}
       {canOperate ? (
         <section className="od-section">
-          <h2 className="od-card__title">Actions</h2>
+          <h2 className="od-card__title">Lifecycle</h2>
           <ReturnActions returnId={ret.id} nextStates={nextStates} />
         </section>
       ) : null}

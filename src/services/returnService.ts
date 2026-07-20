@@ -290,6 +290,47 @@ export async function getReturnsForOrder(orderId: string): Promise<Array<{ id: s
   }));
 }
 
+export interface ReturnUpdate {
+  resolution?: string;
+  refundMethod?: string;
+  inspectionResult?: string;
+  inspectionNote?: string;
+  warehouseDecision?: string;
+  damage?: string;
+  internalNote?: string; // → returns.notes
+  customerMessage?: string; // → returns.customer_message
+}
+
+/**
+ * Set the Resolution-Center fields on a return (any subset). Resolution / inspection / warehouse
+ * decision each stamp operator + timestamp; every change writes ONE audit event. Reuses the same
+ * logEvent + returns table — no parallel record. Capability is enforced at the route.
+ */
+export async function updateReturnRecord(returnId: string, u: ReturnUpdate, actorId?: string): Promise<{ ok: boolean; reason?: string }> {
+  const db = loose();
+  const { data: ret } = await db.from("returns").select("id,order_id,rma_number").eq("id", returnId).maybeSingle();
+  if (!ret) return { ok: false, reason: "return_not_found" };
+
+  const now = new Date().toISOString();
+  const patch: Record<string, unknown> = { updated_at: now };
+  const changes: string[] = [];
+
+  if (u.resolution !== undefined) { patch.resolution = u.resolution || null; patch.resolution_by = actorId ?? null; patch.resolved_at = now; changes.push(`resolution=${u.resolution || "cleared"}`); }
+  if (u.refundMethod !== undefined) { patch.refund_method = u.refundMethod || null; changes.push(`refund_method=${u.refundMethod || "cleared"}`); }
+  if (u.inspectionResult !== undefined) { patch.inspection_result = u.inspectionResult || null; patch.inspection_by = actorId ?? null; patch.inspected_at = now; changes.push(`inspection=${u.inspectionResult || "cleared"}`); }
+  if (u.inspectionNote !== undefined) patch.inspection_note = u.inspectionNote || null;
+  if (u.warehouseDecision !== undefined) { patch.warehouse_decision = u.warehouseDecision || null; patch.warehouse_decision_by = actorId ?? null; patch.warehouse_decided_at = now; changes.push(`warehouse=${u.warehouseDecision || "cleared"}`); }
+  if (u.damage !== undefined) { patch.damage_classification = u.damage || null; changes.push(`damage=${u.damage || "cleared"}`); }
+  if (u.internalNote !== undefined) { patch.notes = u.internalNote || null; changes.push("internal note"); }
+  if (u.customerMessage !== undefined) { patch.customer_message = u.customerMessage || null; changes.push("customer message"); }
+
+  if (changes.length === 0) return { ok: true };
+  const { error } = await db.from("returns").update(patch).eq("id", returnId);
+  if (error) return { ok: false, reason: error.message };
+  await logEvent({ orderId: ret.order_id, entityType: "return", entityId: returnId, event: "return.updated", actorType: actorId ? "staff" : "system", actorId, notes: `${ret.rma_number}: ${changes.join(", ")}`, metadata: { ...u } });
+  return { ok: true };
+}
+
 /** Full return record for the Resolution Center detail page: the row (all resolution/inspection/
  *  warehouse/notes fields), its line items, and its evidence attachments. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
