@@ -15,7 +15,11 @@ export interface Attachment {
   url: string;
   caption: string | null;
   source: string | null;
+  created_at?: string | null;
+  uploaded_by_name?: string | null;
 }
+
+const fmtDate = (v: unknown) => (v ? new Date(String(v)).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—");
 
 export function ReturnEvidence({ returnId, attachments, canOperate, bare = false }: { returnId: string; attachments: Attachment[]; canOperate: boolean; bare?: boolean }) {
   const router = useRouter();
@@ -24,6 +28,7 @@ export function ReturnEvidence({ returnId, attachments, canOperate, bare = false
   const [err, setErr] = useState("");
   const [caption, setCaption] = useState("");
   const [lightbox, setLightbox] = useState<number | null>(null);
+  const [dims, setDims] = useState<Record<string, string>>({});
   const fileRef = useRef<HTMLInputElement>(null);
 
   const images = attachments.filter((a) => a.kind === "image");
@@ -83,22 +88,30 @@ export function ReturnEvidence({ returnId, attachments, canOperate, bare = false
         <div className="ret-evidence">
           {images.map((a, i) => (
             <div key={a.id} className="ret-evidence__item">
-              <button type="button" className="ret-evidence__thumb" title={a.caption ?? "Open"} onClick={() => setLightbox(i)}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={a.url} alt={a.caption ?? "Return evidence"} />
-              </button>
-              {a.source && a.source !== "admin" ? <span className="ret-evidence__tag">{a.source}</span> : null}
-              {canOperate ? <button type="button" className="ret-evidence__del" disabled={busy} onClick={() => remove(a.id)} title="Remove">×</button> : null}
+              <div className="ret-evidence__thumbwrap">
+                <button type="button" className="ret-evidence__thumb" title={a.caption ?? "Open"} onClick={() => setLightbox(i)}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={a.url} alt={a.caption ?? "Return evidence"} onLoad={(e) => { const t = e.currentTarget; setDims((d) => (d[a.id] ? d : { ...d, [a.id]: `${t.naturalWidth}×${t.naturalHeight}` })); }} />
+                </button>
+                {a.source && a.source !== "admin" ? <span className="ret-evidence__tag">{a.source}</span> : null}
+                {canOperate ? <button type="button" className="ret-evidence__del" disabled={busy} onClick={() => remove(a.id)} title="Remove">×</button> : null}
+              </div>
+              <div className="ret-evidence__meta">
+                {a.caption ? <span className="ret-evidence__cap-txt">{a.caption}</span> : null}
+                <span>{dims[a.id] ?? "…"} · {fmtDate(a.created_at)}</span>
+                <span className="admin__muted">by {a.uploaded_by_name ?? "—"}</span>
+              </div>
             </div>
           ))}
         </div>
       ) : null}
 
       {videos.map((a) => (
-        <p key={a.id} className="ret-evidence__video">
+        <div key={a.id} className="ret-evidence__video">
           <a href={a.url} target="_blank" rel="noopener noreferrer" className="text-link">▶ Video{a.caption ? ` · ${a.caption}` : ""}</a>
+          <span className="admin__muted"> · {fmtDate(a.created_at)} · by {a.uploaded_by_name ?? "—"}</span>
           {canOperate ? <button type="button" className="ff-link-btn" disabled={busy} onClick={() => remove(a.id)}>remove</button> : null}
-        </p>
+        </div>
       ))}
 
       {canOperate ? (
@@ -124,6 +137,7 @@ export function ReturnEvidence({ returnId, attachments, canOperate, bare = false
             <img src={images[lightbox].url} alt={images[lightbox].caption ?? "Return evidence"} />
             <figcaption className="ret-lb__cap">
               {images[lightbox].caption ? `${images[lightbox].caption} · ` : ""}{lightbox + 1} / {images.length}
+              {dims[images[lightbox].id] ? ` · ${dims[images[lightbox].id]}` : ""} · {fmtDate(images[lightbox].created_at)} · by {images[lightbox].uploaded_by_name ?? "—"}
               <a href={images[lightbox].url} target="_blank" rel="noopener noreferrer" className="text-link" style={{ marginLeft: 10 }}>open original</a>
             </figcaption>
           </figure>

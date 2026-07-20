@@ -9,7 +9,7 @@ import { Timeline } from "@/components/admin/Timeline";
 import { ReturnActions } from "@/components/admin/ReturnActions";
 import { ReturnManage } from "@/components/admin/ReturnManage";
 import { ReturnEvidence } from "@/components/admin/ReturnEvidence";
-import { nextReturnStates, type ReturnStatus } from "@/lib/returns/state";
+import { nextReturnStates, isResolutionLocked, type ReturnStatus } from "@/lib/returns/state";
 import { RESOLUTIONS, INSPECTION_RESULTS, WAREHOUSE_DECISIONS, DAMAGE_GRADES, REFUND_METHODS, labelOf } from "@/lib/returns/resolution";
 
 /**
@@ -60,6 +60,12 @@ export default async function ReturnDetailPage({ params }: { params: Promise<{ i
   const nextStates = nextReturnStates(ret.status as ReturnStatus);
   const hasInspOrWh = !!(ret.inspection_result || ret.warehouse_decision || ret.damage_classification);
   const gstLabel = finance.intraState ? "CGST+SGST" : "IGST";
+  const locked = isResolutionLocked(ret.status as ReturnStatus);
+  const REFUND_PROG: Record<string, { label: string; cls: string }> = {
+    waiting: { label: "Waiting", cls: "rp--wait" }, processing: { label: "Processing", cls: "rp--proc" },
+    completed: { label: "Completed", cls: "rp--done" }, failed: { label: "Failed", cls: "rp--fail" },
+  };
+  const rp = finance.refundProgress ? REFUND_PROG[finance.refundProgress] : null;
 
   return (
     <main className="admin">
@@ -74,15 +80,24 @@ export default async function ReturnDetailPage({ params }: { params: Promise<{ i
         </p>
       </header>
 
+      {/* Sticky context bar — RMA / status / resolution / lock stay visible on scroll (priority 4) */}
+      <div className="ret-sticky">
+        <span className="ret-sticky__rma">{ret.rma_number}</span>
+        <span className="ff-status" data-s={ret.status}>{STATUS_LABEL[ret.status] ?? ret.status}</span>
+        {ret.resolution ? <span className="res-badge" data-res={ret.resolution}>{labelOf(RESOLUTIONS, ret.resolution)}</span> : <span className="pending-badge">No resolution</span>}
+        {rp ? <span className={`refund-prog ${rp.cls}`}>Refund: {rp.label}</span> : null}
+        {locked ? <span className="lock-badge">🔒 Locked</span> : null}
+      </div>
+
       {/* Resolution + finance */}
       <details className="od-group" open>
         <summary className="od-group__sum">Resolution &amp; finance</summary>
         <div className="od-grid">
           <section className="od-card">
-            <h2 className="od-card__title">Resolution</h2>
+            <h2 className="od-card__title">Resolution {locked ? <span className="lock-badge">🔒 Locked</span> : null}</h2>
             {ret.resolution ? (
               <p><span className="res-badge" data-res={ret.resolution}>{labelOf(RESOLUTIONS, ret.resolution)}</span></p>
-            ) : <p className="admin__muted">Not decided yet.</p>}
+            ) : <p><span className="pending-badge">Not decided yet</span></p>}
             {ret.resolution_reason ? <p className="od-reason"><span className="od-reason__k">Reason</span> {ret.resolution_reason}</p> : (ret.resolution ? <p className="admin__muted om-field__hint">No reason recorded.</p> : null)}
             {ret.resolution_by_name ? <p className="admin__muted">by {ret.resolution_by_name} · {dt(ret.resolved_at)}</p> : null}
           </section>
@@ -94,8 +109,9 @@ export default async function ReturnDetailPage({ params }: { params: Promise<{ i
               <div><dt>Returned goods value</dt><dd>{inr(finance.goodsValue)}</dd></div>
               <div>
                 <dt>Refund</dt>
-                <dd>{finance.refundAmount > 0 ? inr(finance.refundAmount) : "—"} {finance.refundAmount > 0 ? <span className={finance.refundIssued ? "fin-pill fin-pill--ok" : "fin-pill fin-pill--pend"}>{finance.refundIssued ? "issued" : "planned"}</span> : null}</dd>
+                <dd>{finance.refundAmount > 0 ? inr(finance.refundAmount) : "—"} {rp ? <span className={`refund-prog ${rp.cls}`}>{rp.label}</span> : null}</dd>
               </div>
+              {finance.refundProgress === "failed" && finance.refundError ? <div><dt className="admin__muted">— gateway error</dt><dd className="admin__muted">{finance.refundError}</dd></div> : null}
               {finance.refundAmount > 0 ? <div><dt className="admin__muted">— incl. GST ({gstLabel})</dt><dd className="admin__muted">{inr(finance.refundGst)}</dd></div> : null}
               <div><dt>Method</dt><dd>{labelOf(REFUND_METHODS, finance.refundMethod)}</dd></div>
               <div><dt>Refund id</dt><dd className="admin__mono">{finance.refundId ? String(finance.refundId).slice(0, 8) : "—"}</dd></div>
@@ -155,7 +171,7 @@ export default async function ReturnDetailPage({ params }: { params: Promise<{ i
                 {ret.inspection_note ? <p className="admin__muted">{ret.inspection_note}</p> : null}
                 {ret.inspection_by_name ? <p className="admin__muted">by {ret.inspection_by_name} · {dt(ret.inspected_at)}</p> : null}
               </>
-            ) : <p className="admin__muted">Not inspected yet.</p>}
+            ) : <p><span className="pending-badge">Pending Inspection</span></p>}
           </section>
           <section className="od-card">
             <h2 className="od-card__title">Warehouse decision</h2>
@@ -164,7 +180,7 @@ export default async function ReturnDetailPage({ params }: { params: Promise<{ i
                 <p className="od-name">{labelOf(WAREHOUSE_DECISIONS, ret.warehouse_decision)}</p>
                 {ret.warehouse_decision_by_name ? <p className="admin__muted">by {ret.warehouse_decision_by_name} · {dt(ret.warehouse_decided_at)}</p> : null}
               </>
-            ) : <p className="admin__muted">No disposition yet.</p>}
+            ) : <p><span className="pending-badge">Pending Warehouse Decision</span></p>}
             {ret.damage_classification ? <p><span className="dmg-badge" data-dmg={ret.damage_classification}>Damage: {labelOf(DAMAGE_GRADES, ret.damage_classification)}</span></p> : null}
           </section>
         </div>
@@ -197,6 +213,7 @@ export default async function ReturnDetailPage({ params }: { params: Promise<{ i
           returnId={ret.id}
           canApprove={canApprove}
           canOperate={canOperate}
+          locked={locked}
           current={{
             resolution: ret.resolution ?? "", resolutionReason: ret.resolution_reason ?? "", refundMethod: ret.refund_method ?? "",
             inspectionResult: ret.inspection_result ?? "", inspectionNote: ret.inspection_note ?? "",

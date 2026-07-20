@@ -50,6 +50,14 @@ export function assertReturnTransition(from: ReturnStatus, to: ReturnStatus): vo
 export function isTerminalReturn(s: ReturnStatus): boolean {
   return TRANSITIONS[s].length === 0;
 }
+
+// Once money/goods have moved or the ticket is settled, the RESOLUTION (and refund method) must not
+// change — editing it after the fact is an expensive, audit-breaking mistake. The UI shows a lock and
+// disables the setters; the update API enforces the same rule server-side.
+const RESOLUTION_LOCKED: ReturnStatus[] = ["refunded", "replacement_shipped", "closed", "rejected"];
+export function isResolutionLocked(s: ReturnStatus): boolean {
+  return RESOLUTION_LOCKED.includes(s);
+}
 export function nextReturnStates(from: ReturnStatus): ReturnStatus[] {
   return [...TRANSITIONS[from]];
 }

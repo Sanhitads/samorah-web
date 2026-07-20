@@ -9,9 +9,9 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { callRpc } from "@/lib/supabase/rpc";
 import { getOrderByNumber } from "@/services/orderService";
-import { issueRefund } from "@/services/refundService";
+import { issueRefund, getOrderRefunds } from "@/services/refundService";
 import { logEvent } from "@/services/auditService";
-import { assertReturnTransition, isTerminalReturn, nextReturnStates, type ReturnStatus, type ReturnReason } from "@/lib/returns/state";
+import { assertReturnTransition, isResolutionLocked, isTerminalReturn, nextReturnStates, type ReturnStatus, type ReturnReason } from "@/lib/returns/state";
 import type { NotificationEvent } from "@/lib/notifications/types";
 
 function loose() {
@@ -309,8 +309,14 @@ export interface ReturnUpdate {
  */
 export async function updateReturnRecord(returnId: string, u: ReturnUpdate, actorId?: string): Promise<{ ok: boolean; reason?: string }> {
   const db = loose();
-  const { data: ret } = await db.from("returns").select("id,order_id,rma_number").eq("id", returnId).maybeSingle();
+  const { data: ret } = await db.from("returns").select("id,order_id,rma_number,status").eq("id", returnId).maybeSingle();
   if (!ret) return { ok: false, reason: "return_not_found" };
+
+  // Resolution + refund method are locked once the return has settled (refund paid / replacement
+  // shipped / closed / rejected) — server-side guard mirroring the disabled UI (review priority 1).
+  if ((u.resolution !== undefined || u.refundMethod !== undefined) && isResolutionLocked(ret.status as ReturnStatus)) {
+    return { ok: false, reason: "resolution_locked" };
+  }
 
   const now = new Date().toISOString();
   const patch: Record<string, unknown> = { updated_at: now };
@@ -356,12 +362,18 @@ export interface ReturnFinance {
   netCashOut: number;          // honest cash leaving the business = refundAmount
   isReplacement: boolean;
   isExchange: boolean;
+  refundProgress: RefundProgress; // real gateway/ledger state (review priority 6)
+  refundError: string | null;  // gateway error when the refund failed
 }
+
+/** Where the refund actually is, read from the `refunds` ledger — not guessed. `null` = no refund
+ *  applies (e.g. a pure replacement); "waiting" = owed but no ledger row yet. */
+export type RefundProgress = "waiting" | "processing" | "completed" | "failed" | null;
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function computeReturnFinance(order: any, ret: any, items: any[]): ReturnFinance {
+function computeReturnFinance(order: any, ret: any, items: any[], refunds: any[]): ReturnFinance {
   const total = Number(order?.total_amount ?? 0);
   const orderTax = Number(order?.cgst_amount ?? 0) + Number(order?.sgst_amount ?? 0) + Number(order?.igst_amount ?? 0);
   const refundAmount = Number(ret?.refund_amount ?? 0);
@@ -371,6 +383,20 @@ function computeReturnFinance(order: any, ret: any, items: any[]): ReturnFinance
   const isReplacement = ret?.return_type === "replacement" || ret?.resolution === "replacement_only";
   const isExchange = ret?.return_type === "exchange" || ret?.resolution === "exchange";
   const sendsGoods = isReplacement || isExchange;
+
+  // Tie the refund ledger to THIS return via its RMA (refunds are logged with reason "Return <RMA>").
+  const mine = (refunds ?? []).filter((r) => String(r.reason ?? "").includes(ret?.rma_number ?? " "));
+  const latest = mine[0]; // getOrderRefunds returns newest-first
+  const owesRefund = refundAmount > 0 && !isReplacement;
+  let refundProgress: RefundProgress = null;
+  let refundError: string | null = null;
+  if (latest) {
+    refundProgress = latest.status === "processed" ? "completed" : latest.status === "processing" ? "processing" : latest.status === "failed" ? "failed" : "waiting";
+    refundError = latest.error_description ?? null;
+  } else if (owesRefund) {
+    refundProgress = "waiting";
+  }
+
   return {
     customerPaid: round2(total),
     goodsValue,
@@ -379,13 +405,15 @@ function computeReturnFinance(order: any, ret: any, items: any[]): ReturnFinance
     refundTaxable: round2(refundAmount - refundGst),
     refundMethod: ret?.refund_method ?? null,
     refundId: ret?.refund_id ?? null,
-    refundIssued: !!ret?.refund_id || Number(order?.refund_amount ?? 0) > 0,
+    refundIssued: refundProgress === "completed" || !!ret?.refund_id,
     intraState: Number(order?.igst_amount ?? 0) === 0,
     storeCredit: ret?.refund_method === "store_credit" ? refundAmount : 0,
     replacementValue: sendsGoods ? goodsValue : null,
     netCashOut: round2(refundAmount),
     isReplacement,
     isExchange,
+    refundProgress,
+    refundError,
   };
 }
 
@@ -397,17 +425,20 @@ export async function getReturnDetail(returnId: string): Promise<{ ret: any; ite
   const db = loose();
   const { data: ret } = await db.from("returns").select("*").eq("id", returnId).maybeSingle();
   if (!ret) return null;
-  const [{ data: items }, { data: attachments }, { data: order }, { data: evAudit }] = await Promise.all([
+  const [{ data: items }, { data: attachments }, { data: order }, { data: evAudit }, refunds] = await Promise.all([
     db.from("return_items").select("*").eq("return_id", returnId).order("created_at"),
     db.from("return_attachments").select("*").eq("return_id", returnId).order("created_at"),
     db.from("orders").select("total_amount,subtotal,discount_amount,taxable_amount,cgst_amount,sgst_amount,igst_amount,shipping_charge,shipping_amount,refund_amount,refunded_at").eq("id", ret.order_id).maybeSingle(),
     db.from("audit_events").select("event,actor_id,created_at").eq("entity_id", returnId).in("event", ["return.approved", "return.refunded", "return.refund_processing"]).order("created_at"),
+    getOrderRefunds(ret.order_id),
   ]);
   // The approver + refunder live in the audit stream (no dedicated column) — reuse it (priority 4).
   const approvedEv = (evAudit ?? []).find((e: { event: string }) => e.event === "return.approved");
   const refundEv = (evAudit ?? []).find((e: { event: string }) => e.event === "return.refunded") ?? (evAudit ?? []).find((e: { event: string }) => e.event === "return.refund_processing");
 
-  const ids = [...new Set([ret.resolution_by, ret.inspection_by, ret.warehouse_decision_by, ret.created_by, approvedEv?.actor_id, refundEv?.actor_id].filter(Boolean))];
+  // Resolve every referenced actor in one pass — decision owners + evidence uploaders (priority 3).
+  const uploaderIds = (attachments ?? []).map((a: { uploaded_by: string | null }) => a.uploaded_by).filter(Boolean);
+  const ids = [...new Set([ret.resolution_by, ret.inspection_by, ret.warehouse_decision_by, ret.created_by, approvedEv?.actor_id, refundEv?.actor_id, ...uploaderIds].filter(Boolean))];
   const names = new Map<string, string>();
   if (ids.length) {
     const { data: users } = await db.from("users").select("id,full_name").in("id", ids);
@@ -422,8 +453,14 @@ export async function getReturnDetail(returnId: string): Promise<{ ret: any; ite
   ret.refund_by_name = refundEv?.actor_id ? names.get(refundEv.actor_id) ?? null : null;
   ret.refund_at = refundEv?.created_at ?? null;
 
-  const finance = computeReturnFinance(order, ret, items ?? []);
-  return { ret, items: items ?? [], attachments: attachments ?? [], finance };
+  // Stamp each attachment with its uploader's display name (staff name, else "Customer").
+  const atts = (attachments ?? []).map((a: { uploaded_by: string | null; source: string | null }) => ({
+    ...a,
+    uploaded_by_name: a.uploaded_by ? names.get(a.uploaded_by) ?? null : (a.source === "customer" ? "Customer" : null),
+  }));
+
+  const finance = computeReturnFinance(order, ret, items ?? [], refunds ?? []);
+  return { ret, items: items ?? [], attachments: atts, finance };
 }
 
 export interface EvidenceInput {

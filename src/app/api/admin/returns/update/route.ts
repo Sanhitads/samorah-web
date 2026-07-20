@@ -27,6 +27,11 @@ export async function POST(request: Request) {
 
   const { returnId, ...update } = body;
   const result = await updateReturnRecord(returnId, update, staff.userId ?? undefined);
-  if (!result.ok) return NextResponse.json({ error: result.reason ?? "Failed." }, { status: 422 });
+  if (!result.ok) {
+    const msg = result.reason === "resolution_locked"
+      ? "Resolution is locked — this return has already settled (refund paid / replacement shipped / closed)."
+      : result.reason ?? "Failed.";
+    return NextResponse.json({ error: msg }, { status: result.reason === "resolution_locked" ? 409 : 422 });
+  }
   return NextResponse.json(result);
 }
