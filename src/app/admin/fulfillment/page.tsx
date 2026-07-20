@@ -143,7 +143,7 @@ export default async function FulfillmentDashboard({ searchParams }: { searchPar
         </select>
         <select name="wholesale" defaultValue={sp.wholesale ?? ""} aria-label="Wholesale">
           <option value="">Any wholesale</option>
-          <option value="any">Any wholesale</option>
+          <option value="any">Wholesale or B2B</option>
           <option value="wholesale_order">Wholesale order</option>
           <option value="b2b_customer">B2B customer</option>
         </select>

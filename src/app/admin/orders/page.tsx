@@ -147,7 +147,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         </select>
         <select name="wholesale" defaultValue={sp.wholesale ?? ""} aria-label="Wholesale">
           <option value="">Any wholesale</option>
-          <option value="any">Any wholesale</option>
+          <option value="any">Wholesale or B2B</option>
           {WHOLESALE_FILTERS.map((w) => <option key={w.value} value={w.value}>{w.label}</option>)}
         </select>
         <select name="sort" defaultValue={sp.sort ?? ""} aria-label="Sort">
