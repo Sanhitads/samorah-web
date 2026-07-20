@@ -7,6 +7,7 @@ import { getStaffOptions, getCourierOptions, getOperationalMetrics } from "@/ser
 import { FulfillmentActions } from "@/components/admin/FulfillmentActions";
 import { PriorityControl, AssigneeControl, TagsControl } from "@/components/admin/BoardControls";
 import { BoardBulk } from "@/components/admin/BoardBulk";
+import { BoardSelectionProvider, BoardCheckbox } from "@/components/admin/BoardSelection";
 import { WORK_QUEUES, refundBadge, type WorkQueue, type EffectivePriority } from "@/lib/fulfillment/derive";
 import type { FulfillmentStatus } from "@/lib/fulfillment/state";
 
@@ -152,10 +153,12 @@ export default async function FulfillmentDashboard({ searchParams }: { searchPar
 
       <BoardBulk readyToShip={readyToShip} dispatchable={dispatchable} />
 
+      <BoardSelectionProvider pageNumbers={rows.map((r) => r.orderNumber)} staff={staffOptions}>
       <div className="admin__table-wrap">
         <table className="admin__table admin__table--board">
           <thead>
             <tr>
+              <th className="obulk-th" aria-label="Select"></th>
               <th>Priority</th>
               <th>Order</th>
               <th>Customer</th>
@@ -171,6 +174,7 @@ export default async function FulfillmentDashboard({ searchParams }: { searchPar
               const pay = paymentBadge(r.paymentStatus, r.isCod, r.latestRefundStatus);
               return (
                 <tr key={r.orderNumber}>
+                  <td className="obulk-td"><BoardCheckbox orderNumber={r.orderNumber} /></td>
                   <td>
                     <span className="bc-eff" data-p={r.effectivePriority}>{EFF_LABEL[r.effectivePriority]}</span>
                     <div className="bc-eff-set"><PriorityControl orderNumber={r.orderNumber} priority={r.priority} /></div>
@@ -219,11 +223,12 @@ export default async function FulfillmentDashboard({ searchParams }: { searchPar
               );
             })}
             {rows.length === 0 ? (
-              <tr><td colSpan={8} className="admin__empty">No orders in this queue.</td></tr>
+              <tr><td colSpan={9} className="admin__empty">No orders in this queue.</td></tr>
             ) : null}
           </tbody>
         </table>
       </div>
+      </BoardSelectionProvider>
     </main>
   );
 }

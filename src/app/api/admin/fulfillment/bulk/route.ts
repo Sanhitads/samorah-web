@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireCapability } from "@/lib/auth/requireStaff";
 import { getOrderByNumber } from "@/services/orderService";
 import { createShipmentForOrder, markShipmentDispatched } from "@/services/shipmentService";
-import { tryAdvanceFulfillment } from "@/services/fulfillmentService";
+import { tryAdvanceFulfillment, advanceFulfillment } from "@/services/fulfillmentService";
 
 /**
  * POST /api/admin/fulfillment/bulk { action, orderNumbers[] } — batch operations
@@ -43,6 +43,11 @@ export async function POST(request: Request) {
         const r = await markShipmentDispatched((order as { id: string }).id, { actorId });
         if (r.ok) { await tryAdvanceFulfillment(orderNumber, "picked_up", { actorId }); done++; }
         else failed.push({ orderNumber, reason: r.reason ?? "failed" });
+      } else if (body.action === "startPicking") {
+        // Non-destructive: only orders whose state permits reserved→picking advance; the state
+        // machine throws otherwise → caught below and reported as a skipped row.
+        await advanceFulfillment(orderNumber, "picking", { actorId });
+        done++;
       } else {
         return NextResponse.json({ error: "unknown action" }, { status: 400 });
       }

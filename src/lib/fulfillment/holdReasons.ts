@@ -20,6 +20,9 @@ export const HOLD_REASONS: HoldReason[] = [
   { value: "inventory_issue", label: "Inventory Issue" },
   { value: "address_confirmation", label: "Address Confirmation" },
   { value: "customer_request", label: "Customer Request" },
+  // A deliberate quality gate (gift box damaged, label misprinted, story/care card missing,
+  // packaging defect) — distinct from "packing delay": it protects the premium unboxing.
+  { value: "packaging_quality_review", label: "Packaging Quality Review" },
 ];
 
 /** Compose the reason string written to fulfillment_hold_reason: the structured label, plus an
