@@ -116,7 +116,10 @@ export default async function FulfillmentDashboard({ searchParams }: { searchPar
                     <span className="om-pay" data-tone={pay.tone}>{pay.label}</span>
                     {r.refundAmount > 0 ? <div className="admin__muted">₹{r.refundAmount.toFixed(2)}</div> : null}
                   </td>
-                  <td><span className="bc-sla" data-tone={r.slaTone}>{sla(r.placedAt, now)}</span></td>
+                  <td>
+                    <span className="bc-sla" data-tone={r.slaTone}>{sla(r.placedAt, now)}</span>
+                    <div className="bc-slabadge" data-tone={r.sla.tone} title={r.sla.state === "breached" ? `${Math.abs(r.sla.hoursLeft)}h late (target ${r.sla.targetHrs}h)` : `${r.sla.hoursLeft}h left of ${r.sla.targetHrs}h`}>{r.sla.label}</div>
+                  </td>
                   <td><AssigneeControl orderNumber={r.orderNumber} assigneeName={r.assigneeName} /></td>
                   <td>
                     <FulfillmentActions

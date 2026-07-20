@@ -22,6 +22,7 @@ import {
   type InventorySignal,
   type SlaTone,
 } from "@/lib/fulfillment/derive";
+import { fulfillmentSla, type SlaBadge } from "@/lib/fulfillment/sla";
 import { logEvent } from "@/services/auditService";
 
 const START: FulfillmentStatus = "reserved";
@@ -132,6 +133,7 @@ export interface FulfillmentQueueRow {
   priority: BoardPriority;            // manual override input
   effectivePriority: EffectivePriority; // computed (Critical/High/Normal) — board sorts on this
   slaTone: SlaTone;
+  sla: SlaBadge;                      // per-priority SLA state (Within / Approaching / Breached)
   queue: WorkQueue;                   // derived functional queue (point 10)
   nextAction: string;                 // explicit next step (point 2)
   assignedTo: string | null;          // user id
@@ -225,6 +227,7 @@ export async function getFulfillmentQueue(opts: { limit?: number; queue?: WorkQu
     const manual = (o.priority ?? "normal") as BoardPriority;
     const slaTone = slaToneOf(o.placed_at, now);
     const eff = effectivePriority(manual, { slaTone, tags });
+    const sla = fulfillmentSla(o.placed_at, manual, now); // per-priority SLA (Phase 1)
 
     return {
       orderNumber: o.order_number,
@@ -240,6 +243,7 @@ export async function getFulfillmentQueue(opts: { limit?: number; queue?: WorkQu
       priority: manual,
       effectivePriority: eff,
       slaTone,
+      sla,
       queue: queueOf(fs, inventory),
       nextAction: nextActionLabel(fs, sh?.status ?? null),
       assignedTo: o.assigned_to ?? null,
