@@ -484,6 +484,59 @@
 .ret-lb__nav:hover { background: rgba(255,255,255,0.2); }
 .ret-lb__nav--prev { left: 16px; }
 .ret-lb__nav--next { right: 16px; }
+
+/* Resolution outcome badges (priority 1) — colour-coded by outcome for fast scanning */
+.res-badge { display: inline-block; padding: 2px 9px; border-radius: 11px; font-family: var(--font-sans); font-size: 11px; font-weight: 600; letter-spacing: 0.02em; border: 1px solid var(--ad-hair); background: #eee; color: #333; }
+.res-badge[data-res="replacement_only"] { background: #e7f4ec; color: #256b3e; border-color: #bcdfc9; }
+.res-badge[data-res="exchange"]         { background: #e6f0fb; color: #1f5fa8; border-color: #c2dbf3; }
+.res-badge[data-res="partial_refund"]   { background: #fdf0e2; color: #ab5f1a; border-color: #f4d8b5; }
+.res-badge[data-res="refund_only"]      { background: #f1ebf9; color: #6b3fa0; border-color: #ddccf0; }
+.res-badge[data-res="reject_claim"]     { background: #eeecea; color: #6b6259; border-color: #dcd7d1; }
+.res-badge[data-res="return_required"]  { background: #e4f3f2; color: #1f6f68; border-color: #bfe3df; }
+.res-badge[data-res="return_waived"]    { background: #f7f0e0; color: #8a6d3b; border-color: #e8dab9; }
+/* Damage grade badges */
+.dmg-badge { display: inline-block; padding: 2px 9px; border-radius: 11px; font-family: var(--font-sans); font-size: 11px; font-weight: 600; border: 1px solid var(--ad-hair); background: #eee; color: #333; }
+.dmg-badge[data-dmg="minor"]    { background: #eef2ea; color: #4d6b3c; border-color: #d4e0c8; }
+.dmg-badge[data-dmg="moderate"] { background: #fdf0e2; color: #ab5f1a; border-color: #f4d8b5; }
+.dmg-badge[data-dmg="major"]    { background: #fbe9e7; color: #b23b2e; border-color: #f2c9c2; }
+
+/* Count badge (priority 5) */
+.count-badge { display: inline-block; min-width: 20px; padding: 1px 7px; border-radius: 10px; background: var(--ad-gold, #8a6d3b); color: #fff; font-family: var(--font-sans); font-size: 11px; font-weight: 600; text-align: center; vertical-align: middle; }
+.count-badge[data-empty="true"] { background: rgba(31,26,22,0.12); color: var(--smoke, #6b6259); }
+
+/* Timeline event icon (priority 6) */
+.od-tl__icon { display: inline-block; width: 1.3em; margin-right: 4px; font-size: 12px; }
+
+/* Collapsible section groups (priority 12) */
+.od-group { border: 1px solid var(--ad-hair); border-radius: 8px; margin: 14px 0; background: #fff; }
+.od-group__sum { cursor: pointer; padding: 12px 16px; font-family: var(--font-sans); font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink, #1f1a16); list-style: none; display: flex; align-items: center; gap: 8px; user-select: none; }
+.od-group__sum::-webkit-details-marker { display: none; }
+.od-group__sum::before { content: "▸"; color: var(--smoke, #6b6259); font-size: 11px; transition: transform 0.15s ease; }
+.od-group[open] > .od-group__sum::before { transform: rotate(90deg); }
+.od-group__sum:hover { color: var(--ad-gold, #8a6d3b); }
+.od-group > *:not(.od-group__sum) { margin: 0 16px 16px; }
+.od-group > .od-grid:not(.od-group__sum) { margin: 0 16px 16px; }
+
+/* Finance summary (priority 2/7) */
+.od-card--finance .od-dl--fin div { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; }
+.od-dl--fin dt { font-family: var(--font-sans); font-size: 12px; color: var(--smoke, #6b6259); }
+.od-dl--fin dd { margin: 0; font-family: var(--font-sans); font-size: 13px; color: var(--ink, #1f1a16); text-align: right; }
+.od-dl__net { border-top: 1px solid var(--ad-hair); margin-top: 4px; padding-top: 7px !important; }
+.od-dl__net dt { font-weight: 600; color: var(--ink, #1f1a16) !important; text-transform: uppercase; letter-spacing: 0.04em; }
+.od-dl__net dd { font-weight: 700; }
+.fin-pill { display: inline-block; padding: 0 7px; border-radius: 9px; font-size: 10px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; }
+.fin-pill--ok { background: #e7f4ec; color: #256b3e; }
+.fin-pill--pend { background: #fdf0e2; color: #ab5f1a; }
+
+/* Resolution reason + accountability (priority 3/4) */
+.od-reason { margin: 8px 0 4px; font-family: var(--font-sans); font-size: 13px; color: var(--ink, #1f1a16); }
+.od-reason__k { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--smoke, #6b6259); margin-right: 6px; }
+.own { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+.own-row { display: flex; align-items: baseline; gap: 8px; min-width: 200px; }
+.own-row__role { flex: 0 0 92px; font-family: var(--font-sans); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--smoke, #6b6259); }
+.own-row__name { font-family: var(--font-sans); font-size: 13px; color: var(--ink, #1f1a16); font-weight: 600; }
+.own-row__at { font-size: 11px; }
+
 /* Return Resolution-Center setters */
 .rman { display: flex; flex-direction: column; gap: 10px; }
 .rman__row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }

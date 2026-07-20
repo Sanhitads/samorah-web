@@ -11,7 +11,7 @@ import { RESOLUTIONS, INSPECTION_RESULTS, WAREHOUSE_DECISIONS, DAMAGE_GRADES, RE
  * operate-capable staff. The API re-enforces the same split.
  */
 interface Current {
-  resolution: string; refundMethod: string;
+  resolution: string; resolutionReason: string; refundMethod: string;
   inspectionResult: string; inspectionNote: string;
   warehouseDecision: string; damage: string;
   internalNote: string; customerMessage: string;
@@ -24,6 +24,7 @@ export function ReturnManage({ returnId, current, canApprove, canOperate }: { re
   const [msg, setMsg] = useState("");
 
   const [resolution, setResolution] = useState(current.resolution);
+  const [resolutionReason, setResolutionReason] = useState(current.resolutionReason);
   const [refundMethod, setRefundMethod] = useState(current.refundMethod);
   const [inspectionResult, setInspectionResult] = useState(current.inspectionResult);
   const [inspectionNote, setInspectionNote] = useState(current.inspectionNote);
@@ -55,7 +56,8 @@ export function ReturnManage({ returnId, current, canApprove, canOperate }: { re
                 <option value="">— not decided —</option>
                 {RESOLUTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
-              <button type="button" className="ff-btn ff-btn--primary" disabled={busy !== null || resolution === current.resolution} onClick={() => save("res", { resolution })}>{busy === "res" ? "…" : "Set"}</button>
+              <input value={resolutionReason} onChange={(e) => setResolutionReason(e.target.value)} placeholder="Reason (e.g. return cost exceeds product value)" />
+              <button type="button" className="ff-btn ff-btn--primary" disabled={busy !== null || (resolution === current.resolution && resolutionReason === current.resolutionReason)} onClick={() => save("res", { resolution, resolutionReason })}>{busy === "res" ? "…" : "Set"}</button>
             </div>
             <div className="rman__row">
               <label className="rman__label">Refund method</label>

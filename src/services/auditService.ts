@@ -51,6 +51,7 @@ export interface AuditEvent {
   entity_type: string;
   actor_type: string;
   actor_id: string | null;
+  actorName?: string | null; // resolved where the caller opts in (e.g. return timeline); else undefined
   previous_state: string | null;
   new_state: string | null;
   notes: string | null;
@@ -116,12 +117,21 @@ export async function getOrderTimeline(orderId: string): Promise<AuditEvent[]> {
 }
 
 /** A single return's timeline — the audit stream scoped to that return (events are logged with
- *  entity_id = returnId). Reuses the same audit_events table + Timeline component as orders. */
+ *  entity_id = returnId). Reuses the same audit_events table + Timeline component as orders, and
+ *  resolves staff names so each row reads "…by Rahul" rather than a bare "staff" (priority 4/6). */
 export async function getReturnTimeline(returnId: string): Promise<AuditEvent[]> {
   try {
     const db = createAdminClient() as unknown as { from: (t: string) => any };
     const { data } = await db.from("audit_events").select("*").eq("entity_id", returnId).order("created_at", { ascending: true });
-    return (data ?? []) as AuditEvent[];
+    const events = (data ?? []) as AuditEvent[];
+    const actorIds = [...new Set(events.map((e) => e.actor_id).filter(Boolean))] as string[];
+    if (actorIds.length) {
+      const { data: us } = await db.from("users").select("id,full_name").in("id", actorIds);
+      const names = new Map<string, string>();
+      for (const u of us ?? []) names.set(u.id, u.full_name ?? "");
+      for (const e of events) e.actorName = e.actor_id ? names.get(e.actor_id) ?? null : null;
+    }
+    return events;
   } catch {
     return [];
   }

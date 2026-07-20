@@ -20,7 +20,7 @@ export async function POST(request: Request) {
   if (!body.returnId) return NextResponse.json({ error: "returnId is required." }, { status: 400 });
 
   // A change that decides money / speaks to the customer needs the approve capability.
-  const financial = body.resolution !== undefined || body.refundMethod !== undefined || body.customerMessage !== undefined;
+  const financial = body.resolution !== undefined || body.resolutionReason !== undefined || body.refundMethod !== undefined || body.customerMessage !== undefined;
   const cap = financial ? "returns.approve" : "returns.operate";
   const staff = await requireCapability(cap);
   if (!staff.ok) return NextResponse.json({ error: `Forbidden — this change needs the ${cap} capability.` }, { status: 403 });

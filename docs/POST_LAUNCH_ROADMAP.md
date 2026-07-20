@@ -185,6 +185,18 @@ ML, courier integrations, or the finance ledger.
 | **Return approval workflow (maker-checker)** | Second approver for high-value refunds/waivers. Reuse the orders approval workflow (P1 Approvals). | Approvals (P1) | M | Approvals-2 |
 | **Partial-exchange automation** | Auto-create the exchange order + price-difference charge. Needs order-linking + payment top-up. | order creation, payment | L | Ret-2 |
 | **Return analytics dashboard** | Return rate, reasons, damage reports, product-return %, customer-return %, fraud analytics. Needs aggregation + enough return volume to be meaningful. | return volume, analytics infra | M | Ret-2 |
+| **Similar-returns / customer history panel** (review P8) | Side panel on the return detail: this customer's last-12-months returns, return %, fraud %, a customer score. Needs return history at volume + the fraud signal. | return history, fraud scoring | M | Ret-3 |
+| **Product return-history panel** (review P9) | "This fragrance has been returned N times" beside the item — a QC signal. Needs product-level return aggregation. | return volume, analytics infra | M | Ret-3 |
+| **Evidence image annotation** (review P10) | Draw circle/arrow/highlight on an evidence photo (mark the crack) and save the markup. Needs a canvas annotation layer + a place to persist the overlay. | evidence store, annotation UI | M | Ret-3 |
+| **Return SLA timeline** (review P11) | Requested → Review → Pickup → Received → Refund with elapsed time per hop + breach flags. Reuse the fulfillment SLA approach; the audit timeline already carries the timestamps. | SLA config, audit timestamps (exist) | S | Ret-2 |
+
+**Shipped in the launch build (review priorities 1–7, 12 — UI/UX polish, no architecture change):**
+resolution colour badges, expanded finance summary (customer paid / returned-goods value / refund +
+derived GST split / store credit / replacement value / net cash out), a persistent resolution *reason*,
+an accountability panel (who approved / resolved / inspected / dispositioned / refunded, from the audit
+stream), an evidence count badge, timeline event icons + resolved staff names, and collapsible section
+groups. Deferred cost analytics (unit COGS + reverse-logistics cost) is the only part of the finance
+"cost impact" ask that needs new data — it rides on the analytics/finance work above.
 
 **Note on evidence:** the launch build reads customer evidence from a return-attachments store that CS
 attaches to (e.g. photos a customer emails in). The customer self-service *upload* path (Ret-1) writes

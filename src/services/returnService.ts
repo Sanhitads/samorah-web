@@ -292,6 +292,7 @@ export async function getReturnsForOrder(orderId: string): Promise<Array<{ id: s
 
 export interface ReturnUpdate {
   resolution?: string;
+  resolutionReason?: string; // → returns.resolution_reason (the WHY behind the resolution)
   refundMethod?: string;
   inspectionResult?: string;
   inspectionNote?: string;
@@ -316,6 +317,7 @@ export async function updateReturnRecord(returnId: string, u: ReturnUpdate, acto
   const changes: string[] = [];
 
   if (u.resolution !== undefined) { patch.resolution = u.resolution || null; patch.resolution_by = actorId ?? null; patch.resolved_at = now; changes.push(`resolution=${u.resolution || "cleared"}`); }
+  if (u.resolutionReason !== undefined) { patch.resolution_reason = u.resolutionReason || null; changes.push("resolution reason"); }
   if (u.refundMethod !== undefined) { patch.refund_method = u.refundMethod || null; changes.push(`refund_method=${u.refundMethod || "cleared"}`); }
   if (u.inspectionResult !== undefined) { patch.inspection_result = u.inspectionResult || null; patch.inspection_by = actorId ?? null; patch.inspected_at = now; changes.push(`inspection=${u.inspectionResult || "cleared"}`); }
   if (u.inspectionNote !== undefined) patch.inspection_note = u.inspectionNote || null;
@@ -331,19 +333,81 @@ export async function updateReturnRecord(returnId: string, u: ReturnUpdate, acto
   return { ok: true };
 }
 
-/** Full return record for the Resolution Center detail page: the row (all resolution/inspection/
- *  warehouse/notes fields), its line items, and its evidence attachments. */
+/**
+ * Finance summary for one return (review priorities 2 + 7). Everything here is DERIVED from data we
+ * already store — the return's single `refund_amount` + the order's GST-inclusive breakdown — so
+ * finance sees the money picture on one card with no new columns and no fabricated figures. The GST
+ * portion of a refund is split out using the order's effective inclusive rate (tax / total). Reverse-
+ * logistics cost and unit COGS are NOT tracked, so true "loss" analytics stays post-launch (netCashOut
+ * is the honest cash figure: what actually leaves the business).
+ */
+export interface ReturnFinance {
+  customerPaid: number;        // order total (what the customer paid for the whole order)
+  goodsValue: number;          // Σ returned line amounts (retail value of the goods in this return)
+  refundAmount: number;        // the return's refund figure (planned or issued)
+  refundGst: number;           // GST portion within the refund (derived, inclusive split)
+  refundTaxable: number;       // refund minus its GST portion
+  refundMethod: string | null;
+  refundId: string | null;
+  refundIssued: boolean;       // a real refund id exists (else it's planned, not yet paid)
+  intraState: boolean;         // CGST+SGST (true) vs IGST (false) — for the GST label
+  storeCredit: number;         // real store credit (0 until the ledger ships post-launch)
+  replacementValue: number | null; // retail value reshipped, when the resolution sends goods back out
+  netCashOut: number;          // honest cash leaving the business = refundAmount
+  isReplacement: boolean;
+  isExchange: boolean;
+}
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function getReturnDetail(returnId: string): Promise<{ ret: any; items: any[]; attachments: any[] } | null> {
+function computeReturnFinance(order: any, ret: any, items: any[]): ReturnFinance {
+  const total = Number(order?.total_amount ?? 0);
+  const orderTax = Number(order?.cgst_amount ?? 0) + Number(order?.sgst_amount ?? 0) + Number(order?.igst_amount ?? 0);
+  const refundAmount = Number(ret?.refund_amount ?? 0);
+  const taxFraction = total > 0 ? orderTax / total : 0;
+  const refundGst = round2(refundAmount * taxFraction);
+  const goodsValue = round2(items.reduce((s, it) => s + Number(it.line_amount ?? 0), 0));
+  const isReplacement = ret?.return_type === "replacement" || ret?.resolution === "replacement_only";
+  const isExchange = ret?.return_type === "exchange" || ret?.resolution === "exchange";
+  const sendsGoods = isReplacement || isExchange;
+  return {
+    customerPaid: round2(total),
+    goodsValue,
+    refundAmount: round2(refundAmount),
+    refundGst,
+    refundTaxable: round2(refundAmount - refundGst),
+    refundMethod: ret?.refund_method ?? null,
+    refundId: ret?.refund_id ?? null,
+    refundIssued: !!ret?.refund_id || Number(order?.refund_amount ?? 0) > 0,
+    intraState: Number(order?.igst_amount ?? 0) === 0,
+    storeCredit: ret?.refund_method === "store_credit" ? refundAmount : 0,
+    replacementValue: sendsGoods ? goodsValue : null,
+    netCashOut: round2(refundAmount),
+    isReplacement,
+    isExchange,
+  };
+}
+
+/** Full return record for the Resolution Center detail page: the row (all resolution/inspection/
+ *  warehouse/notes fields + resolved actor names, incl. approver + refunder from the audit stream),
+ *  its line items, its evidence attachments, and a derived finance summary. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function getReturnDetail(returnId: string): Promise<{ ret: any; items: any[]; attachments: any[]; finance: ReturnFinance } | null> {
   const db = loose();
   const { data: ret } = await db.from("returns").select("*").eq("id", returnId).maybeSingle();
   if (!ret) return null;
-  const [{ data: items }, { data: attachments }] = await Promise.all([
+  const [{ data: items }, { data: attachments }, { data: order }, { data: evAudit }] = await Promise.all([
     db.from("return_items").select("*").eq("return_id", returnId).order("created_at"),
     db.from("return_attachments").select("*").eq("return_id", returnId).order("created_at"),
+    db.from("orders").select("total_amount,subtotal,discount_amount,taxable_amount,cgst_amount,sgst_amount,igst_amount,shipping_charge,shipping_amount,refund_amount,refunded_at").eq("id", ret.order_id).maybeSingle(),
+    db.from("audit_events").select("event,actor_id,created_at").eq("entity_id", returnId).in("event", ["return.approved", "return.refunded", "return.refund_processing"]).order("created_at"),
   ]);
-  // Resolve actor names for resolution / inspection / warehouse decision (one query).
-  const ids = [...new Set([ret.resolution_by, ret.inspection_by, ret.warehouse_decision_by, ret.created_by].filter(Boolean))];
+  // The approver + refunder live in the audit stream (no dedicated column) — reuse it (priority 4).
+  const approvedEv = (evAudit ?? []).find((e: { event: string }) => e.event === "return.approved");
+  const refundEv = (evAudit ?? []).find((e: { event: string }) => e.event === "return.refunded") ?? (evAudit ?? []).find((e: { event: string }) => e.event === "return.refund_processing");
+
+  const ids = [...new Set([ret.resolution_by, ret.inspection_by, ret.warehouse_decision_by, ret.created_by, approvedEv?.actor_id, refundEv?.actor_id].filter(Boolean))];
   const names = new Map<string, string>();
   if (ids.length) {
     const { data: users } = await db.from("users").select("id,full_name").in("id", ids);
@@ -352,7 +416,14 @@ export async function getReturnDetail(returnId: string): Promise<{ ret: any; ite
   ret.resolution_by_name = ret.resolution_by ? names.get(ret.resolution_by) ?? null : null;
   ret.inspection_by_name = ret.inspection_by ? names.get(ret.inspection_by) ?? null : null;
   ret.warehouse_decision_by_name = ret.warehouse_decision_by ? names.get(ret.warehouse_decision_by) ?? null : null;
-  return { ret, items: items ?? [], attachments: attachments ?? [] };
+  ret.created_by_name = ret.created_by ? names.get(ret.created_by) ?? null : null;
+  ret.approved_by_name = approvedEv?.actor_id ? names.get(approvedEv.actor_id) ?? null : null;
+  ret.approved_at = approvedEv?.created_at ?? null;
+  ret.refund_by_name = refundEv?.actor_id ? names.get(refundEv.actor_id) ?? null : null;
+  ret.refund_at = refundEv?.created_at ?? null;
+
+  const finance = computeReturnFinance(order, ret, items ?? []);
+  return { ret, items: items ?? [], attachments: attachments ?? [], finance };
 }
 
 export interface EvidenceInput {

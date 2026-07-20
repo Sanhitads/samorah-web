@@ -17,7 +17,7 @@ export interface Attachment {
   source: string | null;
 }
 
-export function ReturnEvidence({ returnId, attachments, canOperate }: { returnId: string; attachments: Attachment[]; canOperate: boolean }) {
+export function ReturnEvidence({ returnId, attachments, canOperate, bare = false }: { returnId: string; attachments: Attachment[]; canOperate: boolean; bare?: boolean }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState(false);
@@ -75,7 +75,7 @@ export function ReturnEvidence({ returnId, attachments, canOperate }: { returnId
 
   return (
     <section className="od-section">
-      <h2 className="od-card__title">Customer evidence ({attachments.length})</h2>
+      {!bare ? <h2 className="od-card__title">Customer evidence <span className="count-badge" data-empty={attachments.length === 0}>{attachments.length}</span></h2> : null}
 
       {attachments.length === 0 ? <p className="admin__muted">No evidence attached.</p> : null}
 
