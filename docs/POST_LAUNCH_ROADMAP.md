@@ -160,3 +160,32 @@ optimization, heat maps, AI pick) are **blocked on this**.
 `variant_locations` (variant × warehouse → bin/rack/shelf) table for multi-warehouse — then populate
 it (a real warehouse-mapping exercise, not just a migration). **Complexity: M** (schema) **+ ongoing
 data entry. Recommended phase: WhOps-1** (it gates the rest).
+
+---
+
+## P6 — Returns (Resolution Center follow-ons)
+
+The launch build turns Returns into a Resolution Center (resolution outcomes, evidence review,
+expanded lifecycle, return timeline, inspection, warehouse disposition, internal/customer notes,
+damage classification, refund method). These extend it further and need customer-facing surfaces,
+ML, courier integrations, or the finance ledger.
+
+| Feature | Why deferred | Dependencies | Complexity | Phase |
+|---|---|---|---|---|
+| **Customer self-service return portal** | Customers raise/track returns + upload evidence themselves. Needs an authed storefront flow + the evidence store the admin side already reads from. | auth (exists), evidence store, storefront | L | Ret-1 |
+| **Customer return tracking** | Customer-facing status of their return. Rides on the portal. | Customer portal | M | Ret-1 |
+| **AI image analysis / auto damage detection** | Classify damage from photos. Needs an ML pipeline + a labelled dataset — explicitly out of launch scope. | evidence at volume, ML infra | XL | Ret-3 |
+| **Fraud / return-abuse scoring** | Flag serial returners / abuse. Needs return history at volume + a scoring model. | return history, model | L | Ret-3 |
+| **Automatic approval rules** | Auto-approve low-risk returns. Needs the fraud signal + a rules engine (reuse the incident rule engine). | fraud scoring, rules engine | M | Ret-2 |
+| **Return shipping labels / return AWB** | Generate a reverse label + AWB for the customer. Needs a courier reverse-pickup integration (Shiprocket etc.). | courier integration | M | Ret-2 |
+| **Courier pickup automation** | Auto-book reverse pickup on approval. | Return AWB, courier API | M | Ret-2 |
+| **Warehouse barcode scanning / image capture** | Scan the returned item; capture inspection photos at the bench. Needs scanner/camera hardware + the evidence store. | hardware, evidence store, warehouse locations | M | Ret-3 |
+| **Supplier / vendor RMA** | Route "return to vendor" dispositions to a supplier RMA flow. Needs a suppliers domain (doesn't exist). | suppliers domain | L | Ret-3 |
+| **Store Credit ledger** | The disabled refund method. Needs a stored-value ledger (also blocks orders' store-credit refunds) — see P0 Finance. | Store Credit ledger (P0) | XL | Finance-2 |
+| **Return approval workflow (maker-checker)** | Second approver for high-value refunds/waivers. Reuse the orders approval workflow (P1 Approvals). | Approvals (P1) | M | Approvals-2 |
+| **Partial-exchange automation** | Auto-create the exchange order + price-difference charge. Needs order-linking + payment top-up. | order creation, payment | L | Ret-2 |
+| **Return analytics dashboard** | Return rate, reasons, damage reports, product-return %, customer-return %, fraud analytics. Needs aggregation + enough return volume to be meaningful. | return volume, analytics infra | M | Ret-2 |
+
+**Note on evidence:** the launch build reads customer evidence from a return-attachments store that CS
+attaches to (e.g. photos a customer emails in). The customer self-service *upload* path (Ret-1) writes
+to that same store — no rework, just a new writer.
