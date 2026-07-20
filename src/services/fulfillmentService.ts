@@ -23,6 +23,7 @@ import {
   type SlaTone,
 } from "@/lib/fulfillment/derive";
 import { fulfillmentSla, type SlaBadge } from "@/lib/fulfillment/sla";
+import { shippingMilestones, type ShippingMilestones } from "@/lib/fulfillment/holdReasons";
 import { logEvent } from "@/services/auditService";
 
 const START: FulfillmentStatus = "reserved";
@@ -127,6 +128,7 @@ export interface FulfillmentQueueRow {
   shipmentStatus: string | null;
   awb: string | null;
   courierName: string | null;
+  shipping: ShippingMilestones | null; // label / AWB / booked milestones (point 9)
   holdReason: string | null;
   placedAt: string;
   // ── context (principles 11–17) ──
@@ -232,7 +234,7 @@ export async function getFulfillmentQueue(opts: FulfillmentFilter = {}): Promise
     .select(
       "id,order_number,status,fulfillment_status,fulfillment_hold_reason,ship_full_name,placed_at," +
         "priority,assigned_to,ops_tags,ops_note,is_cod,payment_status,refund_amount,is_gift,gift_note,gift_occasion,wholesale," +
-        "shipments(status,awb,courier_name),order_items(quantity,sku,collection_name,variants(stock))",
+        "shipments(status,awb,courier_name,label_url,provider_shipment_id),order_items(quantity,sku,collection_name,variants(stock))",
     )
     .eq("payment_status", "paid")
     .order("placed_at", { ascending: false })
@@ -301,6 +303,7 @@ export async function getFulfillmentQueue(opts: FulfillmentFilter = {}): Promise
       shipmentStatus: sh?.status ?? null,
       awb: sh?.awb ?? null,
       courierName: sh?.courier_name ?? null,
+      shipping: shippingMilestones(sh ? { status: sh.status, labelUrl: sh.label_url, awb: sh.awb, providerShipmentId: sh.provider_shipment_id } : null),
       holdReason: o.fulfillment_hold_reason ?? null,
       placedAt: o.placed_at,
       priority: manual,

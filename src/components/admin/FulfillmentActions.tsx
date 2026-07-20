@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { FulfillmentStatus } from "@/lib/fulfillment/state";
+import { HOLD_REASONS, composeHoldReason } from "@/lib/fulfillment/holdReasons";
 
 const ACTION_LABEL: Record<string, string> = {
   picking: "Start Picking",
@@ -36,7 +37,8 @@ export function FulfillmentActions({
   const [err, setErr] = useState("");
   const [more, setMore] = useState(false);
   const [holdInput, setHoldInput] = useState(false);
-  const [reason, setReason] = useState("");
+  const [reasonValue, setReasonValue] = useState(HOLD_REASONS[0].value);
+  const [note, setNote] = useState("");
   const disabled = busy !== null || pending;
 
   const post = async (url: string, body: Record<string, unknown>, key: string) => {
@@ -61,7 +63,7 @@ export function FulfillmentActions({
   const createShipment = () => post("/api/admin/fulfillment/create-shipment", { orderNumber }, "ship");
   const dispatch = () => post("/api/admin/fulfillment/dispatch", { orderNumber }, "dispatch");
   const resume = () => post("/api/admin/fulfillment/hold", { orderNumber, resume: true }, "resume");
-  const confirmHold = () => post("/api/admin/fulfillment/hold", { orderNumber, reason }, "hold");
+  const confirmHold = () => post("/api/admin/fulfillment/hold", { orderNumber, reason: composeHoldReason(reasonValue, note) }, "hold");
   // No Cancel here — cancellation is a commercial action owned by Order Management
   // (Admin/CS), not the warehouse board (Design Principles 1, 4, 7).
 
@@ -117,11 +119,14 @@ export function FulfillmentActions({
           ) : null}
           {canHold && holdInput ? (
             <span className="ff-hold-form">
+              <select className="ff-hold-input" value={reasonValue} onChange={(e) => setReasonValue(e.target.value)} aria-label="Hold reason">
+                {HOLD_REASONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+              </select>
               <input
                 className="ff-hold-input"
-                placeholder="Reason (optional)"
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
+                placeholder="Note (optional)"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") { confirmHold(); setMore(false); } }}
               />
               <button type="button" className="ff-btn" disabled={disabled} onClick={() => { confirmHold(); setMore(false); }}>

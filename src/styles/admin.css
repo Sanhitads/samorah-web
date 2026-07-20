@@ -225,6 +225,10 @@
 .ff-balance__chip[data-heavy="1"] { border-color: rgba(168,68,58,0.4); }
 .ff-balance__chip[data-heavy="1"] b { color: #8a3d2f; }
 .ff-balance__chip--none { color: var(--smoke, #6b6259); }
+/* Shipping milestones (point 9) — Label → AWB → Booked */
+.bc-ship { display: flex; gap: 4px; margin-top: 4px; }
+.bc-ship span { font-family: var(--font-sans); font-size: 9px; letter-spacing: 0.04em; text-transform: uppercase; padding: 1px 6px; border-radius: 3px; background: rgba(31,26,22,0.06); color: #b3a99d; }
+.bc-ship span[data-done="1"] { background: rgba(60,120,70,0.14); color: #2f6b3c; }
 .bc-inv { font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.04em; margin-top: 4px; }
 .bc-inv[data-inv="allocated"] { color: #2f6b3c; }
 .bc-inv[data-inv="missing"] { color: #8a3d2f; font-weight: 600; }

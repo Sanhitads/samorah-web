@@ -188,7 +188,14 @@ export default async function FulfillmentDashboard({ searchParams }: { searchPar
                     <span className="ff-status" data-s={r.fulfillmentStatus}>{FS_LABEL[r.fulfillmentStatus] ?? r.fulfillmentStatus}</span>
                     <div className="bc-next">→ {r.nextAction}</div>
                     <div className="bc-inv" data-inv={r.inventory}>{INV_LABEL[r.inventory]}</div>
-                    {r.shipmentStatus ? <div className="admin__muted">{r.shipmentStatus}{r.awb ? ` · ${r.awb}` : ""}</div> : null}
+                    {r.shipmentStatus ? <div className="admin__muted">{r.shipmentStatus}{r.courierName ? ` · ${r.courierName}` : ""}{r.awb ? ` · ${r.awb}` : ""}</div> : null}
+                    {r.shipping ? (
+                      <div className="bc-ship" aria-label="Shipping milestones">
+                        <span data-done={r.shipping.label ? "1" : "0"}>Label</span>
+                        <span data-done={r.shipping.awb ? "1" : "0"}>AWB</span>
+                        <span data-done={r.shipping.booked ? "1" : "0"}>Booked</span>
+                      </div>
+                    ) : null}
                   </td>
                   <td>
                     <span className="om-pay" data-tone={pay.tone}>{pay.label}</span>
