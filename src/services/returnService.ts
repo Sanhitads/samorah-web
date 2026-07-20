@@ -417,6 +417,55 @@ function computeReturnFinance(order: any, ret: any, items: any[], refunds: any[]
   };
 }
 
+/**
+ * Retry a failed return refund (review follow-on). A gateway refund can fail (e.g. Razorpay
+ * BAD_REQUEST) — the ledger records it `failed` and the return sits with no linked refund. This
+ * re-issues through the SAME ledger: `begin_refund` excludes failed rows from its over-refund guard
+ * and only `processed` rows count toward the order total, so re-calling `issueRefund` can never
+ * double-refund. On success it links the refund and, if the money fully processed while the return
+ * is mid-refund, completes it (→ refunded, which notifies the customer). Gated returns.approve at the
+ * route (issuing money), same as the original refund transition.
+ */
+export async function retryReturnRefund(returnId: string, actorId?: string): Promise<{ ok: boolean; status?: string; refundId?: string; reason?: string }> {
+  const db = loose();
+  const { data: ret } = await db.from("returns").select("id,order_id,status,return_type,refund_amount,refund_id,rma_number").eq("id", returnId).maybeSingle();
+  if (!ret) return { ok: false, reason: "return_not_found" };
+  if (ret.return_type === "replacement") return { ok: false, reason: "replacement_has_no_refund" };
+  const amount = Number(ret.refund_amount ?? 0);
+  if (amount <= 0) return { ok: false, reason: "no_refund_amount" };
+  if (ret.refund_id) return { ok: false, reason: "already_refunded" };
+
+  // Only retry when the latest attempt for this return actually failed — don't fire a second gateway
+  // call while one is still processing (begin_refund's guard is the ultimate backstop regardless).
+  const refunds = await getOrderRefunds(ret.order_id);
+  const mine = refunds.filter((r) => String(r.reason ?? "").includes(ret.rma_number ?? " "));
+  const latest = mine[0];
+  if (latest && (latest.status === "processing" || latest.status === "processed")) return { ok: false, reason: "refund_not_failed" };
+
+  const { data: order } = await db.from("orders").select("razorpay_payment_id").eq("id", ret.order_id).maybeSingle();
+  const r = await issueRefund({
+    orderId: ret.order_id, amount, reason: `Return ${ret.rma_number}`, refundType: "return_retry",
+    actorId, paymentId: order?.razorpay_payment_id ?? null,
+  });
+
+  await logEvent({
+    orderId: ret.order_id, entityType: "return", entityId: returnId,
+    event: r.ok ? "return.refund_retried" : "return.refund_retry_failed",
+    actorType: actorId ? "staff" : "system", actorId,
+    notes: `${ret.rma_number}: refund retry ${r.ok ? `→ ${r.status}` : `failed — ${r.reason ?? "error"}`}`,
+    metadata: { amount, status: r.status ?? null, refundId: r.refundId ?? null, reason: r.reason ?? null },
+  });
+
+  if (!r.ok) return { ok: false, reason: r.reason ?? "refund_failed", status: r.status };
+
+  if (r.refundId) await db.from("returns").update({ refund_id: r.refundId, updated_at: new Date().toISOString() }).eq("id", returnId);
+  // Fully processed while mid-refund → complete the return the same way the normal flow does.
+  if (r.status === "processed" && ret.status === "refund_processing") {
+    await advanceReturn(returnId, "refunded", { actorId });
+  }
+  return { ok: true, status: r.status, refundId: r.refundId };
+}
+
 /** Full return record for the Resolution Center detail page: the row (all resolution/inspection/
  *  warehouse/notes fields + resolved actor names, incl. approver + refunder from the audit stream),
  *  its line items, its evidence attachments, and a derived finance summary. */

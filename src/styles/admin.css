@@ -560,6 +560,7 @@
 .cf__detail { margin: 0 0 6px; font-family: var(--font-sans); font-size: 14px; color: var(--ink, #1f1a16); }
 .cf__warn { margin: 0 0 18px; font-family: var(--font-sans); font-size: 13px; color: #ab5f1a; }
 .cf__actions { display: flex; justify-content: flex-end; gap: 10px; }
+.retry-refund { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 10px 0 4px; }
 
 /* Evidence item metadata (priority 3) */
 .ret-evidence__item { display: flex; flex-direction: column; gap: 4px; width: 116px; }

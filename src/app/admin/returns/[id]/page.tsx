@@ -9,6 +9,7 @@ import { Timeline } from "@/components/admin/Timeline";
 import { ReturnActions } from "@/components/admin/ReturnActions";
 import { ReturnManage } from "@/components/admin/ReturnManage";
 import { ReturnEvidence } from "@/components/admin/ReturnEvidence";
+import { RetryRefundButton } from "@/components/admin/RetryRefundButton";
 import { nextReturnStates, isResolutionLocked, type ReturnStatus } from "@/lib/returns/state";
 import { RESOLUTIONS, INSPECTION_RESULTS, WAREHOUSE_DECISIONS, DAMAGE_GRADES, REFUND_METHODS, labelOf } from "@/lib/returns/resolution";
 
@@ -119,6 +120,7 @@ export default async function ReturnDetailPage({ params }: { params: Promise<{ i
               <div><dt>Replacement value</dt><dd>{finance.replacementValue != null ? <>{inr(finance.replacementValue)} <span className="admin__muted">retail</span></> : <span className="admin__muted">—</span>}</dd></div>
               <div className="od-dl__net"><dt>Net cash out</dt><dd>{inr(finance.netCashOut)}</dd></div>
             </dl>
+            {finance.refundProgress === "failed" && canApprove ? <RetryRefundButton returnId={ret.id} amount={finance.refundAmount} /> : null}
             <p className="om-field__hint">Reverse-logistics cost &amp; unit COGS aren&apos;t tracked — full cost/loss analytics is post-launch. GST split is derived from the order&apos;s effective inclusive rate.</p>
           </section>
         </div>
