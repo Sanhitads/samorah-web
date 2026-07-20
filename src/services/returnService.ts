@@ -155,7 +155,7 @@ export async function advanceReturn(
   let refundId: string | null = ret.refund_id ?? null;
   let restocked = 0;
 
-  if (to === "refund") {
+  if (to === "refund_processing") {
     // Restock the sellable lines (inventory tie), once.
     restocked = await callRpc<number>("restock_return_items", { p_return_id: returnId });
 
@@ -189,14 +189,14 @@ export async function advanceReturn(
     previousState: from,
     newState: to,
     notes: ret.rma_number,
-    metadata: to === "refund" ? { restocked, refundId } : undefined,
+    metadata: to === "refund_processing" ? { restocked, refundId } : undefined,
   });
 
   // Notify the customer on the meaningful transitions (fan-out via the engine).
   const NOTIFY: Partial<Record<ReturnStatus, NotificationEvent>> = {
     approved: "return.approved",
     rejected: "return.rejected",
-    refund: "return.refunded",
+    refunded: "return.refunded",
   };
   const ev = NOTIFY[to];
   if (ev) await emitReturnEvent(ev, ret.order_id, returnId);

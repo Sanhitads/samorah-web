@@ -5,25 +5,38 @@
 export const RETURN_REASONS = ["damaged", "wrong_item", "not_as_described", "changed_mind", "defective"] as const;
 export type ReturnReason = (typeof RETURN_REASONS)[number];
 
+// Full return lifecycle (Resolution Center). The path after "approved" is chosen by the admin's
+// RESOLUTION (return_required → RMA/pickup; waived/refund/replacement → straight to fulfilment) —
+// the state machine allows every valid branch, the UI offers the one the resolution implies.
 export const RETURN_STATUSES = [
   "requested",
+  "under_review",
   "approved",
-  "pickup_scheduled",
+  "return_required",
+  "in_transit",
   "received",
-  "qc",
-  "refund",
+  "inspection",
+  "refund_processing",
+  "refunded",
+  "replacement_shipped",
   "closed",
   "rejected",
 ] as const;
 export type ReturnStatus = (typeof RETURN_STATUSES)[number];
 
 const TRANSITIONS: Record<ReturnStatus, ReturnStatus[]> = {
-  requested: ["approved", "rejected"],
-  approved: ["pickup_scheduled", "rejected"],
-  pickup_scheduled: ["received", "rejected"],
-  received: ["qc"],
-  qc: ["refund", "rejected"],
-  refund: ["closed"],
+  requested: ["under_review", "approved", "rejected"],
+  under_review: ["approved", "rejected"],
+  // Resolution branches: physical return needed, or waive → refund / replacement / close.
+  approved: ["return_required", "refund_processing", "replacement_shipped", "closed", "rejected"],
+  return_required: ["in_transit", "rejected"],
+  in_transit: ["received"],
+  received: ["inspection"],
+  // After inspection: refund, replacement, close (e.g. keep-as-sample), or reject the claim.
+  inspection: ["refund_processing", "replacement_shipped", "closed", "rejected"],
+  refund_processing: ["refunded"],
+  refunded: ["replacement_shipped", "closed"], // "both" = refund then replacement
+  replacement_shipped: ["closed"],
   closed: [],
   rejected: [],
 };

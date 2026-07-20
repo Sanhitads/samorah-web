@@ -15,8 +15,10 @@ export const metadata: Metadata = { title: "Returns", robots: { index: false } }
 export const dynamic = "force-dynamic";
 
 const STATUS_LABEL: Record<string, string> = {
-  requested: "Requested", approved: "Approved", pickup_scheduled: "Pickup Scheduled",
-  received: "Received", qc: "In QC", refund: "Refunding", closed: "Closed", rejected: "Rejected",
+  requested: "Requested", under_review: "Under Review", approved: "Approved",
+  return_required: "Return Required", in_transit: "In Transit", received: "Received",
+  inspection: "Inspection", refund_processing: "Refund Processing", refunded: "Refunded",
+  replacement_shipped: "Replacement Shipped", closed: "Closed", rejected: "Rejected",
 };
 const REASON_LABEL: Record<string, string> = {
   damaged: "Damaged", defective: "Defective", wrong_item: "Wrong item",

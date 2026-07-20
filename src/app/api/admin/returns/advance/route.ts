@@ -5,13 +5,14 @@ import { RETURN_STATUSES, type ReturnStatus } from "@/lib/returns/state";
 
 /**
  * POST /api/admin/returns/advance { returnId, to } — move a return through its
- * state machine. Financial transitions (approve/reject/refund) need returns.approve;
- * operational ones (pickup/received/qc/closed) need returns.operate. Mirrors the
- * cancel-vs-refund capability split so warehouse can process but not approve money.
+ * state machine. FINANCIAL transitions (approve/reject/refund) need returns.approve;
+ * operational ones (review/in-transit/received/inspection/replacement/closed) need
+ * returns.operate. Mirrors the cancel-vs-refund split so warehouse can process but
+ * not approve money.
  */
 export const runtime = "nodejs";
 
-const FINANCIAL = new Set<ReturnStatus>(["approved", "rejected", "refund"]);
+const FINANCIAL = new Set<ReturnStatus>(["approved", "rejected", "refund_processing", "refunded"]);
 
 export async function POST(request: Request) {
   let body: { returnId?: string; to?: string };

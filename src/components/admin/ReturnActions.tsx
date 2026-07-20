@@ -5,12 +5,16 @@ import { useRouter } from "next/navigation";
 import type { ReturnStatus } from "@/lib/returns/state";
 
 const LABEL: Record<string, string> = {
+  under_review: "Start Review",
   approved: "Approve",
   rejected: "Reject",
-  pickup_scheduled: "Schedule Pickup",
+  return_required: "Require Return",
+  in_transit: "Mark In Transit",
   received: "Mark Received",
-  qc: "Start QC",
-  refund: "Refund & Restock",
+  inspection: "Start Inspection",
+  refund_processing: "Process Refund",
+  refunded: "Mark Refunded",
+  replacement_shipped: "Ship Replacement",
   closed: "Close",
 };
 
@@ -51,7 +55,7 @@ export function ReturnActions({ returnId, nextStates }: { returnId: string; next
   return (
     <div className="ff-actions">
       {forward.map((s) => (
-        <button key={s} type="button" disabled={disabled} onClick={() => advance(s)} className={`ff-btn${s === "refund" ? " ff-btn--primary" : ""}`}>
+        <button key={s} type="button" disabled={disabled} onClick={() => advance(s)} className={`ff-btn${s === "refund_processing" ? " ff-btn--primary" : ""}`}>
           {busy === s ? "…" : LABEL[s] ?? s}
         </button>
       ))}

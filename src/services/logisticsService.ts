@@ -68,7 +68,7 @@ export async function transitionReturn(id: string, to: ReturnStatus, opts?: { de
   if (!ret) throw new Error("return not found");
   assertReturnTransition(ret.status as ReturnStatus, to);
   const patch: Record<string, unknown> = { status: to, updated_at: nowIso() };
-  if (to === "refund" && opts?.refundAmount != null) patch.refund_amount = opts.refundAmount;
+  if (to === "refund_processing" && opts?.refundAmount != null) patch.refund_amount = opts.refundAmount;
   if (to === "closed" || to === "rejected") patch.closed_at = nowIso();
   await db.from("returns").update(patch).eq("id", id);
   await db.from("return_events").insert({ return_id: id, status: to, description: opts?.description ?? null });
