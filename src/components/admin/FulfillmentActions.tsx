@@ -140,7 +140,7 @@ export function FulfillmentActions({
                 onChange={(e) => setNote(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") { confirmHold(); setMore(false); } }}
               />
-              <button type="button" className="ff-btn" disabled={disabled} onClick={() => { confirmHold(); setMore(false); }}>
+              <button type="button" className="ff-btn ff-btn--primary" disabled={disabled} onClick={() => { confirmHold(); setMore(false); }}>
                 {busy === "hold" ? "…" : "Confirm Hold"}
               </button>
             </span>

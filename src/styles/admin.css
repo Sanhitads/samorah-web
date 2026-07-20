@@ -94,14 +94,17 @@
 }
 .ff-more__item:hover:not(:disabled) { background: var(--soft-beige, #efe9e0); }
 .ff-more__item--danger { color: #8a3d2f; border-color: rgba(138, 61, 47, 0.4); }
-.ff-hold-form { display: inline-flex; gap: 6px; align-items: center; }
+/* Wrap + full width so the Confirm Hold button stays visible in the narrow actions cell
+   (the reason dropdown + note + button don't fit on one line). */
+.ff-hold-form { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; width: 100%; }
 .ff-hold-input {
   padding: 5px 8px;
   font-family: var(--font-sans);
   font-size: 11px;
   border: 1px solid var(--ad-hair);
   border-radius: 3px;
-  min-width: 150px;
+  flex: 1 1 130px;
+  min-width: 120px;
 }
 .ff-hold-input:focus { outline: none; border-color: var(--ink, #1f1a16); }
 .ff-hold-badge {
