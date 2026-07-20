@@ -39,7 +39,7 @@ export const WORK_QUEUES: { key: WorkQueue; label: string }[] = [
   { key: "pick", label: "Ready to Pick" },
   { key: "pack", label: "Ready to Pack" },
   { key: "ship", label: "Ready to Ship" },
-  { key: "exceptions", label: "Exceptions" },
+  { key: "exceptions", label: "Blocked" }, // QC-failed / out-of-stock — distinct from On Hold
   { key: "hold", label: "On Hold" },
 ];
 

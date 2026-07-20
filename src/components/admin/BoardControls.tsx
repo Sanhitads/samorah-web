@@ -74,7 +74,7 @@ export function AssigneeControl({ orderNumber, assigneeName }: { orderNumber: st
   if (assigneeName) {
     return (
       <span className="bc-owner">
-        <span className="bc-owner__name" title={assigneeName}>{assigneeName}</span>
+        <span className="bc-owner__name" title={assigneeName}>👤 {assigneeName}</span>
         <button type="button" className="bc-owner__clear" disabled={disabled} title="Unassign" onClick={() => post({ orderNumber, clearAssignee: true })}>×</button>
       </span>
     );

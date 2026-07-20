@@ -64,7 +64,7 @@ export default async function FulfillmentDashboard({ searchParams }: { searchPar
     getFulfillmentQueue(filter), getQueueCounts(), getStaffOptions(), getCourierOptions(),
     getOperationalMetrics(), getAssignmentBalance(), getWarehouseCapacity(),
   ]);
-  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  const total = counts.pick + counts.pack + counts.ship + counts.exceptions + counts.hold;
   const now = Date.now();
   // Preserve active filters (minus queue) when switching queue tabs.
   const filterEntries = Object.entries(sp).filter(([k, v]) => v && k !== "queue") as [string, string][];
@@ -90,6 +90,7 @@ export default async function FulfillmentDashboard({ searchParams }: { searchPar
 
       {/* Operations summary (point 16) + assignment balance (point 18) */}
       <div className="oms-strip">
+        <a href={tabHref()} className="oms-stat oms-stat--link" data-tone={counts.breached ? "over" : undefined}><span className="oms-stat__n">{counts.breached}</span><span className="oms-stat__l">Breached SLA</span></a>
         <div className="oms-stat"><span className="oms-stat__n">{metrics.ordersWaiting}</span><span className="oms-stat__l">Awaiting</span></div>
         <div className="oms-stat"><span className="oms-stat__n">{metrics.avgPickMinutes != null ? `${metrics.avgPickMinutes}m` : "—"}</span><span className="oms-stat__l">Avg pick</span></div>
         <div className="oms-stat"><span className="oms-stat__n">{metrics.avgPackMinutes != null ? `${metrics.avgPackMinutes}m` : "—"}</span><span className="oms-stat__l">Avg pack</span></div>
@@ -97,7 +98,7 @@ export default async function FulfillmentDashboard({ searchParams }: { searchPar
         <div className="oms-stat" data-tone={metrics.ordersOnHold ? "warn" : undefined}><span className="oms-stat__n">{metrics.ordersOnHold}</span><span className="oms-stat__l">On hold</span></div>
         <div className="oms-stat" data-tone={capacity.pct != null && capacity.pct >= 90 ? "warn" : undefined}>
           <span className="oms-stat__n">{capacity.pct != null ? `${capacity.pct}%` : "—"}</span>
-          <span className="oms-stat__l">{capacity.capacity != null ? `Capacity · ${capacity.used}/${capacity.capacity}` : "Capacity (unset)"}</span>
+          <span className="oms-stat__l">{capacity.capacity != null ? `Capacity · ${capacity.used}/${capacity.capacity}` : "Capacity · setup required"}</span>
         </div>
       </div>
 
@@ -187,9 +188,14 @@ export default async function FulfillmentDashboard({ searchParams }: { searchPar
                     <div className="bc-order">
                       <Link href={`/admin/orders/${r.orderNumber}`} className="od-link admin__mono">{r.orderNumber}</Link>
                       <span className="admin__muted">{r.itemCount} {r.itemCount === 1 ? "item" : "items"}</span>
-                      {r.pickedUnits > 0 && r.pickedUnits < r.itemCount ? <span className="bc-pick" data-part="1">{r.pickedUnits}/{r.itemCount} picked</span> : null}
-                      {r.itemCount > 0 && r.pickedUnits >= r.itemCount ? <span className="bc-pick" data-done="1">✓ picked</span> : null}
+                      {r.isGift ? <span className="bc-gift" title="Gift order">🎁 Gift</span> : null}
                     </div>
+                    {r.itemCount > 0 && (r.pickedUnits > 0 || r.fulfillmentStatus === "picking") ? (
+                      <div className="bc-pickbar" title={`${r.pickedUnits} of ${r.itemCount} picked`}>
+                        <span className="bc-pickbar__label">Picked {r.pickedUnits}/{r.itemCount}</span>
+                        <span className="bc-pickbar__track"><span className="bc-pickbar__fill" data-done={r.pickedUnits >= r.itemCount ? "1" : undefined} style={{ width: `${Math.min(100, Math.round((r.pickedUnits / r.itemCount) * 100))}%` }} /></span>
+                      </div>
+                    ) : null}
                     <TagsControl orderNumber={r.orderNumber} tags={r.tags} />
                     {r.note ? <div className="bc-note" title={r.note}>📝 {r.note}</div> : null}
                   </td>
@@ -198,6 +204,10 @@ export default async function FulfillmentDashboard({ searchParams }: { searchPar
                     <span className="ff-status" data-s={r.fulfillmentStatus}>{FS_LABEL[r.fulfillmentStatus] ?? r.fulfillmentStatus}</span>
                     <div className="bc-next">→ {r.nextAction}</div>
                     <div className="bc-inv" data-inv={r.inventory}>{INV_LABEL[r.inventory]}</div>
+                    {r.fulfillmentStatus === "packing" && r.packingTotal > 0 ? (
+                      <div className="bc-pack" data-done={r.packingDone >= r.packingTotal ? "1" : undefined}>Checklist {r.packingDone}/{r.packingTotal}{r.packingDone >= r.packingTotal ? " ✓" : ""}</div>
+                    ) : null}
+                    {r.qcAt ? <div className="bc-qc">QC ✓ {r.qcByName ?? "—"} · {new Date(r.qcAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</div> : null}
                     {r.shipmentStatus ? <div className="admin__muted">{r.shipmentStatus}{r.courierName ? ` · ${r.courierName}` : ""}{r.awb ? ` · ${r.awb}` : ""}</div> : null}
                     {r.shipping ? (
                       <div className="bc-ship" aria-label="Shipping milestones">

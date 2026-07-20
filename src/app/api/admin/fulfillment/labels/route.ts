@@ -40,7 +40,7 @@ export async function GET(request: Request) {
     </tr>`).join("");
 
   const pendingNote = pending.length
-    ? `<p class="muted">${pending.length} selected order${pending.length === 1 ? " has" : "s have"} no label yet: ${esc(pending.map((o) => o.orderNumber).join(", "))}. Create the shipment first.</p>`
+    ? `<p class="muted">Shipping labels are not yet available for: ${esc(pending.map((o) => o.orderNumber).join(", "))}. Generate the shipment first — labels will appear here once created.</p>`
     : "";
 
   const html = `<!doctype html><html><head><meta charset="utf-8"><title>Shipping Labels</title>
@@ -60,7 +60,7 @@ export async function GET(request: Request) {
   <div class="meta">${withLabel.length} of ${numbers.length} selected order${numbers.length === 1 ? "" : "s"} have a label</div>
   <table>
     <thead><tr><th>Order</th><th>Customer</th><th>Courier</th><th>AWB</th><th>Label</th></tr></thead>
-    <tbody>${labelRows || `<tr><td colspan="5" class="muted">None of the selected orders have a label yet.</td></tr>`}</tbody>
+    <tbody>${labelRows || `<tr><td colspan="5" class="muted">Shipping labels are not yet available. Generate the shipment first, then labels will appear here.</td></tr>`}</tbody>
   </table>
   ${pendingNote}
 </body></html>`;

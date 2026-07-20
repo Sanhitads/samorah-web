@@ -232,10 +232,23 @@
 .bc-ship { display: flex; gap: 4px; margin-top: 4px; }
 .bc-ship span { font-family: var(--font-sans); font-size: 9px; letter-spacing: 0.04em; text-transform: uppercase; padding: 1px 6px; border-radius: 3px; background: rgba(31,26,22,0.06); color: #b3a99d; }
 .bc-ship span[data-done="1"] { background: rgba(60,120,70,0.14); color: #2f6b3c; }
-/* Pick progress (point 2) */
-.bc-pick { display: inline-block; margin-left: 8px; padding: 1px 7px; border-radius: 3px; font-family: var(--font-sans); font-size: 10px; }
-.bc-pick[data-part="1"] { background: rgba(201,140,80,0.18); color: #a85f24; }
-.bc-pick[data-done="1"] { background: rgba(60,120,70,0.14); color: #2f6b3c; }
+/* Prominent pick progress bar (point 1) */
+.bc-pickbar { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
+.bc-pickbar__label { font-family: var(--font-sans); font-size: 10px; color: var(--smoke, #6b6259); white-space: nowrap; }
+.bc-pickbar__track { flex: 1 1 60px; max-width: 120px; height: 6px; background: rgba(31,26,22,0.08); border-radius: 999px; overflow: hidden; }
+.bc-pickbar__fill { display: block; height: 100%; background: #a85f24; border-radius: 999px; }
+.bc-pickbar__fill[data-done="1"] { background: #2f6b3c; }
+/* Gift badge on the row (point 9) */
+.bc-gift { margin-left: 8px; font-family: var(--font-sans); font-size: 10px; color: #8a3d2f; background: rgba(168,68,58,0.1); padding: 1px 7px; border-radius: 3px; white-space: nowrap; }
+/* Packing checklist completion on board (point 2) */
+.bc-pack { margin-top: 4px; font-family: var(--font-sans); font-size: 10px; color: #a85f24; }
+.bc-pack[data-done="1"] { color: #2f6b3c; }
+/* QC operator + timestamp on board (point 3) */
+.bc-qc { margin-top: 4px; font-family: var(--font-sans); font-size: 10px; color: #2f6b3c; }
+/* Clickable Breached-SLA stat + red tone */
+.oms-stat--link { text-decoration: none; cursor: pointer; }
+.oms-stat--link:hover { background: rgba(31,26,22,0.04); }
+.oms-stat[data-tone="over"] .oms-stat__n { color: #8a3d2f; }
 /* Pick panel */
 .pick-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .pick-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--ad-hair); font-family: var(--font-sans); font-size: 13px; }

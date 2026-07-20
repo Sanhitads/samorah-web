@@ -25,7 +25,7 @@ import {
 import { fulfillmentSla, type SlaBadge } from "@/lib/fulfillment/sla";
 import { shippingMilestones, type ShippingMilestones } from "@/lib/fulfillment/holdReasons";
 import { clampPicked, pickProgress, type PickProgress } from "@/lib/fulfillment/pick";
-import { requiredPackingItems, packingComplete, type PackingChecklist } from "@/lib/fulfillment/packing";
+import { requiredPackingItems, packingComplete, packingProgress, type PackingChecklist } from "@/lib/fulfillment/packing";
 import { logEvent } from "@/services/auditService";
 
 const START: FulfillmentStatus = "reserved";
@@ -154,6 +154,11 @@ export interface FulfillmentQueueRow {
   tags: string[];                     // derived (Gift/COD) + operational
   itemCount: number;
   pickedUnits: number;                // units picked so far (point 2 — "picked / total")
+  isGift: boolean;                    // for the 🎁 badge on the row
+  packingDone: number;                // packing checklist: completed items
+  packingTotal: number;               // packing checklist: required items
+  qcByName: string | null;            // who passed QC (supervisor visibility)
+  qcAt: string | null;                // when QC was passed
   paymentStatus: string;
   isCod: boolean;
   refundAmount: number;
@@ -245,7 +250,7 @@ export async function getFulfillmentQueue(opts: FulfillmentFilter = {}): Promise
     .from("orders")
     .select(
       "id,order_number,status,fulfillment_status,fulfillment_hold_reason,ship_full_name,placed_at," +
-        "priority,assigned_to,ops_tags,ops_note,is_cod,payment_status,refund_amount,is_gift,gift_note,gift_occasion,wholesale," +
+        "priority,assigned_to,ops_tags,ops_note,is_cod,payment_status,refund_amount,is_gift,gift_note,gift_occasion,wholesale,packing_checklist,qc_by,qc_at," +
         "shipments(status,awb,courier_name,label_url,provider_shipment_id),order_items(id,quantity,picked_qty,sku,collection_name,variants(stock))",
     )
     .eq("payment_status", "paid")
@@ -266,11 +271,11 @@ export async function getFulfillmentQueue(opts: FulfillmentFilter = {}): Promise
 
   const live = (data ?? []).filter((o: any) => !TERMINAL_ORDER.has(o.status));
 
-  // Resolve assignee names + latest refund states in one shot each (small tables).
+  // Resolve staff names (assignees + QC operators) + latest refund states in one shot each.
   const staff = new Map<string, string>();
-  const assigneeIds = [...new Set(live.map((o: any) => o.assigned_to).filter(Boolean))];
-  if (assigneeIds.length) {
-    const { data: users } = await db.from("users").select("id,full_name").in("id", assigneeIds);
+  const staffIds = [...new Set([...live.map((o: any) => o.assigned_to), ...live.map((o: any) => o.qc_by)].filter(Boolean))];
+  if (staffIds.length) {
+    const { data: users } = await db.from("users").select("id,full_name").in("id", staffIds);
     for (const u of users ?? []) staff.set(u.id, u.full_name ?? "");
   }
   const refundStatus = await latestRefundStatuses(db, live.map((o: any) => o.id));
@@ -330,6 +335,11 @@ export async function getFulfillmentQueue(opts: FulfillmentFilter = {}): Promise
       tags,
       itemCount,
       pickedUnits,
+      isGift: Boolean(o.is_gift),
+      packingDone: packingProgress(o.packing_checklist, Boolean(o.is_gift)).done,
+      packingTotal: packingProgress(o.packing_checklist, Boolean(o.is_gift)).total,
+      qcByName: o.qc_by ? staff.get(o.qc_by) ?? null : null,
+      qcAt: o.qc_at ?? null,
       paymentStatus: o.payment_status,
       isCod: o.is_cod,
       refundAmount: Number(o.refund_amount ?? 0),
@@ -351,11 +361,12 @@ export async function getFulfillmentQueue(opts: FulfillmentFilter = {}): Promise
   });
 }
 
-/** Counts per work queue (for the board's queue tabs) — one pass over the full set. */
-export async function getQueueCounts(): Promise<Record<WorkQueue, number>> {
+export interface BoardCounts { pick: number; pack: number; ship: number; exceptions: number; hold: number; breached: number; }
+/** Counts per work queue + SLA-breached total (point 5) — one pass over the full active set. */
+export async function getQueueCounts(): Promise<BoardCounts> {
   const all = await getFulfillmentQueue({ limit: 500 });
-  const counts: Record<WorkQueue, number> = { pick: 0, pack: 0, ship: 0, exceptions: 0, hold: 0 };
-  for (const r of all) counts[r.queue]++;
+  const counts: BoardCounts = { pick: 0, pack: 0, ship: 0, exceptions: 0, hold: 0, breached: 0 };
+  for (const r of all) { counts[r.queue]++; if (r.sla.state === "breached") counts.breached++; }
   return counts;
 }
 
