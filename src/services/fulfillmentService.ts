@@ -52,6 +52,9 @@ export async function advanceFulfillment(
   const patch: Record<string, unknown> = { fulfillment_status: to, updated_at: new Date().toISOString() };
   const mapped = fulfillmentToOrderStatus(to);
   if (mapped && mapped !== order.status) patch.status = mapped;
+  // First-class QC record (point 4): stamp who passed QC + when. The state machine already REQUIRES
+  // qc_passed before ship; this makes the pass queryable/displayable, not just an audit line.
+  if (to === "qc_passed") { patch.qc_by = opts?.actorId ?? null; patch.qc_at = new Date().toISOString(); }
   await db.from("orders").update(patch).eq("id", order.id);
   await logEvent({ orderId: order.id, entityType: "fulfillment", entityId: order.id, event: `fulfillment.${to}`, actorId: opts?.actorId, previousState: from, newState: to });
   return { ok: true, from, to };

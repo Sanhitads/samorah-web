@@ -72,6 +72,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
           <span className="oh-badge" data-h={health.tone} title={health.reason}>{health.dot} {health.label}</span>
           {fraudB ? <span className="adm-badge" data-b={fraudB.b} style={{ marginLeft: 8 }}>{fraudB.label}</span> : null}
           {wholeB ? <span className="adm-badge" data-b={wholeB.b} style={{ marginLeft: 8 }}>{wholeB.label}</span> : null}
+          {order.qc_at ? <span className="adm-badge" data-b="fraudok" style={{ marginLeft: 8 }} title={`QC passed ${dt(order.qc_at)}`}>✓ QC</span> : null}
           <span className="ff-status" data-s={order.status} style={{ marginLeft: 8 }}>{order.status}</span>
           <span className="om-pay" data-tone={order.payment_status === "paid" ? "paid" : order.payment_status?.includes("refund") ? "refunded" : "pending"} style={{ marginLeft: 8 }}>{order.payment_status}</span>
           <span className="admin__muted"> · placed {dt(order.placed_at)}{order.invoice_number ? ` · Invoice ${order.invoice_number}` : ""}</span>
