@@ -146,6 +146,53 @@ export interface FulfillmentQueueRow {
   latestRefundStatus: string | null;  // ledger sub-state (point 4)
   note: string | null;                // gift note / occasion + warehouse note, combined for display
   inventory: InventorySignal;
+  collections: string[];              // distinct collection names on the order (for the collection filter)
+  wholesale: string;                  // Phase-2 flag, for the wholesale filter
+}
+
+export interface FulfillmentFilter {
+  queue?: WorkQueue;
+  search?: string;   // order # / customer / SKU / AWB / courier
+  picker?: string;   // assigned_to (users.id)
+  courier?: string;  // shipments.courier_name
+  collection?: string;
+  priority?: string;
+  payment?: string;  // cod | prepaid
+  wholesale?: string;
+  gift?: boolean;
+  range?: string;    // today | 7d | 30d
+  limit?: number;
+}
+
+/** ISO lower bound for a date-range key. */
+function rangeStartIso(range: string | undefined, now: number): string | null {
+  const DAY = 86_400_000;
+  if (range === "today") { const d = new Date(now); d.setHours(0, 0, 0, 0); return d.toISOString(); }
+  if (range === "7d") return new Date(now - 7 * DAY).toISOString();
+  if (range === "30d") return new Date(now - 30 * DAY).toISOString();
+  return null;
+}
+
+/** Search spans order fields + SKU + AWB/courier — resolve matching order ids across all three
+ *  sources so a search finds an order by any of them, not just the order number. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function resolveFulfillmentSearchIds(db: any, search?: string): Promise<string[] | null> {
+  if (!search || !search.trim()) return null;
+  const s = search.trim().replace(/[%,]/g, "");
+  if (!s) return null;
+  const [o, it, sh] = await Promise.all([
+    db.from("orders").select("id").or(`order_number.ilike.%${s}%,email.ilike.%${s}%,ship_full_name.ilike.%${s}%`).limit(300),
+    db.from("order_items").select("order_id").ilike("sku", `%${s}%`).limit(300),
+    db.from("shipments").select("order_id").or(`awb.ilike.%${s}%,courier_name.ilike.%${s}%`).limit(300),
+  ]);
+  const ids = new Set<string>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const r of (o.data ?? []) as any[]) ids.add(r.id);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const r of (it.data ?? []) as any[]) ids.add(r.order_id);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const r of (sh.data ?? []) as any[]) ids.add(r.order_id);
+  return [...ids];
 }
 
 /** SLA tone from order age — shared by reader (for priority) and UI. */
@@ -172,20 +219,36 @@ async function latestRefundStatuses(db: any, orderIds: string[]): Promise<Map<st
  * Orders awaiting/undergoing fulfillment (paid, not terminal), sorted by EFFECTIVE
  * priority then newest. Optional `queue` narrows to one functional queue (point 10).
  */
-export async function getFulfillmentQueue(opts: { limit?: number; queue?: WorkQueue } = {}): Promise<FulfillmentQueueRow[]> {
+export async function getFulfillmentQueue(opts: FulfillmentFilter = {}): Promise<FulfillmentQueueRow[]> {
   const limit = opts.limit ?? 100;
   const db = loose();
   const now = Date.now();
-  const { data } = await db
+
+  const searchIds = await resolveFulfillmentSearchIds(db, opts.search);
+  if (searchIds && searchIds.length === 0) return []; // searched, matched nothing
+
+  let q = db
     .from("orders")
     .select(
       "id,order_number,status,fulfillment_status,fulfillment_hold_reason,ship_full_name,placed_at," +
-        "priority,assigned_to,ops_tags,ops_note,is_cod,payment_status,refund_amount,is_gift,gift_note,gift_occasion," +
-        "shipments(status,awb,courier_name),order_items(quantity,variants(stock))",
+        "priority,assigned_to,ops_tags,ops_note,is_cod,payment_status,refund_amount,is_gift,gift_note,gift_occasion,wholesale," +
+        "shipments(status,awb,courier_name),order_items(quantity,sku,collection_name,variants(stock))",
     )
     .eq("payment_status", "paid")
     .order("placed_at", { ascending: false })
     .limit(limit);
+  // Order-column filters pushed to the query; courier/collection are on embedded rows → filtered
+  // post-load (the board is a bounded active queue, so this is exact in practice).
+  if (searchIds) q = q.in("id", searchIds);
+  if (opts.picker) q = q.eq("assigned_to", opts.picker);
+  if (opts.priority) q = q.eq("priority", opts.priority);
+  if (opts.wholesale) q = opts.wholesale === "any" ? q.neq("wholesale", "none") : q.eq("wholesale", opts.wholesale);
+  if (opts.gift) q = q.eq("is_gift", true);
+  if (opts.payment === "cod") q = q.eq("is_cod", true);
+  else if (opts.payment === "prepaid") q = q.eq("is_cod", false);
+  const start = rangeStartIso(opts.range, now);
+  if (start) q = q.gte("placed_at", start);
+  const { data } = await q;
 
   const live = (data ?? []).filter((o: any) => !TERMINAL_ORDER.has(o.status));
 
@@ -256,10 +319,14 @@ export async function getFulfillmentQueue(opts: { limit?: number; queue?: WorkQu
       latestRefundStatus: refundStatus.get(o.id) ?? null,
       note: noteParts.length ? noteParts.join(" · ") : null,
       inventory,
+      collections: [...new Set(items.map((it: any) => it.collection_name).filter(Boolean) as string[])],
+      wholesale: (o.wholesale ?? "none") as string,
     };
   });
 
-  const filtered = opts.queue ? rows.filter((r) => r.queue === opts.queue) : rows;
+  let filtered = opts.queue ? rows.filter((r) => r.queue === opts.queue) : rows;
+  if (opts.courier) filtered = filtered.filter((r) => r.courierName === opts.courier);
+  if (opts.collection) filtered = filtered.filter((r) => r.collections.includes(opts.collection as string));
   return filtered.sort((a, b) => {
     const pr = EFFECTIVE_RANK[a.effectivePriority] - EFFECTIVE_RANK[b.effectivePriority];
     if (pr !== 0) return pr;

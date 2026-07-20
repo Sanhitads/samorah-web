@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth/requireStaff";
-import { getFulfillmentQueue, getQueueCounts } from "@/services/fulfillmentService";
+import { getFulfillmentQueue, getQueueCounts, type FulfillmentFilter } from "@/services/fulfillmentService";
+import { getStaffOptions, getCourierOptions } from "@/services/orderAdminService";
 import { FulfillmentActions } from "@/components/admin/FulfillmentActions";
 import { PriorityControl, AssigneeControl, TagsControl } from "@/components/admin/BoardControls";
 import { BoardBulk } from "@/components/admin/BoardBulk";
@@ -41,15 +42,37 @@ function sla(placedAt: string, now: number): string {
   return hrs < 1 ? "just now" : hrs < 24 ? `${Math.floor(hrs)}h` : `${Math.floor(hrs / 24)}d`;
 }
 
-export default async function FulfillmentDashboard({ searchParams }: { searchParams: Promise<{ queue?: string }> }) {
+interface FulfillmentSearchParams {
+  queue?: string; search?: string; picker?: string; courier?: string; collection?: string;
+  priority?: string; payment?: string; wholesale?: string; gift?: string; range?: string;
+}
+const PRIORITY_FILTERS = [{ v: "vip", l: "VIP" }, { v: "urgent", l: "Urgent" }, { v: "high", l: "High" }, { v: "normal", l: "Normal" }];
+const DATE_RANGES = [{ v: "today", l: "Today" }, { v: "7d", l: "Last 7 days" }, { v: "30d", l: "Last 30 days" }];
+
+export default async function FulfillmentDashboard({ searchParams }: { searchParams: Promise<FulfillmentSearchParams> }) {
   const staff = await requireStaff("editor");
   if (!staff.ok) redirect("/login");
 
   const sp = await searchParams;
   const queue = (WORK_QUEUES.find((q) => q.key === sp.queue)?.key ?? undefined) as WorkQueue | undefined;
-  const [rows, counts] = await Promise.all([getFulfillmentQueue({ queue }), getQueueCounts()]);
+  const filter: FulfillmentFilter = {
+    queue, search: sp.search, picker: sp.picker, courier: sp.courier, collection: sp.collection,
+    priority: sp.priority, payment: sp.payment, wholesale: sp.wholesale, gift: sp.gift === "1", range: sp.range,
+  };
+  const [rows, counts, staffOptions, courierOptions] = await Promise.all([
+    getFulfillmentQueue(filter), getQueueCounts(), getStaffOptions(), getCourierOptions(),
+  ]);
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const now = Date.now();
+  // Preserve active filters (minus queue) when switching queue tabs.
+  const filterEntries = Object.entries(sp).filter(([k, v]) => v && k !== "queue") as [string, string][];
+  const anyFilter = filterEntries.length > 0;
+  const tabHref = (qKey?: string) => {
+    const p = new URLSearchParams(filterEntries);
+    if (qKey) p.set("queue", qKey);
+    const s = p.toString();
+    return `/admin/fulfillment${s ? `?${s}` : ""}`;
+  };
 
   // Batch-eligible sets (the "select many → dispatch" productivity win).
   const readyToShip = rows.filter((r) => r.fulfillmentStatus === "ready_for_dispatch" && !r.shipmentStatus).map((r) => r.orderNumber);
@@ -64,13 +87,49 @@ export default async function FulfillmentDashboard({ searchParams }: { searchPar
       </header>
 
       <nav className="ff-queues" aria-label="Work queues">
-        <Link href="/admin/fulfillment" className="ff-queue" data-active={!queue ? "1" : "0"}>All <span className="ff-queue__n">{total}</span></Link>
+        <Link href={tabHref()} className="ff-queue" data-active={!queue ? "1" : "0"}>All <span className="ff-queue__n">{total}</span></Link>
         {WORK_QUEUES.map((q) => (
-          <Link key={q.key} href={`/admin/fulfillment?queue=${q.key}`} className="ff-queue" data-active={queue === q.key ? "1" : "0"} data-q={q.key}>
+          <Link key={q.key} href={tabHref(q.key)} className="ff-queue" data-active={queue === q.key ? "1" : "0"} data-q={q.key}>
             {q.label} <span className="ff-queue__n">{counts[q.key]}</span>
           </Link>
         ))}
       </nav>
+
+      <form className="adm-filters" method="get">
+        {queue ? <input type="hidden" name="queue" value={queue} /> : null}
+        <input className="adm-filters__search" type="search" name="search" defaultValue={sp.search ?? ""} placeholder="Search order #, customer, SKU, AWB, courier…" />
+        <select name="picker" defaultValue={sp.picker ?? ""} aria-label="Picker">
+          <option value="">Any picker</option>
+          {staffOptions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+        <select name="courier" defaultValue={sp.courier ?? ""} aria-label="Courier">
+          <option value="">Any courier</option>
+          {courierOptions.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <select name="priority" defaultValue={sp.priority ?? ""} aria-label="Priority">
+          <option value="">Any priority</option>
+          {PRIORITY_FILTERS.map((p) => <option key={p.v} value={p.v}>{p.l}</option>)}
+        </select>
+        <select name="payment" defaultValue={sp.payment ?? ""} aria-label="Payment">
+          <option value="">COD + Prepaid</option>
+          <option value="cod">COD</option>
+          <option value="prepaid">Prepaid</option>
+        </select>
+        <select name="wholesale" defaultValue={sp.wholesale ?? ""} aria-label="Wholesale">
+          <option value="">Any wholesale</option>
+          <option value="any">Any wholesale</option>
+          <option value="wholesale_order">Wholesale order</option>
+          <option value="b2b_customer">B2B customer</option>
+        </select>
+        <select name="range" defaultValue={sp.range ?? ""} aria-label="Date range">
+          <option value="">All time</option>
+          {DATE_RANGES.map((r) => <option key={r.v} value={r.v}>{r.l}</option>)}
+        </select>
+        <input className="adm-filters__search" type="search" name="collection" defaultValue={sp.collection ?? ""} placeholder="Collection…" style={{ flex: "0 1 160px" }} />
+        <label className="adm-filters__check"><input type="checkbox" name="gift" value="1" defaultChecked={sp.gift === "1"} /> Gift</label>
+        <button type="submit" className="ff-btn ff-btn--primary">Apply</button>
+        {anyFilter ? <a href={queue ? `/admin/fulfillment?queue=${queue}` : "/admin/fulfillment"} className="ff-btn">Clear</a> : null}
+      </form>
 
       <BoardBulk readyToShip={readyToShip} dispatchable={dispatchable} />
 
@@ -99,7 +158,7 @@ export default async function FulfillmentDashboard({ searchParams }: { searchPar
                   </td>
                   <td>
                     <div className="bc-order">
-                      <span className="admin__mono">{r.orderNumber}</span>
+                      <Link href={`/admin/orders/${r.orderNumber}`} className="od-link admin__mono">{r.orderNumber}</Link>
                       <span className="admin__muted">{r.itemCount} {r.itemCount === 1 ? "item" : "items"}</span>
                     </div>
                     <TagsControl orderNumber={r.orderNumber} tags={r.tags} />
