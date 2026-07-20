@@ -25,6 +25,7 @@ import {
 import { fulfillmentSla, type SlaBadge } from "@/lib/fulfillment/sla";
 import { shippingMilestones, type ShippingMilestones } from "@/lib/fulfillment/holdReasons";
 import { clampPicked, pickProgress, type PickProgress } from "@/lib/fulfillment/pick";
+import { requiredPackingItems, packingComplete, type PackingChecklist } from "@/lib/fulfillment/packing";
 import { logEvent } from "@/services/auditService";
 
 const START: FulfillmentStatus = "reserved";
@@ -43,12 +44,18 @@ export async function advanceFulfillment(
   const db = loose();
   const { data: order } = await db
     .from("orders")
-    .select("id,fulfillment_status,status")
+    .select("id,fulfillment_status,status,is_gift,packing_checklist")
     .eq("order_number", orderNumber)
     .maybeSingle();
   if (!order) throw new Error("order not found");
   const from = (order.fulfillment_status ?? START) as FulfillmentStatus;
   assertFulfillmentTransition(from, to);
+
+  // Brand gate (point 3): an order cannot be marked PACKED until every required packing item is
+  // checked — protects the unboxing (no order ships without the Story/Care card, gift box, etc.).
+  if (to === "packed" && !packingComplete(order.packing_checklist, Boolean(order.is_gift))) {
+    throw new Error("packing_checklist_incomplete");
+  }
 
   const patch: Record<string, unknown> = { fulfillment_status: to, updated_at: new Date().toISOString() };
   const mapped = fulfillmentToOrderStatus(to);
@@ -417,6 +424,33 @@ export async function setItemPicked(orderNumber: string, itemId: string, pickedQ
     try { await advanceFulfillment(orderNumber, "picked", opts); advanced = true; } catch { /* stay in picking if the guard rejects */ }
   }
   return { ok: true, progress, advanced };
+}
+
+// ── Packing checklist (Priority-1 #3) ────────────────────────────────────────
+export interface PackingChecklistItem { key: string; label: string; done: boolean; }
+
+/** The required packing items for an order + their checked state. */
+export async function getPackingChecklist(orderNumber: string): Promise<{ isGift: boolean; complete: boolean; items: PackingChecklistItem[] }> {
+  const db = loose();
+  const { data: o } = await db.from("orders").select("is_gift,packing_checklist").eq("order_number", orderNumber).maybeSingle();
+  if (!o) return { isGift: false, complete: false, items: [] };
+  const cl = (o.packing_checklist ?? {}) as PackingChecklist;
+  const isGift = Boolean(o.is_gift);
+  const items = requiredPackingItems(isGift).map((i) => ({ key: i.key, label: i.label, done: cl[i.key]?.done === true }));
+  return { isGift, complete: items.every((i) => i.done), items };
+}
+
+/** Check/uncheck one packing item (stamped with operator + time). Audited. */
+export async function setPackingItem(orderNumber: string, itemKey: string, done: boolean, opts?: { actorId?: string }): Promise<{ ok: boolean; complete: boolean; reason?: string }> {
+  const db = loose();
+  const { data: o } = await db.from("orders").select("id,is_gift,packing_checklist").eq("order_number", orderNumber).maybeSingle();
+  if (!o) return { ok: false, complete: false, reason: "order not found" };
+  const cl = { ...((o.packing_checklist ?? {}) as PackingChecklist) };
+  if (done) cl[itemKey] = { done: true, by: opts?.actorId ?? null, at: new Date().toISOString() };
+  else delete cl[itemKey];
+  await db.from("orders").update({ packing_checklist: cl, updated_at: new Date().toISOString() }).eq("id", o.id);
+  await logEvent({ orderId: o.id, entityType: "fulfillment", entityId: o.id, event: "fulfillment.packing_item", actorId: opts?.actorId, notes: `${itemKey}: ${done ? "packed" : "cleared"}` });
+  return { ok: true, complete: packingComplete(cl, Boolean(o.is_gift)) };
 }
 
 // ── Board context mutators (principles 11–13, 15) ────────────────────────────

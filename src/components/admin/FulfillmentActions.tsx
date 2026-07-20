@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { FulfillmentStatus } from "@/lib/fulfillment/state";
 import { HOLD_REASONS, composeHoldReason } from "@/lib/fulfillment/holdReasons";
 import { PickPanel } from "@/components/admin/PickPanel";
+import { PackPanel } from "@/components/admin/PackPanel";
 
 const ACTION_LABEL: Record<string, string> = {
   picking: "Start Picking",
@@ -39,6 +40,7 @@ export function FulfillmentActions({
   const [more, setMore] = useState(false);
   const [holdInput, setHoldInput] = useState(false);
   const [showPick, setShowPick] = useState(false);
+  const [showPack, setShowPack] = useState(false);
   const [reasonValue, setReasonValue] = useState(HOLD_REASONS[0].value);
   const [note, setNote] = useState("");
   const disabled = busy !== null || pending;
@@ -84,7 +86,8 @@ export function FulfillmentActions({
   }
 
   // Happy path stays primary; QC failure is a secondary (⋯) action, not a competing button.
-  const forwardNext = nextStates.filter((s) => !SHIPMENT_DRIVEN.has(s) && !SECONDARY.has(s) && s !== "qc_failed");
+  // "packed" while packing is routed through the checklist panel (the brand gate), not a bare button.
+  const forwardNext = nextStates.filter((s) => !SHIPMENT_DRIVEN.has(s) && !SECONDARY.has(s) && s !== "qc_failed" && !(fulfillmentStatus === "packing" && s === "packed"));
   const canCreateShipment = fulfillmentStatus === "ready_for_dispatch" && !shipmentStatus;
   const canHold = nextStates.includes("on_hold");
   const canFailQc = nextStates.includes("qc_failed");
@@ -93,6 +96,9 @@ export function FulfillmentActions({
     <div className="ff-actions">
       {fulfillmentStatus === "picking" ? (
         <button type="button" className="ff-btn" disabled={disabled} onClick={() => setShowPick(true)}>Pick items</button>
+      ) : null}
+      {fulfillmentStatus === "packing" ? (
+        <button type="button" className="ff-btn ff-btn--primary" disabled={disabled} onClick={() => setShowPack(true)}>Packing checklist</button>
       ) : null}
       {forwardNext.map((s) => (
         <button key={s} type="button" disabled={disabled} onClick={() => advance(s)} className="ff-btn">
@@ -152,6 +158,9 @@ export function FulfillmentActions({
 
       {showPick ? (
         <PickPanel orderNumber={orderNumber} onClose={() => setShowPick(false)} onDone={() => startTransition(() => router.refresh())} />
+      ) : null}
+      {showPack ? (
+        <PackPanel orderNumber={orderNumber} onClose={() => setShowPack(false)} onDone={() => startTransition(() => router.refresh())} />
       ) : null}
     </div>
   );

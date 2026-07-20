@@ -242,6 +242,11 @@
 .pick-row__n { font-family: ui-monospace, monospace; font-size: 12px; min-width: 34px; text-align: center; }
 .pick-btn { width: 26px; height: 26px; border: 1px solid var(--ad-hair); border-radius: 4px; background: #fff; cursor: pointer; font-size: 15px; line-height: 1; }
 .pick-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+/* Packing checklist rows */
+.pack-row { padding: 7px 0; border-bottom: 1px solid var(--ad-hair); }
+.pack-row:last-child { border-bottom: none; }
+.pack-row__label { display: flex; align-items: center; gap: 8px; font-family: var(--font-sans); font-size: 13px; cursor: pointer; }
+.pack-row[data-done="1"] .pack-row__label { color: #2f6b3c; }
 .bc-inv { font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.04em; margin-top: 4px; }
 .bc-inv[data-inv="allocated"] { color: #2f6b3c; }
 .bc-inv[data-inv="missing"] { color: #8a3d2f; font-weight: 600; }
