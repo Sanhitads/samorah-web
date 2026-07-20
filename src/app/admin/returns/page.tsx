@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { hasCapability } from "@/lib/auth/capabilities";
@@ -59,7 +60,7 @@ export default async function ReturnsPage() {
           <tbody>
             {rows.map((r) => (
               <tr key={r.id}>
-                <td className="admin__mono">{r.rma}<div className="admin__muted">{r.itemCount} {r.itemCount === 1 ? "item" : "items"}</div></td>
+                <td className="admin__mono"><Link href={`/admin/returns/${r.id}`} className="od-link">{r.rma}</Link><div className="admin__muted">{r.itemCount} {r.itemCount === 1 ? "item" : "items"}</div></td>
                 <td className="admin__mono">{r.orderNumber}</td>
                 <td>{r.reason ? REASON_LABEL[r.reason] ?? r.reason : "—"}</td>
                 <td className="admin__muted">{r.returnType}</td>

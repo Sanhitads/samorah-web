@@ -289,3 +289,27 @@ export async function getReturnsForOrder(orderId: string): Promise<Array<{ id: s
     createdAt: r.created_at,
   }));
 }
+
+/** Full return record for the Resolution Center detail page: the row (all resolution/inspection/
+ *  warehouse/notes fields), its line items, and its evidence attachments. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function getReturnDetail(returnId: string): Promise<{ ret: any; items: any[]; attachments: any[] } | null> {
+  const db = loose();
+  const { data: ret } = await db.from("returns").select("*").eq("id", returnId).maybeSingle();
+  if (!ret) return null;
+  const [{ data: items }, { data: attachments }] = await Promise.all([
+    db.from("return_items").select("*").eq("return_id", returnId).order("created_at"),
+    db.from("return_attachments").select("*").eq("return_id", returnId).order("created_at"),
+  ]);
+  // Resolve actor names for resolution / inspection / warehouse decision (one query).
+  const ids = [...new Set([ret.resolution_by, ret.inspection_by, ret.warehouse_decision_by, ret.created_by].filter(Boolean))];
+  const names = new Map<string, string>();
+  if (ids.length) {
+    const { data: users } = await db.from("users").select("id,full_name").in("id", ids);
+    for (const u of users ?? []) names.set(u.id, u.full_name ?? "");
+  }
+  ret.resolution_by_name = ret.resolution_by ? names.get(ret.resolution_by) ?? null : null;
+  ret.inspection_by_name = ret.inspection_by ? names.get(ret.inspection_by) ?? null : null;
+  ret.warehouse_decision_by_name = ret.warehouse_decision_by ? names.get(ret.warehouse_decision_by) ?? null : null;
+  return { ret, items: items ?? [], attachments: attachments ?? [] };
+}

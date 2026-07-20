@@ -11,6 +11,7 @@ import { getReturnsForOrder } from "@/services/returnService";
 import { hasCapability } from "@/lib/auth/capabilities";
 import { OrderMeta } from "@/components/admin/OrderMeta";
 import { OrderFlags } from "@/components/admin/OrderFlags";
+import { Timeline } from "@/components/admin/Timeline";
 import { RefundRetryBanner } from "@/components/admin/RefundRetryBanner";
 import { getIncidentForOrder } from "@/services/incidentService";
 import { orderHealth } from "@/lib/admin/orderHealth";
@@ -226,20 +227,8 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
         </section>
       </div>
 
-      {/* Audit timeline */}
-      <section className="od-section">
-        <h2 className="od-card__title">Timeline ({timeline.length})</h2>
-        <ol className="od-timeline">
-          {timeline.map((e) => (
-            <li key={e.id} className="od-tl">
-              <span className="od-tl__time">{dt(e.created_at)}</span>
-              <span className="od-tl__event">{EVENT_LABEL(e.event)}{e.previous_state && e.new_state ? <span className="admin__muted"> · {e.previous_state}→{e.new_state}</span> : e.new_state ? <span className="admin__muted"> · {e.new_state}</span> : null}</span>
-              <span className="od-tl__actor admin__muted">{e.actor_type}{e.notes ? ` · ${e.notes}` : ""}</span>
-            </li>
-          ))}
-          {timeline.length === 0 ? <li className="admin__muted">No events yet.</li> : null}
-        </ol>
-      </section>
+      {/* Audit timeline (shared component) */}
+      <Timeline events={timeline} />
     </main>
   );
 }

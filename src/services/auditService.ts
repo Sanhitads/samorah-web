@@ -114,3 +114,15 @@ export async function getOrderTimeline(orderId: string): Promise<AuditEvent[]> {
     return [];
   }
 }
+
+/** A single return's timeline — the audit stream scoped to that return (events are logged with
+ *  entity_id = returnId). Reuses the same audit_events table + Timeline component as orders. */
+export async function getReturnTimeline(returnId: string): Promise<AuditEvent[]> {
+  try {
+    const db = createAdminClient() as unknown as { from: (t: string) => any };
+    const { data } = await db.from("audit_events").select("*").eq("entity_id", returnId).order("created_at", { ascending: true });
+    return (data ?? []) as AuditEvent[];
+  } catch {
+    return [];
+  }
+}
