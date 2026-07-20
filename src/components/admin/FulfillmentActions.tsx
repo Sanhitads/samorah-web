@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { FulfillmentStatus } from "@/lib/fulfillment/state";
 import { HOLD_REASONS, composeHoldReason } from "@/lib/fulfillment/holdReasons";
+import { PickPanel } from "@/components/admin/PickPanel";
 
 const ACTION_LABEL: Record<string, string> = {
   picking: "Start Picking",
@@ -37,6 +38,7 @@ export function FulfillmentActions({
   const [err, setErr] = useState("");
   const [more, setMore] = useState(false);
   const [holdInput, setHoldInput] = useState(false);
+  const [showPick, setShowPick] = useState(false);
   const [reasonValue, setReasonValue] = useState(HOLD_REASONS[0].value);
   const [note, setNote] = useState("");
   const disabled = busy !== null || pending;
@@ -89,6 +91,9 @@ export function FulfillmentActions({
 
   return (
     <div className="ff-actions">
+      {fulfillmentStatus === "picking" ? (
+        <button type="button" className="ff-btn" disabled={disabled} onClick={() => setShowPick(true)}>Pick items</button>
+      ) : null}
       {forwardNext.map((s) => (
         <button key={s} type="button" disabled={disabled} onClick={() => advance(s)} className="ff-btn">
           {busy === s ? "…" : ACTION_LABEL[s] ?? s}
@@ -144,6 +149,10 @@ export function FulfillmentActions({
 
       {pending ? <span className="ff-refreshing">updating…</span> : null}
       {err ? <span className="ff-err">{err}</span> : null}
+
+      {showPick ? (
+        <PickPanel orderNumber={orderNumber} onClose={() => setShowPick(false)} onDone={() => startTransition(() => router.refresh())} />
+      ) : null}
     </div>
   );
 }

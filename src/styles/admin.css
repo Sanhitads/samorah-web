@@ -229,6 +229,19 @@
 .bc-ship { display: flex; gap: 4px; margin-top: 4px; }
 .bc-ship span { font-family: var(--font-sans); font-size: 9px; letter-spacing: 0.04em; text-transform: uppercase; padding: 1px 6px; border-radius: 3px; background: rgba(31,26,22,0.06); color: #b3a99d; }
 .bc-ship span[data-done="1"] { background: rgba(60,120,70,0.14); color: #2f6b3c; }
+/* Pick progress (point 2) */
+.bc-pick { display: inline-block; margin-left: 8px; padding: 1px 7px; border-radius: 3px; font-family: var(--font-sans); font-size: 10px; }
+.bc-pick[data-part="1"] { background: rgba(201,140,80,0.18); color: #a85f24; }
+.bc-pick[data-done="1"] { background: rgba(60,120,70,0.14); color: #2f6b3c; }
+/* Pick panel */
+.pick-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.pick-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--ad-hair); font-family: var(--font-sans); font-size: 13px; }
+.pick-row:last-child { border-bottom: none; }
+.pick-row[data-done="1"] .pick-row__name { color: #2f6b3c; }
+.pick-row__ctl { display: flex; align-items: center; gap: 6px; }
+.pick-row__n { font-family: ui-monospace, monospace; font-size: 12px; min-width: 34px; text-align: center; }
+.pick-btn { width: 26px; height: 26px; border: 1px solid var(--ad-hair); border-radius: 4px; background: #fff; cursor: pointer; font-size: 15px; line-height: 1; }
+.pick-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .bc-inv { font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.04em; margin-top: 4px; }
 .bc-inv[data-inv="allocated"] { color: #2f6b3c; }
 .bc-inv[data-inv="missing"] { color: #8a3d2f; font-weight: 600; }

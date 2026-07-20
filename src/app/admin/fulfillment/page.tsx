@@ -183,6 +183,8 @@ export default async function FulfillmentDashboard({ searchParams }: { searchPar
                     <div className="bc-order">
                       <Link href={`/admin/orders/${r.orderNumber}`} className="od-link admin__mono">{r.orderNumber}</Link>
                       <span className="admin__muted">{r.itemCount} {r.itemCount === 1 ? "item" : "items"}</span>
+                      {r.pickedUnits > 0 && r.pickedUnits < r.itemCount ? <span className="bc-pick" data-part="1">{r.pickedUnits}/{r.itemCount} picked</span> : null}
+                      {r.itemCount > 0 && r.pickedUnits >= r.itemCount ? <span className="bc-pick" data-done="1">✓ picked</span> : null}
                     </div>
                     <TagsControl orderNumber={r.orderNumber} tags={r.tags} />
                     {r.note ? <div className="bc-note" title={r.note}>📝 {r.note}</div> : null}

@@ -24,6 +24,7 @@ import {
 } from "@/lib/fulfillment/derive";
 import { fulfillmentSla, type SlaBadge } from "@/lib/fulfillment/sla";
 import { shippingMilestones, type ShippingMilestones } from "@/lib/fulfillment/holdReasons";
+import { clampPicked, pickProgress, type PickProgress } from "@/lib/fulfillment/pick";
 import { logEvent } from "@/services/auditService";
 
 const START: FulfillmentStatus = "reserved";
@@ -145,6 +146,7 @@ export interface FulfillmentQueueRow {
   assigneeName: string | null;
   tags: string[];                     // derived (Gift/COD) + operational
   itemCount: number;
+  pickedUnits: number;                // units picked so far (point 2 — "picked / total")
   paymentStatus: string;
   isCod: boolean;
   refundAmount: number;
@@ -237,7 +239,7 @@ export async function getFulfillmentQueue(opts: FulfillmentFilter = {}): Promise
     .select(
       "id,order_number,status,fulfillment_status,fulfillment_hold_reason,ship_full_name,placed_at," +
         "priority,assigned_to,ops_tags,ops_note,is_cod,payment_status,refund_amount,is_gift,gift_note,gift_occasion,wholesale," +
-        "shipments(status,awb,courier_name,label_url,provider_shipment_id),order_items(quantity,sku,collection_name,variants(stock))",
+        "shipments(status,awb,courier_name,label_url,provider_shipment_id),order_items(id,quantity,picked_qty,sku,collection_name,variants(stock))",
     )
     .eq("payment_status", "paid")
     .order("placed_at", { ascending: false })
@@ -271,6 +273,7 @@ export async function getFulfillmentQueue(opts: FulfillmentFilter = {}): Promise
     const sh = Array.isArray(o.shipments) ? o.shipments[0] : o.shipments;
     const items = Array.isArray(o.order_items) ? o.order_items : [];
     const itemCount = items.reduce((s: number, it: any) => s + (it.quantity ?? 0), 0);
+    const pickedUnits = items.reduce((s: number, it: any) => s + Math.min(it.picked_qty ?? 0, it.quantity ?? 0), 0);
 
     // Inventory (5/17): missing (oversold) → picking (in progress) → allocated (paid).
     let inventory: InventorySignal = items.length ? "allocated" : "unknown";
@@ -319,6 +322,7 @@ export async function getFulfillmentQueue(opts: FulfillmentFilter = {}): Promise
       assigneeName: o.assigned_to ? staff.get(o.assigned_to) ?? null : null,
       tags,
       itemCount,
+      pickedUnits,
       paymentStatus: o.payment_status,
       isCod: o.is_cod,
       refundAmount: Number(o.refund_amount ?? 0),
@@ -369,6 +373,50 @@ export async function getAssignmentBalance(): Promise<{ balance: { id: string; n
     .map(([id, count]) => ({ id, name: names.get(id) || "—", count }))
     .sort((a, b) => b.count - a.count);
   return { balance, unassigned };
+}
+
+// ── Pick progress (Priority-1 #2) ────────────────────────────────────────────
+export interface PickItem { id: string; name: string; sku: string | null; quantity: number; pickedQty: number; }
+
+/** The order's lines with per-item pick state — for the pick panel. */
+export async function getOrderPickItems(orderNumber: string): Promise<PickItem[]> {
+  const db = loose();
+  const { data: o } = await db.from("orders").select("id").eq("order_number", orderNumber).maybeSingle();
+  if (!o) return [];
+  const { data } = await db.from("order_items").select("id,product_name,variant_name,sku,quantity,picked_qty").eq("order_id", o.id).order("product_name");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data ?? []).map((it: any) => ({
+    id: it.id,
+    name: `${it.product_name}${it.variant_name ? ` · ${it.variant_name}` : ""}`,
+    sku: it.sku ?? null,
+    quantity: it.quantity ?? 0,
+    pickedQty: it.picked_qty ?? 0,
+  }));
+}
+
+/** Set the picked quantity of one line (clamped), re-derive progress, and AUTO-ADVANCE picking→picked
+ *  when every unit is picked. Non-destructive: never advances a non-picking order. Audited. */
+export async function setItemPicked(orderNumber: string, itemId: string, pickedQty: number, opts?: { actorId?: string }): Promise<{ ok: boolean; progress: PickProgress; advanced: boolean; reason?: string }> {
+  const empty: PickProgress = { picked: 0, total: 0, complete: false };
+  const db = loose();
+  const { data: o } = await db.from("orders").select("id,fulfillment_status").eq("order_number", orderNumber).maybeSingle();
+  if (!o) return { ok: false, progress: empty, advanced: false, reason: "order not found" };
+  const { data: item } = await db.from("order_items").select("id,quantity").eq("id", itemId).eq("order_id", o.id).maybeSingle();
+  if (!item) return { ok: false, progress: empty, advanced: false, reason: "item not found" };
+
+  const clamped = clampPicked(pickedQty, item.quantity ?? 0);
+  await db.from("order_items").update({ picked_qty: clamped }).eq("id", itemId);
+  await logEvent({ orderId: o.id, entityType: "fulfillment", entityId: o.id, event: "fulfillment.item_picked", actorId: opts?.actorId, notes: `${clamped}/${item.quantity} — item ${itemId.slice(0, 8)}` });
+
+  const { data: allItems } = await db.from("order_items").select("picked_qty,quantity").eq("order_id", o.id);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const progress = pickProgress((allItems ?? []).map((i: any) => ({ pickedQty: i.picked_qty ?? 0, quantity: i.quantity ?? 0 })));
+
+  let advanced = false;
+  if (progress.complete && o.fulfillment_status === "picking") {
+    try { await advanceFulfillment(orderNumber, "picked", opts); advanced = true; } catch { /* stay in picking if the guard rejects */ }
+  }
+  return { ok: true, progress, advanced };
 }
 
 // ── Board context mutators (principles 11–13, 15) ────────────────────────────
