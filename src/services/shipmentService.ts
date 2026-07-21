@@ -489,6 +489,7 @@ export interface ShipmentRow {
   wholesale: string;
   deliveredAt: string | null;
   rtoAt: string | null;
+  priority: string;
   sla: SlaBadge;
   health: ShipmentHealth;
 }
@@ -526,7 +527,7 @@ export async function getShipmentsQueue(opts: ShipmentFilter = {}): Promise<Ship
   const now = Date.now();
   const { data } = await db
     .from("shipments")
-    .select("id,status,provider,provider_shipment_id,courier_name,awb,tracking_url,label_url,chargeable_weight_kg,shipping_cost,total_logistics_cost,exception_reason,payment_mode,cod_amount,delivered_at,rto_at,created_at,orders(order_number,ship_full_name,ship_phone,wholesale,is_cod)")
+    .select("id,status,provider,provider_shipment_id,courier_name,awb,tracking_url,label_url,chargeable_weight_kg,shipping_cost,total_logistics_cost,exception_reason,payment_mode,cod_amount,delivered_at,rto_at,created_at,orders(order_number,ship_full_name,ship_phone,wholesale,is_cod,priority)")
     .order("created_at", { ascending: false })
     .limit(opts.limit ?? 1000);
 
@@ -552,6 +553,7 @@ export async function getShipmentsQueue(opts: ShipmentFilter = {}): Promise<Ship
       customerName: o?.ship_full_name ?? null, phone: o?.ship_phone ?? null,
       paymentMode, isCod: paymentMode === "cod" || Boolean(o?.is_cod),
       wholesale: o?.wholesale ?? "none", deliveredAt, rtoAt: s.rto_at ?? null,
+      priority: o?.priority ?? "normal",
       sla, health,
     };
   });
@@ -620,7 +622,7 @@ export async function getShipmentDetail(shipmentId: string): Promise<{ sh: any; 
   if (!sh) return null;
   const { data: order } = await db
     .from("orders")
-    .select("order_number,ship_full_name,ship_phone,email,ship_line1,ship_line2,ship_city,ship_state,ship_pincode,ship_country,is_cod,wholesale")
+    .select("id,order_number,ship_full_name,ship_phone,email,ship_line1,ship_line2,ship_city,ship_state,ship_pincode,ship_country,is_cod,wholesale,priority")
     .eq("id", sh.order_id)
     .maybeSingle();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -650,6 +652,76 @@ export async function setShipmentCourier(shipmentId: string, courier: string, ac
   await db.from("shipments").update({ courier_name: name, updated_at: new Date().toISOString() }).eq("id", shipmentId);
   await logEvent({ orderId: sh.order_id, entityType: "shipment", entityId: shipmentId, event: "shipment.courier_assigned", actorType: actorId ? "staff" : "system", actorId, notes: name });
   return { ok: true };
+}
+
+// ── Controlled logistics editing (review: editable weight/cost with audit) ──────────────────────
+// Operationally correctable values. Product-derived weights (net / total) + GST + total logistics
+// cost are NEVER hand-set — they're recomputed. Chargeable weight is manual-shipment-only (a courier
+// integration computes its own). For a courier-provider shipment the cost fields are read-only by
+// default; an edit is still allowed but recorded as an OVERRIDE in the audit.
+const SHIP_COST_FIELDS = ["shipping_cost", "courier_cost", "packaging_cost", "insurance_cost", "fuel_surcharge"];
+const SHIP_DIM_FIELDS = ["length_cm", "width_cm", "height_cm"];
+const SHIP_EDITABLE = new Set<string>([...SHIP_COST_FIELDS, ...SHIP_DIM_FIELDS, "packaging_weight_kg", "chargeable_weight_kg"]);
+
+export interface ShipmentEditResult { ok: boolean; reason?: string; total?: number }
+
+/**
+ * Apply a controlled edit to a shipment's operational logistics values (weights / dimensions / manual
+ * costs), each change gated by a required reason and written to the audit stream with old → new value,
+ * operator, timestamp, and reason (finance reconciliation trail). Derived values recompute here so
+ * they never drift: volumetric from dimensions, total package weight from net + packaging, and GST +
+ * total logistics cost from the cost components. Reuses the same logEvent audit as orders/returns.
+ */
+export async function updateShipmentLogistics(shipmentId: string, changes: Record<string, number>, reason: string, actorId?: string): Promise<ShipmentEditResult> {
+  const r = (reason ?? "").trim();
+  if (!r) return { ok: false, reason: "reason_required" };
+  const db = adminLoose();
+  const { data: sh } = await db.from("shipments").select("*").eq("id", shipmentId).maybeSingle();
+  if (!sh) return { ok: false, reason: "shipment_not_found" };
+  const manual = isManualProvider(sh.provider);
+
+  const applied: { field: string; old: number | null; val: number }[] = [];
+  for (const [field, raw] of Object.entries(changes)) {
+    if (!SHIP_EDITABLE.has(field)) return { ok: false, reason: `field_not_editable:${field}` };
+    if (field === "chargeable_weight_kg" && !manual) return { ok: false, reason: "chargeable_manual_only" };
+    const val = Number(raw);
+    if (!Number.isFinite(val) || val < 0) return { ok: false, reason: `invalid_value:${field}` };
+    const old = sh[field] != null ? Number(sh[field]) : null;
+    if (old === val) continue;
+    applied.push({ field, old, val });
+  }
+  if (!applied.length) return { ok: true, total: sh.total_logistics_cost != null ? Number(sh.total_logistics_cost) : undefined };
+
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  for (const a of applied) patch[a.field] = a.val;
+  const cur = (k: string) => (patch[k] != null ? Number(patch[k]) : sh[k] != null ? Number(sh[k]) : 0);
+
+  const changedDims = applied.some((a) => SHIP_DIM_FIELDS.includes(a.field));
+  const changedPackWeight = applied.some((a) => a.field === "packaging_weight_kg");
+  // Shipping charge is customer-paid revenue, outside the logistics-cost sum — only the cost side triggers a recompute.
+  const changedCost = applied.some((a) => SHIP_COST_FIELDS.includes(a.field) && a.field !== "shipping_cost");
+
+  if (changedDims) patch.volumetric_weight_kg = Math.round(volumetricWeightKg({ lengthCm: cur("length_cm"), widthCm: cur("width_cm"), heightCm: cur("height_cm") }) * 1000) / 1000;
+  if (changedPackWeight && sh.net_weight_kg != null) patch.shipping_weight_kg = Math.round((Number(sh.net_weight_kg) + cur("packaging_weight_kg")) * 1000) / 1000;
+  if (changedCost) {
+    const taxable = cur("courier_cost") + cur("packaging_cost") + cur("insurance_cost") + cur("cod_fee") + cur("fuel_surcharge");
+    const tax = Math.round(taxable * (LOGISTICS_TAX_PCT / 100) * 100) / 100;
+    patch.tax_cost = tax;
+    patch.total_logistics_cost = Math.round((taxable + tax) * 100) / 100;
+  }
+
+  await db.from("shipments").update(patch).eq("id", shipmentId);
+
+  for (const a of applied) {
+    const override = !manual && SHIP_COST_FIELDS.includes(a.field);
+    await logEvent({
+      orderId: sh.order_id, entityType: "shipment", entityId: shipmentId, event: "shipment.logistics_edit",
+      actorType: actorId ? "staff" : "system", actorId,
+      notes: `${override ? "OVERRIDE " : ""}${a.field}: ${a.old ?? "—"} → ${a.val} · ${r}`,
+      metadata: { field: a.field, old: a.old, new: a.val, reason: r, override },
+    });
+  }
+  return { ok: true, total: patch.total_logistics_cost != null ? Number(patch.total_logistics_cost) : sh.total_logistics_cost != null ? Number(sh.total_logistics_cost) : undefined };
 }
 
 /** Batch a safe status transition (in_transit / out_for_delivery / delivered) or courier assignment

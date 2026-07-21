@@ -47,4 +47,14 @@ export function isManualProvider(provider: string): boolean {
   return (provider ?? "").toLowerCase() === "manual";
 }
 
+/** Inherit the order's priority as a shipment badge (review A). Normal → no badge (noise reduction);
+ *  `p` maps to the existing `bc-eff` data-p tones so styling is reused. */
+export function shipmentPriorityBadge(priority: string | null | undefined): { label: string; p: string } | null {
+  const p = (priority ?? "normal").toLowerCase();
+  if (p === "vip") return { label: "VIP", p: "critical" };
+  if (p === "urgent") return { label: "Urgent", p: "critical" };
+  if (p === "high") return { label: "High", p: "high" };
+  return null;
+}
+
 export type { ShipmentStatus };

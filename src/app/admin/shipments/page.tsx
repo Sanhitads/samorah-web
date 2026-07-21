@@ -8,7 +8,7 @@ import { ShipmentActions } from "@/components/admin/ShipmentActions";
 import { ShipmentSelectionProvider, ShipmentCheckbox } from "@/components/admin/ShipmentSelection";
 import { CUSTOMER_STATUS_LABEL, type CustomerShipmentStatus } from "@/lib/shipment/state";
 import { SHIPMENT_STATUSES } from "@/lib/shipment/state";
-import { shipmentStatusIcon, shipmentStatusLabel, providerBrand, SHIPMENT_STATUS_LABEL } from "@/lib/shipment/display";
+import { shipmentStatusIcon, shipmentStatusLabel, providerBrand, shipmentPriorityBadge, SHIPMENT_STATUS_LABEL } from "@/lib/shipment/display";
 import { shipmentSettled } from "@/lib/shipment/sla";
 
 /**
@@ -116,11 +116,12 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
             <tbody>
               {rows.map((s) => {
                 const brand = providerBrand(s.provider);
+                const prio = shipmentPriorityBadge(s.priority);
                 return (
                   <tr key={s.id}>
                     {canOperate ? <td className="obulk-td"><ShipmentCheckbox shipmentId={s.id} /></td> : null}
                     <td>
-                      <div className="admin__mono">{s.orderNumber}</div>
+                      <div className="admin__mono">{s.orderNumber}{prio ? <span className="bc-eff" data-p={prio.p} style={{ marginLeft: 6 }}>{prio.label}</span> : null}</div>
                       {s.customerName ? <div className="admin__muted">{s.customerName}</div> : null}
                       {s.isCod ? <span className="adm-badge" data-b="rush">COD</span> : null}
                     </td>
