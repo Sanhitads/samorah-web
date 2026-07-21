@@ -717,6 +717,10 @@
 .pe-img__actions { display: flex; flex-wrap: wrap; gap: 3px; }
 .pe-imgadd { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .pe-imgadd input { flex: 1 1 200px; padding: 6px 8px; font-family: var(--font-sans); font-size: 13px; border: 1px solid var(--ad-hair); border-radius: 4px; }
+.pe-variant { border: 1px solid var(--ad-hair); border-radius: 6px; padding: 8px; margin-bottom: 8px; }
+.pe-variant__sub { margin-top: 6px; }
+.pe-variant__sub input { background: rgba(31,26,22,0.02); }
+.stock-dot { font-size: 9px; }
 .ff-btn--mini { padding: 2px 8px; font-size: 10px; border-radius: 3px; }
 .od-line__end { display: inline-flex; align-items: center; gap: 8px; }
 .refund-retry-inline { display: inline-flex; align-items: center; gap: 6px; }

@@ -302,3 +302,43 @@ feeds (Amazon/Flipkart), barcode scanning, POS, and ERP. These belong to a much 
 (the service comment literally said "the full editorial form layers on later"). The only new columns
 (20260730120000_product_cms) are the merchandising flags, visibility controls, chapter position, and
 SEO OG/canonical — everything else already fed the storefront and is now editable.
+
+## P9.1 — Products/Chapters CMS (round 2 — Chapter CMS shipped; remaining 35-point items)
+
+**Shipped this round:** a full **Chapter / Collection CMS** at `/admin/collections` (list + create +
+editor: name/slug/volume, tagline, poetic line, intro, description, long story, hero desktop+mobile,
+hero/signature product, SEO + OG + Google preview, visibility/coming-soon, and product ordering
+within the chapter) — launching "Monsoon Library" is now an admin task, not a code change. Also:
+**product type** (candle / room freshener / linen freshener / wax tablet / diffuser) + **category**
+picker on the product editor; **per-variant barcode, shipping weight, low-stock threshold, and a
+Size/Volume field** that holds 100g *or* 100ml; **Duplicate product**; and list polish (stock colour
+dots 🟢🟡🔴, "N sold · ₹revenue", thumbnail fallback).
+
+| Feature | Why deferred | Dependencies | Complexity | Phase |
+|---|---|---|---|---|
+| **Air/spray products in the DB (product-type-driven PDP)** | Room + linen fresheners currently live in `config/theHours.ts` (no DB rows) and the PDP picks candle vs air by slug/config, not a `product_type`. To manage them in the CMS, migrate the config data to real products + variants and make the PDP builder select the experience from `product_type`. The column now exists; this is the migration + PDP-builder change. | product_type (added), PDP builder, data migration | L | Catalog-1 |
+| **Volume (ml) on the PDP** | The size/volume is now editable per variant (100ml); showing it prominently on the air PDP (and "50ml/100ml" selectors) is a storefront change. | air PDP components | S | Catalog-1 |
+| **Per-product Artist Story** (review 11/33C) | PDP artist block is global config; per-product needs columns + PDP rewire. | product columns, PDP builder | M | Prod-1 |
+| **Product Relationships / manual "Continue the Chapter"** (review 10/14/33B/33G) | related_products table exists but empty; related is derived. Manual related/upsell/cross-sell/bundle picker needs it wired + editor. | related_products, editor | M | Prod-1 |
+| **Homepage merchandising placement** (review 15/21/33F) | Homepage hero/featured/collection/slider flags need columns + homepage builder wiring. | product columns, homepage builder | M | Prod-1 |
+| **Media Library integration** (review 8/33H) | Gallery is add-by-URL + hero/alt/reorder(↑↓)/delete. Direct upload, folders, native drag-sort, crop, mobile-crop, video/360 reuse the media provider + new UX. | media provider, upload UX | L | Prod-2 |
+| **Featured review picker** (review 12/33D) | PDP pulls testimonials from config by chapter; a per-product featured-review selector needs the reviews domain populated + a picker. | reviews at volume | M | Prod-2 |
+| **FAQ / accordion builder** (review 13/33E) | Care/Shipping/etc. accordion is house copy today; a per-product Q&A builder needs a store + editor. | product_faqs table | M | Prod-2 |
+| **Product analytics card** (review 16/31/33I) | Views/orders/conversion/revenue/returns on the editor. Orders/revenue are derivable; views need storefront view tracking. | view tracking, aggregation | M | Prod-2 |
+| **Product timeline / version history** (review 17/32) | Every change is already audited (product.* / collection.*); a per-product timeline view + "updated by" reuses the shared Timeline. | audit stream (exists) | S | Prod-1 |
+| **Draft preview + Quick view** (review 18/25/26) | Preview-as-draft URL + a hover quick-view popup (story/collection/images/inventory) without opening the editor. | preview tokens | M | Prod-2 |
+| **Bulk product actions** (review 23/10) | Checkboxes → make featured/bestseller/archive/assign chapter/change status/duplicate/export/import. The list filters exist; safe bulk + CSV is its own slice. | bulk framework, CSV | L | Prod-2 |
+| **Slug-change 301 redirects** (review 1) | Auto-create a redirect when a slug changes (the SEO & Redirects module exists). | redirect service | S | Prod-2 |
+| **Repeatable lifestyle rows + story heading/image per section + multiple quotes** (review 5) | Lifestyle is a textarea; the frontend renders labelled rows. Structured repeatable rows + per-section heading/image/alignment + multi-quote need JSON columns or child tables. | schema, PDP builder | M | Prod-2 |
+| **Fragrance-note drag-sort + descriptions + strength** (review 6) | Notes reorder is add-order today; native drag, per-note description, and Light/Medium/Strong need columns + DnD. | fragrance_notes columns, DnD | S | Prod-2 |
+| **Structured ingredients (wax %/soy %/coconut %/fragrance %/origin/vegan/cruelty-free)** (review 7) | Wax + wick editable; the transparent breakdown needs columns. | product columns | S | Prod-2 |
+| **Categories CMS** (review 22/34) | Only "Candles" exists; managing categories (Room Spray, Linen Spray, Wax Tablet) as a module complements product_type. | category admin | S | Catalog-1 |
+| **Custom merchandising badges** (review 3) | Beyond the fixed flags — a custom badge (label + colour + date, e.g. "Winter 2026"). | product_badges table | S | Prod-3 |
+| **Search-keyword management + internal admin notes + rating** (review 1) | Keywords, admin-only product notes, an internal quality rating. | product columns | S | Prod-3 |
+| **Advanced visibility (hidden-but-purchasable / private URL / password / notify-me)** (review 4) | Beyond the 5 visibility toggles + status. | product columns, access control | M | Prod-3 |
+| **Per-variant tax override + default variant + inventory history** (review 9) | Tax override + a default-variant flag + a stock-movement log. | variant columns, inventory ledger | M | Prod-2 |
+
+**Architectural note (review 22/34):** the admin nav already groups **Catalog** (Products, Collections,
+Coupons, Content, Media, …) — Collections is now a first-class module there, matching the reviewer's
+"Chapters are first-class content" recommendation. The Volume → Chapter → Products hierarchy is fully
+manageable; the remaining hierarchy work is migrating the config-driven air products into it.

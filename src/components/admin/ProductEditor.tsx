@@ -13,6 +13,10 @@ import type { VariantRow, NoteRow, ImageRow, VesselType, ProductStatus } from "@
 const STATUSES: ProductStatus[] = ["draft", "active", "out_of_stock", "archived"];
 const VESSELS: VesselType[] = ["glass", "ceramic", "terracotta"];
 const GST = [0, 5, 12, 18, 28];
+const PRODUCT_TYPES = [
+  { v: "candle", l: "Candle" }, { v: "room_spray", l: "Room Freshener" }, { v: "linen_spray", l: "Linen Freshener" },
+  { v: "wax_tablet", l: "Wax Tablet" }, { v: "reed_diffuser", l: "Reed Diffuser" }, { v: "other", l: "Other" },
+];
 const LAYERS = [{ k: "top", l: "Top notes" }, { k: "heart", l: "Heart notes" }, { k: "base", l: "Base notes" }];
 const FLAGS: { k: keyof Core; l: string }[] = [
   { k: "isFeatured", l: "Featured" }, { k: "isHero", l: "Hero" }, { k: "isBestseller", l: "Best Seller" }, { k: "isNewArrival", l: "New Arrival" },
@@ -23,6 +27,7 @@ const VIS: { k: keyof Core; l: string }[] = [
 ];
 
 type Core = {
+  productType: string; categoryId: string;
   name: string; slug: string; tagline: string; scentGroup: string; fragranceFamily: string; story: string; storyLong: string; burnTime: string;
   flamePersona: string; moodTags: string; lifestyleUse: string; culturalReference: string; waxBlend: string; wick: string;
   seoTitle: string; seoDescription: string; seoOgImage: string; seoCanonical: string;
@@ -36,8 +41,8 @@ type Core = {
 const bv = (v: any) => Boolean(v);
 const sv = (v: unknown) => (v == null ? "" : String(v));
 
-export function ProductEditor({ productId, collections, onClose, onSaved }: {
-  productId: string; collections: { id: string; name: string; volume: string | null }[]; onClose: () => void; onSaved: () => void;
+export function ProductEditor({ productId, collections, categories, onClose, onSaved }: {
+  productId: string; collections: { id: string; name: string; volume: string | null }[]; categories: { id: string; name: string }[]; onClose: () => void; onSaved: () => void;
 }) {
   const [core, setCore] = useState<Core | null>(null);
   const [variants, setVariants] = useState<VariantRow[]>([]);
@@ -64,6 +69,7 @@ export function ProductEditor({ productId, collections, onClose, onSaved }: {
     if (!d?.product) return;
     const p = d.product;
     setCore({
+      productType: sv(p.product_type) || "candle", categoryId: sv(p.category_id),
       name: sv(p.name), slug: sv(p.slug), tagline: sv(p.tagline), scentGroup: sv(p.scent_group), fragranceFamily: sv(p.fragrance_family),
       story: sv(p.story), storyLong: sv(p.story_long), burnTime: sv(p.burn_time), flamePersona: sv(p.flame_persona),
       moodTags: Array.isArray(p.mood_tags) ? p.mood_tags.join(", ") : "", lifestyleUse: sv(p.lifestyle_use), culturalReference: sv(p.cultural_reference),
@@ -99,7 +105,7 @@ export function ProductEditor({ productId, collections, onClose, onSaved }: {
 
   // Variants
   const saveVariant = async (v: VariantRow) => {
-    if (await post({ action: "variant.upsert", variant: { id: v.id || undefined, productId, sku: v.sku, variantName: v.variantName, vesselType: v.vesselType, sizeLabel: v.sizeLabel, price: v.price, salePrice: v.salePrice, costPrice: v.costPrice, stock: v.stock, isActive: v.isActive, sortOrder: v.sortOrder } })) { await load(); onSaved(); }
+    if (await post({ action: "variant.upsert", variant: { id: v.id || undefined, productId, sku: v.sku, variantName: v.variantName, vesselType: v.vesselType, sizeLabel: v.sizeLabel, price: v.price, salePrice: v.salePrice, costPrice: v.costPrice, stock: v.stock, isActive: v.isActive, sortOrder: v.sortOrder, barcode: v.barcode, weightGrams: v.weightGrams, lowStockThreshold: v.lowStockThreshold } })) { await load(); onSaved(); }
   };
   const delVariant = async (v: VariantRow) => { if (v.id && await post({ action: "variant.delete", id: v.id, productId })) { await load(); onSaved(); } };
   const setV = (i: number, patch: Partial<VariantRow>) => setVariants((vs) => vs.map((v, j) => (j === i ? { ...v, ...patch } : v)));
@@ -128,7 +134,7 @@ export function ProductEditor({ productId, collections, onClose, onSaved }: {
     await load();
   };
 
-  const addVariant = () => setVariants((vs) => [...vs, { id: "", sku: "", variantName: "", vesselType: null, sizeLabel: "", price: core?.price ?? 0, salePrice: null, costPrice: 0, stock: 0, isActive: true, sortOrder: vs.length }]);
+  const addVariant = () => setVariants((vs) => [...vs, { id: "", sku: "", variantName: "", vesselType: null, sizeLabel: "", price: core?.price ?? 0, salePrice: null, costPrice: 0, stock: 0, isActive: true, sortOrder: vs.length, barcode: null, weightGrams: null, lowStockThreshold: null }]);
 
   if (!core) return (
     <div className="om-modal" role="dialog" aria-modal="true" onClick={onClose}><div className="om-modal__card om-modal__card--wide" onClick={(e) => e.stopPropagation()}><p className="admin__muted">Loading…</p></div></div>
@@ -144,6 +150,8 @@ export function ProductEditor({ productId, collections, onClose, onSaved }: {
           <div className="cfg-grid">
             <label className="cfg-field"><span>Name</span><input value={core.name} onChange={(e) => set({ name: e.target.value })} /></label>
             <label className="cfg-field"><span>Slug</span><input value={core.slug} onChange={(e) => set({ slug: e.target.value })} /></label>
+            <label className="cfg-field"><span>Product type</span><select value={core.productType} onChange={(e) => set({ productType: e.target.value })}>{PRODUCT_TYPES.map((t) => <option key={t.v} value={t.v}>{t.l}</option>)}</select></label>
+            <label className="cfg-field"><span>Category</span><select value={core.categoryId} onChange={(e) => set({ categoryId: e.target.value })}><option value="">—</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
             <label className="cfg-field"><span>Fragrance family</span><input value={core.fragranceFamily} onChange={(e) => set({ fragranceFamily: e.target.value })} /></label>
             <label className="cfg-field"><span>Scent group</span><input value={core.scentGroup} onChange={(e) => set({ scentGroup: e.target.value })} /></label>
             <label className="cfg-field"><span>Price (₹)</span><input type="number" value={core.price} onChange={(e) => set({ price: Number(e.target.value) })} /></label>
@@ -250,16 +258,24 @@ export function ProductEditor({ productId, collections, onClose, onSaved }: {
 
         <details className="pe-sec">
           <summary>Variants ({variants.length})</summary>
+          <p className="om-field__hint" style={{ margin: "0 0 8px" }}>Size / Volume holds the unit label — e.g. <b>100g</b> for candles, <b>100ml</b> for room / linen fresheners. Barcode, weight, and low-stock alert are per variant.</p>
           {variants.map((v, i) => (
-            <div key={v.id || `new${i}`} className="cfg-row" style={{ gridTemplateColumns: "1.2fr 0.8fr 0.6fr 0.6fr 0.6fr 0.6fr auto auto" }}>
-              <input value={v.sku} onChange={(e) => setV(i, { sku: e.target.value })} placeholder="SKU" />
-              <select value={v.vesselType ?? ""} onChange={(e) => setV(i, { vesselType: (e.target.value || null) as VesselType | null })}><option value="">vessel</option>{VESSELS.map((x) => <option key={x} value={x}>{x}</option>)}</select>
-              <input value={v.sizeLabel ?? ""} onChange={(e) => setV(i, { sizeLabel: e.target.value })} placeholder="size" />
-              <input type="number" value={v.price} onChange={(e) => setV(i, { price: Number(e.target.value) })} placeholder="price ₹" />
-              <input type="number" value={v.costPrice} onChange={(e) => setV(i, { costPrice: Number(e.target.value) })} placeholder="cost ₹" />
-              <input type="number" value={v.stock} onChange={(e) => setV(i, { stock: Number(e.target.value) })} placeholder="stock" />
-              <button type="button" className="cfg-toggle" data-on={v.isActive ? "1" : "0"} onClick={() => setV(i, { isActive: !v.isActive })}>{v.isActive ? "On" : "Off"}</button>
-              <span className="ff-actions"><button type="button" className="ff-btn" disabled={busy} onClick={() => saveVariant(v)}>Save</button>{v.id ? <button type="button" className="ff-btn ff-btn--danger" disabled={busy} onClick={() => delVariant(v)}>×</button> : null}</span>
+            <div key={v.id || `new${i}`} className="pe-variant">
+              <div className="cfg-row" style={{ gridTemplateColumns: "1.2fr 0.8fr 0.7fr 0.6fr 0.6fr 0.6fr auto auto" }}>
+                <input value={v.sku} onChange={(e) => setV(i, { sku: e.target.value })} placeholder="SKU" />
+                <select value={v.vesselType ?? ""} onChange={(e) => setV(i, { vesselType: (e.target.value || null) as VesselType | null })}><option value="">vessel</option>{VESSELS.map((x) => <option key={x} value={x}>{x}</option>)}</select>
+                <input value={v.sizeLabel ?? ""} onChange={(e) => setV(i, { sizeLabel: e.target.value })} placeholder="100g / 100ml" title="Size / Volume" />
+                <input type="number" value={v.price} onChange={(e) => setV(i, { price: Number(e.target.value) })} placeholder="price ₹" />
+                <input type="number" value={v.costPrice} onChange={(e) => setV(i, { costPrice: Number(e.target.value) })} placeholder="cost ₹" />
+                <input type="number" value={v.stock} onChange={(e) => setV(i, { stock: Number(e.target.value) })} placeholder="stock" />
+                <button type="button" className="cfg-toggle" data-on={v.isActive ? "1" : "0"} onClick={() => setV(i, { isActive: !v.isActive })}>{v.isActive ? "On" : "Off"}</button>
+                <span className="ff-actions"><button type="button" className="ff-btn" disabled={busy} onClick={() => saveVariant(v)}>Save</button>{v.id ? <button type="button" className="ff-btn ff-btn--danger" disabled={busy} onClick={() => delVariant(v)}>×</button> : null}</span>
+              </div>
+              <div className="cfg-row pe-variant__sub" style={{ gridTemplateColumns: "1.4fr 0.8fr 0.8fr" }}>
+                <input value={v.barcode ?? ""} onChange={(e) => setV(i, { barcode: e.target.value })} placeholder="Barcode / EAN" />
+                <input type="number" value={v.weightGrams ?? ""} onChange={(e) => setV(i, { weightGrams: e.target.value === "" ? null : Number(e.target.value) })} placeholder="weight g" title="Shipping weight (g)" />
+                <input type="number" value={v.lowStockThreshold ?? ""} onChange={(e) => setV(i, { lowStockThreshold: e.target.value === "" ? null : Number(e.target.value) })} placeholder="low-stock alert" title="Low-stock threshold" />
+              </div>
             </div>
           ))}
           <button type="button" className="ff-btn" onClick={addVariant}>+ variant</button>

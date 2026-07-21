@@ -40,6 +40,7 @@ export interface ProductRow {
   totalStock: number;
   lowStock: boolean;
   salesCount: number;
+  salesRevenue: number;
   updatedAt: string | null;
 }
 
@@ -50,11 +51,15 @@ export async function listProductsAdmin(): Promise<ProductRow[]> {
   const db = loose();
   const { data } = await db.from("products").select("*, variants(stock), collections!collection_id(name), product_images(url,is_primary,sort_order)").order("name");
 
-  // Units sold per product (paid orders) — one query, aggregated in-process.
+  // Units sold + revenue per product (paid orders) — one query, aggregated in-process.
   const sales = new Map<string, number>();
+  const revenue = new Map<string, number>();
   try {
-    const { data: lines } = await db.from("order_items").select("product_id,quantity,orders!inner(payment_status)").in("orders.payment_status", ["paid", "partially_refunded", "refunded"]);
-    for (const l of lines ?? []) if (l.product_id) sales.set(l.product_id, (sales.get(l.product_id) ?? 0) + Number(l.quantity ?? 0));
+    const { data: lines } = await db.from("order_items").select("product_id,quantity,line_total,orders!inner(payment_status)").in("orders.payment_status", ["paid", "partially_refunded", "refunded"]);
+    for (const l of lines ?? []) if (l.product_id) {
+      sales.set(l.product_id, (sales.get(l.product_id) ?? 0) + Number(l.quantity ?? 0));
+      revenue.set(l.product_id, (revenue.get(l.product_id) ?? 0) + Number(l.line_total ?? 0));
+    }
   } catch { /* order_items optional */ }
 
   return (data ?? []).map((p: any) => {
@@ -69,7 +74,7 @@ export async function listProductsAdmin(): Promise<ProductRow[]> {
       hsnCode: p.hsn_code, gstRate: Number(p.gst_rate), fragranceFamily: p.fragrance_family, scentGroup: p.scent_group,
       collectionName: col?.name ?? null, imageUrl: primary?.url ?? null,
       variantCount: (p.variants ?? []).length, totalStock, lowStock: totalStock > 0 && totalStock < LOW_STOCK,
-      salesCount: sales.get(p.id) ?? 0, updatedAt: p.updated_at ?? null,
+      salesCount: sales.get(p.id) ?? 0, salesRevenue: Math.round(revenue.get(p.id) ?? 0), updatedAt: p.updated_at ?? null,
     };
   });
 }
@@ -77,6 +82,7 @@ export async function listProductsAdmin(): Promise<ProductRow[]> {
 export interface VariantRow {
   id: string; sku: string; variantName: string | null; vesselType: VesselType | null;
   sizeLabel: string | null; price: number; salePrice: number | null; costPrice: number; stock: number; isActive: boolean; sortOrder: number;
+  barcode: string | null; weightGrams: number | null; lowStockThreshold: number | null;
 }
 
 export interface NoteRow { id: string; layer: string; note: string; sortOrder: number; }
@@ -95,6 +101,7 @@ export async function getProductForEdit(id: string): Promise<{ product: any; var
     id: v.id, sku: v.sku, variantName: v.variant_name, vesselType: v.vessel_type, sizeLabel: v.size_label,
     price: Number(v.price), salePrice: v.sale_price != null ? Number(v.sale_price) : null, costPrice: Number(v.cost_price ?? 0), stock: Number(v.stock ?? 0),
     isActive: Boolean(v.is_active), sortOrder: Number(v.sort_order ?? 0),
+    barcode: v.barcode ?? null, weightGrams: v.weight_grams != null ? Number(v.weight_grams) : null, lowStockThreshold: v.low_stock_threshold != null ? Number(v.low_stock_threshold) : null,
   }));
   const notes: NoteRow[] = (ns ?? []).map((n: any) => ({ id: n.id, layer: n.layer, note: n.note, sortOrder: Number(n.sort_order ?? 0) }));
   const images: ImageRow[] = (imgs ?? []).map((im: any) => ({ id: im.id, url: im.url, altText: im.alt_text ?? null, isPrimary: Boolean(im.is_primary), sortOrder: Number(im.sort_order ?? 0) }));
@@ -164,7 +171,7 @@ export async function deleteProductImage(id: string, productId: string, actorId?
 export interface ProductCoreInput {
   name?: string; slug?: string; tagline?: string; scentGroup?: string; fragranceFamily?: string;
   story?: string; burnTime?: string; price?: number; salePrice?: number | null; hsnCode?: string; gstRate?: number;
-  weightGrams?: number | null; status?: ProductStatus; isFeatured?: boolean;
+  weightGrams?: number | null; status?: ProductStatus; isFeatured?: boolean; productType?: string; categoryId?: string;
   // Editorial content (existing columns the storefront already reads)
   collectionId?: string | null; storyLong?: string; flamePersona?: string; moodTags?: string[];
   lifestyleUse?: string; culturalReference?: string; waxBlend?: string; wick?: string;
@@ -182,6 +189,7 @@ function productRow(i: ProductCoreInput): Record<string, unknown> {
   const b = (k: string, v: boolean | undefined) => { if (v !== undefined) r[k] = v; };
   if (i.name !== undefined) r.name = i.name.trim();
   if (i.slug !== undefined) r.slug = i.slug.trim();
+  if (i.productType !== undefined) r.product_type = i.productType || "candle";
   s("tagline", i.tagline); s("scent_group", i.scentGroup); s("fragrance_family", i.fragranceFamily);
   s("story", i.story); s("story_long", i.storyLong); s("burn_time", i.burnTime);
   s("flame_persona", i.flamePersona); s("lifestyle_use", i.lifestyleUse); s("cultural_reference", i.culturalReference);
@@ -190,6 +198,7 @@ function productRow(i: ProductCoreInput): Record<string, unknown> {
   s("chapter_position", i.chapterPosition);
   if (i.moodTags !== undefined) r.mood_tags = i.moodTags.map((t) => t.trim()).filter(Boolean);
   if (i.collectionId !== undefined) r.collection_id = i.collectionId || null;
+  if (i.categoryId !== undefined && i.categoryId) r.category_id = i.categoryId;
   if (i.price !== undefined) r.price = i.price;
   if (i.salePrice !== undefined) r.sale_price = i.salePrice;
   if (i.hsnCode !== undefined) r.hsn_code = i.hsnCode;
@@ -211,7 +220,7 @@ function productRow(i: ProductCoreInput): Record<string, unknown> {
 const CMS_COLUMNS = [
   "is_bestseller", "is_new_arrival", "is_limited_edition", "is_seasonal", "is_staff_pick", "is_coming_soon",
   "visible_website", "visible_search", "visible_homepage", "visible_chapter", "visible_bundles",
-  "chapter_position", "display_order", "seo_og_image", "seo_canonical",
+  "chapter_position", "display_order", "seo_og_image", "seo_canonical", "product_type",
 ];
 
 export async function updateProduct(id: string, input: ProductCoreInput, actorId?: string) {
@@ -245,6 +254,34 @@ export async function setProductFeatured(id: string, isFeatured: boolean, actorI
   return { ok: true };
 }
 
+/** Duplicate a product (review 19/24) — copies core fields, fragrance notes, images, and variants
+ *  (fresh SKUs, zero stock) into a new draft. Luxury brands reuse product templates constantly. */
+export async function duplicateProduct(id: string, actorId?: string) {
+  const db = loose();
+  const { data: p } = await db.from("products").select("*").eq("id", id).maybeSingle();
+  if (!p) return { ok: false, reason: "product_not_found" };
+  const stamp = Date.now().toString(36).slice(-4);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { id: _oldId, created_at, updated_at, ...rest } = p;
+  const copy = { ...rest, name: `${p.name} Copy`, slug: `${p.slug}-copy-${stamp}`, base_sku: `${p.base_sku}-C${stamp}`, status: "draft", is_featured: false, is_hero: false };
+  const { data: newP, error } = await db.from("products").insert(copy).select("id").single();
+  if (error || !newP) return { ok: false, reason: /duplicate|unique/i.test(error?.message ?? "") ? "slug/SKU collision — try again" : error?.message ?? "insert failed" };
+  const [{ data: notes }, { data: vs }, { data: imgs }] = await Promise.all([
+    db.from("fragrance_notes").select("layer,note,sort_order").eq("product_id", id),
+    db.from("variants").select("*").eq("product_id", id),
+    db.from("product_images").select("url,alt_text,is_primary,sort_order").eq("product_id", id),
+  ]);
+  if (notes?.length) await db.from("fragrance_notes").insert(notes.map((n: any) => ({ ...n, product_id: newP.id })));
+  if (imgs?.length) await db.from("product_images").insert(imgs.map((im: any) => ({ ...im, product_id: newP.id })));
+  if (vs?.length) await db.from("variants").insert(vs.map((v: any, i: number) => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { id: _vid, created_at: _c, updated_at: _u, ...vr } = v;
+    return { ...vr, product_id: newP.id, sku: `${v.sku}-C${stamp}${i}`, stock: 0 };
+  }));
+  await logEvent({ entityType: "product", entityId: newP.id, event: "product.duplicated", actorType: actorId ? "staff" : "system", actorId, notes: p.name });
+  return { ok: true, id: newP.id };
+}
+
 export interface CreateProductInput {
   name: string; slug: string; baseSku: string; categoryId: string; price: number; hsnCode: string; gstRate: number;
   fragranceFamily?: string; tagline?: string;
@@ -267,6 +304,7 @@ export async function createProduct(input: CreateProductInput, actorId?: string)
 export interface VariantInput {
   id?: string; productId: string; sku: string; variantName?: string; vesselType?: VesselType | null;
   sizeLabel?: string; price: number; salePrice?: number | null; costPrice?: number; stock?: number; isActive?: boolean; sortOrder?: number;
+  barcode?: string | null; weightGrams?: number | null; lowStockThreshold?: number | null;
 }
 export async function upsertVariant(input: VariantInput, actorId?: string) {
   if (!input.sku?.trim()) return { ok: false, reason: "SKU required" };
@@ -275,7 +313,8 @@ export async function upsertVariant(input: VariantInput, actorId?: string) {
     product_id: input.productId, sku: input.sku.trim().toUpperCase(), variant_name: input.variantName || null,
     vessel_type: input.vesselType || null, size_label: input.sizeLabel || null, price: input.price,
     sale_price: input.salePrice ?? null, cost_price: input.costPrice ?? 0, stock: input.stock ?? 0, is_active: input.isActive ?? true,
-    sort_order: input.sortOrder ?? 0, updated_at: new Date().toISOString(),
+    sort_order: input.sortOrder ?? 0, barcode: input.barcode || null, weight_grams: input.weightGrams ?? null,
+    low_stock_threshold: input.lowStockThreshold ?? null, updated_at: new Date().toISOString(),
   };
   const { error } = input.id
     ? await db.from("variants").update(row).eq("id", input.id)

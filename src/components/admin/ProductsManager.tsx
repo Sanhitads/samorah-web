@@ -110,8 +110,8 @@ export function ProductsManager({ products, categories, collections }: {
                 <td>{p.name}<div className="admin__muted admin__mono">{p.baseSku}{p.fragranceFamily ? ` · ${p.fragranceFamily}` : ""}</div></td>
                 <td className="admin__muted">{p.collectionName ?? "—"}</td>
                 <td className="admin__mono">{money(p.price)}{p.salePrice != null ? <span className="admin__muted"> ({money(p.salePrice)})</span> : null}</td>
-                <td className="admin__mono">{p.totalStock}{p.lowStock ? <span className="pending-badge" style={{ marginLeft: 4 }}>low</span> : null}<div className="admin__muted">{p.variantCount} var</div></td>
-                <td className="admin__mono">{p.salesCount}</td>
+                <td className="admin__mono"><span className="stock-dot" data-s={p.totalStock === 0 ? "out" : p.lowStock ? "low" : "ok"}>{p.totalStock === 0 ? "🔴" : p.lowStock ? "🟡" : "🟢"}</span> {p.totalStock}<div className="admin__muted">{p.variantCount} var</div></td>
+                <td className="admin__mono">{p.salesCount ? <>{p.salesCount} sold<div className="admin__muted">{money(p.salesRevenue)}</div></> : <span className="admin__muted">—</span>}</td>
                 <td><div className="pl-flags">
                   <button type="button" className="cfg-toggle" data-on={p.isFeatured ? "1" : "0"} disabled={busy} onClick={async () => { if (await post({ action: "featured", id: p.id, isFeatured: !p.isFeatured })) refresh(); }} title="Featured">★</button>
                   {p.isHero ? <span className="pl-flag" title="Hero">H</span> : null}
@@ -124,7 +124,10 @@ export function ProductsManager({ products, categories, collections }: {
                   </select>
                 </td>
                 <td className="admin__muted">{shortDate(p.updatedAt)}</td>
-                <td><button type="button" className="ff-btn" onClick={() => setEditId(p.id)}>Edit</button></td>
+                <td className="ff-actions">
+                  <button type="button" className="ff-btn" onClick={() => setEditId(p.id)}>Edit</button>
+                  <button type="button" className="ff-btn ff-btn--mini" disabled={busy} title="Duplicate" onClick={async () => { const d = await post({ action: "duplicate", id: p.id }); if (d?.ok) { refresh(); setEditId(d.id); } }}>⧉</button>
+                </td>
               </tr>
             ))}
             {rows.length === 0 ? <tr><td colSpan={10} className="admin__empty">No products{anyFilter ? " match these filters" : " yet"}.</td></tr> : null}
@@ -133,7 +136,7 @@ export function ProductsManager({ products, categories, collections }: {
       </div>
 
       {creating ? <CreateModal categories={categories} busy={busy} err={err} onClose={() => setCreating(false)} onCreate={async (c) => { const d = await post({ action: "create", product: c }); if (d?.ok) { setCreating(false); refresh(); } }} /> : null}
-      {editId ? <ProductEditor productId={editId} collections={collections} onClose={() => setEditId(null)} onSaved={refresh} /> : null}
+      {editId ? <ProductEditor productId={editId} collections={collections} categories={categories} onClose={() => setEditId(null)} onSaved={refresh} /> : null}
     </div>
   );
 }
