@@ -645,6 +645,9 @@
 .sprog__flag[data-s="rto"] { color: #b23b2e; }
 .sprog__flag[data-s="exception"] { color: #ab5f1a; }
 .sprog__flag[data-s="cancelled"] { color: var(--smoke, #6b6259); }
+
+/* Customer risk figures — highlight non-zero failed payments / RTO */
+.od-dl--fin dd[data-tone="warn"] { color: #ab5f1a; font-weight: 600; }
 .ff-btn--mini { padding: 2px 8px; font-size: 10px; border-radius: 3px; }
 .od-line__end { display: inline-flex; align-items: center; gap: 8px; }
 .refund-retry-inline { display: inline-flex; align-items: center; gap: 6px; }
