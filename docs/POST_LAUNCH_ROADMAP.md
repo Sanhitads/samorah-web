@@ -201,3 +201,33 @@ groups. Deferred cost analytics (unit COGS + reverse-logistics cost) is the only
 **Note on evidence:** the launch build reads customer evidence from a return-attachments store that CS
 attaches to (e.g. photos a customer emails in). The customer self-service *upload* path (Ret-1) writes
 to that same store — no rework, just a new writer.
+
+## P7 — Shipments (post-dispatch maturity follow-ons)
+
+The launch build brings Shipments to the operational maturity of Orders/Fulfillment/Returns: global
+search + filters, a morning analytics strip (today / in transit / out for delivery / delivered / RTO /
+exceptions / avg delivery time), safe bulk operations (mark in transit / out for delivery / delivered,
+assign courier, print labels, packing slips, export manifest — **never** bulk RTO/exception), a
+clickable-AWB shipment detail page (summary, courier, cost breakdown, weight + dimensions, tracking
+history, exception history, internal notes, POD placeholder, ship-to), per-parcel SLA + health badges,
+status icons + courier branding, and an RTO confirmation with reason. These extend it further and need
+courier integrations, capture hardware, or ML.
+
+| Feature | Why deferred | Dependencies | Complexity | Phase |
+|---|---|---|---|---|
+| **Courier performance dashboard** (review P8) | Per-courier avg delivery, exception %, RTO %, on-time %. The data (delivered_at, statuses, SLA) is already captured per shipment — this is the aggregation view. Needs enough volume + a real multi-courier mix to be meaningful. | shipment volume, real couriers, analytics infra | M | Ship-2 |
+| **Proof of delivery capture** (review P11) | Signature + delivery photo on the shipment, not just delivered-to text. Needs a courier webhook that returns POD assets (or a capture app) + the media store. Detail page already shows an "Awaiting POD" placeholder. | courier integration / capture app, media store | M | Ship-2 |
+| **Real courier integration (Shiprocket/Delhivery/BlueDart)** | Live AWB, label PDFs, pickup booking, and a tracking webhook feeding the same state machine. The provider abstraction + status map already exist; this wires a real provider behind them. | provider API keys, webhook infra (exists) | L | Ship-1 |
+| **Barcode / scan-based warehouse routing** | Scan a parcel to advance its status at the bench. Needs scanner hardware + a scan endpoint. | hardware, scan endpoint | M | Ship-3 |
+| **Automatic courier selection / allocation** | Pick the cheapest/fastest serviceable courier per parcel from live rates. Needs multi-courier serviceability + rate APIs. | multi-courier rates, serviceability | L | Ship-3 |
+| **Delivery ETA prediction** | Predicted delivery date per parcel. Needs historical lane data + a model. | delivery history at volume, model | XL | Ship-4 |
+| **Route optimization / multi-warehouse routing** | Optimal dispatch routing across warehouses. The warehouse-routing service exists (region rules); this is the optimization layer. | multi-warehouse volume, optimizer | XL | Ship-4 |
+| **GPS / live customer tracking + delivery heat maps** | Real-time parcel GPS, a customer live-tracking view, and delivery-density heat maps. All need courier GPS feeds. | courier GPS feed | XL | Ship-4 |
+| **Per-courier / per-zone SLA table** | Replace the single flat transit target with a courier × zone matrix (a metro is not the North-East). The SLA helper is already isolated + pure — swap the constant for a table. | zone data, courier SLAs | S | Ship-2 |
+
+**Shipped in the launch build (review priorities 1–7 + P2 items + UI improvements):** search, filters,
+analytics strip, safe bulk ops, clickable-AWB detail page, tracking-history + audit timeline, SLA
+badges, shipment health badges, internal notes (audit-backed), status icons, courier branding labels,
+expanded cost breakdown, CSV/manifest + labels + packing-slip exports, RTO confirmation with reason,
+and an exception button that reads neutral until an exception exists. No schema change — notes use the
+audit stream, everything else derives from columns already present.

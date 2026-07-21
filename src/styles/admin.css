@@ -561,6 +561,19 @@
 .cf__warn { margin: 0 0 18px; font-family: var(--font-sans); font-size: 13px; color: #ab5f1a; }
 .cf__actions { display: flex; justify-content: flex-end; gap: 10px; }
 .retry-refund { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 10px 0 4px; }
+
+/* Shipment detail — tracking history, events, notes */
+.ship-track { list-style: none; margin: 0; padding: 0; }
+.ship-track__row { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--ad-hair); font-family: var(--font-sans); font-size: 13px; align-items: baseline; }
+.ship-track__row:last-child { border-bottom: none; }
+.ship-track__icon { font-size: 14px; }
+.ship-track__status { color: var(--ink, #1f1a16); }
+.ship-events { list-style: none; margin: 6px 0 0; padding: 0; font-family: var(--font-sans); font-size: 13px; }
+.ship-events li { padding: 6px 0; border-bottom: 1px solid var(--ad-hair); line-height: 1.5; }
+.ship-events li:last-child { border-bottom: none; }
+.ship-note { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.ship-note textarea { width: 100%; padding: 8px 10px; font-family: var(--font-sans); font-size: 13px; border: 1px solid var(--ad-hair); border-radius: 4px; box-sizing: border-box; resize: vertical; }
+.ship-note__row { display: flex; align-items: center; gap: 10px; }
 .ff-btn--mini { padding: 2px 8px; font-size: 10px; border-radius: 3px; }
 .od-line__end { display: inline-flex; align-items: center; gap: 8px; }
 .refund-retry-inline { display: inline-flex; align-items: center; gap: 6px; }

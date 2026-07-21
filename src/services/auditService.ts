@@ -136,3 +136,24 @@ export async function getReturnTimeline(returnId: string): Promise<AuditEvent[]>
     return [];
   }
 }
+
+/** A single shipment's timeline — the audit stream scoped to that shipment (events logged with
+ *  entity_id = shipmentId), staff names resolved. Same audit_events table + Timeline component as
+ *  orders/returns (no parallel timeline). The shipment_events tracking table is shown separately. */
+export async function getShipmentTimeline(shipmentId: string): Promise<AuditEvent[]> {
+  try {
+    const db = createAdminClient() as unknown as { from: (t: string) => any };
+    const { data } = await db.from("audit_events").select("*").eq("entity_id", shipmentId).order("created_at", { ascending: true });
+    const events = (data ?? []) as AuditEvent[];
+    const actorIds = [...new Set(events.map((e) => e.actor_id).filter(Boolean))] as string[];
+    if (actorIds.length) {
+      const { data: us } = await db.from("users").select("id,full_name").in("id", actorIds);
+      const names = new Map<string, string>();
+      for (const u of us ?? []) names.set(u.id, u.full_name ?? "");
+      for (const e of events) e.actorName = e.actor_id ? names.get(e.actor_id) ?? null : null;
+    }
+    return events;
+  } catch {
+    return [];
+  }
+}

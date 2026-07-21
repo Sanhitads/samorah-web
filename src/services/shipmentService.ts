@@ -9,6 +9,9 @@ import { getShippingProvider } from "@/lib/shipping";
 import type { ProviderName, ShipmentRequest, PickupLocation } from "@/lib/shipping/types";
 import { routeWarehouseForOrder } from "@/services/warehouseService";
 import { toCustomerStatus, assertShipmentTransition, nextShipmentStates, type ShipmentStatus } from "@/lib/shipment/state";
+import { shipmentSla, type SlaBadge } from "@/lib/shipment/sla";
+import { shipmentHealth, type ShipmentHealth } from "@/lib/shipment/health";
+import { isManualProvider } from "@/lib/shipment/display";
 import { trackServerShipment } from "@/lib/analytics/server";
 import { fulfillmentReadyToShip, type FulfillmentStatus } from "@/lib/fulfillment/state";
 import {
@@ -474,44 +477,201 @@ export interface ShipmentRow {
   labelUrl: string | null;
   chargeableWeightKg: number | null;
   shippingCost: number | null;
+  totalCost: number | null;
   exceptionReason: string | null;
   hasProviderShipmentId: boolean;
   nextStates: ShipmentStatus[];
   createdAt: string;
+  customerName: string | null;
+  phone: string | null;
+  paymentMode: string;
+  isCod: boolean;
+  wholesale: string;
+  deliveredAt: string | null;
+  rtoAt: string | null;
+  sla: SlaBadge;
+  health: ShipmentHealth;
 }
 
-/** Shipments for the admin module, newest first (optionally filtered by status). */
-export async function getShipmentsQueue(opts: { limit?: number; status?: ShipmentStatus } = {}): Promise<ShipmentRow[]> {
+/** Search + filter set for the shipments board (review priorities 1–2). Additive over the same
+ *  table; structured filters + free-text search + date range, mirroring the fulfillment board. */
+export interface ShipmentFilter {
+  search?: string;
+  status?: string;
+  courier?: string;
+  provider?: string; // "manual" | "provider"
+  range?: string; // today | 7d | 30d
+  exception?: boolean;
+  rto?: boolean;
+  payment?: string; // cod | prepaid
+  wholesale?: string; // any | wholesale_order | b2b_customer
+  limit?: number;
+}
+
+function rangeCutoff(range: string, now: number): number | null {
+  const d = new Date(now);
+  if (range === "today") return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  if (range === "7d") return now - 7 * 86_400_000;
+  if (range === "30d") return now - 30 * 86_400_000;
+  return null;
+}
+
+/**
+ * Shipments for the admin board, newest first, with search + filters + a derived SLA/health verdict
+ * per row. Structured filters are applied in-process over a generous fetch (launch volume is small,
+ * same pragmatic approach as the fulfillment queue); the display list is capped at 100.
+ */
+export async function getShipmentsQueue(opts: ShipmentFilter = {}): Promise<ShipmentRow[]> {
   const db = adminLoose();
-  let q = db
+  const now = Date.now();
+  const { data } = await db
     .from("shipments")
-    .select("id,status,provider,provider_shipment_id,courier_name,awb,tracking_url,label_url,chargeable_weight_kg,shipping_cost,exception_reason,created_at,orders(order_number)")
+    .select("id,status,provider,provider_shipment_id,courier_name,awb,tracking_url,label_url,chargeable_weight_kg,shipping_cost,total_logistics_cost,exception_reason,payment_mode,cod_amount,delivered_at,rto_at,created_at,orders(order_number,ship_full_name,ship_phone,wholesale,is_cod)")
     .order("created_at", { ascending: false })
-    .limit(opts.limit ?? 100);
-  if (opts.status) q = q.eq("status", opts.status);
-  const { data } = await q;
+    .limit(opts.limit ?? 1000);
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (data ?? []).map((s: any) => {
+  let rows: ShipmentRow[] = (data ?? []).map((s: any) => {
     const o = Array.isArray(s.orders) ? s.orders[0] : s.orders;
     const status = s.status as ShipmentStatus;
+    const createdAt = s.created_at;
+    const deliveredAt = s.delivered_at ?? null;
+    const sla = shipmentSla(createdAt, status, deliveredAt, now);
+    const health = shipmentHealth({ status, exceptionReason: s.exception_reason ?? null, createdAt, deliveredAt, slaBreached: sla.state === "breached", now });
+    const paymentMode = s.payment_mode ?? "prepaid";
     return {
-      id: s.id,
-      orderNumber: o?.order_number ?? "",
-      provider: s.provider,
-      status,
-      customerStatus: toCustomerStatus(status),
-      courierName: s.courier_name ?? null,
-      awb: s.awb ?? null,
-      trackingUrl: s.tracking_url ?? null,
-      labelUrl: s.label_url ?? null,
+      id: s.id, orderNumber: o?.order_number ?? "", provider: s.provider, status,
+      customerStatus: toCustomerStatus(status), courierName: s.courier_name ?? null,
+      awb: s.awb ?? null, trackingUrl: s.tracking_url ?? null, labelUrl: s.label_url ?? null,
       chargeableWeightKg: s.chargeable_weight_kg != null ? Number(s.chargeable_weight_kg) : null,
       shippingCost: s.shipping_cost != null ? Number(s.shipping_cost) : null,
+      totalCost: s.total_logistics_cost != null ? Number(s.total_logistics_cost) : null,
       exceptionReason: s.exception_reason ?? null,
       hasProviderShipmentId: Boolean(s.provider_shipment_id),
-      nextStates: nextShipmentStates(status),
-      createdAt: s.created_at,
+      nextStates: nextShipmentStates(status), createdAt,
+      customerName: o?.ship_full_name ?? null, phone: o?.ship_phone ?? null,
+      paymentMode, isCod: paymentMode === "cod" || Boolean(o?.is_cod),
+      wholesale: o?.wholesale ?? "none", deliveredAt, rtoAt: s.rto_at ?? null,
+      sla, health,
     };
   });
+
+  if (opts.status) rows = rows.filter((r) => r.status === opts.status);
+  if (opts.courier) rows = rows.filter((r) => (r.courierName ?? "") === opts.courier);
+  if (opts.provider === "manual") rows = rows.filter((r) => isManualProvider(r.provider));
+  else if (opts.provider === "provider") rows = rows.filter((r) => !isManualProvider(r.provider));
+  if (opts.exception) rows = rows.filter((r) => r.status === "exception" || r.exceptionReason);
+  if (opts.rto) rows = rows.filter((r) => r.status === "rto" || r.rtoAt);
+  if (opts.payment === "cod") rows = rows.filter((r) => r.isCod);
+  else if (opts.payment === "prepaid") rows = rows.filter((r) => !r.isCod);
+  if (opts.wholesale === "any") rows = rows.filter((r) => r.wholesale && r.wholesale !== "none");
+  else if (opts.wholesale) rows = rows.filter((r) => r.wholesale === opts.wholesale);
+  if (opts.range) { const c = rangeCutoff(opts.range, now); if (c) rows = rows.filter((r) => new Date(r.createdAt).getTime() >= c); }
+  if (opts.search) {
+    const q = opts.search.trim().toLowerCase();
+    rows = rows.filter((r) => [r.orderNumber, r.awb, r.customerName, r.courierName, r.phone, r.provider].some((v) => String(v ?? "").toLowerCase().includes(q)));
+  }
+  return rows.slice(0, 100);
+}
+
+export interface ShipmentCounts {
+  total: number; today: number; inTransit: number; outForDelivery: number;
+  delivered: number; rto: number; exceptions: number; avgDeliveryDays: number | null;
+}
+
+/** Analytics-strip metrics — the numbers an operations lead checks each morning (review priority 1.3).
+ *  Computed over the shipments table (small volume); avg delivery time is created → delivered in days. */
+export async function getShipmentCounts(): Promise<ShipmentCounts> {
+  const db = adminLoose();
+  const { data } = await db.from("shipments").select("status,created_at,delivered_at").limit(5000);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rows = (data ?? []) as any[];
+  const d = new Date();
+  const startToday = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  let today = 0, inTransit = 0, outForDelivery = 0, delivered = 0, rto = 0, exceptions = 0;
+  const days: number[] = [];
+  for (const r of rows) {
+    if (new Date(r.created_at).getTime() >= startToday) today++;
+    if (r.status === "in_transit") inTransit++;
+    else if (r.status === "out_for_delivery") outForDelivery++;
+    else if (r.status === "delivered") { delivered++; if (r.delivered_at) days.push((new Date(r.delivered_at).getTime() - new Date(r.created_at).getTime()) / 86_400_000); }
+    else if (r.status === "rto") rto++;
+    else if (r.status === "exception") exceptions++;
+  }
+  const avgDeliveryDays = days.length ? Math.round((days.reduce((a, b) => a + b, 0) / days.length) * 10) / 10 : null;
+  return { total: rows.length, today, inTransit, outForDelivery, delivered, rto, exceptions, avgDeliveryDays };
+}
+
+/** Distinct courier names present (for the board's courier filter). */
+export async function getShipmentCourierOptions(): Promise<string[]> {
+  const db = adminLoose();
+  const { data } = await db.from("shipments").select("courier_name").limit(5000);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const set = new Set<string>(); for (const r of (data ?? []) as any[]) if (r.courier_name) set.add(r.courier_name);
+  return [...set].sort();
+}
+
+/** Full shipment record for the detail page: the row, its order (address + customer), and its
+ *  tracking events (oldest first). Audit timeline + notes come from getShipmentTimeline (audit stream). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function getShipmentDetail(shipmentId: string): Promise<{ sh: any; order: any; events: any[] } | null> {
+  const db = adminLoose();
+  const { data: sh } = await db.from("shipments").select("*, shipment_events(*)").eq("id", shipmentId).maybeSingle();
+  if (!sh) return null;
+  const { data: order } = await db
+    .from("orders")
+    .select("order_number,ship_full_name,ship_phone,email,ship_line1,ship_line2,ship_city,ship_state,ship_pincode,ship_country,is_cod,wholesale")
+    .eq("id", sh.order_id)
+    .maybeSingle();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const events = ((sh.shipment_events ?? []) as any[]).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  return { sh, order, events };
+}
+
+/** Append an internal note to a shipment — recorded on the audit stream (no schema; reuses the same
+ *  infrastructure as orders/returns). Notes are staff-only and surface in the detail page + timeline. */
+export async function addShipmentNote(shipmentId: string, note: string, actorId?: string): Promise<{ ok: boolean; reason?: string }> {
+  const text = note.trim();
+  if (!text) return { ok: false, reason: "empty" };
+  const db = adminLoose();
+  const { data: sh } = await db.from("shipments").select("order_id").eq("id", shipmentId).maybeSingle();
+  await logEvent({ orderId: sh?.order_id, entityType: "shipment", entityId: shipmentId, event: "shipment.note", actorType: actorId ? "staff" : "system", actorId, notes: text });
+  return { ok: true };
+}
+
+/** Set/append the courier on a shipment (Bulk Assign Courier). Manual dispatch has no provider call —
+ *  this records the courier label + audits it. */
+export async function setShipmentCourier(shipmentId: string, courier: string, actorId?: string): Promise<{ ok: boolean; reason?: string }> {
+  const name = courier.trim();
+  if (!name) return { ok: false, reason: "empty" };
+  const db = adminLoose();
+  const { data: sh } = await db.from("shipments").select("order_id,status").eq("id", shipmentId).maybeSingle();
+  if (!sh) return { ok: false, reason: "shipment_not_found" };
+  await db.from("shipments").update({ courier_name: name, updated_at: new Date().toISOString() }).eq("id", shipmentId);
+  await logEvent({ orderId: sh.order_id, entityType: "shipment", entityId: shipmentId, event: "shipment.courier_assigned", actorType: actorId ? "staff" : "system", actorId, notes: name });
+  return { ok: true };
+}
+
+/** Batch a safe status transition (in_transit / out_for_delivery / delivered) or courier assignment
+ *  over many shipments. Each item runs the same guarded single-item path, so partial failures are
+ *  isolated and reported. RTO + exception are deliberately NOT batchable (they need a per-parcel
+ *  reason) — enforced at the route. */
+export async function bulkAdvanceShipments(ids: string[], to: ShipmentStatus, actorId?: string): Promise<{ done: number; failed: { id: string; reason: string }[] }> {
+  let done = 0; const failed: { id: string; reason: string }[] = [];
+  for (const id of ids) {
+    try { const r = await advanceShipment(id, to, { actorId }); if (r.ok) done++; else failed.push({ id, reason: r.reason ?? "failed" }); }
+    catch (e) { failed.push({ id, reason: e instanceof Error ? e.message : "error" }); }
+  }
+  return { done, failed };
+}
+
+export async function bulkAssignShipmentCourier(ids: string[], courier: string, actorId?: string): Promise<{ done: number; failed: { id: string; reason: string }[] }> {
+  let done = 0; const failed: { id: string; reason: string }[] = [];
+  for (const id of ids) {
+    try { const r = await setShipmentCourier(id, courier, actorId); if (r.ok) done++; else failed.push({ id, reason: r.reason ?? "failed" }); }
+    catch (e) { failed.push({ id, reason: e instanceof Error ? e.message : "error" }); }
+  }
+  return { done, failed };
 }
 
 /** Minimal data for the ORDER_DELIVERED email. */
