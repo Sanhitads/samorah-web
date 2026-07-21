@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireCapability } from "@/lib/auth/requireStaff";
 import {
   createProduct, updateProduct, setProductStatus, setProductFeatured, getProductForEdit,
-  upsertVariant, deleteVariant,
+  upsertVariant, deleteVariant, setFragranceNotes, addProductImage, updateProductImage, setPrimaryImage, deleteProductImage,
   type CreateProductInput, type ProductCoreInput, type VariantInput, type ProductStatus,
 } from "@/services/productAdminService";
 
@@ -37,6 +37,16 @@ export async function POST(request: Request) {
         return NextResponse.json(await upsertVariant(body.variant as VariantInput, a));
       case "variant.delete":
         return NextResponse.json(await deleteVariant(body.id, body.productId, a));
+      case "notes.set":
+        return NextResponse.json(await setFragranceNotes(body.productId, body.notes ?? [], a));
+      case "image.add":
+        return NextResponse.json(await addProductImage(body.productId, body.url, body.altText ?? "", a));
+      case "image.update":
+        return NextResponse.json(await updateProductImage(body.id, body.patch ?? {}, a));
+      case "image.primary":
+        return NextResponse.json(await setPrimaryImage(body.productId, body.id, a));
+      case "image.delete":
+        return NextResponse.json(await deleteProductImage(body.id, body.productId, a));
       default:
         return NextResponse.json({ error: "unknown action" }, { status: 400 });
     }

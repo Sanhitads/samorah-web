@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { hasCapability } from "@/lib/auth/capabilities";
-import { listProductsAdmin, getCategoriesForSelect } from "@/services/productAdminService";
+import { listProductsAdmin, getCategoriesForSelect, getCollectionsForSelect } from "@/services/productAdminService";
 import { ProductsManager } from "@/components/admin/ProductsManager";
 
 /**
@@ -18,7 +18,11 @@ export default async function ProductsPage() {
   if (!staff.ok) redirect("/login");
   const canManage = hasCapability(staff.role, "catalog.manage");
 
-  const [products, categories] = await Promise.all([listProductsAdmin(), canManage ? getCategoriesForSelect() : Promise.resolve([])]);
+  const [products, categories, collections] = await Promise.all([
+    listProductsAdmin(),
+    canManage ? getCategoriesForSelect() : Promise.resolve([]),
+    canManage ? getCollectionsForSelect() : Promise.resolve([]),
+  ]);
 
   return (
     <main className="admin">
@@ -29,7 +33,7 @@ export default async function ProductsPage() {
       </header>
 
       {canManage ? (
-        <ProductsManager products={products} categories={categories} />
+        <ProductsManager products={products} categories={categories} collections={collections} />
       ) : (
         <div className="admin__table-wrap">
           <table className="admin__table admin__table--board">

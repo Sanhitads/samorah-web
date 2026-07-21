@@ -268,3 +268,37 @@ summary card, financial summary, returns & risk, address card, communication his
 consent (display), product/fragrance preference, a merged Customer Lifetime Timeline, notes, tags,
 and derived operational flags. No schema change — everything derives from users + orders + returns +
 shipments + notification_dispatches + incidents.
+
+## P9 — Products / Editorial CMS (follow-ons)
+
+The launch build evolves Products from a CRUD screen into an editorial CMS: a rich list (analytics
+strip, search, filters, sort, thumbnail/collection/sales/updated columns, quick featured+status), and
+a collapsible editor exposing the storefront content that already lived in the DB but wasn't editable
+— Collection/Chapter + position, merchandising flags (featured/hero/best seller/new arrival/limited/
+seasonal/staff pick/coming soon), visibility controls, story (short+long), flame persona, mood tags,
+lifestyle, centre quote, ingredients (wax/wick/burn), a Fragrance Journey editor (Top/Heart/Base), an
+image gallery (add/hero/alt/reorder/delete), SEO (title/description/OG/canonical + Google preview),
+and scheduled publish. These extend it further.
+
+| Feature | Why deferred | Dependencies | Complexity | Phase |
+|---|---|---|---|---|
+| **Per-product Artist Story** | Today the artist block is global `config/artist.ts`. Making it per-product (name/story/image/quote/enabled) needs product columns + a migration + moving the PDP builder off config. | product columns, PDP builder change | M | Prod-1 |
+| **Testimonials per product** | Currently per-chapter `config/testimonials.ts`. Per-product needs a `product_testimonials` table + editor. | new table | M | Prod-2 |
+| **Continue-the-Chapter manual picker / related products** | The `related_products` table exists but is empty; related is derived from the collection today. A manual picker (related / upsell / cross-sell / pairs-with) needs the table wired + an editor. | related_products schema + editor | M | Prod-1 |
+| **Structured ingredients** (vessel / fragrance % / origin) | Wax + wick are editable; the richer breakdown needs columns. | product columns | S | Prod-2 |
+| **Advanced pricing** (compare-at / MSRP / margin display / wholesale price) | Cost price exists per variant (margin is derivable in the UI); compare-at / MSRP / wholesale need columns. | product/variant columns | M | Prod-2 |
+| **Advanced inventory** (safety stock / reorder level / track-inventory toggle / preorder) | `allow_backorder` is editable; the rest need columns + reorder alerts. | product/variant columns, alerting | M | Prod-2 |
+| **Bulk product actions** (status / featured / collection / price / inventory / tags / archive / export / import) | The list filters + selects exist; safe bulk (with confirm + audit + partial-failure isolation) + CSV import/export is its own slice. | bulk framework, CSV parser | L | Prod-2 |
+| **Publishing workflow** (duplicate / unpublish / schedule archive / preview-as-draft) | Scheduled *publish* + status ship now; duplicate, schedule-archive, and a draft preview URL are follow-ons. | preview tokens, scheduler | M | Prod-2 |
+| **Product audit history view** | Every change is already audited (product.updated / notes_set / image_* / variant.*); this is a per-product timeline view of that stream (reuse the shared Timeline). | audit stream (exists) | S | Prod-1 |
+| **Gallery drag-sort + video + 360 + zoom + mobile crop** | The gallery does add/hero/alt/reorder(↑↓)/delete by URL. Native drag-sort, a video/360 field, zoom, and mobile-crop presets are richer media work. | media columns, upload UX | M | Prod-2 |
+| **Image upload (vs paste URL)** | Images are added by Cloudinary URL today; a direct upload would reuse the media provider (as returns evidence does). | media upload wiring | S | Prod-1 |
+| **Hero overlay / background controls + signature-section fields** | The hero image is `is_hero` on an image; overlay/background/signature-eyebrow are extra presentation columns. | product columns | S | Prod-2 |
+
+**Explicitly NOT for launch (review) — deliberate:** AI description / AI SEO / AI images, marketplace
+feeds (Amazon/Flipkart), barcode scanning, POS, and ERP. These belong to a much later phase.
+
+**Note:** most launch-build fields are *existing* product columns the editor simply didn't expose
+(the service comment literally said "the full editorial form layers on later"). The only new columns
+(20260730120000_product_cms) are the merchandising flags, visibility controls, chapter position, and
+SEO OG/canonical — everything else already fed the storefront and is now editable.
