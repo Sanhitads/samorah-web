@@ -270,8 +270,9 @@ export async function getCustomer360(id: string): Promise<Customer360 | null> {
   const segment = segmentOf(paid.length, ltv);
   const health = customerHealth(lastOrderAt, paid.length);
 
+  // Operational flags (mirrors Orders). VIP is NOT included here — the segment badge already conveys
+  // it, so listing it as a flag too would show "VIP" twice in the header.
   const flags: { key: string; label: string; tone: string }[] = [];
-  if (segment === "vip") flags.push({ key: "vip", label: "VIP", tone: "gold" });
   if (wholesale) flags.push({ key: "wholesale", label: "Wholesale", tone: "paid" });
   if (fraudFlag) flags.push({ key: "fraud", label: "Fraud Review", tone: "over" });
   if (tagsArr.map((t: string) => t.toLowerCase()).includes("watch")) flags.push({ key: "watch", label: "Watch", tone: "warn" });
