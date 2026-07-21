@@ -104,7 +104,22 @@ export default async function ProductRoute({
     { id: raw.id, fragrance_family: null, collection_id: raw.collection_id },
     4,
   )) as unknown as RelatedProductInput[];
-  const editorial = buildCandleEditorial({ view: p, artist: getArtist(null), related });
+  // Per-product artist (review) — when a product enables a custom artist, the PDP uses it; otherwise
+  // it falls back to the house artist. Fields come straight off the product row (getProductBySlug *).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pa = product as any;
+  const artist = pa.artist_enabled
+    ? {
+        id: "product", name: pa.artist_name || "The Samorah Artist", role: pa.artist_role || "Painter · Colourist",
+        story: String(pa.artist_story || "").split(/\n{2,}|\n/).map((t: string) => t.trim()).filter(Boolean),
+        portrait: pa.artist_image || "gradient:grad-blush",
+        processImages: [pa.artist_image || "gradient:grad-chai"],
+        artworkImages: ["gradient:grad-amethyst"],
+        signature: `— ${pa.artist_name || "The Samorah Artist"}`,
+        quote: pa.artist_quote || "",
+      }
+    : getArtist(null);
+  const editorial = buildCandleEditorial({ view: p, artist, related });
   const palette = chapterTheme(p.chapterSlug);
   const ld = productLd({ name: p.name, slug: p.slug, description: p.tagline, gallery: p.gallery, priceLabel: p.priceLabel, variants: p.variants });
 

@@ -178,6 +178,8 @@ export interface ProductCoreInput {
   seoTitle?: string; seoDescription?: string; seoOgImage?: string; seoCanonical?: string;
   isHero?: boolean; allowBackorder?: boolean; publishAt?: string | null;
   chapterPosition?: string; displayOrder?: number;
+  // Artist section (per-product; PDP falls back to the house artist)
+  artistEnabled?: boolean; artistName?: string; artistRole?: string; artistStory?: string; artistQuote?: string; artistImage?: string;
   // Merchandising flags (added by 20260730120000_product_cms)
   isBestseller?: boolean; isNewArrival?: boolean; isLimitedEdition?: boolean; isSeasonal?: boolean; isStaffPick?: boolean; isComingSoon?: boolean;
   // Visibility controls
@@ -196,6 +198,8 @@ function productRow(i: ProductCoreInput): Record<string, unknown> {
   s("wax_blend", i.waxBlend); s("wick", i.wick);
   s("seo_title", i.seoTitle); s("seo_description", i.seoDescription); s("seo_og_image", i.seoOgImage); s("seo_canonical", i.seoCanonical);
   s("chapter_position", i.chapterPosition);
+  s("artist_name", i.artistName); s("artist_role", i.artistRole); s("artist_story", i.artistStory); s("artist_quote", i.artistQuote); s("artist_image", i.artistImage);
+  b("artist_enabled", i.artistEnabled);
   if (i.moodTags !== undefined) r.mood_tags = i.moodTags.map((t) => t.trim()).filter(Boolean);
   if (i.collectionId !== undefined) r.collection_id = i.collectionId || null;
   if (i.categoryId !== undefined && i.categoryId) r.category_id = i.categoryId;
@@ -221,6 +225,7 @@ const CMS_COLUMNS = [
   "is_bestseller", "is_new_arrival", "is_limited_edition", "is_seasonal", "is_staff_pick", "is_coming_soon",
   "visible_website", "visible_search", "visible_homepage", "visible_chapter", "visible_bundles",
   "chapter_position", "display_order", "seo_og_image", "seo_canonical", "product_type",
+  "artist_enabled", "artist_name", "artist_role", "artist_story", "artist_quote", "artist_image",
 ];
 
 export async function updateProduct(id: string, input: ProductCoreInput, actorId?: string) {

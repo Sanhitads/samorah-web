@@ -35,6 +35,7 @@ type Core = {
   status: ProductStatus; collectionId: string; chapterPosition: string; displayOrder: string; publishAt: string;
   isFeatured: boolean; isHero: boolean; isBestseller: boolean; isNewArrival: boolean; isLimitedEdition: boolean; isSeasonal: boolean; isStaffPick: boolean; isComingSoon: boolean;
   visibleWebsite: boolean; visibleSearch: boolean; visibleHomepage: boolean; visibleChapter: boolean; visibleBundles: boolean; allowBackorder: boolean;
+  artistEnabled: boolean; artistName: string; artistRole: string; artistStory: string; artistQuote: string; artistImage: string;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -82,6 +83,7 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
       visibleWebsite: p.visible_website == null ? true : bv(p.visible_website), visibleSearch: p.visible_search == null ? true : bv(p.visible_search),
       visibleHomepage: p.visible_homepage == null ? true : bv(p.visible_homepage), visibleChapter: p.visible_chapter == null ? true : bv(p.visible_chapter),
       visibleBundles: p.visible_bundles == null ? true : bv(p.visible_bundles), allowBackorder: bv(p.allow_backorder),
+      artistEnabled: bv(p.artist_enabled), artistName: sv(p.artist_name), artistRole: sv(p.artist_role), artistStory: sv(p.artist_story), artistQuote: sv(p.artist_quote), artistImage: sv(p.artist_image),
     });
     setVariants(d.variants ?? []); setNotes(d.notes ?? []); setImages(d.images ?? []);
   };
@@ -204,6 +206,18 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
           </div>
           <label className="cfg-field"><span>Lifestyle (Living With It)</span><textarea value={core.lifestyleUse} onChange={(e) => set({ lifestyleUse: e.target.value })} rows={3} /></label>
           <label className="cfg-field"><span>Centre quote (cultural reference)</span><input value={core.culturalReference} onChange={(e) => set({ culturalReference: e.target.value })} /></label>
+        </details>
+
+        <details className="pe-sec">
+          <summary>Artist ({core.artistEnabled ? "custom" : "house default"})</summary>
+          <label className="om-check" style={{ marginBottom: 8 }}><input type="checkbox" checked={core.artistEnabled} onChange={(e) => set({ artistEnabled: e.target.checked })} /><span>Use a custom artist for this product (otherwise the house artist shows)</span></label>
+          <div className="cfg-grid">
+            <label className="cfg-field"><span>Artist name</span><input value={core.artistName} onChange={(e) => set({ artistName: e.target.value })} placeholder="The Samorah Artist" disabled={!core.artistEnabled} /></label>
+            <label className="cfg-field"><span>Artist role</span><input value={core.artistRole} onChange={(e) => set({ artistRole: e.target.value })} placeholder="Painter · Colourist" disabled={!core.artistEnabled} /></label>
+            <label className="cfg-field"><span>Artist image URL</span><input value={core.artistImage} onChange={(e) => set({ artistImage: e.target.value })} disabled={!core.artistEnabled} /></label>
+          </div>
+          <label className="cfg-field"><span>Artist story <em className="om-field__hint">one paragraph per line</em></span><textarea value={core.artistStory} onChange={(e) => set({ artistStory: e.target.value })} rows={4} disabled={!core.artistEnabled} /></label>
+          <label className="cfg-field"><span>Artist quote</span><input value={core.artistQuote} onChange={(e) => set({ artistQuote: e.target.value })} placeholder="Every colour begins with a feeling." disabled={!core.artistEnabled} /></label>
         </details>
 
         <details className="pe-sec">
