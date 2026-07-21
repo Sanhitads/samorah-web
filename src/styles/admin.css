@@ -561,6 +561,9 @@
 .cf__warn { margin: 0 0 18px; font-family: var(--font-sans); font-size: 13px; color: #ab5f1a; }
 .cf__actions { display: flex; justify-content: flex-end; gap: 10px; }
 .retry-refund { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 10px 0 4px; }
+.ff-btn--mini { padding: 2px 8px; font-size: 10px; border-radius: 3px; }
+.od-line__end { display: inline-flex; align-items: center; gap: 8px; }
+.refund-retry-inline { display: inline-flex; align-items: center; gap: 6px; }
 
 /* Evidence item metadata (priority 3) */
 .ret-evidence__item { display: flex; flex-direction: column; gap: 4px; width: 116px; }

@@ -13,6 +13,7 @@ import { OrderMeta } from "@/components/admin/OrderMeta";
 import { OrderFlags } from "@/components/admin/OrderFlags";
 import { Timeline } from "@/components/admin/Timeline";
 import { RefundRetryBanner } from "@/components/admin/RefundRetryBanner";
+import { RefundRowRetry } from "@/components/admin/RefundRowRetry";
 import { getIncidentForOrder } from "@/services/incidentService";
 import { orderHealth } from "@/lib/admin/orderHealth";
 import { fraudBadge, wholesaleBadge } from "@/lib/admin/orderList";
@@ -63,6 +64,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
   });
   const fraudB = fraudBadge(order.fraud_review);
   const wholeB = wholesaleBadge(order.wholesale);
+  const canRefund = hasCapability(staff.role, "order.refund");
 
   return (
     <main className="admin">
@@ -192,7 +194,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
         <section className="od-card" id="refunds" style={{ scrollMarginTop: 20 }}>
           <h2 className="od-card__title">Refunds ({refunds.length})</h2>
           {refunds.length ? refunds.map((r) => (
-            <div key={r.id} className="od-line"><span>{inr(r.amount)} · {r.method}</span><span className="om-pay" data-tone={r.status === "processed" ? "paid" : r.status === "failed" ? "failed" : "refundprog"}>{r.status}</span><span className="admin__muted">{dt(r.created_at)}</span></div>
+            <div key={r.id} className="od-line"><span>{inr(r.amount)} · {r.method}</span><span className="om-pay" data-tone={r.status === "processed" ? "paid" : r.status === "failed" ? "failed" : "refundprog"}>{r.status}</span><span className="admin__muted od-line__end">{dt(r.created_at)}{canRefund && r.status === "failed" ? <RefundRowRetry orderNumber={order.order_number} amount={Number(r.amount)} /> : null}</span></div>
           )) : <p className="admin__muted">No refunds.</p>}
         </section>
 
@@ -227,8 +229,12 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
         </section>
       </div>
 
-      {/* Audit timeline (shared component) */}
-      <Timeline events={timeline} />
+      {/* Audit timeline (shared component) — collapsed by default so a long history doesn't bloat
+          the page; the summary keeps the event count visible. Matches the return timeline. */}
+      <details className="od-group" open={timeline.length <= 8}>
+        <summary className="od-group__sum">Timeline <span className="count-badge">{timeline.length}</span></summary>
+        <Timeline events={timeline} bare />
+      </details>
     </main>
   );
 }
