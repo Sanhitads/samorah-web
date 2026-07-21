@@ -36,6 +36,7 @@ export interface CustomerRow {
   wholesale: boolean;
   tags: string[];
   createdAt: string;
+  lastActivity: { event: string; at: string } | null;
 }
 
 /** Search + filter set for the customer board (review priority 1.2 / 1.3). */
@@ -70,12 +71,14 @@ export async function listCustomers(opts: CustomerFilter = {}): Promise<Customer
   const ids = (users ?? []).map((u: any) => u.id);
 
   // Per-customer order aggregates + a searchable blob (order numbers + cities) for advanced search.
-  const agg = new Map<string, { orders: number; ltv: number; lastOrderAt: string | null; blob: string }>();
+  const agg = new Map<string, { orders: number; ltv: number; lastOrderAt: string | null; blob: string; orderIds: string[] }>();
+  const orderOwner = new Map<string, string>(); // order_id → user_id (for last-activity lookup)
   if (ids.length) {
-    const { data: orders } = await db.from("orders").select("user_id,order_number,total_amount,payment_status,placed_at,ship_city").in("user_id", ids);
+    const { data: orders } = await db.from("orders").select("id,user_id,order_number,total_amount,payment_status,placed_at,ship_city").in("user_id", ids);
     for (const o of orders ?? []) {
-      const a = agg.get(o.user_id) ?? { orders: 0, ltv: 0, lastOrderAt: null, blob: "" };
+      const a = agg.get(o.user_id) ?? { orders: 0, ltv: 0, lastOrderAt: null, blob: "", orderIds: [] };
       a.blob += ` ${o.order_number ?? ""} ${o.ship_city ?? ""}`;
+      if (o.id) { a.orderIds.push(o.id); orderOwner.set(o.id, o.user_id); }
       if (PAID.includes(o.payment_status)) {
         a.orders++; a.ltv += Number(o.total_amount ?? 0);
         if (o.placed_at && (!a.lastOrderAt || o.placed_at > a.lastOrderAt)) a.lastOrderAt = o.placed_at;
@@ -98,7 +101,7 @@ export async function listCustomers(opts: CustomerFilter = {}): Promise<Customer
       segment: segmentOf(a.orders, ltv), health: customerHealth(a.lastOrderAt, a.orders, now),
       marketingConsent: Boolean(u.marketing_consent), newsletter: Boolean(u.marketing_consent),
       wholesale: wholesaleIds.has(u.id) || tags.map((t: string) => t.toLowerCase()).includes("wholesale"),
-      tags, createdAt: u.created_at,
+      tags, createdAt: u.created_at, lastActivity: null,
       _blob: `${u.full_name ?? ""} ${u.email} ${u.phone ?? ""} ${u.id}${a.blob}`.toLowerCase(),
     } as CustomerRow & { _blob: string };
   });
@@ -120,8 +123,23 @@ export async function listCustomers(opts: CustomerFilter = {}): Promise<Customer
   if (opts.lastOrder) { const d = { "7d": 7, "30d": 30, "90d": 90, "1y": 365 }[opts.lastOrder]; if (d) rows = rows.filter((r) => withinDays(r.lastOrderAt, d, now)); }
   if (opts.since) { const d = { "30d": 30, "90d": 90, "1y": 365 }[opts.since]; if (d) rows = rows.filter((r) => withinDays(r.createdAt, d, now)); }
 
+  const final = rows.slice(0, 200);
+
+  // Last activity (review 2.8) — the most recent audit event across each displayed customer's orders
+  // (delivery, refund, return, etc.), not just their last purchase. One bounded query for the page.
+  const displayedOrderIds = final.flatMap((r) => agg.get(r.id)?.orderIds ?? []);
+  if (displayedOrderIds.length) {
+    const { data: ev } = await db.from("audit_events").select("event,order_id,created_at").in("order_id", displayedOrderIds.slice(0, 1000)).order("created_at", { ascending: false }).limit(1000);
+    const latest = new Map<string, { event: string; at: string }>();
+    for (const e of ev ?? []) {
+      const uid = orderOwner.get(e.order_id);
+      if (uid && !latest.has(uid)) latest.set(uid, { event: e.event, at: e.created_at });
+    }
+    for (const r of final) r.lastActivity = latest.get(r.id) ?? null;
+  }
+
   // Strip the internal search blob before returning.
-  return rows.map(({ ...r }) => { delete (r as any)._blob; return r; }).slice(0, 200);
+  return final.map(({ ...r }) => { delete (r as any)._blob; return r; });
 }
 
 export interface CustomerCounts {
@@ -180,6 +198,9 @@ export interface Customer360 {
   wholesale: boolean;
   flags: { key: string; label: string; tone: string }[];  // derived operational flags
   consent: { channel: string; state: "in" | "out" | "unknown" }[]; // per-channel (display only)
+  financial: { ltv: number; refunded: number; storeCredit: number; aov: number; highest: number; netRevenue: number };
+  journey: { key: string; label: string; date: string | null; detail: string | null }[];
+  isOneYear: boolean;
   // CRM additions (R13)
   favouriteFragrance: string | null;                                  // most-purchased family across paid orders
   acquisition: { source: string; medium: string; campaign: string; channel: string } | null; // first order's UTMs, normalised to a channel
@@ -236,6 +257,24 @@ export async function getCustomer360(id: string): Promise<Customer360 | null> {
     { channel: "Push", state: "unknown" },
   ];
 
+  // Financial summary (review priority 4) — net revenue = what the customer actually kept us paid.
+  const financial = { ltv, refunded: refundTotal, storeCredit: 0, aov, highest: Math.round(highestOrder), netRevenue: ltv - refundTotal };
+  const isOneYear = Date.now() - new Date(u.created_at).getTime() >= 365 * 86_400_000;
+
+  // Customer journey (review priority 4) — the relationship's milestones, oldest first.
+  const paidAsc = [...paid].reverse();
+  const journey: { key: string; label: string; date: string | null; detail: string | null }[] = [
+    { key: "joined", label: "Joined", date: u.created_at, detail: null },
+  ];
+  if (paidAsc[0]) journey.push({ key: "first_order", label: "First order", date: paidAsc[0].placed_at, detail: paidAsc[0].order_number });
+  if (paidAsc[1]) journey.push({ key: "repeat", label: "Became a repeat buyer", date: paidAsc[1].placed_at, detail: paidAsc[1].order_number });
+  const firstDelivered = paidAsc.find((o) => o.status === "delivered");
+  if (firstDelivered) journey.push({ key: "delivered", label: "First delivery", date: firstDelivered.placed_at, detail: firstDelivered.order_number });
+  const firstReturn = returnsData.length ? returnsData[returnsData.length - 1] : null;
+  if (firstReturn) journey.push({ key: "return", label: firstReturn.return_type === "replacement" ? "First replacement" : "First return", date: firstReturn.created_at, detail: firstReturn.rma_number });
+  if (paid.length > 1) journey.push({ key: "latest", label: "Latest order", date: paid[0].placed_at, detail: paid[0].order_number });
+  journey.sort((a, b) => (a.date && b.date ? new Date(a.date).getTime() - new Date(b.date).getTime() : 0));
+
   // Acquisition = the earliest order's UTMs (orders are desc, so the last is oldest).
   const firstOrder = orders.length ? orders[orders.length - 1] : null;
   const acquisition = firstOrder && (firstOrder.utm_source || firstOrder.utm_medium || firstOrder.utm_campaign)
@@ -278,7 +317,7 @@ export async function getCustomer360(id: string): Promise<Customer360 | null> {
     createdAt: u.created_at, phoneDigits: u.phone ? String(u.phone).replace(/\D/g, "").replace(/^0+/, "").replace(/^(\d{10})$/, "91$1") : null,
     health, lastOrderAt, highestOrder: Math.round(highestOrder),
     totalReturns: returnsData.length, refundTotal, replacementCount, failedPayments, rtoCount, fraudFlag, wholesale,
-    flags, consent,
+    flags, consent, financial, journey, isOneYear,
     favouriteFragrance, acquisition, wishlist,
     favouriteCollection, favouritePriceRange, preferredJarSize,
   };

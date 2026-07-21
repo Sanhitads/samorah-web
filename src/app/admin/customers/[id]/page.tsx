@@ -6,6 +6,7 @@ import { hasCapability } from "@/lib/auth/capabilities";
 import { getCustomer360, getCustomerTimeline, getCustomerEmailHistory } from "@/services/customerAdminService";
 import { getAccountAudit } from "@/services/accountAuditService";
 import { CustomerMeta } from "@/components/admin/CustomerMeta";
+import { CustomerJourney } from "@/components/admin/CustomerJourney";
 import { Timeline } from "@/components/admin/Timeline";
 
 export const metadata: Metadata = { title: "Customer", robots: { index: false } };
@@ -40,7 +41,8 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           <span className="om-pay" data-tone={SEG_TONE[c.segment]}>{c.segment}</span>
           <span className="oh-badge" data-h={c.health.tone} title={c.health.reason} style={{ marginLeft: 8 }}>{c.health.dot} {c.health.label}</span>
           {c.flags.map((f) => <span key={f.key} className="om-pay" data-tone={f.tone} style={{ marginLeft: 8 }}>{f.label}</span>)}
-          <span className="admin__muted"> · Customer since {fmt(c.createdAt)}</span>
+          {c.isOneYear ? <span className="adm-badge" data-b="gst" style={{ marginLeft: 8 }} title="Customer for over a year">🎉 1+ year</span> : null}
+          <span className="admin__muted"> · Customer since {fmt(c.createdAt)}{c.birthday ? ` · 🎂 ${new Date(c.birthday).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}` : ""}</span>
         </p>
       </header>
 
@@ -62,6 +64,20 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       </div>
 
       <div className="od-grid">
+        {/* Financial summary (review priority 4) */}
+        <section className="od-card od-card--finance">
+          <h2 className="od-card__title">Financial summary</h2>
+          <dl className="od-dl od-dl--fin">
+            <div><dt>Lifetime value</dt><dd>{money(c.financial.ltv)}</dd></div>
+            <div><dt>Refunded</dt><dd>{money(c.financial.refunded)}</dd></div>
+            <div><dt>Store credit</dt><dd className="admin__muted">{money(c.financial.storeCredit)}</dd></div>
+            <div><dt>Average order</dt><dd>{money(c.financial.aov)}</dd></div>
+            <div><dt>Highest order</dt><dd>{money(c.financial.highest)}</dd></div>
+            <div className="od-dl__net"><dt>Net revenue</dt><dd>{money(c.financial.netRevenue)}</dd></div>
+          </dl>
+          <p className="om-field__hint">Net revenue = lifetime value − refunded. Store credit ledger is post-launch (shows ₹0).</p>
+        </section>
+
         {/* Returns & risk summary (review sections 9, 15) */}
         <section className="od-card">
           <h2 className="od-card__title">Returns &amp; risk</h2>
@@ -103,6 +119,12 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           )) : <p className="admin__muted">Nothing saved yet.</p>}
         </section>
       </div>
+
+      {/* Customer journey (review priority 4) */}
+      <details className="od-group" open>
+        <summary className="od-group__sum">Customer journey</summary>
+        <section className="od-card"><CustomerJourney milestones={c.journey} /></section>
+      </details>
 
       <div className="od-grid">
         {/* Orders */}
