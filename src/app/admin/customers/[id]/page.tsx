@@ -3,11 +3,10 @@ import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { hasCapability } from "@/lib/auth/capabilities";
-import { getCustomer360, getCustomerTimeline, getCustomerEmailHistory } from "@/services/customerAdminService";
+import { getCustomer360, getCustomerEmailHistory, custRef } from "@/services/customerAdminService";
 import { getAccountAudit } from "@/services/accountAuditService";
 import { CustomerMeta } from "@/components/admin/CustomerMeta";
 import { CustomerJourney } from "@/components/admin/CustomerJourney";
-import { Timeline } from "@/components/admin/Timeline";
 
 export const metadata: Metadata = { title: "Customer", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -30,7 +29,8 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
 
   const c = await getCustomer360(id);
   if (!c) notFound();
-  const [audit, timeline, emails] = await Promise.all([getAccountAudit(id, 12), getCustomerTimeline(id), getCustomerEmailHistory(id)]);
+  const [audit, emails] = await Promise.all([getAccountAudit(id, 12), getCustomerEmailHistory(id)]);
+  const rel = (v: string) => { const d = Math.floor((Date.now() - new Date(v).getTime()) / 86400000); return d <= 0 ? "today" : d === 1 ? "yesterday" : `${d}d ago`; };
 
   return (
     <main className="admin">
@@ -42,9 +42,21 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           <span className="oh-badge" data-h={c.health.tone} title={c.health.reason} style={{ marginLeft: 8 }}>{c.health.dot} {c.health.label}</span>
           {c.flags.map((f) => <span key={f.key} className="om-pay" data-tone={f.tone} style={{ marginLeft: 8 }}>{f.label}</span>)}
           {c.isOneYear ? <span className="adm-badge" data-b="gst" style={{ marginLeft: 8 }} title="Customer for over a year">🎉 1+ year</span> : null}
-          <span className="admin__muted"> · Customer since {fmt(c.createdAt)}{c.birthday ? ` · 🎂 ${new Date(c.birthday).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}` : ""}</span>
+          <span className="admin__muted"> · <span className="admin__mono">{custRef(c.id)}</span> · Customer since {fmt(c.createdAt)}{c.birthday ? ` · 🎂 ${new Date(c.birthday).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}` : ""}</span>
         </p>
       </header>
+
+      {/* Support summary (review 9) — everything an agent needs on pickup, one compact strip */}
+      <div className="oms-strip ship-glance">
+        <div className="oms-stat"><span className="oms-stat__n">{c.support.orders}</span><span className="oms-stat__l">Orders</span></div>
+        <div className="oms-stat"><span className="oms-stat__n">{c.support.returns}</span><span className="oms-stat__l">Returns</span></div>
+        <div className="oms-stat"><span className="oms-stat__n">{money(c.support.refunds)}</span><span className="oms-stat__l">Refunds</span></div>
+        <div className="oms-stat" data-tone={c.support.openIncidents ? "over" : undefined}><span className="oms-stat__n">{c.support.openIncidents}</span><span className="oms-stat__l">Open incidents</span></div>
+        <div className="oms-stat"><span className="oms-stat__n">{c.support.openTickets ?? "—"}</span><span className="oms-stat__l">Open tickets</span></div>
+        <div className="oms-stat"><span className="oms-stat__n" style={{ fontSize: 14 }}>{c.support.currentShipment ?? "—"}</span><span className="oms-stat__l">Current shipment</span></div>
+        <div className="oms-stat"><span className="oms-stat__n" style={{ fontSize: 14 }}>{c.support.latestEmailAt ? fmt(c.support.latestEmailAt) : "—"}</span><span className="oms-stat__l">Latest email</span></div>
+        <div className="oms-stat"><span className="oms-stat__n" style={{ fontSize: 14 }}>{c.support.lastContactAt ? rel(c.support.lastContactAt) : "—"}</span><span className="oms-stat__l">Last contact</span></div>
+      </div>
 
       {/* Communication quick actions (review section 10) */}
       <div className="ship-quick">
@@ -105,12 +117,19 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       <div className="od-grid">
         <section className="od-card">
           <h2 className="od-card__title">Profile insight</h2>
-          <div className="od-line"><span className="admin__muted">Favourite fragrance</span><span>{c.favouriteFragrance ?? "—"}</span></div>
+          <div className="od-line"><span className="admin__muted">Favourite fragrance</span><span>{c.favouriteFragrance ?? "—"}{c.favouriteFragrancePct != null ? <span className="admin__muted"> · {c.favouriteFragrancePct}%</span> : null}</span></div>
           <div className="od-line"><span className="admin__muted">Favourite collection</span><span>{c.favouriteCollection ?? "—"}</span></div>
           <div className="od-line"><span className="admin__muted">Preferred jar size</span><span>{c.preferredJarSize ?? "—"}</span></div>
           <div className="od-line"><span className="admin__muted">Price range</span><span>{c.favouritePriceRange ?? "—"}</span></div>
           <div className="od-line"><span className="admin__muted">Acquisition channel</span><span>{c.acquisition ? c.acquisition.channel : "Direct / unknown"}</span></div>
-          {c.acquisition ? <div className="od-line"><span className="admin__muted">Source detail</span><span>{c.acquisition.source}{c.acquisition.campaign !== "—" ? ` · ${c.acquisition.campaign}` : ""}</span></div> : null}
+          {c.productHeat.length ? (
+            <div className="cust-heat">
+              <span className="admin__muted" style={{ fontSize: 11 }}>Product preference</span>
+              {c.productHeat.map((h) => (
+                <div key={h.type} className="cust-heat__row"><span className="cust-heat__label">{h.type}</span><span className="cust-heat__bar"><span className="cust-heat__fill" style={{ width: `${h.pct}%` }} /></span><span className="cust-heat__pct">{h.pct}%</span></div>
+              ))}
+            </div>
+          ) : null}
         </section>
         <section className="od-card">
           <h2 className="od-card__title">Wishlist ({c.wishlist.length})</h2>
@@ -120,9 +139,9 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
         </section>
       </div>
 
-      {/* Customer journey (review priority 4) */}
+      {/* Customer Lifetime Timeline — journey + lifecycle merged into one (review 1) */}
       <details className="od-group" open>
-        <summary className="od-group__sum">Customer journey</summary>
+        <summary className="od-group__sum">Customer Lifetime Timeline</summary>
         <section className="od-card"><CustomerJourney milestones={c.journey} /></section>
       </details>
 
@@ -145,12 +164,21 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       </div>
 
       <div className="od-grid">
-        {/* Addresses */}
+        {/* Address card (review 2) — latest-order ship-to + bill-to, plus any saved addresses */}
         <section className="od-card">
-          <h2 className="od-card__title">Addresses ({c.addresses.length})</h2>
-          {c.addresses.length ? c.addresses.map((a, i) => (
-            <p key={i} className="acc__addr" style={{ marginBottom: 10 }}>{a.isDefault ? "★ " : ""}{a.line1}{a.line2 ? `, ${a.line2}` : ""}, {a.city}, {a.state} {a.pincode}</p>
-          )) : <p className="admin__muted">No saved addresses.</p>}
+          <h2 className="od-card__title">Address</h2>
+          {c.address?.ship ? (
+            <div className="cust-addr"><span className="cust-addr__k">Shipping · latest order</span><p className="acc__addr">{c.address.ship.name ? `${c.address.ship.name} · ` : ""}{c.address.ship.line1}{c.address.ship.line2 ? `, ${c.address.ship.line2}` : ""}, {c.address.ship.city}, {c.address.ship.state} {c.address.ship.pincode}{c.address.ship.phone ? ` · ${c.address.ship.phone}` : ""}</p></div>
+          ) : null}
+          {c.address?.bill ? (
+            <div className="cust-addr"><span className="cust-addr__k">Billing</span><p className="acc__addr">{c.address.bill.line1}{c.address.bill.line2 ? `, ${c.address.bill.line2}` : ""}, {c.address.bill.city}, {c.address.bill.state} {c.address.bill.pincode}</p></div>
+          ) : null}
+          {c.addresses.length ? (
+            <div className="cust-addr"><span className="cust-addr__k">Saved</span>{c.addresses.map((a, i) => (
+              <p key={i} className="acc__addr">{a.isDefault ? "★ " : ""}{a.line1}{a.line2 ? `, ${a.line2}` : ""}, {a.city}, {a.state} {a.pincode}</p>
+            ))}</div>
+          ) : null}
+          {!c.address?.ship && !c.address?.bill && !c.addresses.length ? <p className="admin__muted">No address on file.</p> : null}
         </section>
 
         {/* Returns */}
@@ -162,20 +190,14 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
         </section>
       </div>
 
-      {/* Email history (review section 8) */}
+      {/* Communication history (review 4) — email + SMS + WhatsApp in one log, from notification_dispatches */}
       <details className="od-group" open={emails.length > 0}>
-        <summary className="od-group__sum">Email history <span className="count-badge" data-empty={emails.length === 0}>{emails.length}</span></summary>
+        <summary className="od-group__sum">Communication history <span className="count-badge" data-empty={emails.length === 0}>{emails.length}</span></summary>
         <section className="od-card">
           {emails.length ? emails.map((n, i) => (
             <div key={i} className="od-line"><span>{EVENT_LABEL(n.event)} · {n.channel}</span><span className="om-pay" data-tone={n.status === "sent" ? "paid" : n.status === "failed" ? "failed" : "pending"}>{n.status}</span><span className="admin__muted">{dt(n.created_at)}</span></div>
-          )) : <p className="admin__muted">No emails sent yet.</p>}
+          )) : <p className="admin__muted">No messages sent yet.</p>}
         </section>
-      </details>
-
-      {/* Customer timeline — commerce activity across all orders (review section 5) */}
-      <details className="od-group">
-        <summary className="od-group__sum">Customer timeline <span className="count-badge" data-empty={timeline.length === 0}>{timeline.length}</span></summary>
-        <Timeline events={timeline} bare />
       </details>
 
       {/* Account activity (login / profile audit) */}

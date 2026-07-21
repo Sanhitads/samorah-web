@@ -98,7 +98,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                           {nameBadges.map((b) => <span key={b.label} className="cust-namebadge" data-tone={b.tone} title={b.label}>{b.icon} {b.label}</span>)}
                         </div>
                         <div className="admin__muted">{c.email}</div>
-                        <div className="admin__muted">since {monthYr(c.createdAt)}</div>
+                        <div className="admin__muted"><span className="admin__mono">{c.ref}</span> · since {monthYr(c.createdAt)}</div>
                       </div>
                     </div>
                   </td>
@@ -107,7 +107,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                     {rep ? <div className="adm-badge" data-b="gst" style={{ marginTop: 4 }}>{rep.label}</div> : null}
                   </td>
                   <td><span className="oh-badge" data-h={c.health.tone} title={c.health.reason}>{c.health.dot} {c.health.label}</span></td>
-                  <td className="admin__mono">{c.orders}<div className="admin__muted">{c.lastOrderAt ? `Last ${fmtD(c.lastOrderAt)}` : "—"}</div></td>
+                  <td className="admin__mono">{c.orders}<div className="admin__muted">{c.lastOrderAt ? `Last ${fmtD(c.lastOrderAt)}${c.lastOrderAmount != null ? ` · ${money(c.lastOrderAmount)}` : ""}` : "—"}</div></td>
                   <td className="admin__mono">{money(c.ltv)}{c.aov ? <div className="admin__muted">avg {money(c.aov)}</div> : null}<div className="cust-stars" title={`${tier.label} · ${money(c.ltv)}`}>{stars(tier.tier)}</div></td>
                   <td>{c.lastActivity ? <div className="cust-activity"><span>{EVENT_LABEL(c.lastActivity.event)}</span><span className="admin__muted">{relDay(c.lastActivity.at)}</span></div> : <span className="admin__muted">—</span>}</td>
                   <td>

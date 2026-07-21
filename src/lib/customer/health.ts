@@ -23,6 +23,6 @@ export function customerHealth(lastOrderIso: string | null, paidOrders: number, 
   const days = Math.floor((now - new Date(lastOrderIso).getTime()) / DAY);
   if (days <= 90) return { key: "healthy", label: "Healthy", tone: "ok", dot: "●", reason: `Ordered ${days} day${days === 1 ? "" : "s"} ago.` };
   if (days <= 180) return { key: "at_risk", label: "At Risk", tone: "warn", dot: "▲", reason: `No order in ${days} days — worth a nudge.` };
-  if (days <= 365) return { key: "inactive", label: "Inactive", tone: "over", dot: "■", reason: `No order in ${Math.round(days / 30)} months.` };
+  if (days <= 365) return { key: "inactive", label: "Inactive", tone: "muted", dot: "■", reason: `No order in ${Math.round(days / 30)} months.` };
   return { key: "lost", label: "Lost", tone: "over", dot: "✕", reason: `No order in over a year (${Math.round(days / 30)} months).` };
 }

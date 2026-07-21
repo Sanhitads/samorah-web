@@ -9,6 +9,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { logEvent, type AuditEvent } from "@/services/auditService";
 import { channelOf } from "@/lib/marketing/channel";
 import { customerHealth, type CustomerHealth } from "@/lib/customer/health";
+import { shipmentStatusLabel } from "@/lib/shipment/display";
 
 const PAID = ["paid", "partially_refunded", "refunded"];
 const VIP_LTV = 15000;
@@ -20,6 +21,12 @@ export function segmentOf(paidOrders: number, ltv: number): Segment {
   return "new";
 }
 
+/** A short, quotable customer reference from the UUID (review 10A). A sequential CUS-000014 needs a
+ *  dedicated column + backfill (roadmap); this is stable, unique, and support can read it aloud. */
+export function custRef(id: string): string {
+  return "CUS-" + id.replace(/-/g, "").slice(0, 6).toUpperCase();
+}
+
 export interface CustomerRow {
   id: string;
   name: string;
@@ -29,6 +36,8 @@ export interface CustomerRow {
   ltv: number;
   aov: number;
   lastOrderAt: string | null;
+  lastOrderAmount: number | null;
+  ref: string;
   segment: Segment;
   health: CustomerHealth;
   marketingConsent: boolean;
@@ -71,17 +80,17 @@ export async function listCustomers(opts: CustomerFilter = {}): Promise<Customer
   const ids = (users ?? []).map((u: any) => u.id);
 
   // Per-customer order aggregates + a searchable blob (order numbers + cities) for advanced search.
-  const agg = new Map<string, { orders: number; ltv: number; lastOrderAt: string | null; blob: string; orderIds: string[] }>();
+  const agg = new Map<string, { orders: number; ltv: number; lastOrderAt: string | null; lastOrderAmount: number | null; blob: string; orderIds: string[] }>();
   const orderOwner = new Map<string, string>(); // order_id → user_id (for last-activity lookup)
   if (ids.length) {
     const { data: orders } = await db.from("orders").select("id,user_id,order_number,total_amount,payment_status,placed_at,ship_city").in("user_id", ids);
     for (const o of orders ?? []) {
-      const a = agg.get(o.user_id) ?? { orders: 0, ltv: 0, lastOrderAt: null, blob: "", orderIds: [] };
+      const a = agg.get(o.user_id) ?? { orders: 0, ltv: 0, lastOrderAt: null, lastOrderAmount: null, blob: "", orderIds: [] };
       a.blob += ` ${o.order_number ?? ""} ${o.ship_city ?? ""}`;
       if (o.id) { a.orderIds.push(o.id); orderOwner.set(o.id, o.user_id); }
       if (PAID.includes(o.payment_status)) {
         a.orders++; a.ltv += Number(o.total_amount ?? 0);
-        if (o.placed_at && (!a.lastOrderAt || o.placed_at > a.lastOrderAt)) a.lastOrderAt = o.placed_at;
+        if (o.placed_at && (!a.lastOrderAt || o.placed_at > a.lastOrderAt)) { a.lastOrderAt = o.placed_at; a.lastOrderAmount = Number(o.total_amount ?? 0); }
       }
       agg.set(o.user_id, a);
     }
@@ -92,12 +101,13 @@ export async function listCustomers(opts: CustomerFilter = {}): Promise<Customer
   try { const { data: ws } = await db.from("wholesale_customers").select("user_id"); for (const w of ws ?? []) if (w.user_id) wholesaleIds.add(w.user_id); } catch { /* table may not exist */ }
 
   let rows: CustomerRow[] = (users ?? []).map((u: any) => {
-    const a = agg.get(u.id) ?? { orders: 0, ltv: 0, lastOrderAt: null, blob: "" };
+    const a = agg.get(u.id) ?? { orders: 0, ltv: 0, lastOrderAt: null, lastOrderAmount: null, blob: "", orderIds: [] };
     const tags = Array.isArray(u.tags) ? u.tags : [];
     const ltv = Math.round(a.ltv);
     return {
       id: u.id, name: u.full_name ?? u.email, email: u.email, phone: u.phone,
       orders: a.orders, ltv, aov: a.orders ? Math.round(ltv / a.orders) : 0, lastOrderAt: a.lastOrderAt,
+      lastOrderAmount: a.lastOrderAmount != null ? Math.round(a.lastOrderAmount) : null, ref: custRef(u.id),
       segment: segmentOf(a.orders, ltv), health: customerHealth(a.lastOrderAt, a.orders, now),
       marketingConsent: Boolean(u.marketing_consent), newsletter: Boolean(u.marketing_consent),
       wholesale: wholesaleIds.has(u.id) || tags.map((t: string) => t.toLowerCase()).includes("wholesale"),
@@ -175,6 +185,8 @@ export async function getCustomerCounts(): Promise<CustomerCounts> {
   return { total: (users ?? []).length, new30d, returning, vip, newsletter, wholesale, avgLtv: withOrders ? Math.round(ltvSum / withOrders) : 0 };
 }
 
+export interface CustomerAddr { name: string | null; line1: string | null; line2: string | null; city: string | null; state: string | null; pincode: string | null; phone: string | null; }
+
 export interface Customer360 {
   id: string; name: string; email: string; phone: string | null;
   marketingConsent: boolean; loyaltyPoints: number; loyaltyTier: string; birthday: string | null;
@@ -203,6 +215,13 @@ export interface Customer360 {
   isOneYear: boolean;
   // CRM additions (R13)
   favouriteFragrance: string | null;                                  // most-purchased family across paid orders
+  favouriteFragrancePct: number | null;                               // its share of purchased units (review 3)
+  productHeat: { type: string; pct: number }[];                       // product-type preference heat (review 6)
+  address: { ship: CustomerAddr | null; bill: CustomerAddr | null } | null; // latest-order address card (review 2)
+  support: {                                                          // support summary card (review 9)
+    orders: number; returns: number; refunds: number; openIncidents: number;
+    openTickets: number | null; currentShipment: string | null; latestEmailAt: string | null; lastContactAt: string | null;
+  };
   acquisition: { source: string; medium: string; campaign: string; channel: string } | null; // first order's UTMs, normalised to a channel
   wishlist: { product: string; fragrance: string | null; addedAt: string }[];
   // Marketing insight (derived from order lines)
@@ -217,15 +236,24 @@ export async function getCustomer360(id: string): Promise<Customer360 | null> {
   if (!u) return null;
 
   const [ordersRes, addrRes, retRes, itemsRes, wishRes, wsRes] = await Promise.all([
-    db.from("orders").select("id,order_number,status,total_amount,payment_status,placed_at,refund_amount,fraud_review,ndr_status,utm_source,utm_medium,utm_campaign").eq("user_id", id).order("placed_at", { ascending: false }),
+    db.from("orders").select("id,order_number,status,total_amount,payment_status,placed_at,refund_amount,fraud_review,ndr_status,ship_full_name,ship_line1,ship_line2,ship_city,ship_state,ship_pincode,ship_phone,bill_full_name,bill_line1,bill_line2,bill_city,bill_state,bill_pincode,utm_source,utm_medium,utm_campaign").eq("user_id", id).order("placed_at", { ascending: false }),
     db.from("addresses").select("line1,line2,city,state,pincode,is_default").eq("user_id", id).order("is_default", { ascending: false }),
     db.from("returns").select("rma_number,status,reason,return_type,refund_amount,created_at,order_id,orders!inner(user_id)").eq("orders.user_id", id).order("created_at", { ascending: false }),
-    db.from("order_items").select("product_id,quantity,unit_price,collection_name,size,orders!inner(user_id,payment_status)").eq("orders.user_id", id).in("orders.payment_status", PAID),
+    db.from("order_items").select("product_id,product_name,quantity,unit_price,collection_name,size,orders!inner(user_id,payment_status)").eq("orders.user_id", id).in("orders.payment_status", PAID),
     db.from("wishlists").select("product_id,created_at,products(name,fragrance_family)").eq("user_id", id).order("created_at", { ascending: false }),
     db.from("wholesale_customers").select("user_id").eq("user_id", id).maybeSingle(),
   ]);
 
   const orders = (ordersRes.data ?? []) as any[];
+  const orderIds = orders.map((o) => o.id).filter(Boolean);
+  const orderNumbers = orders.map((o) => o.order_number).filter(Boolean);
+  // Second batch (needs order ids) for the support summary — incidents (via incident_notifications,
+  // which carry order_number), current shipment, latest email.
+  const [incRes, shipRes, mailRes] = await Promise.all([
+    orderNumbers.length ? db.from("incident_notifications").select("incident_id,incidents!inner(status)").in("order_number", orderNumbers) : Promise.resolve({ data: [] }),
+    orderIds.length ? db.from("shipments").select("status,created_at,order_id").in("order_id", orderIds).order("created_at", { ascending: false }) : Promise.resolve({ data: [] }),
+    orderIds.length ? db.from("notification_dispatches").select("created_at").in("order_id", orderIds).order("created_at", { ascending: false }).limit(1) : Promise.resolve({ data: [] }),
+  ]);
   const paid = orders.filter((o) => PAID.includes(o.payment_status));
   const ltv = Math.round(paid.reduce((s, o) => s + Number(o.total_amount ?? 0), 0));
   const aov = paid.length ? Math.round(ltv / paid.length) : 0;
@@ -271,9 +299,31 @@ export async function getCustomer360(id: string): Promise<Customer360 | null> {
   const firstDelivered = paidAsc.find((o) => o.status === "delivered");
   if (firstDelivered) journey.push({ key: "delivered", label: "First delivery", date: firstDelivered.placed_at, detail: firstDelivered.order_number });
   const firstReturn = returnsData.length ? returnsData[returnsData.length - 1] : null;
-  if (firstReturn) journey.push({ key: "return", label: firstReturn.return_type === "replacement" ? "First replacement" : "First return", date: firstReturn.created_at, detail: firstReturn.rma_number });
+  if (firstReturn) journey.push({ key: "return", label: "Return requested", date: firstReturn.created_at, detail: firstReturn.rma_number });
+  const firstReplacement = returnsData.filter((r) => r.return_type === "replacement" || r.status === "replacement_shipped").slice(-1)[0];
+  if (firstReplacement) journey.push({ key: "replacement", label: "Replacement sent", date: firstReplacement.created_at, detail: firstReplacement.rma_number });
   if (paid.length > 1) journey.push({ key: "latest", label: "Latest order", date: paid[0].placed_at, detail: paid[0].order_number });
   journey.sort((a, b) => (a.date && b.date ? new Date(a.date).getTime() - new Date(b.date).getTime() : 0));
+
+  // Address card (review 2) — the latest order's ship-to + bill-to (the addresses table is empty for
+  // guest-checkout customers; the order snapshot is the reliable "where do we ship?" source).
+  const latest = orders[0];
+  const address = latest ? {
+    ship: latest.ship_line1 ? { name: latest.ship_full_name, line1: latest.ship_line1, line2: latest.ship_line2, city: latest.ship_city, state: latest.ship_state, pincode: latest.ship_pincode, phone: latest.ship_phone } : null,
+    bill: latest.bill_line1 ? { name: latest.bill_full_name, line1: latest.bill_line1, line2: latest.bill_line2, city: latest.bill_city, state: latest.bill_state, pincode: latest.bill_pincode, phone: null } : null,
+  } : null;
+
+  // Support summary (review 9) — everything an agent needs on pickup, aggregated from existing data.
+  const openStates = ["open", "investigating", "mitigated"];
+  const openIncidents = new Set(((incRes.data ?? []) as any[]).filter((n) => openStates.includes(n.incidents?.status)).map((n) => n.incident_id)).size;
+  const latestShip = ((shipRes.data ?? []) as any[])[0];
+  const latestEmailAt = ((mailRes.data ?? []) as any[])[0]?.created_at ?? null;
+  const support = {
+    orders: paid.length, returns: returnsData.length, refunds: refundTotal,
+    openIncidents, openTickets: null as number | null,
+    currentShipment: latestShip?.status ? shipmentStatusLabel(latestShip.status) : null,
+    latestEmailAt, lastContactAt: latestEmailAt,
+  };
 
   // Acquisition = the earliest order's UTMs (orders are desc, so the last is oldest).
   const firstOrder = orders.length ? orders[orders.length - 1] : null;
@@ -289,14 +339,28 @@ export async function getCustomer360(id: string): Promise<Customer360 | null> {
     return [...t.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
   };
 
-  // Favourite fragrance — needs a product→family lookup; the rest read straight off the line.
+  const totalUnits = items.reduce((s, it) => s + Number(it.quantity ?? 0), 0);
+
+  // Favourite fragrance (+ its share, review 3) — needs a product→family lookup.
   let favouriteFragrance: string | null = null;
+  let favouriteFragrancePct: number | null = null;
+  const famOf = new Map<string, string>();
   if (items.length) {
     const pids = [...new Set(items.map((it) => it.product_id).filter(Boolean))];
-    const famOf = new Map<string, string>();
     if (pids.length) { const { data: prods } = await db.from("products").select("id,fragrance_family").in("id", pids); for (const p of prods ?? []) famOf.set(p.id, p.fragrance_family || "Unclassified"); }
     favouriteFragrance = modeBy((it) => famOf.get(it.product_id));
+    if (favouriteFragrance && totalUnits) {
+      const favUnits = items.filter((it) => famOf.get(it.product_id) === favouriteFragrance).reduce((s, it) => s + Number(it.quantity ?? 0), 0);
+      favouriteFragrancePct = Math.round((favUnits / totalUnits) * 100);
+    }
   }
+
+  // Product-type preference heat (review 6) — units by inferred type, as a share.
+  const heatMap = new Map<string, number>();
+  for (const it of items) { const t = inferProductCategory(it); heatMap.set(t, (heatMap.get(t) ?? 0) + Number(it.quantity ?? 0)); }
+  const productHeat = totalUnits
+    ? [...heatMap.entries()].map(([type, u]) => ({ type, pct: Math.round((u / totalUnits) * 100) })).sort((a, b) => b.pct - a.pct)
+    : [];
 
   const favouriteCollection = modeBy((it) => it.collection_name);
   const preferredJarSize = modeBy((it) => it.size);
@@ -318,9 +382,20 @@ export async function getCustomer360(id: string): Promise<Customer360 | null> {
     health, lastOrderAt, highestOrder: Math.round(highestOrder),
     totalReturns: returnsData.length, refundTotal, replacementCount, failedPayments, rtoCount, fraudFlag, wholesale,
     flags, consent, financial, journey, isOneYear,
-    favouriteFragrance, acquisition, wishlist,
+    favouriteFragrance, favouriteFragrancePct, productHeat, address, support,
+    acquisition, wishlist,
     favouriteCollection, favouritePriceRange, preferredJarSize,
   };
+}
+
+/** Infer a product category from the line snapshot (for the preference heat, review 6). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function inferProductCategory(it: any): string {
+  const s = `${it.product_name ?? ""} ${it.collection_name ?? ""} ${it.size ?? ""}`.toLowerCase();
+  if (s.includes("melt")) return "Wax Melt";
+  if (s.includes("spray") || s.includes("room")) return "Room Spray";
+  if (s.includes("diffuser")) return "Diffuser";
+  return "Candle";
 }
 
 /** Price bands for the "favourite price range" insight (₹, per-unit). */

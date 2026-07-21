@@ -231,3 +231,40 @@ badges, shipment health badges, internal notes (audit-backed), status icons, cou
 expanded cost breakdown, CSV/manifest + labels + packing-slip exports, RTO confirmation with reason,
 and an exception button that reads neutral until an exception exists. No schema change — notes use the
 audit stream, everything else derives from columns already present.
+
+## P8 — Customers / CRM (Customer 360 follow-ons)
+
+The launch build makes Customers an operational CRM: analytics strip, search + filters, customer
+health, a Customer 360 profile (financial summary, returns & risk, communication history, per-channel
+consent display, customer journey, timeline, notes, tags, operational flags), plus list refinements
+(avatars, name badges, spend tier, last activity, quick actions, support summary). These extend it
+further and need new subsystems, tracked preferences, or volume to be meaningful.
+
+| Feature | Why deferred | Dependencies | Complexity | Phase |
+|---|---|---|---|---|
+| **Internal CRM tasks / reminders** (review 5) | Staff-set follow-up reminders ("call after 25 days", assigned to X) with a due date + a today view. NOT marketing automation — internal only. Needs a `crm_tasks` table + an assignee/notify surface. | new table, assignment + notification (exists) | M | CRM-1 |
+| **Communication preference** (review 7) | "Prefers WhatsApp / Email / Calls" per customer, surfaced to support. Needs a stored preference (customer-set or staff-set) — not tracked today. | preference column/table | S | CRM-1 |
+| **Per-channel consent management** (review, prior round) | The consent panel is display-only and only email consent is stored. Editable SMS/WhatsApp/Push consent needs per-channel columns + a DPDP-compliant capture + audit. | per-channel consent columns, capture flow | M | CRM-2 |
+| **Friendly customer number** (review 10A) | A sequential, human "CUS-000014" reference instead of the UUID prefix support quotes today. Needs a per-customer sequence column + backfill. | `customer_number` sequence, backfill | S | CRM-1 |
+| **Review-submitted journey milestone** | The lifetime timeline can include "Review submitted" once the `reviews` domain is populated + wired (table exists, empty at launch). | reviews at volume | S | CRM-2 |
+| **Open tickets in the support summary** | The support card shows Open Tickets as "—" because there is no ticketing system. Wire it when/if a helpdesk (Zendesk/Freshdesk/internal) lands. | ticketing system | M | CRM-3 |
+| **Customer cohorts / acquisition analytics** | Monthly acquisition cohorts, retention curves. Needs aggregation + enough history. | customer volume, analytics infra | M | CRM-3 |
+| **Purchase-frequency + fragrance analytics dashboards** | Store-wide preference analytics beyond the per-customer heat already shown. | volume, analytics infra | M | CRM-3 |
+| **Geographic customer heatmap** | Delivery/customer density maps. Needs a map layer + geocoding. | map layer, geocoding | L | CRM-3 |
+| **Last-viewed / browse tracking** | "Recently viewed products" on the profile needs storefront view-event capture (the profile already notes this is planned). | storefront analytics events | M | CRM-2 |
+
+**Explicitly NOT for launch (review 8) — a considered "no", not an oversight:** loyalty program, rewards
+engine, referral analytics, AI segmentation, AI recommendations, churn prediction, customer-scoring
+models, marketing-campaign builder, and CRM automation. These belong in a dedicated CRM/marketing
+product once there is meaningful customer data, and were deliberately excluded to keep the admin an
+operations tool, not a marketing platform.
+
+**Shipped in the customer launch build:** analytics strip (total / new / returning / VIP / newsletter
+/ wholesale / avg LTV), advanced search (name / email / phone / id / order # / city) + filters
+(segment / health / newsletter / wholesale / LTV / orders / recency), customer health, list columns
+(last order + amount, AOV, customer since, last activity), avatars, priority name-badges, repeat +
+spend-tier badges, row quick actions (call / WhatsApp / email), and a Customer 360 with a support
+summary card, financial summary, returns & risk, address card, communication history, per-channel
+consent (display), product/fragrance preference, a merged Customer Lifetime Timeline, notes, tags,
+and derived operational flags. No schema change — everything derives from users + orders + returns +
+shipments + notification_dispatches + incidents.
