@@ -6,10 +6,11 @@ import { hasCapability } from "@/lib/auth/capabilities";
 import { getShipmentsQueue, getShipmentCounts, getShipmentCourierOptions, type ShipmentFilter } from "@/services/shipmentService";
 import { ShipmentActions } from "@/components/admin/ShipmentActions";
 import { ShipmentSelectionProvider, ShipmentCheckbox } from "@/components/admin/ShipmentSelection";
+import { ShipmentProgress } from "@/components/admin/ShipmentProgress";
 import { CUSTOMER_STATUS_LABEL, type CustomerShipmentStatus } from "@/lib/shipment/state";
 import { SHIPMENT_STATUSES } from "@/lib/shipment/state";
 import { shipmentStatusIcon, shipmentStatusLabel, providerBrand, shipmentPriorityBadge, SHIPMENT_STATUS_LABEL } from "@/lib/shipment/display";
-import { shipmentSettled } from "@/lib/shipment/sla";
+import { shipmentSettled, shipmentEta, shipmentAgeDays, shipmentMovement } from "@/lib/shipment/sla";
 
 /**
  * Shipment Management — `/admin/shipments`. The post-dispatch board, brought to the operational
@@ -22,6 +23,7 @@ export const dynamic = "force-dynamic";
 
 const WHOLESALE_FILTERS = [{ v: "any", l: "Wholesale or B2B" }, { v: "wholesale_order", l: "Wholesale order" }, { v: "b2b_customer", l: "B2B customer" }];
 const DATE_RANGES = [{ v: "today", l: "Today" }, { v: "7d", l: "Last 7 days" }, { v: "30d", l: "Last 30 days" }];
+const shortDate = (ms: number) => new Date(ms).toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
 
 interface ShipmentSearchParams {
   search?: string; status?: string; courier?: string; provider?: string; payment?: string;
@@ -43,6 +45,7 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
     getShipmentsQueue(filter), getShipmentCounts(), getShipmentCourierOptions(),
   ]);
   const anyFilter = Object.entries(sp).some(([, v]) => v);
+  const now = Date.now();
 
   return (
     <main className="admin">
@@ -117,13 +120,20 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
               {rows.map((s) => {
                 const brand = providerBrand(s.provider);
                 const prio = shipmentPriorityBadge(s.priority);
+                const settled = shipmentSettled(s.status);
+                const age = shipmentAgeDays(s.createdAt, now);
+                const eta = shipmentEta(s.createdAt, s.sla.targetHrs, now);
+                const move = shipmentMovement(s.lastTrackingAt, s.status, now);
                 return (
                   <tr key={s.id}>
                     {canOperate ? <td className="obulk-td"><ShipmentCheckbox shipmentId={s.id} /></td> : null}
                     <td>
-                      <div className="admin__mono">{s.orderNumber}{prio ? <span className="bc-eff" data-p={prio.p} style={{ marginLeft: 6 }}>{prio.label}</span> : null}</div>
+                      <div className="admin__mono">{s.orderNumber}{prio ? <span className="prio-badge" data-p={prio.p}>{prio.dot} {prio.label}</span> : null}</div>
                       {s.customerName ? <div className="admin__muted">{s.customerName}</div> : null}
-                      {s.isCod ? <span className="adm-badge" data-b="rush">COD</span> : null}
+                      <div className="ship-tagrow">
+                        {s.isCod ? <span className="adm-badge" data-b="rush">COD</span> : null}
+                        {s.tags.map((t) => <span key={t} className="ship-tag">{t}</span>)}
+                      </div>
                     </td>
                     <td>
                       <div title={s.provider}>{brand.icon} {brand.label}</div>
@@ -135,16 +145,23 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
                     </td>
                     <td>
                       <span className="ff-status" data-s={s.status}>{shipmentStatusIcon(s.status)} {shipmentStatusLabel(s.status)}</span>
-                      <div className="admin__muted">{CUSTOMER_STATUS_LABEL[s.customerStatus as CustomerShipmentStatus] ?? s.customerStatus}</div>
+                      <ShipmentProgress status={s.status} compact />
                       {s.exceptionReason ? <div className="bc-inv" data-inv="missing">{s.exceptionReason}</div> : null}
-                      {!shipmentSettled(s.status) ? <div className="bc-slabadge" data-tone={s.sla.tone} title={s.sla.state === "breached" ? `${Math.abs(Math.round(s.sla.hoursLeft / 24))}d late (target ${s.sla.targetHrs / 24}d)` : `${Math.round(s.sla.hoursLeft / 24)}d left of ${s.sla.targetHrs / 24}d`}>{s.sla.label}</div> : null}
+                      {!settled ? (
+                        <div className="ship-signals">
+                          <span className="ship-eta" data-tone={eta.daysRemaining < 0 ? "over" : eta.daysRemaining <= 1 ? "warn" : undefined}>ETA {shortDate(eta.dateMs)} · {eta.daysRemaining >= 0 ? `${eta.daysRemaining}d left` : `${Math.abs(eta.daysRemaining)}d late`}</span>
+                          <span className="admin__muted">{age}d old</span>
+                          {move.stalled ? <span className="ship-nomove">⚠ No movement · {move.days}d</span> : null}
+                        </div>
+                      ) : <div className="admin__muted">{s.customerStatus === "delivered" && s.deliveredAt ? `Delivered ${shortDate(new Date(s.deliveredAt).getTime())}` : CUSTOMER_STATUS_LABEL[s.customerStatus as CustomerShipmentStatus]}</div>}
                     </td>
                     <td>
                       <span className="oh-badge" data-h={s.health.tone} title={s.health.reason}>{s.health.dot} {s.health.label}</span>
                     </td>
                     <td className="admin__muted">
                       {s.chargeableWeightKg != null ? `${s.chargeableWeightKg} kg` : "—"}
-                      {s.totalCost != null ? <div>₹{s.totalCost.toFixed(2)}</div> : s.shippingCost != null ? <div>₹{s.shippingCost.toFixed(2)}</div> : null}
+                      {s.declaredValue != null ? <div className="ship-value">₹{s.declaredValue.toLocaleString("en-IN")}</div> : null}
+                      {s.totalCost != null ? <div className="admin__muted">cost ₹{s.totalCost.toFixed(2)}</div> : null}
                     </td>
                     <td>
                       {canOperate ? (

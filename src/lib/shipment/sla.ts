@@ -48,3 +48,32 @@ export function shipmentSla(createdAtIso: string, status: string, deliveredAtIso
 export function shipmentSettled(status: string): boolean {
   return SETTLED.has(status);
 }
+
+/**
+ * Expected delivery date + days remaining (review priority 1.2 — actionable ETA instead of only a
+ * "Within SLA" pill). Derived from the same created + transit-target clock as the SLA badge, so the
+ * two never disagree. `daysRemaining` goes negative once overdue (how many days late).
+ */
+export function shipmentEta(createdAtIso: string, targetHrs: number = SHIPMENT_SLA_HRS, now: number = Date.now()): { dateMs: number; daysRemaining: number } {
+  const created = new Date(createdAtIso).getTime();
+  const dateMs = (Number.isFinite(created) ? created : now) + targetHrs * 3.6e6;
+  return { dateMs, daysRemaining: Math.round(((dateMs - now) / 86_400_000) * 10) / 10 };
+}
+
+/** Age of a shipment in whole days (review priority 1.4 — "4 days old", the way warehouse staff think). */
+export function shipmentAgeDays(createdAtIso: string, now: number = Date.now()): number {
+  const created = new Date(createdAtIso).getTime();
+  return Number.isFinite(created) ? Math.max(0, Math.floor((now - created) / 86_400_000)) : 0;
+}
+
+/**
+ * "No movement" signal (review priority 1.3). Days since the last tracking update; `stalled` once a
+ * live parcel has sat 48h+ without a courier scan. Terminal shipments never stall.
+ */
+export function shipmentMovement(lastUpdateIso: string | null, status: string, now: number = Date.now()): { days: number | null; stalled: boolean } {
+  if (!lastUpdateIso || SETTLED.has(status)) return { days: null, stalled: false };
+  const last = new Date(lastUpdateIso).getTime();
+  if (!Number.isFinite(last)) return { days: null, stalled: false };
+  const days = Math.floor((now - last) / 86_400_000);
+  return { days, stalled: now - last >= 48 * 3.6e6 };
+}

@@ -11,9 +11,10 @@ import { ShipmentActions } from "@/components/admin/ShipmentActions";
 import { ShipmentNote } from "@/components/admin/ShipmentNote";
 import { ShipmentCostEditor } from "@/components/admin/ShipmentCostEditor";
 import { CopyButton } from "@/components/admin/CopyButton";
+import { ShipmentProgress } from "@/components/admin/ShipmentProgress";
 import { nextShipmentStates, toCustomerStatus, CUSTOMER_STATUS_LABEL, type ShipmentStatus, type CustomerShipmentStatus } from "@/lib/shipment/state";
-import { shipmentStatusIcon, shipmentStatusLabel, providerBrand, shipmentPriorityBadge, isManualProvider } from "@/lib/shipment/display";
-import { shipmentSla, shipmentSettled } from "@/lib/shipment/sla";
+import { shipmentStatusIcon, shipmentStatusLabel, providerBrand, shipmentPriorityBadge, isManualProvider, damageRisk, courierSupport } from "@/lib/shipment/display";
+import { shipmentSla, shipmentSettled, shipmentEta, shipmentAgeDays, shipmentMovement } from "@/lib/shipment/sla";
 import { shipmentHealth } from "@/lib/shipment/health";
 
 /**
@@ -29,6 +30,8 @@ export const dynamic = "force-dynamic";
 const inr = (v: unknown) => `₹${Number(v ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const dt = (v: unknown) => (v ? new Date(String(v)).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "—");
 const num = (v: unknown) => (v != null ? Number(v) : null);
+const shortDate = (ms: number) => new Date(ms).toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
+const relDays = (iso: string) => { const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000); return d <= 0 ? "today" : d === 1 ? "1d ago" : `${d}d ago`; };
 const waLink = (phone: string) => `https://wa.me/${phone.replace(/\D/g, "").replace(/^0+/, "").replace(/^(\d{10})$/, "91$1")}`;
 const EVENT_LABEL = (e: string) => e.replace(/[._]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 const SHIP_NOTIFY = /(dispatch|deliver|transit|shipment|shipping|rto|exception|out_for)/i;
@@ -58,6 +61,15 @@ export default async function ShipmentDetailPage({ params }: { params: Promise<{
   const addrText = order ? [order.ship_full_name, ...addr, order.ship_phone].filter(Boolean).join("\n") : "";
   const shipNotifs = notifications.filter((n) => SHIP_NOTIFY.test(n.event));
 
+  const settled = shipmentSettled(status);
+  const age = shipmentAgeDays(sh.created_at);
+  const eta = shipmentEta(sh.created_at, sla.targetHrs);
+  const lastTrackingAt = evList.length ? evList[evList.length - 1].created_at : null;
+  const move = shipmentMovement(lastTrackingAt, status);
+  const damage = damageRisk(order?.order_items ?? []);
+  const courierPhone = courierSupport(sh.courier_name, sh.provider);
+  const tags: string[] = Array.isArray(order?.ops_tags) ? order.ops_tags : [];
+
   const costValues = { shipping_cost: num(sh.shipping_cost), courier_cost: num(sh.courier_cost), packaging_cost: num(sh.packaging_cost), insurance_cost: num(sh.insurance_cost), fuel_surcharge: num(sh.fuel_surcharge), cod_fee: num(sh.cod_fee), tax_cost: num(sh.tax_cost), total_logistics_cost: num(sh.total_logistics_cost) };
   const weightValues = { packaging_weight_kg: num(sh.packaging_weight_kg), chargeable_weight_kg: num(sh.chargeable_weight_kg), net_weight_kg: num(sh.net_weight_kg), shipping_weight_kg: num(sh.shipping_weight_kg), volumetric_weight_kg: num(sh.volumetric_weight_kg), length_cm: num(sh.length_cm), width_cm: num(sh.width_cm), height_cm: num(sh.height_cm) };
 
@@ -68,10 +80,16 @@ export default async function ShipmentDetailPage({ params }: { params: Promise<{
         <h1 className="admin__title">{sh.awb || (order?.order_number ?? "Shipment")}</h1>
         <p className="admin__count">
           <span className="ff-status" data-s={status}>{shipmentStatusIcon(status)} {shipmentStatusLabel(status)}</span>
-          {prio ? <span className="bc-eff" data-p={prio.p} style={{ marginLeft: 8 }}>{prio.label}</span> : null}
+          {prio ? <span className="prio-badge" data-p={prio.p} style={{ marginLeft: 8 }}>{prio.dot} {prio.label}</span> : null}
           <span className="oh-badge" data-h={health.tone} title={health.reason} style={{ marginLeft: 8 }}>{health.dot} {health.label}</span>
-          {!shipmentSettled(status) ? <span className="bc-slabadge" data-tone={sla.tone} style={{ marginLeft: 8 }}>{sla.label}</span> : null}
+          {!settled ? <span className="bc-slabadge" data-tone={sla.tone} style={{ marginLeft: 8 }}>{sla.label}</span> : null}
         </p>
+        {tags.length || damage ? (
+          <div className="ship-tagrow" style={{ marginTop: 6 }}>
+            {damage ? <span className="dmg-risk" data-lvl={damage.level}>⚠ {damage.label}</span> : null}
+            {tags.map((t) => <span key={t} className="ship-tag">{t}</span>)}
+          </div>
+        ) : null}
       </header>
 
       {/* Quick actions (review A–E, G, H) */}
@@ -85,6 +103,29 @@ export default async function ShipmentDetailPage({ params }: { params: Promise<{
         {sh.tracking_url ? <a className="ff-btn" href={sh.tracking_url} target="_blank" rel="noreferrer">🔗 Open Courier Tracking</a> : null}
         <a className="ff-btn" href={`/api/admin/shipments/packing-slips?ids=${sh.id}`} target="_blank" rel="noreferrer">🖨 Packing slip</a>
         {sh.label_url ? <a className="ff-btn" href={sh.label_url} target="_blank" rel="noreferrer">🏷️ Label</a> : null}
+      </div>
+
+      {/* Tracking progress bar (review 2.5) */}
+      <section className="ship-progress-wrap"><ShipmentProgress status={status} /></section>
+
+      {/* At-a-glance signals (review 1.2–1.4, 2.7, 2.8, 3.10, 3.11) */}
+      <div className="oms-strip ship-glance">
+        <div className="oms-stat"><span className="oms-stat__n">{age}d</span><span className="oms-stat__l">Age</span></div>
+        {!settled ? (
+          <div className="oms-stat" data-tone={eta.daysRemaining < 0 ? "over" : eta.daysRemaining <= 1 ? "warn" : undefined}>
+            <span className="oms-stat__n">{shortDate(eta.dateMs)}</span>
+            <span className="oms-stat__l">Expected · {eta.daysRemaining >= 0 ? `${eta.daysRemaining}d left` : `${Math.abs(eta.daysRemaining)}d late`}</span>
+          </div>
+        ) : null}
+        {!settled ? (
+          <div className="oms-stat" data-tone={move.stalled ? "over" : undefined}>
+            <span className="oms-stat__n">{lastTrackingAt ? relDays(lastTrackingAt) : "—"}</span>
+            <span className="oms-stat__l">{move.stalled ? `⚠ No movement · ${move.days}d` : "Last update"}</span>
+          </div>
+        ) : null}
+        <div className="oms-stat"><span className="oms-stat__n">₹{Number(sh.declared_value ?? 0).toLocaleString("en-IN")}</span><span className="oms-stat__l">Shipment value</span></div>
+        <div className="oms-stat"><span className="oms-stat__n">{sh.insured ? "🛡️" : "—"}</span><span className="oms-stat__l">{sh.insured ? `Insured · ₹${Number(sh.declared_value ?? 0).toLocaleString("en-IN")}` : "Not insured"}</span></div>
+        {courierPhone ? <div className="oms-stat"><span className="oms-stat__n" style={{ fontSize: 14 }}>☎ {courierPhone}</span><span className="oms-stat__l">{sh.courier_name ?? "Courier"} support</span></div> : null}
       </div>
 
       {/* Shipment + ship-to */}

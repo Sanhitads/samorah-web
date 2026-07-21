@@ -35,12 +35,11 @@ export function shipmentHealth(input: {
   if (input.status === "rto") return { key: "rto", label: "RTO", tone: "over", dot: "↩", reason: "Return to origin — parcel came back." };
   if (input.status === "cancelled") return { key: "cancelled", label: "Cancelled", tone: "muted", dot: "✕", reason: "Shipment cancelled before delivery." };
 
-  if (input.status === "exception") {
-    // A stale exception (past ~2× the transit target) reads as likely lost — escalate, don't age it.
-    if (ageDays >= 12) return { key: "lost", label: "Lost?", tone: "over", dot: "❓", reason: `In exception for ${Math.floor(ageDays)} days — likely lost, needs a claim.` };
-    return { key: "exception", label: "Exception", tone: "warn", dot: "⚠", reason: input.exceptionReason || "Delivery exception (NDR) — needs a re-attempt or RTO." };
-  }
+  // Any undelivered parcel past ~10 days reads as likely lost — escalate to a claim, don't let it age
+  // silently as merely "delayed" (review priority 2.7).
+  if (ageDays >= 10) return { key: "lost", label: "Likely Lost", tone: "over", dot: "❓", reason: `${Math.floor(ageDays)} days and not delivered — likely lost, raise a courier claim.` };
 
+  if (input.status === "exception") return { key: "exception", label: "Exception", tone: "warn", dot: "⚠", reason: input.exceptionReason || "Delivery exception (NDR) — needs a re-attempt or RTO." };
   if (input.slaBreached) return { key: "delayed", label: "Delayed", tone: "warn", dot: "⏱", reason: "Past the delivery SLA and still in transit." };
   return { key: "healthy", label: "Healthy", tone: "ok", dot: "•", reason: "On track, within the delivery SLA." };
 }

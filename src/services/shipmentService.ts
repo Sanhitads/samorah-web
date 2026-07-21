@@ -490,6 +490,10 @@ export interface ShipmentRow {
   deliveredAt: string | null;
   rtoAt: string | null;
   priority: string;
+  declaredValue: number | null;
+  insured: boolean;
+  tags: string[];
+  lastTrackingAt: string | null;
   sla: SlaBadge;
   health: ShipmentHealth;
 }
@@ -507,6 +511,15 @@ export interface ShipmentFilter {
   payment?: string; // cod | prepaid
   wholesale?: string; // any | wholesale_order | b2b_customer
   limit?: number;
+}
+
+/** Latest tracking-event timestamp (last courier update), or null. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function lastEventAt(events: any): string | null {
+  if (!Array.isArray(events) || !events.length) return null;
+  let max = 0, iso: string | null = null;
+  for (const e of events) { const t = new Date(e.created_at).getTime(); if (t > max) { max = t; iso = e.created_at; } }
+  return iso;
 }
 
 function rangeCutoff(range: string, now: number): number | null {
@@ -527,7 +540,7 @@ export async function getShipmentsQueue(opts: ShipmentFilter = {}): Promise<Ship
   const now = Date.now();
   const { data } = await db
     .from("shipments")
-    .select("id,status,provider,provider_shipment_id,courier_name,awb,tracking_url,label_url,chargeable_weight_kg,shipping_cost,total_logistics_cost,exception_reason,payment_mode,cod_amount,delivered_at,rto_at,created_at,orders(order_number,ship_full_name,ship_phone,wholesale,is_cod,priority)")
+    .select("id,status,provider,provider_shipment_id,courier_name,awb,tracking_url,label_url,chargeable_weight_kg,shipping_cost,total_logistics_cost,declared_value,insured,exception_reason,payment_mode,cod_amount,delivered_at,rto_at,created_at,shipment_events(created_at),orders(order_number,ship_full_name,ship_phone,wholesale,is_cod,priority,ops_tags)")
     .order("created_at", { ascending: false })
     .limit(opts.limit ?? 1000);
 
@@ -554,6 +567,10 @@ export async function getShipmentsQueue(opts: ShipmentFilter = {}): Promise<Ship
       paymentMode, isCod: paymentMode === "cod" || Boolean(o?.is_cod),
       wholesale: o?.wholesale ?? "none", deliveredAt, rtoAt: s.rto_at ?? null,
       priority: o?.priority ?? "normal",
+      declaredValue: s.declared_value != null ? Number(s.declared_value) : null,
+      insured: Boolean(s.insured),
+      tags: Array.isArray(o?.ops_tags) ? o.ops_tags : [],
+      lastTrackingAt: lastEventAt(s.shipment_events),
       sla, health,
     };
   });
@@ -622,7 +639,7 @@ export async function getShipmentDetail(shipmentId: string): Promise<{ sh: any; 
   if (!sh) return null;
   const { data: order } = await db
     .from("orders")
-    .select("id,order_number,ship_full_name,ship_phone,email,ship_line1,ship_line2,ship_city,ship_state,ship_pincode,ship_country,is_cod,wholesale,priority")
+    .select("id,order_number,ship_full_name,ship_phone,email,ship_line1,ship_line2,ship_city,ship_state,ship_pincode,ship_country,is_cod,wholesale,priority,ops_tags,order_items(product_name,vessel,quantity)")
     .eq("id", sh.order_id)
     .maybeSingle();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
