@@ -27,10 +27,10 @@ export function HoursGroup({ settings }: SectionComponentProps) {
       </div>
 
       <div className="hours-group__blocks">
-        {s.hours.map((hour, i) => (
+        {s.hours.map((hour) => (
           <Fragment key={hour.name}>
             <HourBlock hour={hour} headingLevel={blockLevel} />
-            {hour.interlude && i < s.hours.length - 1 ? (
+            {hour.interlude ? (
               <p className="hours-interlude">
                 <span className="hours-interlude__rule" aria-hidden="true" />
                 <span className="hours-interlude__quote">“{hour.interlude}”</span>
