@@ -34,6 +34,21 @@ export interface HourEntry {
   gradient: string; // "gradient:grad-air"
   /** A short editorial line shown between this Hour and the next (turning a leaf). */
   interlude?: string;
+  /** Details accordion (Composition, Shipping, How to use…). When set, replaces the house-default
+   *  accordion entirely — so the admin can rename, reorder, add and remove rows. */
+  accordion?: { title: string; body: string }[];
+  /** Per-section heading / eyebrow overrides for the air PDP. Any blank field uses the house default,
+   *  so nothing on the page is truly hard-coded — it can all be edited per product. */
+  labels?: {
+    hourEyebrow?: string;
+    fragranceEyebrow?: string;
+    feelsEyebrow?: string;
+    experienceEyebrow?: string;
+    placementEyebrow?: string;
+    placementHeading?: string;
+    continueEyebrow?: string;
+    continueHeading?: string;
+  };
 }
 
 export interface HourGroup {

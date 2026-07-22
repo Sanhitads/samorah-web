@@ -38,6 +38,10 @@ export function airHourFromProduct(p: any): HourEntry {
     palette: ac.palette || "monsoon",
     gradient: primaryImg(p.product_images) ?? ac.gradient ?? "gradient:grad-air",
     interlude: ac.interlude || undefined,
+    accordion: Array.isArray(ac.accordion)
+      ? ac.accordion.map((x: any) => ({ title: String(x.title ?? "").trim(), body: String(x.body ?? "").trim() })).filter((x: any) => x.title || x.body)
+      : undefined,
+    labels: ac.labels && typeof ac.labels === "object" ? ac.labels : undefined,
   };
 }
 

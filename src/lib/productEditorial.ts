@@ -408,47 +408,55 @@ function airScentLayers(scent: string[]): { label: string; notes: string[] }[] {
 }
 
 export function buildAirEditorial({ hour, volume, others }: AirEditorialInput): SectionInstance[] {
+  // Every heading/eyebrow can be overridden per product (labels); a blank falls back to the house
+  // default, so nothing on the air PDP is truly hard-coded — it is all editable in the admin.
+  const L = hour.labels ?? {};
+  // The Hour — the short reason leads, the long story follows. Both render when both are filled
+  // (the reason is no longer hidden behind the story), so every field the admin types is visible.
+  const hourBody = [hour.hourReason, ...(hour.hourStory ? hour.hourStory.split(/\n{2,}/) : [])]
+    .map((t) => t.trim())
+    .filter(Boolean);
+  // Details accordion — admin-defined rows when present (rename / reorder / add / remove),
+  // otherwise the house defaults (Composition + Shipping).
+  const accordionItems = hour.accordion?.length ? hour.accordion : airAccordion(hour.productDetails);
   const overrides: SectionInstance[] = [
-    // The Hour — the signature time, prominent, with the hour's story (or, when
-    // there's no long story, the one-line reason it inspired the scent).
+    // The Hour — the signature time, prominent, with the reason + story beneath it.
     fill("the-hour", {
-      eyebrow: "The Hour",
+      eyebrow: L.hourEyebrow || "The Hour",
       heading: hour.time,
-      body: hour.hourStory
-        ? hour.hourStory.split(/\n{2,}/).map((t) => t.trim()).filter(Boolean)
-        : [hour.hourReason],
+      body: hourBody,
       align: "none",
-    } satisfies EditorialStatementSettings, { visibility: Boolean(hour.hourStory || hour.hourReason) }),
+    } satisfies EditorialStatementSettings, { visibility: hourBody.length > 0 }),
     // Fragrance Journey — Opening / Heart / Lingering (the brand's perfumery
     // language; lighter under the air palette). "The Effect" as the lead line.
     fill("smells-like", {
-      eyebrow: "Fragrance Journey",
+      eyebrow: L.fragranceEyebrow || "Fragrance Journey",
       heading: "",
       intro: hour.scentEffect,
       layers: airScentLayers(hour.scent),
     } satisfies FragrancePyramidSettings, { visibility: hour.scent.length > 0 }),
     // Feels Like — large editorial typography, one evocative line per row.
-    fill("feels-like", { eyebrow: "Feels Like", lines: hour.feels } satisfies PoeticLinesSettings, {
+    fill("feels-like", { eyebrow: L.feelsEyebrow || "Feels Like", lines: hour.feels } satisfies PoeticLinesSettings, {
       visibility: hour.feels.length > 0,
     }),
     // The Experience — the atmosphere of the room, sentence per line.
     fill("experience", {
-      eyebrow: "The Experience",
+      eyebrow: L.experienceEyebrow || "The Experience",
       body: hour.experience.split(/(?<=[.!?])\s+/).map((t) => t.trim()).filter(Boolean),
       align: "none",
     } satisfies EditorialStatementSettings, { visibility: Boolean(hour.experience) }),
     fill("placement", {
-      eyebrow: "Placement",
-      heading: "Where it belongs",
+      eyebrow: L.placementEyebrow || "Placement",
+      heading: L.placementHeading || "Where it belongs",
       items: hour.placement,
     } satisfies PlacementGridSettings, { visibility: hour.placement.length > 0 }),
     fill("signature", { quote: hour.signature, variant: "handwritten" } satisfies EditorialQuoteSettings, {
       visibility: Boolean(hour.signature),
     }),
-    fill("details", { items: airAccordion(hour.productDetails) } satisfies EditorialAccordionSettings),
+    fill("details", { items: accordionItems } satisfies EditorialAccordionSettings, { visibility: accordionItems.length > 0 }),
     fill("related", {
-      eyebrow: "Continue",
-      heading: `Continue ${volume.title}`,
+      eyebrow: L.continueEyebrow || "Continue",
+      heading: L.continueHeading || `Continue ${volume.title}`,
       products: others.map((h) => toHourCard(h, volume)),
     } satisfies RelatedProductsSettings, { visibility: others.length > 0 }),
   ];

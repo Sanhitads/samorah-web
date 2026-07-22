@@ -39,13 +39,22 @@ type Core = {
   // Air PDP content (room / linen fresheners) — flat in the form, assembled to JSON on save.
   airTime: string; airMoment: string; airHeroLine: string; airHourReason: string; airHourStory: string; airScentEffect: string;
   airScent: string; airFeels: string; airExperience: string; airPlacement: string; airSignature: string; airComposition: string;
+  airPalette: string; airGradient: string; airInterlude: string;
+  airAccordion: string; // details accordion — "Title | body" per line
+  airHourEyebrow: string; airFragranceEyebrow: string; airFeelsEyebrow: string; airExperienceEyebrow: string;
+  airPlacementEyebrow: string; airPlacementHeading: string; airContinueEyebrow: string; airContinueHeading: string;
 };
 
 const AIR_TYPES = ["room_spray", "linen_spray"];
+const AIR_PALETTES = ["morning-blue", "amber-hour", "sand", "deep-indigo", "monsoon"]; // section theme (page colour)
+const AIR_GRADIENTS = ["gradient:grad-air", "gradient:grad-chai", "gradient:grad-amethyst", "gradient:grad-blush"]; // hero block
 // Placement is edited as "label | note" per line.
 const placementToText = (arr: { label?: string; note?: string }[]) => (Array.isArray(arr) ? arr.map((p) => `${p.label ?? ""}${p.note ? ` | ${p.note}` : ""}`).join("\n") : "");
 const textToPlacement = (t: string) => t.split("\n").map((l) => l.trim()).filter(Boolean).map((l) => { const [label, note] = l.split("|").map((s) => s.trim()); return { label: label ?? "", note: note ?? "" }; });
 const linesToArr = (t: string) => t.split("\n").map((s) => s.trim()).filter(Boolean);
+// Details accordion is edited as "Title | body" per line (split on the first "|" so bodies may contain "|").
+const accordionToText = (arr: { title?: string; body?: string }[]) => (Array.isArray(arr) ? arr.map((a) => `${a.title ?? ""}${a.body ? ` | ${a.body}` : ""}`).join("\n") : "");
+const textToAccordion = (t: string) => t.split("\n").map((l) => l.trim()).filter(Boolean).map((l) => { const i = l.indexOf("|"); return { title: (i >= 0 ? l.slice(0, i) : l).trim(), body: (i >= 0 ? l.slice(i + 1) : "").trim() }; });
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const bv = (v: any) => Boolean(v);
@@ -93,12 +102,20 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
       visibleHomepage: p.visible_homepage == null ? true : bv(p.visible_homepage), visibleChapter: p.visible_chapter == null ? true : bv(p.visible_chapter),
       visibleBundles: p.visible_bundles == null ? true : bv(p.visible_bundles), allowBackorder: bv(p.allow_backorder),
       artistEnabled: bv(p.artist_enabled), artistName: sv(p.artist_name), artistRole: sv(p.artist_role), artistStory: sv(p.artist_story), artistQuote: sv(p.artist_quote), artistImage: sv(p.artist_image),
-      ...((): Pick<Core, "airTime" | "airMoment" | "airHeroLine" | "airHourReason" | "airHourStory" | "airScentEffect" | "airScent" | "airFeels" | "airExperience" | "airPlacement" | "airSignature" | "airComposition"> => {
+      ...((): Pick<Core,
+        "airTime" | "airMoment" | "airHeroLine" | "airHourReason" | "airHourStory" | "airScentEffect" | "airScent" | "airFeels" | "airExperience" | "airPlacement" | "airSignature" | "airComposition" |
+        "airPalette" | "airGradient" | "airInterlude" | "airAccordion" |
+        "airHourEyebrow" | "airFragranceEyebrow" | "airFeelsEyebrow" | "airExperienceEyebrow" | "airPlacementEyebrow" | "airPlacementHeading" | "airContinueEyebrow" | "airContinueHeading"> => {
         const ac = (p.air_content ?? {}) as Record<string, unknown>;
+        const lb = (ac.labels ?? {}) as Record<string, unknown>;
         return {
           airTime: sv(ac.time), airMoment: sv(ac.moment), airHeroLine: sv(ac.heroLine), airHourReason: sv(ac.hourReason), airHourStory: sv(ac.hourStory), airScentEffect: sv(ac.scentEffect),
           airScent: Array.isArray(ac.scent) ? (ac.scent as string[]).join(", ") : "", airFeels: Array.isArray(ac.feels) ? (ac.feels as string[]).join("\n") : "",
           airExperience: sv(ac.experience), airPlacement: placementToText((ac.placement as { label?: string; note?: string }[]) ?? []), airSignature: sv(ac.signature), airComposition: sv(ac.composition),
+          airPalette: sv(ac.palette), airGradient: sv(ac.gradient), airInterlude: sv(ac.interlude),
+          airAccordion: accordionToText((ac.accordion as { title?: string; body?: string }[]) ?? []),
+          airHourEyebrow: sv(lb.hourEyebrow), airFragranceEyebrow: sv(lb.fragranceEyebrow), airFeelsEyebrow: sv(lb.feelsEyebrow), airExperienceEyebrow: sv(lb.experienceEyebrow),
+          airPlacementEyebrow: sv(lb.placementEyebrow), airPlacementHeading: sv(lb.placementHeading), airContinueEyebrow: sv(lb.continueEyebrow), airContinueHeading: sv(lb.continueHeading),
         };
       })(),
     });
@@ -119,6 +136,12 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
       time: core.airTime, moment: core.airMoment, heroLine: core.airHeroLine, hourReason: core.airHourReason, hourStory: core.airHourStory, scentEffect: core.airScentEffect,
       scent: core.airScent.split(",").map((s) => s.trim()).filter(Boolean), feels: linesToArr(core.airFeels), experience: core.airExperience,
       placement: textToPlacement(core.airPlacement), signature: core.airSignature, composition: core.airComposition,
+      palette: core.airPalette || undefined, gradient: core.airGradient || undefined, interlude: core.airInterlude || undefined,
+      accordion: textToAccordion(core.airAccordion),
+      labels: {
+        hourEyebrow: core.airHourEyebrow || undefined, fragranceEyebrow: core.airFragranceEyebrow || undefined, feelsEyebrow: core.airFeelsEyebrow || undefined, experienceEyebrow: core.airExperienceEyebrow || undefined,
+        placementEyebrow: core.airPlacementEyebrow || undefined, placementHeading: core.airPlacementHeading || undefined, continueEyebrow: core.airContinueEyebrow || undefined, continueHeading: core.airContinueHeading || undefined,
+      },
     } : undefined;
     const product = {
       ...core, salePrice: numOrNull(core.salePrice), weightGrams: numOrNull(core.weightGrams),
@@ -260,10 +283,44 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
             <label className="cfg-field"><span>Feels like <em className="om-field__hint">one line each</em></span><textarea value={core.airFeels} onChange={(e) => set({ airFeels: e.target.value })} rows={2} /></label>
             <label className="cfg-field"><span>The Experience</span><textarea value={core.airExperience} onChange={(e) => set({ airExperience: e.target.value })} rows={3} /></label>
             <label className="cfg-field"><span>Placement <em className="om-field__hint">one per line — "label | note"</em></span><textarea value={core.airPlacement} onChange={(e) => set({ airPlacement: e.target.value })} rows={3} placeholder="Evenings with no plans&#10;Post-work silence" /></label>
+            <label className="cfg-field"><span>Signature line</span><input value={core.airSignature} onChange={(e) => set({ airSignature: e.target.value })} placeholder="Best experienced when you stop trying to be productive." /></label>
+
+            <p className="om-field__hint" style={{ margin: "12px 0 6px", fontWeight: 600 }}>Section colours</p>
             <div className="cfg-grid">
-              <label className="cfg-field"><span>Signature line</span><input value={core.airSignature} onChange={(e) => set({ airSignature: e.target.value })} placeholder="Best experienced when you stop trying to be productive." /></label>
-              <label className="cfg-field"><span>Composition (accordion body)</span><input value={core.airComposition} onChange={(e) => set({ airComposition: e.target.value })} placeholder="A room mist spray. 100 ml. Made in India." /></label>
+              <label className="cfg-field"><span>Section palette <em className="om-field__hint">the page colour</em></span>
+                <select value={core.airPalette} onChange={(e) => set({ airPalette: e.target.value })}>
+                  <option value="">Default (monsoon — light)</option>
+                  {AIR_PALETTES.map((p) => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </label>
+              <label className="cfg-field"><span>Hero gradient <em className="om-field__hint">the image block</em></span>
+                <select value={core.airGradient} onChange={(e) => set({ airGradient: e.target.value })}>
+                  <option value="">Default (grad-air)</option>
+                  {AIR_GRADIENTS.map((g) => <option key={g} value={g}>{g.replace("gradient:", "")}</option>)}
+                </select>
+              </label>
+              <label className="cfg-field"><span>Interlude <em className="om-field__hint">line to the next hour</em></span><input value={core.airInterlude} onChange={(e) => set({ airInterlude: e.target.value })} placeholder="The morning arrives quietly." /></label>
             </div>
+
+            <p className="om-field__hint" style={{ margin: "12px 0 6px", fontWeight: 600 }}>Details accordion</p>
+            <label className="cfg-field"><span>Rows <em className="om-field__hint">one per line — &quot;Title | body&quot;. Add / rename / reorder freely (Composition, Shipping, How to use…)</em></span>
+              <textarea value={core.airAccordion} onChange={(e) => set({ airAccordion: e.target.value })} rows={5} placeholder={"Composition | A 100ml room & linen mist. Alcohol-free, made in India.\nHow to use | Mist lightly into the air, or over linen and soft furnishings.\nShipping & Exchanges | Dispatched within 2–3 business days."} />
+            </label>
+            <label className="cfg-field"><span>Composition <em className="om-field__hint">fallback body — used only when the accordion above is empty</em></span><input value={core.airComposition} onChange={(e) => set({ airComposition: e.target.value })} placeholder="A room mist spray. 100 ml. Made in India." /></label>
+
+            <details className="pe-sec" style={{ marginTop: 12 }}>
+              <summary>Section headings (optional — blank uses the house wording)</summary>
+              <div className="cfg-grid">
+                <label className="cfg-field"><span>The Hour — eyebrow</span><input value={core.airHourEyebrow} onChange={(e) => set({ airHourEyebrow: e.target.value })} placeholder="The Hour" /></label>
+                <label className="cfg-field"><span>Fragrance Journey — eyebrow</span><input value={core.airFragranceEyebrow} onChange={(e) => set({ airFragranceEyebrow: e.target.value })} placeholder="Fragrance Journey" /></label>
+                <label className="cfg-field"><span>Feels Like — eyebrow</span><input value={core.airFeelsEyebrow} onChange={(e) => set({ airFeelsEyebrow: e.target.value })} placeholder="Feels Like" /></label>
+                <label className="cfg-field"><span>The Experience — eyebrow</span><input value={core.airExperienceEyebrow} onChange={(e) => set({ airExperienceEyebrow: e.target.value })} placeholder="The Experience" /></label>
+                <label className="cfg-field"><span>Placement — eyebrow</span><input value={core.airPlacementEyebrow} onChange={(e) => set({ airPlacementEyebrow: e.target.value })} placeholder="Placement" /></label>
+                <label className="cfg-field"><span>Placement — heading</span><input value={core.airPlacementHeading} onChange={(e) => set({ airPlacementHeading: e.target.value })} placeholder="Where it belongs" /></label>
+                <label className="cfg-field"><span>Continue — eyebrow</span><input value={core.airContinueEyebrow} onChange={(e) => set({ airContinueEyebrow: e.target.value })} placeholder="Continue" /></label>
+                <label className="cfg-field"><span>Continue — heading</span><input value={core.airContinueHeading} onChange={(e) => set({ airContinueHeading: e.target.value })} placeholder="Continue The Everyday" /></label>
+              </div>
+            </details>
           </details>
         ) : null}
 
