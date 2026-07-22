@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type FocusEvent, type TextareaHTMLAttributes } from "react";
 import type { VariantRow, NoteRow, ImageRow, VesselType, ProductStatus } from "@/services/productAdminService";
 import { AirPdpLivePreview } from "@/components/admin/AirPdpLivePreview";
+import { AIR_ACCORDION_DEFAULTS } from "@/config/theHours";
 
 /** A textarea that grows to fit its content, so long editorial text (the Hour story, etc.) is fully
  *  visible while editing instead of scrolling inside a fixed box. */
@@ -139,7 +140,11 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
           airScent: Array.isArray(ac.scent) ? (ac.scent as string[]).join(", ") : "", airFeels: Array.isArray(ac.feels) ? (ac.feels as string[]).join("\n") : "",
           airExperience: sv(ac.experience), airPlacement: placementToText((ac.placement as { label?: string; note?: string }[]) ?? []), airSignature: sv(ac.signature), airComposition: sv(ac.composition),
           airPalette: sv(ac.palette), airGradient: sv(ac.gradient), airInterlude: sv(ac.interlude),
-          airAccordion: Array.isArray(ac.accordion) ? (ac.accordion as { title?: string; body?: string }[]).map((r) => ({ title: sv(r.title), body: sv(r.body) })) : [],
+          airAccordion: (() => {
+            const rows = Array.isArray(ac.accordion) ? (ac.accordion as { title?: string; body?: string }[]).map((r) => ({ title: sv(r.title), body: sv(r.body) })) : [];
+            // No real rows yet → pre-fill the house defaults so Composition / Shipping are editable from the start.
+            return rows.some((r) => r.title.trim() || r.body.trim()) ? rows : AIR_ACCORDION_DEFAULTS.map((r) => ({ ...r }));
+          })(),
           airHourEyebrow: sv(lb.hourEyebrow), airFragranceEyebrow: sv(lb.fragranceEyebrow), airFeelsEyebrow: sv(lb.feelsEyebrow), airExperienceEyebrow: sv(lb.experienceEyebrow),
           airPlacementEyebrow: sv(lb.placementEyebrow), airPlacementHeading: sv(lb.placementHeading), airContinueEyebrow: sv(lb.continueEyebrow), airContinueHeading: sv(lb.continueHeading),
         };
@@ -406,7 +411,8 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
             </div>
 
             <details className="pe-sec" style={{ marginTop: 12 }}>
-              <summary>Section headings (optional — blank uses the house wording)</summary>
+              <summary>Section titles (optional — rename the labels on the page)</summary>
+              <p className="om-field__hint" style={{ margin: "0 0 8px" }}>These rename the small labels above each PDP section (e.g. the “Fragrance Journey” or “Where it belongs” headings). Type to rename one; leave it blank to keep the default wording — that grey text is the placeholder, not a saved value. Example: change “Fragrance Journey” to “The Scent”.</p>
               <div className="cfg-grid">
                 <label className="cfg-field"><span>The Hour — eyebrow</span><input value={core.airHourEyebrow} onChange={(e) => set({ airHourEyebrow: e.target.value })} placeholder="The Hour" /></label>
                 <label className="cfg-field"><span>Fragrance Journey — eyebrow</span><input value={core.airFragranceEyebrow} onChange={(e) => set({ airFragranceEyebrow: e.target.value })} placeholder="Fragrance Journey" /></label>
