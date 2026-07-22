@@ -143,6 +143,7 @@ export type ProductBadge =
 export interface BadgeInput {
   is_hero?: boolean | null;
   is_featured?: boolean | null;
+  is_bestseller?: boolean | null;
   price?: number;
   sale_price?: number | null;
   /** Optional variant stock signals; enables sold_out / low_stock badges. */
@@ -160,7 +161,7 @@ export function productBadge(p: BadgeInput): ProductBadge {
   if (stock === 0) return "sold_out";
   if (p.price != null && isOnSale({ price: p.price, sale_price: p.sale_price })) return "sale";
   if (p.is_hero) return "hero";
-  if (p.is_featured) return "bestseller";
+  if (p.is_bestseller || p.is_featured) return "bestseller";
   if (stock != null && stock <= 10) return "low_stock";
   return null;
 }

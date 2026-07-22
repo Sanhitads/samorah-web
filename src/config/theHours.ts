@@ -34,6 +34,8 @@ export interface HourEntry {
   gradient: string; // "gradient:grad-air"
   /** A short editorial line shown between this Hour and the next (turning a leaf). */
   interlude?: string;
+  /** Chapter position (e.g. "1.4") — drives the "VOL. I.4" edition when set. */
+  chapterPosition?: string;
   /** Details accordion (Composition, Shipping, How to use…). When set, replaces the house-default
    *  accordion entirely — so the admin can rename, reorder, add and remove rows. */
   accordion?: { title: string; body: string }[];

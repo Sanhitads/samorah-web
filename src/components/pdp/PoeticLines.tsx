@@ -3,13 +3,14 @@
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import type { SectionComponentProps } from "@/components/sections/registry";
 import type { PoeticLinesSettings } from "@/lib/productEditorial";
+import { revealProps } from "./reveal";
 
 /**
  * PoeticLines (block, client) — short lines read like verse, revealed one after
  * another (fade + gentle rise) as the section scrolls in. The "Feels Like" beat.
  * Reduced-motion safe.
  */
-export function PoeticLines({ settings }: SectionComponentProps) {
+export function PoeticLines({ settings, context }: SectionComponentProps) {
   const s = settings as unknown as PoeticLinesSettings;
   const reduce = useReducedMotion();
   if (!s.lines?.length) return null;
@@ -29,9 +30,7 @@ export function PoeticLines({ settings }: SectionComponentProps) {
       <motion.div
         className="poetic__lines"
         variants={container}
-        initial="hidden"
-        whileInView="show"
-        viewport={{ once: true, margin: "0px 0px -100px 0px" }}
+        {...revealProps(context?.preview)}
       >
         {s.lines.map((l, i) => (
           <motion.p key={i} className="poetic__line" variants={line}>{l}</motion.p>

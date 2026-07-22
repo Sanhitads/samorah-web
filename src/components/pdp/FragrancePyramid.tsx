@@ -3,6 +3,7 @@
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import type { SectionComponentProps } from "@/components/sections/registry";
 import type { FragrancePyramidSettings } from "@/lib/productEditorial";
+import { revealProps } from "./reveal";
 
 /**
  * FragrancePyramid (block, client) — the Top / Heart / Base composition as an
@@ -10,7 +11,7 @@ import type { FragrancePyramidSettings } from "@/lib/productEditorial";
  * (Top first, then Heart, then Base) with a gentle opacity + translate only —
  * no flashy effects, reduced-motion safe.
  */
-export function FragrancePyramid({ settings }: SectionComponentProps) {
+export function FragrancePyramid({ settings, context }: SectionComponentProps) {
   const s = settings as unknown as FragrancePyramidSettings;
   const reduce = useReducedMotion();
   if (!s.layers?.length) return null;
@@ -34,12 +35,10 @@ export function FragrancePyramid({ settings }: SectionComponentProps) {
       <motion.div
         className="pyramid__layers"
         variants={container}
-        initial="hidden"
-        whileInView="show"
-        viewport={{ once: true, margin: "0px 0px -100px 0px" }}
+        {...revealProps(context?.preview)}
       >
-        {s.layers.map((l) => (
-          <motion.div key={l.label} className="pyramid__layer" variants={layer}>
+        {s.layers.map((l, i) => (
+          <motion.div key={i} className="pyramid__layer" variants={layer}>
             <p className="pyramid__layer-label">{l.label}</p>
             <ul className="pyramid__notes">
               {l.notes.map((n) => (

@@ -22,7 +22,9 @@ export function airHourFromProduct(p: any): HourEntry {
     time: ac.time ?? "",
     moment: ac.moment ?? "",
     name: p.name,
-    story: ac.heroLine || p.tagline || "",
+    // Hero line = the product tagline (single source; the admin edits it in one place). Legacy
+    // air_content.heroLine remains a fallback for products seeded before the fields were unified.
+    story: p.tagline || ac.heroLine || "",
     hourReason: ac.hourReason ?? "",
     hourStory: ac.hourStory || undefined,
     scentEffect: ac.scentEffect || undefined,
@@ -42,6 +44,7 @@ export function airHourFromProduct(p: any): HourEntry {
       ? ac.accordion.map((x: any) => ({ title: String(x.title ?? "").trim(), body: String(x.body ?? "").trim() })).filter((x: any) => x.title || x.body)
       : undefined,
     labels: ac.labels && typeof ac.labels === "object" ? ac.labels : undefined,
+    chapterPosition: p.chapter_position || undefined,
   };
 }
 

@@ -17,7 +17,7 @@ const SORTS = [
 ];
 
 export function ProductsManager({ products, categories, collections }: {
-  products: ProductRow[]; categories: { id: string; name: string }[]; collections: { id: string; name: string; volume: string | null }[];
+  products: ProductRow[]; categories: { id: string; name: string }[]; collections: { id: string; name: string; volume: string | null; slug?: string }[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();

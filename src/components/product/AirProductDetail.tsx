@@ -17,20 +17,24 @@ export function AirProductDetail({
   group,
   volume,
   others,
+  preview = false,
 }: {
   hour: HourEntry;
   group: HourGroup;
   volume: AirVolume;
   others: HourEntry[];
+  preview?: boolean;
 }) {
   bootstrapPlatform();
   const editorial = buildAirEditorial({ hour, volume, others });
   const category = group.kind === "room" ? "Room Spray" : "Linen Spray";
 
-  // Volume numbering — the hour's position across the whole volume (VOL. I.1 …).
+  // Volume numbering — the admin's chapter position drives the number (VOL. I.4); otherwise it falls
+  // back to the hour's auto position across the whole volume (VOL. I.1 …).
   const allHours = volume.groups.flatMap((g) => g.hours);
   const idx = allHours.findIndex((h) => h.productSlug === hour.productSlug);
-  const edition = `${volume.volume.replace(/volume/i, "Vol.").toUpperCase()}.${idx + 1}`;
+  const seq = hour.chapterPosition?.split(".").pop()?.trim() || String(idx + 1);
+  const edition = `${volume.volume.replace(/volume/i, "Vol.").toUpperCase()}.${seq}`;
 
   const variant = {
     id: hour.id,
@@ -65,7 +69,8 @@ export function AirProductDetail({
           <h1 className="pdp__name">{hour.name}</h1>
           <p className="pdp__air-hour">Hour {hour.time} · {hour.moment}</p>
           <p className="pdp__tagline">{hour.story}</p>
-          <p className="pdp__meta">{category} · {hour.scent.join(" · ")}</p>
+          <p className="pdp__meta">{category}</p>
+          {hour.scent.length ? <p className="pdp__meta pdp__meta--notes">{hour.scent.join(" · ")}</p> : null}
 
           <ProductPurchasePanel
             product={{
@@ -90,7 +95,7 @@ export function AirProductDetail({
       <div className="pdp__editorial">
         <SectionRenderer
           sections={editorial}
-          context={{ pageId: hour.productSlug, themeToken: hour.palette || "monsoon", preview: false, data: { productSlug: hour.productSlug } }}
+          context={{ pageId: hour.productSlug, themeToken: hour.palette || "monsoon", preview, data: { productSlug: hour.productSlug } }}
         />
       </div>
     </main>

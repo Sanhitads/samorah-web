@@ -5,6 +5,7 @@ import { Fragment } from "react";
 import { ParallaxMedia } from "@/components/ui/ParallaxMedia";
 import type { SectionComponentProps } from "@/components/sections/registry";
 import type { EditorialStatementSettings } from "@/lib/productEditorial";
+import { revealProps } from "./reveal";
 
 /** Render single "\n" line breaks within a paragraph as <br> (stanza lines). */
 function withBreaks(text: string) {
@@ -24,7 +25,7 @@ function withBreaks(text: string) {
  * rise) for a cinematic scroll; the image keeps its own parallax. Themed by
  * SectionShell. Reduced-motion safe.
  */
-export function EditorialStatement({ settings }: SectionComponentProps) {
+export function EditorialStatement({ settings, context }: SectionComponentProps) {
   const s = settings as unknown as EditorialStatementSettings;
   const reduce = useReducedMotion();
   if (!s.body?.length) return null;
@@ -49,9 +50,7 @@ export function EditorialStatement({ settings }: SectionComponentProps) {
       <motion.div
         className="estatement__body"
         variants={container}
-        initial="hidden"
-        whileInView="show"
-        viewport={{ once: true, margin: "0px 0px -100px 0px" }}
+        {...revealProps(context?.preview)}
       >
         {s.eyebrow ? <motion.p className="estatement__eyebrow" variants={item}>{s.eyebrow}</motion.p> : null}
         {s.heading ? <motion.h2 className="estatement__heading" variants={item}>{s.heading}</motion.h2> : null}

@@ -35,11 +35,18 @@ export default function PdpPreviewRoute() {
       if (flashTimer.current) clearTimeout(flashTimer.current);
       flashTimer.current = setTimeout(() => el.classList.remove("pdp-flash"), 1500);
     };
+    // In the preview, links must not navigate the iframe away (that 404s / breaks the preview).
+    const onClick = (e: MouseEvent) => {
+      const a = (e.target as HTMLElement)?.closest?.("a");
+      if (a) e.preventDefault();
+    };
     window.addEventListener("message", onMessage);
+    document.addEventListener("click", onClick, true);
     // Tell the editor we're mounted and ready to receive the first draft.
     window.parent?.postMessage({ source: SRC, kind: "ready" }, origin);
     return () => {
       window.removeEventListener("message", onMessage);
+      document.removeEventListener("click", onClick, true);
       if (flashTimer.current) clearTimeout(flashTimer.current);
     };
   }, []);
@@ -54,5 +61,5 @@ export default function PdpPreviewRoute() {
   } catch {
     return <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", color: "#b4534b", fontSize: 14 }}>Preview unavailable for this product.</div>;
   }
-  return <AirProductDetail hour={view.hour} group={view.group} volume={view.volume} others={view.others} />;
+  return <AirProductDetail hour={view.hour} group={view.group} volume={view.volume} others={view.others} preview />;
 }

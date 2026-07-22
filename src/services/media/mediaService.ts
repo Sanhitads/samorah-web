@@ -55,14 +55,15 @@ export async function listFolders(): Promise<string[]> {
 }
 
 /** Upload bytes via the storage provider, then register the row. */
-export async function uploadMedia(bytes: Buffer, meta: { filename?: string; folder?: string; alt?: string; title?: string }, actorId?: string): Promise<{ ok: boolean; id?: string; reason?: string }> {
+export async function uploadMedia(bytes: Buffer, meta: { filename?: string; folder?: string; alt?: string; title?: string }, actorId?: string): Promise<{ ok: boolean; id?: string; url?: string; reason?: string }> {
   if (!cloudinaryConfigured()) return { ok: false, reason: "Storage not configured — paste a URL instead." };
   try {
     const up = await cloudinaryProvider.upload(bytes, { filename: meta.filename, folder: meta.folder });
-    return registerMedia({
+    const reg = await registerMedia({
       provider: "cloudinary", publicId: up.publicId, url: up.url, width: up.width, height: up.height, bytes: up.bytes, format: up.format,
       alt: meta.alt, title: meta.title ?? meta.filename, folder: meta.folder,
     }, actorId);
+    return { ...reg, url: reg.ok ? up.url : undefined };
   } catch (e) {
     return { ok: false, reason: e instanceof Error ? e.message : "upload failed" };
   }

@@ -38,7 +38,7 @@ type Core = {
   visibleWebsite: boolean; visibleSearch: boolean; visibleHomepage: boolean; visibleChapter: boolean; visibleBundles: boolean; allowBackorder: boolean;
   artistEnabled: boolean; artistName: string; artistRole: string; artistStory: string; artistQuote: string; artistImage: string;
   // Air PDP content (room / linen fresheners) — flat in the form, assembled to JSON on save.
-  airTime: string; airMoment: string; airHeroLine: string; airHourReason: string; airHourStory: string; airScentEffect: string;
+  airTime: string; airMoment: string; airHourReason: string; airHourStory: string; airScentEffect: string;
   airScent: string; airFeels: string; airExperience: string; airPlacement: string; airSignature: string; airComposition: string;
   airPalette: string; airGradient: string; airInterlude: string;
   airAccordion: string; // details accordion — "Title | body" per line
@@ -61,9 +61,10 @@ const textToAccordion = (t: string) => t.split("\n").map((l) => l.trim()).filter
 // draft, so what you preview is exactly what saves.
 function assembleAirContent(core: Core) {
   return {
-    time: core.airTime, moment: core.airMoment, heroLine: core.airHeroLine, hourReason: core.airHourReason, hourStory: core.airHourStory, scentEffect: core.airScentEffect,
+    time: core.airTime, moment: core.airMoment, hourReason: core.airHourReason, hourStory: core.airHourStory, scentEffect: core.airScentEffect,
     scent: core.airScent.split(",").map((s) => s.trim()).filter(Boolean), feels: linesToArr(core.airFeels), experience: core.airExperience,
     placement: textToPlacement(core.airPlacement), signature: core.airSignature, composition: core.airComposition,
+    heroLine: core.tagline, // hero line mirrors the product tagline (single source)
     palette: core.airPalette || undefined, gradient: core.airGradient || undefined, interlude: core.airInterlude || undefined,
     accordion: textToAccordion(core.airAccordion),
     labels: {
@@ -78,7 +79,7 @@ const bv = (v: any) => Boolean(v);
 const sv = (v: unknown) => (v == null ? "" : String(v));
 
 export function ProductEditor({ productId, collections, categories, onClose, onSaved }: {
-  productId: string; collections: { id: string; name: string; volume: string | null }[]; categories: { id: string; name: string }[]; onClose: () => void; onSaved: () => void;
+  productId: string; collections: { id: string; name: string; volume: string | null; slug?: string }[]; categories: { id: string; name: string }[]; onClose: () => void; onSaved: () => void;
 }) {
   const [core, setCore] = useState<Core | null>(null);
   const [variants, setVariants] = useState<VariantRow[]>([]);
@@ -120,13 +121,13 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
       visibleBundles: p.visible_bundles == null ? true : bv(p.visible_bundles), allowBackorder: bv(p.allow_backorder),
       artistEnabled: bv(p.artist_enabled), artistName: sv(p.artist_name), artistRole: sv(p.artist_role), artistStory: sv(p.artist_story), artistQuote: sv(p.artist_quote), artistImage: sv(p.artist_image),
       ...((): Pick<Core,
-        "airTime" | "airMoment" | "airHeroLine" | "airHourReason" | "airHourStory" | "airScentEffect" | "airScent" | "airFeels" | "airExperience" | "airPlacement" | "airSignature" | "airComposition" |
+        "airTime" | "airMoment" | "airHourReason" | "airHourStory" | "airScentEffect" | "airScent" | "airFeels" | "airExperience" | "airPlacement" | "airSignature" | "airComposition" |
         "airPalette" | "airGradient" | "airInterlude" | "airAccordion" |
         "airHourEyebrow" | "airFragranceEyebrow" | "airFeelsEyebrow" | "airExperienceEyebrow" | "airPlacementEyebrow" | "airPlacementHeading" | "airContinueEyebrow" | "airContinueHeading"> => {
         const ac = (p.air_content ?? {}) as Record<string, unknown>;
         const lb = (ac.labels ?? {}) as Record<string, unknown>;
         return {
-          airTime: sv(ac.time), airMoment: sv(ac.moment), airHeroLine: sv(ac.heroLine), airHourReason: sv(ac.hourReason), airHourStory: sv(ac.hourStory), airScentEffect: sv(ac.scentEffect),
+          airTime: sv(ac.time), airMoment: sv(ac.moment), airHourReason: sv(ac.hourReason), airHourStory: sv(ac.hourStory), airScentEffect: sv(ac.scentEffect),
           airScent: Array.isArray(ac.scent) ? (ac.scent as string[]).join(", ") : "", airFeels: Array.isArray(ac.feels) ? (ac.feels as string[]).join("\n") : "",
           airExperience: sv(ac.experience), airPlacement: placementToText((ac.placement as { label?: string; note?: string }[]) ?? []), airSignature: sv(ac.signature), airComposition: sv(ac.composition),
           airPalette: sv(ac.palette), airGradient: sv(ac.gradient), airInterlude: sv(ac.interlude),
@@ -145,6 +146,10 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
 
   const [previewOn, setPreviewOn] = useState(true);
   const [focusId, setFocusId] = useState<string | null>(null);
+  // Other air products in this chapter — fed to the preview so its "Continue" section renders (it fills
+  // automatically from the chapter; nothing to set).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [siblings, setSiblings] = useState<any[]>([]);
 
   // The live preview draft — a product-row shaped object built from the current (unsaved) form, so the
   // /pdp-preview iframe can render the REAL AirProductDetail from it. Rebuilt on every edit.
@@ -152,14 +157,25 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
     if (!core) return null;
     const col = collections.find((c) => c.id === core.collectionId);
     return {
-      id: productId, name: core.name, slug: core.slug, tagline: core.airHeroLine || core.tagline,
-      price: core.price, product_type: core.productType,
+      id: productId, name: core.name, slug: core.slug, tagline: core.tagline,
+      price: core.price, product_type: core.productType, chapter_position: core.chapterPosition,
       air_content: assembleAirContent(core),
       product_images: [...images].sort((a, b) => a.sortOrder - b.sortOrder).map((im) => ({ url: im.url, is_primary: im.isPrimary, sort_order: im.sortOrder })),
-      collection: col ? { id: col.id, name: col.name, slug: "", volume: col.volume, tagline: "", cover_image_url: "", is_coming_soon: false } : {},
-      __siblings: [],
+      collection: col ? { id: col.id, name: col.name, slug: col.slug ?? "", volume: col.volume, tagline: "", cover_image_url: "", is_coming_soon: false } : {},
+      __siblings: siblings,
     };
-  }, [core, images, collections, productId]);
+  }, [core, images, collections, productId, siblings]);
+
+  // Load the chapter's other air products (the preview's "Continue" section fills automatically).
+  useEffect(() => {
+    const air = core && AIR_TYPES.includes(core.productType);
+    if (!air || !core?.collectionId) { setSiblings([]); return; }
+    let cancelled = false;
+    fetch("/api/admin/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "air.siblings", collectionId: core.collectionId, excludeId: productId }) })
+      .then((r) => r.json()).then((d) => { if (!cancelled && Array.isArray(d?.siblings)) setSiblings(d.siblings); }).catch(() => {});
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [core?.productType, core?.collectionId, productId]);
 
   const set = (patch: Partial<Core>) => setCore((c) => (c ? { ...c, ...patch } : c));
   const numOrNull = (s: string) => (s.trim() === "" ? null : Number(s));
@@ -196,6 +212,17 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
 
   // Images
   const addImage = async () => { if (imgUrl.trim() && await post({ action: "image.add", productId, url: imgUrl, altText: imgAlt })) { setImgUrl(""); setImgAlt(""); await load(); onSaved(); } };
+  const uploadImage = async (file: File) => {
+    setBusy(true); setErr("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file); fd.append("folder", "products"); if (imgAlt) fd.append("alt", imgAlt);
+      const res = await fetch("/api/admin/media", { method: "POST", body: fd });
+      const d = await res.json(); setBusy(false);
+      if (!res.ok || !d.url) { setErr(d.error ?? d.reason ?? "Upload failed"); return; }
+      if (await post({ action: "image.add", productId, url: d.url, altText: imgAlt })) { setImgAlt(""); await load(); onSaved(); }
+    } catch (e) { setBusy(false); setErr(e instanceof Error ? e.message : "Upload failed"); }
+  };
   const primaryImage = async (id: string) => { if (await post({ action: "image.primary", productId, id })) { await load(); onSaved(); } };
   const delImage = async (id: string) => { if (await post({ action: "image.delete", id, productId })) { await load(); onSaved(); } };
   const saveAlt = async (id: string, altText: string) => { await post({ action: "image.update", id, patch: { altText } }); };
@@ -307,8 +334,8 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
             <div className="cfg-grid" data-anchor="pdp-top">
               <label className="cfg-field" data-anchor="the-hour"><span>Hour (time)</span><input value={core.airTime} onChange={(e) => set({ airTime: e.target.value })} placeholder="18:40" /></label>
               <label className="cfg-field" data-anchor="pdp-top"><span>Moment</span><input value={core.airMoment} onChange={(e) => set({ airMoment: e.target.value })} placeholder="The Day Loosens" /></label>
-              <label className="cfg-field" data-anchor="pdp-top"><span>Hero line (tagline)</span><input value={core.airHeroLine} onChange={(e) => set({ airHeroLine: e.target.value })} placeholder="Air after the first light." /></label>
             </div>
+            <p className="om-field__hint" style={{ margin: "0 0 8px" }}>The hero line under the name is the <b>Tagline</b> field in “Basic &amp; SEO” above.</p>
             <label className="cfg-field" data-anchor="the-hour"><span>The Hour — reason (short)</span><input value={core.airHourReason} onChange={(e) => set({ airHourReason: e.target.value })} placeholder="The hour the day finally forgets to hurry." /></label>
             <label className="cfg-field" data-anchor="the-hour"><span>The Hour — story (long, one line per paragraph)</span><textarea value={core.airHourStory} onChange={(e) => set({ airHourStory: e.target.value })} rows={5} /></label>
             <label className="cfg-field" data-anchor="smells-like"><span>Fragrance journey — effect (intro)</span><input value={core.airScentEffect} onChange={(e) => set({ airScentEffect: e.target.value })} placeholder="Soft. Comforting. Slightly indulgent…" /></label>
@@ -339,7 +366,6 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
             <label className="cfg-field" data-anchor="details"><span>Rows <em className="om-field__hint">one per line — &quot;Title | body&quot;. Add / rename / reorder freely (Composition, Shipping, How to use…)</em></span>
               <textarea value={core.airAccordion} onChange={(e) => set({ airAccordion: e.target.value })} rows={5} placeholder={"Composition | A 100ml room & linen mist. Alcohol-free, made in India.\nHow to use | Mist lightly into the air, or over linen and soft furnishings.\nShipping & Exchanges | Dispatched within 2–3 business days."} />
             </label>
-            <label className="cfg-field" data-anchor="details"><span>Composition <em className="om-field__hint">fallback body — used only when the accordion above is empty</em></span><input value={core.airComposition} onChange={(e) => set({ airComposition: e.target.value })} placeholder="A room mist spray. 100 ml. Made in India." /></label>
 
             <details className="pe-sec" style={{ marginTop: 12 }}>
               <summary>Section headings (optional — blank uses the house wording)</summary>
@@ -401,9 +427,15 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
             ))}
           </div>
           <div className="pe-imgadd">
-            <input value={imgUrl} onChange={(e) => setImgUrl(e.target.value)} placeholder="Image URL (Cloudinary)" />
-            <input value={imgAlt} onChange={(e) => setImgAlt(e.target.value)} placeholder="Alt text" />
-            <button type="button" className="ff-btn" disabled={busy || !imgUrl.trim()} onClick={addImage}>Add image</button>
+            <input value={imgAlt} onChange={(e) => setImgAlt(e.target.value)} placeholder="Alt text (applies to the next image)" />
+            <label className={`ff-btn ff-btn--primary${busy ? " is-disabled" : ""}`} style={{ cursor: busy ? "default" : "pointer" }}>
+              {busy ? "Uploading…" : "⬆ Upload image"}
+              <input type="file" accept="image/*" style={{ display: "none" }} disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadImage(f); e.target.value = ""; }} />
+            </label>
+          </div>
+          <div className="pe-imgadd">
+            <input value={imgUrl} onChange={(e) => setImgUrl(e.target.value)} placeholder="…or paste an image URL" />
+            <button type="button" className="ff-btn" disabled={busy || !imgUrl.trim()} onClick={addImage}>Add by URL</button>
           </div>
         </details>
 
@@ -412,20 +444,25 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
           <p className="om-field__hint" style={{ margin: "0 0 8px" }}>Size / Volume holds the unit label — e.g. <b>100g</b> for candles, <b>100ml</b> for room / linen fresheners. Barcode, weight, and low-stock alert are per variant.</p>
           {variants.map((v, i) => (
             <div key={v.id || `new${i}`} className="pe-variant">
-              <div className="cfg-row" style={{ gridTemplateColumns: "1.2fr 0.8fr 0.7fr 0.6fr 0.6fr 0.6fr auto auto" }}>
-                <input value={v.sku} onChange={(e) => setV(i, { sku: e.target.value })} placeholder="SKU" />
-                <select value={v.vesselType ?? ""} onChange={(e) => setV(i, { vesselType: (e.target.value || null) as VesselType | null })}><option value="">vessel</option>{VESSELS.map((x) => <option key={x} value={x}>{x}</option>)}</select>
-                <input value={v.sizeLabel ?? ""} onChange={(e) => setV(i, { sizeLabel: e.target.value })} placeholder="100g / 100ml" title="Size / Volume" />
-                <input type="number" value={v.price} onChange={(e) => setV(i, { price: Number(e.target.value) })} placeholder="price ₹" />
-                <input type="number" value={v.costPrice} onChange={(e) => setV(i, { costPrice: Number(e.target.value) })} placeholder="cost ₹" />
-                <input type="number" value={v.stock} onChange={(e) => setV(i, { stock: Number(e.target.value) })} placeholder="stock" />
-                <button type="button" className="cfg-toggle" data-on={v.isActive ? "1" : "0"} onClick={() => setV(i, { isActive: !v.isActive })}>{v.isActive ? "On" : "Off"}</button>
-                <span className="ff-actions"><button type="button" className="ff-btn" disabled={busy} onClick={() => saveVariant(v)}>Save</button>{v.id ? <button type="button" className="ff-btn ff-btn--danger" disabled={busy} onClick={() => delVariant(v)}>×</button> : null}</span>
+              <div className="pe-variant__top">
+                <span className={`pe-variant__badge${v.isActive ? " is-on" : ""}`}>{v.isActive ? "Active" : "Inactive"}</span>
+                <span className="pe-variant__title">{v.sizeLabel || v.sku || `Variant ${i + 1}`}</span>
+                <span className="pe-variant__act">
+                  <button type="button" className="ff-btn ff-btn--mini" onClick={() => setV(i, { isActive: !v.isActive })}>{v.isActive ? "Deactivate" : "Activate"}</button>
+                  <button type="button" className="ff-btn ff-btn--mini" disabled={busy} onClick={() => saveVariant(v)}>Save</button>
+                  {v.id ? <button type="button" className="ff-btn ff-btn--mini ff-btn--danger" disabled={busy} onClick={() => delVariant(v)}>Delete</button> : null}
+                </span>
               </div>
-              <div className="cfg-row pe-variant__sub" style={{ gridTemplateColumns: "1.4fr 0.8fr 0.8fr" }}>
-                <input value={v.barcode ?? ""} onChange={(e) => setV(i, { barcode: e.target.value })} placeholder="Barcode / EAN" />
-                <input type="number" value={v.weightGrams ?? ""} onChange={(e) => setV(i, { weightGrams: e.target.value === "" ? null : Number(e.target.value) })} placeholder="weight g" title="Shipping weight (g)" />
-                <input type="number" value={v.lowStockThreshold ?? ""} onChange={(e) => setV(i, { lowStockThreshold: e.target.value === "" ? null : Number(e.target.value) })} placeholder="low-stock alert" title="Low-stock threshold" />
+              <div className="pe-variant__grid">
+                <label className="cfg-field cfg-field--sm"><span>SKU</span><input value={v.sku} onChange={(e) => setV(i, { sku: e.target.value })} placeholder="SAM-LNN-100" /></label>
+                <label className="cfg-field cfg-field--sm"><span>Size / Volume</span><input value={v.sizeLabel ?? ""} onChange={(e) => setV(i, { sizeLabel: e.target.value })} placeholder="100ml" /></label>
+                <label className="cfg-field cfg-field--sm"><span>Vessel</span><select value={v.vesselType ?? ""} onChange={(e) => setV(i, { vesselType: (e.target.value || null) as VesselType | null })}><option value="">—</option>{VESSELS.map((x) => <option key={x} value={x}>{x}</option>)}</select></label>
+                <label className="cfg-field cfg-field--sm"><span>Price ₹</span><input type="number" value={v.price} onChange={(e) => setV(i, { price: Number(e.target.value) })} /></label>
+                <label className="cfg-field cfg-field--sm"><span>Cost ₹</span><input type="number" value={v.costPrice} onChange={(e) => setV(i, { costPrice: Number(e.target.value) })} /></label>
+                <label className="cfg-field cfg-field--sm"><span>Stock</span><input type="number" value={v.stock} onChange={(e) => setV(i, { stock: Number(e.target.value) })} /></label>
+                <label className="cfg-field cfg-field--sm"><span>Barcode / EAN</span><input value={v.barcode ?? ""} onChange={(e) => setV(i, { barcode: e.target.value })} /></label>
+                <label className="cfg-field cfg-field--sm"><span>Weight (g)</span><input type="number" value={v.weightGrams ?? ""} onChange={(e) => setV(i, { weightGrams: e.target.value === "" ? null : Number(e.target.value) })} /></label>
+                <label className="cfg-field cfg-field--sm"><span>Low-stock alert</span><input type="number" value={v.lowStockThreshold ?? ""} onChange={(e) => setV(i, { lowStockThreshold: e.target.value === "" ? null : Number(e.target.value) })} /></label>
               </div>
             </div>
           ))}

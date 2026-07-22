@@ -163,7 +163,7 @@ function toCard(p: RelatedProductInput): ProductCardModel {
     priceLabel: `From ${formatINR(price)}`,
     commerce: {
       priceRange: { min: price, max: p.price, display: formatINR(price) },
-      badge: productBadge({ is_hero: p.is_hero, is_featured: p.is_featured, price: p.price, sale_price: p.sale_price }) ?? undefined,
+      badge: productBadge({ is_hero: p.is_hero, is_featured: p.is_featured, is_bestseller: (p as { is_bestseller?: boolean | null }).is_bestseller, price: p.price, sale_price: p.sale_price }) ?? undefined,
     },
   };
 }

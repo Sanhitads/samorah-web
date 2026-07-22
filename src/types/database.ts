@@ -1211,6 +1211,7 @@ export type Database = {
           id: string
           is_featured: boolean
           is_hero: boolean
+          is_bestseller: boolean
           lifestyle_use: string | null
           mood_tags: string[]
           name: string
@@ -1245,6 +1246,7 @@ export type Database = {
           id?: string
           is_featured?: boolean
           is_hero?: boolean
+          is_bestseller?: boolean
           lifestyle_use?: string | null
           mood_tags?: string[]
           name: string
@@ -1279,6 +1281,7 @@ export type Database = {
           id?: string
           is_featured?: boolean
           is_hero?: boolean
+          is_bestseller?: boolean
           lifestyle_use?: string | null
           mood_tags?: string[]
           name?: string

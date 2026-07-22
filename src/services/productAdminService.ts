@@ -114,10 +114,10 @@ export async function getCategoriesForSelect(): Promise<{ id: string; name: stri
   return (data ?? []).map((c: any) => ({ id: c.id, name: c.name }));
 }
 
-export async function getCollectionsForSelect(): Promise<{ id: string; name: string; volume: string | null }[]> {
+export async function getCollectionsForSelect(): Promise<{ id: string; name: string; volume: string | null; slug: string }[]> {
   const db = loose();
-  const { data } = await db.from("collections").select("id,name,volume").order("sort_order");
-  return (data ?? []).map((c: any) => ({ id: c.id, name: c.name, volume: c.volume ?? null }));
+  const { data } = await db.from("collections").select("id,name,volume,slug").order("sort_order");
+  return (data ?? []).map((c: any) => ({ id: c.id, name: c.name, volume: c.volume ?? null, slug: c.slug ?? "" }));
 }
 
 // ── Fragrance journey (fragrance_notes) — replace-all, the editor edits the full set ─────────────

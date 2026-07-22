@@ -3,13 +3,14 @@
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import type { SectionComponentProps } from "@/components/sections/registry";
 import type { PlacementGridSettings } from "@/lib/productEditorial";
+import { revealProps } from "./reveal";
 
 /**
  * PlacementGrid (block, client) — where the fragrance belongs, as quiet editorial
  * tiles (space + a moment beneath each), revealed with a gentle stagger.
  * Reduced-motion safe.
  */
-export function PlacementGrid({ settings }: SectionComponentProps) {
+export function PlacementGrid({ settings, context }: SectionComponentProps) {
   const s = settings as unknown as PlacementGridSettings;
   const reduce = useReducedMotion();
   if (!s.items?.length) return null;
@@ -32,12 +33,10 @@ export function PlacementGrid({ settings }: SectionComponentProps) {
       <motion.div
         className="placement__grid"
         variants={container}
-        initial="hidden"
-        whileInView="show"
-        viewport={{ once: true, margin: "0px 0px -80px 0px" }}
+        {...revealProps(context?.preview, "0px 0px -80px 0px")}
       >
-        {s.items.map((item) => (
-          <motion.div key={item.label} className="placement__item" variants={tile}>
+        {s.items.map((item, i) => (
+          <motion.div key={i} className="placement__item" variants={tile}>
             <span className="placement__rule" aria-hidden="true" />
             <p className="placement__label">{item.label}</p>
             {item.note ? <p className="placement__note">{item.note}</p> : null}

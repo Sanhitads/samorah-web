@@ -2,7 +2,7 @@ import { createPublicClient } from "@/lib/supabase/public";
 
 // Columns needed to render a product card (listings, rails, recommendations).
 const CARD_FIELDS =
-  "id, slug, name, tagline, scent_group, fragrance_family, price, sale_price, is_featured, is_hero, mood_tags, product_images(url, alt_text, is_primary, sort_order)";
+  "id, slug, name, tagline, scent_group, fragrance_family, price, sale_price, is_featured, is_hero, is_bestseller, mood_tags, product_images(url, alt_text, is_primary, sort_order)";
 
 export interface ProductFilter {
   fragranceFamily?: string;
@@ -30,7 +30,7 @@ export async function getProducts(filter: ProductFilter = {}) {
 // Card fields + collection (chapter) + variants (vessels) + created_at —
 // everything the Shop PLP needs to show, filter (chapter × vessel), and sort.
 const SHOP_FIELDS =
-  "id, slug, name, tagline, scent_group, fragrance_family, price, sale_price, is_featured, is_hero, created_at, mood_tags, collection:collections!products_collection_id_fkey(slug, name, volume), variants(vessel_type, is_active), product_images(url, alt_text, is_primary, sort_order)";
+  "id, slug, name, tagline, scent_group, fragrance_family, price, sale_price, is_featured, is_hero, is_bestseller, created_at, mood_tags, collection:collections!products_collection_id_fkey(slug, name, volume), variants(vessel_type, is_active), product_images(url, alt_text, is_primary, sort_order)";
 
 /** Active products for the Shop PLP, with their chapter — filtered/sorted in the
  *  page builder (pure) so the query stays a simple "all active products" read. */
