@@ -14,7 +14,7 @@ function primaryImg(images: any[]): string | null {
   return p?.url ?? null;
 }
 
-function toHour(p: any): HourEntry {
+export function airHourFromProduct(p: any): HourEntry {
   const ac = (p.air_content ?? {}) as any;
   const price = Number(p.price ?? 0);
   return {
@@ -35,16 +35,17 @@ function toHour(p: any): HourEntry {
     productSlug: p.slug,
     priceLabel: price ? `From ₹${price}` : "",
     price,
-    palette: "monsoon",
-    gradient: primaryImg(p.product_images) ?? "gradient:grad-air",
+    palette: ac.palette || "monsoon",
+    gradient: primaryImg(p.product_images) ?? ac.gradient ?? "gradient:grad-air",
+    interlude: ac.interlude || undefined,
   };
 }
 
 export function buildAirViewFromDb(product: any, siblings: any[]): { hour: HourEntry; group: HourGroup; volume: AirVolume; others: HourEntry[] } {
   const col = product.collection ?? {};
   const kind: HourGroup["kind"] = product.product_type === "linen_spray" ? "linen" : "room";
-  const hour = toHour(product);
-  const others = (siblings ?? []).map((s) => toHour(s));
+  const hour = airHourFromProduct(product);
+  const others = (siblings ?? []).map((s) => airHourFromProduct(s));
   const group: HourGroup = {
     kind,
     label: kind === "linen" ? "Private Hours" : "Shared Hours",
@@ -62,4 +63,26 @@ export function buildAirViewFromDb(product: any, siblings: any[]): { hour: HourE
     groups: [group],
   };
   return { hour, group, volume, others };
+}
+
+/** Build an AirVolume (the air chapter page) from a DB collection + its air products, grouped into
+ *  the Room / Linen groups. The group label/title/note default to the house wording (a per-group
+ *  editable column is a later refinement). Returns null when the collection has no air products. */
+export function buildAirVolumeFromDb(col: any, products: any[]): AirVolume | null {
+  const air = (products ?? []).filter((p) => p.product_type === "room_spray" || p.product_type === "linen_spray");
+  if (!air.length) return null;
+  const room = air.filter((p) => p.product_type === "room_spray").map(airHourFromProduct);
+  const linen = air.filter((p) => p.product_type === "linen_spray").map(airHourFromProduct);
+  const groups: HourGroup[] = [];
+  if (room.length) groups.push({ kind: "room", label: "Shared Hours", title: "The Room", note: "The atmosphere a room makes for itself.", hours: room });
+  if (linen.length) groups.push({ kind: "linen", label: "Private Hours", title: "The Linen", note: "For linen, for fabric, for the hours that ask for nothing.", hours: linen });
+  return {
+    slug: col.slug,
+    volume: col.volume ?? "Volume I",
+    title: col.name,
+    tagline: col.tagline ?? "",
+    cover: col.cover_image_url || "gradient:grad-air",
+    isComingSoon: Boolean(col.is_coming_soon),
+    groups,
+  };
 }

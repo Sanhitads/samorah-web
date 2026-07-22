@@ -80,6 +80,27 @@ export async function getAirSiblings(collectionId: string, excludeProductId: str
   }
 }
 
+/** An air volume (chapter) + its active air products, for the DB-driven air chapter page. Returns null
+ *  when the collection doesn't exist or has no air products (route falls back to config). */
+export async function getAirVolumeData(slug: string) {
+  const db = createPublicClient();
+  try {
+    const { data: col } = await db.from("collections").select("id,name,slug,volume,tagline,cover_image_url,is_coming_soon").eq("slug", slug).maybeSingle();
+    if (!col) return null;
+    const { data: products } = await db
+      .from("products")
+      .select("id, slug, name, tagline, price, air_content, product_type, display_order, product_images(url, is_primary, sort_order)")
+      .eq("collection_id", col.id)
+      .in("product_type", AIR_PRODUCT_TYPES)
+      .eq("status", "active")
+      .order("display_order");
+    if (!products || !products.length) return null;
+    return { col, products };
+  } catch {
+    return null;
+  }
+}
+
 /** Active variants for a product, ordered. */
 export async function getVariants(productId: string) {
   const db = createPublicClient();

@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getAirVolume, getAirVolumes } from "@/config/theHours";
+import { getAirVolumeData } from "@/services/productService";
+import { buildAirVolumeFromDb } from "@/lib/airFromProduct";
 import { buildAirVolumePage } from "@/lib/airPage";
 import { isPagePublished } from "@/platform/pageResolver";
 import { PageView, buildPageMetadata } from "@/components/page";
@@ -13,9 +15,16 @@ import { withRouteSeo } from "@/services/seoRedirectService";
  * (AIR_HOURS_TEMPLATE) and experience, reusing the same engines + Hero.
  */
 export const dynamicParams = true;
+export const revalidate = 3600;
 
 export function generateStaticParams() {
   return getAirVolumes().map((v) => ({ slug: v.slug }));
+}
+
+/** Prefer a DB-managed air volume (collection + its air products); fall back to the config volume. */
+async function loadAirVolume(slug: string) {
+  const db = await getAirVolumeData(slug);
+  return (db ? buildAirVolumeFromDb(db.col, db.products) : null) ?? getAirVolume(slug);
 }
 
 export async function generateMetadata({
@@ -24,7 +33,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const vol = getAirVolume(slug);
+  const vol = await loadAirVolume(slug);
   return withRouteSeo(`/collections/${slug}`, vol ? buildPageMetadata(buildAirVolumePage(vol)) : {});
 }
 
@@ -34,7 +43,7 @@ export default async function CollectionRoute({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const vol = getAirVolume(slug);
+  const vol = await loadAirVolume(slug);
   if (!vol) notFound();
   const page = buildAirVolumePage(vol);
   if (!isPagePublished(page)) notFound();
