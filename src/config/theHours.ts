@@ -110,6 +110,7 @@ export interface AirVolume {
   tagline: string; // "The unnoticed moments that shape a day."
   cover: string; // "gradient:grad-air"
   isComingSoon: boolean;
+  heroEyebrow?: string; // "The Hours Collection" — the small label above the volume
   groups: HourGroup[];
   nextVolume?: {
     volume: string;

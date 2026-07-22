@@ -310,6 +310,7 @@ export type Database = {
       }
       collections: {
         Row: {
+          air_chapter: Json | null
           cover_image_url: string | null
           created_at: string
           description: string | null
@@ -328,6 +329,7 @@ export type Database = {
           volume: string | null
         }
         Insert: {
+          air_chapter?: Json | null
           cover_image_url?: string | null
           created_at?: string
           description?: string | null
@@ -346,6 +348,7 @@ export type Database = {
           volume?: string | null
         }
         Update: {
+          air_chapter?: Json | null
           cover_image_url?: string | null
           created_at?: string
           description?: string | null

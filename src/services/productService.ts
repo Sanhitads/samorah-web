@@ -85,7 +85,8 @@ export async function getAirSiblings(collectionId: string, excludeProductId: str
 export async function getAirVolumeData(slug: string) {
   const db = createPublicClient();
   try {
-    const { data: col } = await db.from("collections").select("id,name,slug,volume,tagline,cover_image_url,is_coming_soon,sort_order").eq("slug", slug).maybeSingle();
+    // select * so air_chapter (added by a later migration) is picked up when present but doesn't error before it's applied.
+    const { data: col } = await db.from("collections").select("*").eq("slug", slug).maybeSingle();
     if (!col) return null;
     const { data: products } = await db
       .from("products")

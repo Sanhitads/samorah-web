@@ -48,10 +48,11 @@ export interface CollectionInput {
   name?: string; slug?: string; volume?: string; tagline?: string; poeticLine?: string; description?: string;
   intro?: string; storyLong?: string; coverImageUrl?: string; heroMobileUrl?: string; heroProductId?: string | null;
   seoTitle?: string; seoDescription?: string; seoOgImage?: string; sortOrder?: number; isActive?: boolean; isComingSoon?: boolean;
+  airChapter?: Record<string, unknown> | null; // air chapter CMS config (group headings/notes, teaser, hero eyebrow, colours)
 }
 
-// Columns added by 20260731120000_collection_cms — stripped on retry if the migration isn't applied.
-const CMS_COLUMNS = ["hero_mobile_url", "intro", "story_long", "seo_og_image"];
+// Columns added by later CMS migrations — stripped on retry if the migration isn't applied yet.
+const CMS_COLUMNS = ["hero_mobile_url", "intro", "story_long", "seo_og_image", "air_chapter"];
 
 function collectionRow(i: CollectionInput): Record<string, unknown> {
   const r: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -65,6 +66,7 @@ function collectionRow(i: CollectionInput): Record<string, unknown> {
   if (i.sortOrder !== undefined) r.sort_order = i.sortOrder;
   if (i.isActive !== undefined) r.is_active = i.isActive;
   if (i.isComingSoon !== undefined) r.is_coming_soon = i.isComingSoon;
+  if (i.airChapter !== undefined) r.air_chapter = i.airChapter;
   return r;
 }
 

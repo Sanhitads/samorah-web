@@ -92,11 +92,13 @@ export function buildAirViewFromDb(product: any, siblings: any[]): { hour: HourE
 export function buildAirVolumeFromDb(col: any, products: any[], nextCol?: any): AirVolume | null {
   const air = (products ?? []).filter((p) => p.product_type === "room_spray" || p.product_type === "linen_spray");
   if (!air.length) return null;
-  const room = air.filter((p) => p.product_type === "room_spray").map(airHourFromProduct);
-  const linen = air.filter((p) => p.product_type === "linen_spray").map(airHourFromProduct);
+  const roomHours = air.filter((p) => p.product_type === "room_spray").map(airHourFromProduct);
+  const linenHours = air.filter((p) => p.product_type === "linen_spray").map(airHourFromProduct);
+  // Air chapter CMS — editable group headings/notes + teaser copy; blanks fall back to house wording.
+  const ch = (col.air_chapter ?? {}) as any;
   const groups: HourGroup[] = [];
-  if (room.length) groups.push({ kind: "room", label: "Shared Hours", title: "The Room", note: "The atmosphere a room makes for itself.", hours: room });
-  if (linen.length) groups.push({ kind: "linen", label: "Private Hours", title: "The Linen", note: "For linen, for fabric, for the hours that ask for nothing.", hours: linen });
+  if (roomHours.length) groups.push({ kind: "room", label: ch.room?.label || "Shared Hours", title: ch.room?.title || "The Room", note: ch.room?.note || "The atmosphere a room makes for itself.", hours: roomHours });
+  if (linenHours.length) groups.push({ kind: "linen", label: ch.linen?.label || "Private Hours", title: ch.linen?.title || "The Linen", note: ch.linen?.note || "For linen, for fabric, for the hours that ask for nothing.", hours: linenHours });
   return {
     slug: col.slug,
     volume: col.volume ?? "Volume I",
@@ -104,14 +106,15 @@ export function buildAirVolumeFromDb(col: any, products: any[], nextCol?: any): 
     tagline: col.tagline ?? "",
     cover: col.cover_image_url || "gradient:grad-air",
     isComingSoon: Boolean(col.is_coming_soon),
+    heroEyebrow: ch.heroEyebrow || undefined,
     groups,
     nextVolume: nextCol
       ? {
           volume: nextCol.volume ?? "",
           title: nextCol.name ?? "",
           story: nextCol.tagline ?? "",
-          closing: "Coming in the next volume.",
-          cta: "Available Soon",
+          closing: ch.teaser?.closing || "Coming in the next volume.",
+          cta: ch.teaser?.cta || "Available Soon",
         }
       : undefined,
   };

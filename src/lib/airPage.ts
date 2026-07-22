@@ -116,7 +116,7 @@ export function buildAirVolumePage(vol: AirVolume): Page {
     title: vol.title,
     tagline: vol.tagline,
     poeticLine: null,
-    breadcrumb: "The Hours Collection",
+    breadcrumb: vol.heroEyebrow || "The Hours Collection",
     media: imageMedia(vol.cover, `${vol.title} — The Hours`, "cinematic"),
     overlay: "gradient",
     layout: "immersive",

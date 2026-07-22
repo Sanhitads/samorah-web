@@ -73,6 +73,11 @@ type CEdit = {
   name: string; slug: string; volume: string; tagline: string; poeticLine: string; description: string; intro: string; storyLong: string;
   coverImageUrl: string; heroMobileUrl: string; heroProductId: string; seoTitle: string; seoDescription: string; seoOgImage: string;
   sortOrder: string; isActive: boolean; isComingSoon: boolean;
+  // Air chapter CMS (Room / Linen sprays) — blanks use the house wording.
+  airHeroEyebrow: string;
+  airRoomLabel: string; airRoomTitle: string; airRoomNote: string;
+  airLinenLabel: string; airLinenTitle: string; airLinenNote: string;
+  airTeaserClosing: string; airTeaserCta: string;
 };
 
 function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () => void; onSaved: () => void }) {
@@ -96,11 +101,17 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
     const d = await post({ action: "get", id });
     if (!d?.collection) return;
     const x = d.collection;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ch = (x.air_chapter ?? {}) as any;
     setC({
       name: sv(x.name), slug: sv(x.slug), volume: sv(x.volume), tagline: sv(x.tagline), poeticLine: sv(x.poetic_line), description: sv(x.description),
       intro: sv(x.intro), storyLong: sv(x.story_long), coverImageUrl: sv(x.cover_image_url), heroMobileUrl: sv(x.hero_mobile_url), heroProductId: sv(x.hero_product_id),
       seoTitle: sv(x.seo_title), seoDescription: sv(x.seo_description), seoOgImage: sv(x.seo_og_image),
       sortOrder: x.sort_order != null ? String(x.sort_order) : "0", isActive: Boolean(x.is_active), isComingSoon: Boolean(x.is_coming_soon),
+      airHeroEyebrow: sv(ch.heroEyebrow),
+      airRoomLabel: sv(ch.room?.label), airRoomTitle: sv(ch.room?.title), airRoomNote: sv(ch.room?.note),
+      airLinenLabel: sv(ch.linen?.label), airLinenTitle: sv(ch.linen?.title), airLinenNote: sv(ch.linen?.note),
+      airTeaserClosing: sv(ch.teaser?.closing), airTeaserCta: sv(ch.teaser?.cta),
     });
     setProducts(d.products ?? []); setAllProducts(d.allProducts ?? []);
   };
@@ -112,7 +123,13 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
   const set = (patch: Partial<CEdit>) => setC((v) => (v ? { ...v, ...patch } : v));
   const save = async () => {
     if (!c) return;
-    const collection = { ...c, heroProductId: c.heroProductId || null, sortOrder: Number(c.sortOrder || 0) };
+    const airChapter = {
+      heroEyebrow: c.airHeroEyebrow || undefined,
+      room: { label: c.airRoomLabel || undefined, title: c.airRoomTitle || undefined, note: c.airRoomNote || undefined },
+      linen: { label: c.airLinenLabel || undefined, title: c.airLinenTitle || undefined, note: c.airLinenNote || undefined },
+      teaser: { closing: c.airTeaserClosing || undefined, cta: c.airTeaserCta || undefined },
+    };
+    const collection = { ...c, heroProductId: c.heroProductId || null, sortOrder: Number(c.sortOrder || 0), airChapter };
     if (await post({ action: "update", id, collection })) { setMsg("Saved"); onSaved(); setTimeout(() => setMsg(""), 1500); }
   };
   const moveProduct = async (pid: string, dir: number) => {
@@ -157,6 +174,30 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
             <label className="cfg-field"><span>Hero image URL (mobile)</span><input value={c.heroMobileUrl} onChange={(e) => set({ heroMobileUrl: e.target.value })} /></label>
             <label className="cfg-field"><span>Hero (signature) product</span><select value={c.heroProductId} onChange={(e) => set({ heroProductId: e.target.value })}><option value="">— none —</option>{allProducts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
           </div>
+        </details>
+
+        <details className="pe-sec">
+          <summary>Air chapter (Room / Linen sprays)</summary>
+          <p className="om-field__hint" style={{ margin: "0 0 8px" }}>The group headings + next-volume teaser for the air chapter page. Blank uses the house wording (shown as the placeholder). Applies when this collection holds Room / Linen sprays.</p>
+          <label className="cfg-field"><span>Hero eyebrow</span><input value={c.airHeroEyebrow} onChange={(e) => set({ airHeroEyebrow: e.target.value })} placeholder="The Hours Collection" /></label>
+          <p className="om-field__hint" style={{ margin: "10px 0 4px", fontWeight: 600 }}>The Room — room sprays</p>
+          <div className="cfg-grid">
+            <label className="cfg-field"><span>Eyebrow</span><input value={c.airRoomLabel} onChange={(e) => set({ airRoomLabel: e.target.value })} placeholder="Shared Hours" /></label>
+            <label className="cfg-field"><span>Title</span><input value={c.airRoomTitle} onChange={(e) => set({ airRoomTitle: e.target.value })} placeholder="The Room" /></label>
+          </div>
+          <label className="cfg-field"><span>Note</span><input value={c.airRoomNote} onChange={(e) => set({ airRoomNote: e.target.value })} placeholder="The atmosphere a room makes for itself." /></label>
+          <p className="om-field__hint" style={{ margin: "10px 0 4px", fontWeight: 600 }}>The Linen — linen sprays</p>
+          <div className="cfg-grid">
+            <label className="cfg-field"><span>Eyebrow</span><input value={c.airLinenLabel} onChange={(e) => set({ airLinenLabel: e.target.value })} placeholder="Private Hours" /></label>
+            <label className="cfg-field"><span>Title</span><input value={c.airLinenTitle} onChange={(e) => set({ airLinenTitle: e.target.value })} placeholder="The Linen" /></label>
+          </div>
+          <label className="cfg-field"><span>Note</span><input value={c.airLinenNote} onChange={(e) => set({ airLinenNote: e.target.value })} placeholder="For linen, for fabric, for the hours that ask for nothing." /></label>
+          <p className="om-field__hint" style={{ margin: "10px 0 4px", fontWeight: 600 }}>Next-volume teaser</p>
+          <div className="cfg-grid">
+            <label className="cfg-field"><span>Closing line</span><input value={c.airTeaserClosing} onChange={(e) => set({ airTeaserClosing: e.target.value })} placeholder="Coming in the next volume." /></label>
+            <label className="cfg-field"><span>CTA</span><input value={c.airTeaserCta} onChange={(e) => set({ airTeaserCta: e.target.value })} placeholder="Available Soon" /></label>
+          </div>
+          <p className="om-field__hint" style={{ margin: "8px 0 0" }}>The teaser shows the next collection marked “Coming soon” (by display order); its volume, title and story come from that collection.</p>
         </details>
 
         <details className="pe-sec">
