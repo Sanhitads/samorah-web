@@ -1612,6 +1612,7 @@ a.adm-badge[data-b="incident"]:hover { background: rgba(168,68,58,0.22); }
 .pe-acc__title { flex: 1; font-weight: 600; }
 .pe-acc__act { display: inline-flex; gap: 4px; flex-shrink: 0; }
 .pe-acc__body { width: 100%; resize: vertical; min-height: 2.4em; }
+.pe-acc > input { width: 100%; margin-bottom: 6px; }
 .ff-btn--mini:disabled { opacity: .4; pointer-events: none; }
 
 /* Products table pagination (review) */

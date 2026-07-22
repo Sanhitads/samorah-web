@@ -45,6 +45,7 @@ export function airHourFromProduct(p: any): HourEntry {
       : undefined,
     labels: ac.labels && typeof ac.labels === "object" ? ac.labels : undefined,
     chapterPosition: p.chapter_position || undefined,
+    customSections: Array.isArray(ac.customSections) ? ac.customSections : undefined,
   };
 }
 

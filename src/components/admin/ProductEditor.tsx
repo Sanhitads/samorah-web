@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type FocusEvent, type TextareaHTMLAttributes } from "react";
 import type { VariantRow, NoteRow, ImageRow, VesselType, ProductStatus } from "@/services/productAdminService";
 import { AirPdpLivePreview } from "@/components/admin/AirPdpLivePreview";
-import { AIR_ACCORDION_DEFAULTS } from "@/config/theHours";
+import { AIR_ACCORDION_DEFAULTS, type CustomSection } from "@/config/theHours";
 
 /** A textarea that grows to fit its content, so long editorial text (the Hour story, etc.) is fully
  *  visible while editing instead of scrolling inside a fixed box. */
@@ -54,6 +54,7 @@ type Core = {
   airScent: string; airFeels: string; airExperience: string; airPlacement: string; airSignature: string; airComposition: string;
   airPalette: string; airGradient: string; airInterlude: string;
   airAccordion: { title: string; body: string }[]; // details accordion rows
+  airCustomSections: CustomSection[]; // admin-added extra sections
   airHourEyebrow: string; airFragranceEyebrow: string; airFeelsEyebrow: string; airExperienceEyebrow: string;
   airPlacementEyebrow: string; airPlacementHeading: string; airContinueEyebrow: string; airContinueHeading: string;
 };
@@ -76,6 +77,12 @@ function assembleAirContent(core: Core) {
     heroLine: core.tagline, // hero line mirrors the product tagline (single source)
     palette: core.airPalette || undefined, gradient: core.airGradient || undefined, interlude: core.airInterlude || undefined,
     accordion: core.airAccordion.map((r) => ({ title: r.title.trim(), body: r.body.trim() })).filter((r) => r.title || r.body),
+    customSections: core.airCustomSections.map((s) => ({
+      type: s.type,
+      eyebrow: (s.eyebrow ?? "").trim() || undefined, heading: (s.heading ?? "").trim() || undefined, body: (s.body ?? "").trim() || undefined,
+      lines: (s.lines ?? []).map((l) => l.trim()).filter(Boolean),
+      items: (s.items ?? []).map((x) => ({ label: (x.label ?? "").trim(), note: (x.note ?? "").trim() })).filter((x) => x.label || x.note),
+    })).filter((s) => s.body || s.lines.length || s.items.length),
     labels: {
       hourEyebrow: core.airHourEyebrow || undefined, fragranceEyebrow: core.airFragranceEyebrow || undefined, feelsEyebrow: core.airFeelsEyebrow || undefined, experienceEyebrow: core.airExperienceEyebrow || undefined,
       placementEyebrow: core.airPlacementEyebrow || undefined, placementHeading: core.airPlacementHeading || undefined, continueEyebrow: core.airContinueEyebrow || undefined, continueHeading: core.airContinueHeading || undefined,
@@ -131,7 +138,7 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
       artistEnabled: bv(p.artist_enabled), artistName: sv(p.artist_name), artistRole: sv(p.artist_role), artistStory: sv(p.artist_story), artistQuote: sv(p.artist_quote), artistImage: sv(p.artist_image),
       ...((): Pick<Core,
         "airTime" | "airMoment" | "airHourReason" | "airHourStory" | "airScentEffect" | "airScent" | "airFeels" | "airExperience" | "airPlacement" | "airSignature" | "airComposition" |
-        "airPalette" | "airGradient" | "airInterlude" | "airAccordion" |
+        "airPalette" | "airGradient" | "airInterlude" | "airAccordion" | "airCustomSections" |
         "airHourEyebrow" | "airFragranceEyebrow" | "airFeelsEyebrow" | "airExperienceEyebrow" | "airPlacementEyebrow" | "airPlacementHeading" | "airContinueEyebrow" | "airContinueHeading"> => {
         const ac = (p.air_content ?? {}) as Record<string, unknown>;
         const lb = (ac.labels ?? {}) as Record<string, unknown>;
@@ -145,6 +152,10 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
             // No real rows yet → pre-fill the house defaults so Composition / Shipping are editable from the start.
             return rows.some((r) => r.title.trim() || r.body.trim()) ? rows : AIR_ACCORDION_DEFAULTS.map((r) => ({ ...r }));
           })(),
+          airCustomSections: Array.isArray(ac.customSections) ? (ac.customSections as CustomSection[]).map((s) => ({
+            type: s.type ?? "statement", eyebrow: sv(s.eyebrow), heading: sv(s.heading), body: sv(s.body),
+            lines: Array.isArray(s.lines) ? s.lines.map((l) => sv(l)) : [], items: Array.isArray(s.items) ? s.items.map((x) => ({ label: sv(x.label), note: sv(x.note) })) : [],
+          })) : [],
           airHourEyebrow: sv(lb.hourEyebrow), airFragranceEyebrow: sv(lb.fragranceEyebrow), airFeelsEyebrow: sv(lb.feelsEyebrow), airExperienceEyebrow: sv(lb.experienceEyebrow),
           airPlacementEyebrow: sv(lb.placementEyebrow), airPlacementHeading: sv(lb.placementHeading), airContinueEyebrow: sv(lb.continueEyebrow), airContinueHeading: sv(lb.continueHeading),
         };
@@ -206,6 +217,21 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
       if (j < 0 || j >= rows.length) return c;
       [rows[i], rows[j]] = [rows[j], rows[i]];
       return { ...c, airAccordion: rows };
+    });
+
+  // Custom sections — same repeatable-row pattern (functional updates avoid stale state).
+  const csUpdate = (i: number, patch: Partial<CustomSection>) =>
+    setCore((c) => (c ? { ...c, airCustomSections: c.airCustomSections.map((s, j) => (j === i ? { ...s, ...patch } : s)) } : c));
+  const csAdd = () => setCore((c) => (c ? { ...c, airCustomSections: [...c.airCustomSections, { type: "statement", eyebrow: "", heading: "", body: "", lines: [], items: [] }] } : c));
+  const csRemove = (i: number) => setCore((c) => (c ? { ...c, airCustomSections: c.airCustomSections.filter((_, j) => j !== i) } : c));
+  const csMove = (i: number, dir: -1 | 1) =>
+    setCore((c) => {
+      if (!c) return c;
+      const rows = [...c.airCustomSections];
+      const j = i + dir;
+      if (j < 0 || j >= rows.length) return c;
+      [rows[i], rows[j]] = [rows[j], rows[i]];
+      return { ...c, airCustomSections: rows };
     });
 
   const saveCore = async () => {
@@ -423,6 +449,35 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
                 <label className="cfg-field"><span>Continue — eyebrow</span><input value={core.airContinueEyebrow} onChange={(e) => set({ airContinueEyebrow: e.target.value })} placeholder="Continue" /></label>
                 <label className="cfg-field"><span>Continue — heading</span><input value={core.airContinueHeading} onChange={(e) => set({ airContinueHeading: e.target.value })} placeholder="Continue The Everyday" /></label>
               </div>
+            </details>
+
+            <details className="pe-sec" style={{ marginTop: 12 }} data-anchor="pdp-top">
+              <summary>Custom sections ({core.airCustomSections.length}) — add your own</summary>
+              <p className="om-field__hint" style={{ margin: "0 0 8px" }}>Add extra sections built from the same blocks as the rest of the page, so the styling is automatic and the layout never breaks. They render after Signature, before the Details accordion.</p>
+              {core.airCustomSections.map((sec, i) => (
+                <div key={i} className="pe-acc">
+                  <div className="pe-acc__head">
+                    <select className="pe-acc__title" value={sec.type} onChange={(e) => csUpdate(i, { type: e.target.value as CustomSection["type"] })}>
+                      <option value="statement">Statement — heading + paragraphs</option>
+                      <option value="lines">Lines — verse (one line each)</option>
+                      <option value="grid">Grid — label + note tiles</option>
+                      <option value="quote">Quote — a single line</option>
+                    </select>
+                    <span className="pe-acc__act">
+                      <button type="button" className="ff-btn ff-btn--mini" onClick={() => csMove(i, -1)} disabled={i === 0} aria-label="Move up">↑</button>
+                      <button type="button" className="ff-btn ff-btn--mini" onClick={() => csMove(i, 1)} disabled={i === core.airCustomSections.length - 1} aria-label="Move down">↓</button>
+                      <button type="button" className="ff-btn ff-btn--mini ff-btn--danger" onClick={() => csRemove(i)} aria-label="Remove section">×</button>
+                    </span>
+                  </div>
+                  {sec.type !== "quote" ? <input value={sec.eyebrow ?? ""} onChange={(e) => csUpdate(i, { eyebrow: e.target.value })} placeholder="Eyebrow — e.g. The Ritual" /> : null}
+                  {sec.type === "statement" || sec.type === "grid" ? <input value={sec.heading ?? ""} onChange={(e) => csUpdate(i, { heading: e.target.value })} placeholder="Heading" /> : null}
+                  {sec.type === "statement" ? <AutoTextarea className="pe-acc__body" value={sec.body ?? ""} onChange={(e) => csUpdate(i, { body: e.target.value })} rows={2} placeholder="Paragraphs — leave a blank line between each." /> : null}
+                  {sec.type === "quote" ? <AutoTextarea className="pe-acc__body" value={sec.body ?? ""} onChange={(e) => csUpdate(i, { body: e.target.value })} rows={2} placeholder="The quote." /> : null}
+                  {sec.type === "lines" ? <AutoTextarea className="pe-acc__body" value={(sec.lines ?? []).join("\n")} onChange={(e) => csUpdate(i, { lines: e.target.value.split("\n") })} rows={3} placeholder={"One line each\nlike a little verse"} /> : null}
+                  {sec.type === "grid" ? <AutoTextarea className="pe-acc__body" value={placementToText(sec.items ?? [])} onChange={(e) => csUpdate(i, { items: textToPlacement(e.target.value) })} rows={3} placeholder={"label | note   (one per line)\nBedside | before sleep"} /> : null}
+                </div>
+              ))}
+              <button type="button" className="ff-btn ff-btn--mini" onClick={csAdd}>+ Add section</button>
             </details>
           </details>
         ) : null}

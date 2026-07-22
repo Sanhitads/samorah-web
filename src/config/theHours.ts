@@ -51,6 +51,21 @@ export interface HourEntry {
     continueEyebrow?: string;
     continueHeading?: string;
   };
+  /** Admin-added extra sections, rendered from existing block types (after the built-in sections,
+   *  before the details accordion). Lets the page grow without new code. */
+  customSections?: CustomSection[];
+}
+
+/** An admin-defined extra PDP section, composed from an existing block type so its CSS/layout is
+ *  inherited (no new styling): Statement (heading + paragraphs), Lines (verse), Grid (label/note
+ *  tiles), or Quote. */
+export interface CustomSection {
+  type: "statement" | "lines" | "grid" | "quote";
+  eyebrow?: string;
+  heading?: string;
+  body?: string; // statement: paragraphs (blank-line separated); quote: the quote text
+  lines?: string[]; // lines block
+  items?: { label: string; note: string }[]; // grid block
 }
 
 /** The house-default accordion rows for an air product — the starting point the editor pre-fills so

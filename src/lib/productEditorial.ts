@@ -8,7 +8,7 @@ import type { SectionInstance } from "@/platform/section";
 import { composeSections } from "@/platform/template";
 import { CANDLE_PDP_TEMPLATE, AIR_PDP_TEMPLATE } from "@/platform/coreTemplates";
 import type { ProductPageView } from "@/lib/productPage";
-import { airEditionOf, type AirVolume, type HourEntry } from "@/config/theHours";
+import { airEditionOf, type AirVolume, type HourEntry, type CustomSection } from "@/config/theHours";
 import type { Artist } from "@/config/artist";
 import { getTestimonials } from "@/config/testimonials";
 import type { ProductCardModel } from "@/components/ui/ProductCard";
@@ -407,6 +407,31 @@ function airScentLayers(scent: string[]): { label: string; notes: string[] }[] {
     .filter((l) => l.notes.length > 0);
 }
 
+/** Compose admin-defined custom sections from EXISTING block types, so each inherits the design
+ *  system's CSS + themed shell (no new styling, can't break the page). Ordered 6.0x so they land
+ *  after Signature (order 6) and before the Details accordion (order 7). Empty sections are dropped. */
+function buildAirCustomSections(list: CustomSection[]): SectionInstance[] {
+  return list
+    .map((c, i) => {
+      const base = { id: `custom-${i}`, order: 6 + (i + 1) * 0.01, visibility: true, spacing: "lg", animation: "fade" };
+      if (c.type === "lines") {
+        const lines = (c.lines ?? []).map((l) => l.trim()).filter(Boolean);
+        return lines.length ? { ...base, type: "PoeticLines", variant: "verse", settings: { eyebrow: c.eyebrow ?? "", lines } } : null;
+      }
+      if (c.type === "grid") {
+        const items = (c.items ?? []).map((x) => ({ label: (x.label ?? "").trim(), note: (x.note ?? "").trim() })).filter((x) => x.label || x.note);
+        return items.length ? { ...base, type: "PlacementGrid", variant: "grid", settings: { eyebrow: c.eyebrow ?? "", heading: c.heading ?? "", items } } : null;
+      }
+      if (c.type === "quote") {
+        const quote = (c.body ?? "").trim();
+        return quote ? { ...base, type: "EditorialQuote", variant: "handwritten", settings: { quote, variant: "handwritten" } } : null;
+      }
+      const body = (c.body ?? "").split(/\n{2,}/).map((t) => t.trim()).filter(Boolean);
+      return body.length ? { ...base, type: "EditorialStatement", variant: "statement", settings: { eyebrow: c.eyebrow ?? "", heading: c.heading ?? "", body, align: "none" } } : null;
+    })
+    .filter(Boolean) as unknown as SectionInstance[];
+}
+
 export function buildAirEditorial({ hour, volume, others }: AirEditorialInput): SectionInstance[] {
   // Every heading/eyebrow can be overridden per product (labels); a blank falls back to the house
   // default, so nothing on the air PDP is truly hard-coded — it is all editable in the admin.
@@ -459,6 +484,7 @@ export function buildAirEditorial({ hour, volume, others }: AirEditorialInput): 
       heading: L.continueHeading || `Continue ${volume.title}`,
       products: others.map((h) => toHourCard(h, volume)),
     } satisfies RelatedProductsSettings, { visibility: others.length > 0 }),
+    ...buildAirCustomSections(hour.customSections ?? []),
   ];
 
   return composeSections(AIR_PDP_TEMPLATE.sections, overrides);
