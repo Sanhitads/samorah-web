@@ -1,8 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FocusEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FocusEvent, type TextareaHTMLAttributes } from "react";
 import type { VariantRow, NoteRow, ImageRow, VesselType, ProductStatus } from "@/services/productAdminService";
 import { AirPdpLivePreview } from "@/components/admin/AirPdpLivePreview";
+
+/** A textarea that grows to fit its content, so long editorial text (the Hour story, etc.) is fully
+ *  visible while editing instead of scrolling inside a fixed box. */
+function AutoTextarea({ value, ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (el) { el.style.height = "auto"; el.style.height = `${el.scrollHeight}px`; }
+  }, [value]);
+  return <textarea ref={ref} value={value} {...rest} />;
+}
 
 /**
  * Full editorial product editor (review: Products CMS). Collapsible sections so the long form doesn't
@@ -41,7 +52,7 @@ type Core = {
   airTime: string; airMoment: string; airHourReason: string; airHourStory: string; airScentEffect: string;
   airScent: string; airFeels: string; airExperience: string; airPlacement: string; airSignature: string; airComposition: string;
   airPalette: string; airGradient: string; airInterlude: string;
-  airAccordion: string; // details accordion — "Title | body" per line
+  airAccordion: { title: string; body: string }[]; // details accordion rows
   airHourEyebrow: string; airFragranceEyebrow: string; airFeelsEyebrow: string; airExperienceEyebrow: string;
   airPlacementEyebrow: string; airPlacementHeading: string; airContinueEyebrow: string; airContinueHeading: string;
 };
@@ -53,9 +64,6 @@ const AIR_GRADIENTS = ["gradient:grad-air", "gradient:grad-chai", "gradient:grad
 const placementToText = (arr: { label?: string; note?: string }[]) => (Array.isArray(arr) ? arr.map((p) => `${p.label ?? ""}${p.note ? ` | ${p.note}` : ""}`).join("\n") : "");
 const textToPlacement = (t: string) => t.split("\n").map((l) => l.trim()).filter(Boolean).map((l) => { const [label, note] = l.split("|").map((s) => s.trim()); return { label: label ?? "", note: note ?? "" }; });
 const linesToArr = (t: string) => t.split("\n").map((s) => s.trim()).filter(Boolean);
-// Details accordion is edited as "Title | body" per line (split on the first "|" so bodies may contain "|").
-const accordionToText = (arr: { title?: string; body?: string }[]) => (Array.isArray(arr) ? arr.map((a) => `${a.title ?? ""}${a.body ? ` | ${a.body}` : ""}`).join("\n") : "");
-const textToAccordion = (t: string) => t.split("\n").map((l) => l.trim()).filter(Boolean).map((l) => { const i = l.indexOf("|"); return { title: (i >= 0 ? l.slice(0, i) : l).trim(), body: (i >= 0 ? l.slice(i + 1) : "").trim() }; });
 
 // Assemble the air_content JSON from the flat form fields — used by BOTH save and the live preview
 // draft, so what you preview is exactly what saves.
@@ -66,7 +74,7 @@ function assembleAirContent(core: Core) {
     placement: textToPlacement(core.airPlacement), signature: core.airSignature, composition: core.airComposition,
     heroLine: core.tagline, // hero line mirrors the product tagline (single source)
     palette: core.airPalette || undefined, gradient: core.airGradient || undefined, interlude: core.airInterlude || undefined,
-    accordion: textToAccordion(core.airAccordion),
+    accordion: core.airAccordion.map((r) => ({ title: r.title.trim(), body: r.body.trim() })).filter((r) => r.title || r.body),
     labels: {
       hourEyebrow: core.airHourEyebrow || undefined, fragranceEyebrow: core.airFragranceEyebrow || undefined, feelsEyebrow: core.airFeelsEyebrow || undefined, experienceEyebrow: core.airExperienceEyebrow || undefined,
       placementEyebrow: core.airPlacementEyebrow || undefined, placementHeading: core.airPlacementHeading || undefined, continueEyebrow: core.airContinueEyebrow || undefined, continueHeading: core.airContinueHeading || undefined,
@@ -131,7 +139,7 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
           airScent: Array.isArray(ac.scent) ? (ac.scent as string[]).join(", ") : "", airFeels: Array.isArray(ac.feels) ? (ac.feels as string[]).join("\n") : "",
           airExperience: sv(ac.experience), airPlacement: placementToText((ac.placement as { label?: string; note?: string }[]) ?? []), airSignature: sv(ac.signature), airComposition: sv(ac.composition),
           airPalette: sv(ac.palette), airGradient: sv(ac.gradient), airInterlude: sv(ac.interlude),
-          airAccordion: accordionToText((ac.accordion as { title?: string; body?: string }[]) ?? []),
+          airAccordion: Array.isArray(ac.accordion) ? (ac.accordion as { title?: string; body?: string }[]).map((r) => ({ title: sv(r.title), body: sv(r.body) })) : [],
           airHourEyebrow: sv(lb.hourEyebrow), airFragranceEyebrow: sv(lb.fragranceEyebrow), airFeelsEyebrow: sv(lb.feelsEyebrow), airExperienceEyebrow: sv(lb.experienceEyebrow),
           airPlacementEyebrow: sv(lb.placementEyebrow), airPlacementHeading: sv(lb.placementHeading), airContinueEyebrow: sv(lb.continueEyebrow), airContinueHeading: sv(lb.continueHeading),
         };
@@ -180,6 +188,21 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
   const set = (patch: Partial<Core>) => setCore((c) => (c ? { ...c, ...patch } : c));
   const numOrNull = (s: string) => (s.trim() === "" ? null : Number(s));
 
+  // Details accordion — repeatable rows (functional updates so edits never use a stale core).
+  const accUpdate = (i: number, patch: Partial<{ title: string; body: string }>) =>
+    setCore((c) => (c ? { ...c, airAccordion: c.airAccordion.map((r, j) => (j === i ? { ...r, ...patch } : r)) } : c));
+  const accAdd = () => setCore((c) => (c ? { ...c, airAccordion: [...c.airAccordion, { title: "", body: "" }] } : c));
+  const accRemove = (i: number) => setCore((c) => (c ? { ...c, airAccordion: c.airAccordion.filter((_, j) => j !== i) } : c));
+  const accMove = (i: number, dir: -1 | 1) =>
+    setCore((c) => {
+      if (!c) return c;
+      const rows = [...c.airAccordion];
+      const j = i + dir;
+      if (j < 0 || j >= rows.length) return c;
+      [rows[i], rows[j]] = [rows[j], rows[i]];
+      return { ...c, airAccordion: rows };
+    });
+
   const saveCore = async () => {
     if (!core) return;
     const isAir = AIR_TYPES.includes(core.productType);
@@ -216,11 +239,12 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
     setBusy(true); setErr("");
     try {
       const fd = new FormData();
-      fd.append("file", file); fd.append("folder", "products"); if (imgAlt) fd.append("alt", imgAlt);
+      const alt = imgAlt.trim() || core?.name || "";
+      fd.append("file", file); fd.append("folder", "products"); if (alt) fd.append("alt", alt);
       const res = await fetch("/api/admin/media", { method: "POST", body: fd });
       const d = await res.json(); setBusy(false);
       if (!res.ok || !d.url) { setErr(d.error ?? d.reason ?? "Upload failed"); return; }
-      if (await post({ action: "image.add", productId, url: d.url, altText: imgAlt })) { setImgAlt(""); await load(); onSaved(); }
+      if (await post({ action: "image.add", productId, url: d.url, altText: alt })) { setImgAlt(""); await load(); onSaved(); }
     } catch (e) { setBusy(false); setErr(e instanceof Error ? e.message : "Upload failed"); }
   };
   const primaryImage = async (id: string) => { if (await post({ action: "image.primary", productId, id })) { await load(); onSaved(); } };
@@ -337,12 +361,12 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
             </div>
             <p className="om-field__hint" style={{ margin: "0 0 8px" }}>The hero line under the name is the <b>Tagline</b> field in “Basic &amp; SEO” above.</p>
             <label className="cfg-field" data-anchor="the-hour"><span>The Hour — reason (short)</span><input value={core.airHourReason} onChange={(e) => set({ airHourReason: e.target.value })} placeholder="The hour the day finally forgets to hurry." /></label>
-            <label className="cfg-field" data-anchor="the-hour"><span>The Hour — story (long, one line per paragraph)</span><textarea value={core.airHourStory} onChange={(e) => set({ airHourStory: e.target.value })} rows={5} /></label>
+            <label className="cfg-field" data-anchor="the-hour"><span>The Hour — story <em className="om-field__hint">a blank line starts a new paragraph; each renders in the same editorial style, and the section grows to fit — it won't break the layout</em></span><AutoTextarea value={core.airHourStory} onChange={(e) => set({ airHourStory: e.target.value })} rows={3} /></label>
             <label className="cfg-field" data-anchor="smells-like"><span>Fragrance journey — effect (intro)</span><input value={core.airScentEffect} onChange={(e) => set({ airScentEffect: e.target.value })} placeholder="Soft. Comforting. Slightly indulgent…" /></label>
             <label className="cfg-field" data-anchor="smells-like"><span>Scent — Opening · Heart · Lingering <em className="om-field__hint">comma-separated (3)</em></span><input value={core.airScent} onChange={(e) => set({ airScent: e.target.value })} placeholder="Ripe Fig Flesh, Brown Sugar Warmth, Soft Amber &amp; Sandalwood" /></label>
-            <label className="cfg-field" data-anchor="feels-like"><span>Feels like <em className="om-field__hint">one line each</em></span><textarea value={core.airFeels} onChange={(e) => set({ airFeels: e.target.value })} rows={2} /></label>
-            <label className="cfg-field" data-anchor="experience"><span>The Experience</span><textarea value={core.airExperience} onChange={(e) => set({ airExperience: e.target.value })} rows={3} /></label>
-            <label className="cfg-field" data-anchor="placement"><span>Placement <em className="om-field__hint">one per line — "label | note"</em></span><textarea value={core.airPlacement} onChange={(e) => set({ airPlacement: e.target.value })} rows={3} placeholder="Evenings with no plans&#10;Post-work silence" /></label>
+            <label className="cfg-field" data-anchor="feels-like"><span>Feels like <em className="om-field__hint">one line each</em></span><AutoTextarea value={core.airFeels} onChange={(e) => set({ airFeels: e.target.value })} rows={2} /></label>
+            <label className="cfg-field" data-anchor="experience"><span>The Experience</span><AutoTextarea value={core.airExperience} onChange={(e) => set({ airExperience: e.target.value })} rows={2} /></label>
+            <label className="cfg-field" data-anchor="placement"><span>Placement <em className="om-field__hint">one per line — "label | note"</em></span><AutoTextarea value={core.airPlacement} onChange={(e) => set({ airPlacement: e.target.value })} rows={2} placeholder="Evenings with no plans&#10;Post-work silence" /></label>
             <label className="cfg-field" data-anchor="signature"><span>Signature line</span><input value={core.airSignature} onChange={(e) => set({ airSignature: e.target.value })} placeholder="Best experienced when you stop trying to be productive." /></label>
 
             <p className="om-field__hint" style={{ margin: "12px 0 6px", fontWeight: 600 }}>Section colours</p>
@@ -363,9 +387,23 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
             </div>
 
             <p className="om-field__hint" style={{ margin: "12px 0 6px", fontWeight: 600 }}>Details accordion</p>
-            <label className="cfg-field" data-anchor="details"><span>Rows <em className="om-field__hint">one per line — &quot;Title | body&quot;. Add / rename / reorder freely (Composition, Shipping, How to use…)</em></span>
-              <textarea value={core.airAccordion} onChange={(e) => set({ airAccordion: e.target.value })} rows={5} placeholder={"Composition | A 100ml room & linen mist. Alcohol-free, made in India.\nHow to use | Mist lightly into the air, or over linen and soft furnishings.\nShipping & Exchanges | Dispatched within 2–3 business days."} />
-            </label>
+            <p className="om-field__hint" style={{ margin: "0 0 8px" }}>The collapsible rows at the bottom of the PDP (Composition, Shipping, How to use…). Add, edit, reorder or remove freely.</p>
+            <div data-anchor="details">
+              {core.airAccordion.map((row, i) => (
+                <div key={i} className="pe-acc">
+                  <div className="pe-acc__head">
+                    <input className="pe-acc__title" value={row.title} onChange={(e) => accUpdate(i, { title: e.target.value })} placeholder="Title — e.g. Composition" />
+                    <span className="pe-acc__act">
+                      <button type="button" className="ff-btn ff-btn--mini" onClick={() => accMove(i, -1)} disabled={i === 0} aria-label="Move up">↑</button>
+                      <button type="button" className="ff-btn ff-btn--mini" onClick={() => accMove(i, 1)} disabled={i === core.airAccordion.length - 1} aria-label="Move down">↓</button>
+                      <button type="button" className="ff-btn ff-btn--mini ff-btn--danger" onClick={() => accRemove(i)} aria-label="Remove row">×</button>
+                    </span>
+                  </div>
+                  <AutoTextarea className="pe-acc__body" value={row.body} onChange={(e) => accUpdate(i, { body: e.target.value })} rows={2} placeholder="Body — the text shown when this row is expanded." />
+                </div>
+              ))}
+              <button type="button" className="ff-btn ff-btn--mini" onClick={accAdd}>+ Add row</button>
+            </div>
 
             <details className="pe-sec" style={{ marginTop: 12 }}>
               <summary>Section headings (optional — blank uses the house wording)</summary>

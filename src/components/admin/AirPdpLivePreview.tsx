@@ -11,7 +11,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
  */
 const SRC = "samorah-pdp-preview"; // shared message tag (also used by /pdp-preview)
 const DEVICES = [
-  { k: "desktop", l: "Desktop", w: 1280 },
+  { k: "desktop", l: "Desktop", w: 0 }, // 0 = native panel width (full size, no down-scaling)
   { k: "tablet", l: "Tablet", w: 834 },
   { k: "mobile", l: "Mobile", w: 390 },
 ] as const;
@@ -78,8 +78,11 @@ export function AirPdpLivePreview({
   }, [focusId, post]);
 
   const dev = DEVICES.find((d) => d.k === device)!;
-  const scale = stage.w > 0 ? Math.min(1, stage.w / dev.w) : 1;
-  const frameW = dev.w;
+  // Desktop (w: 0) renders at the panel's native width — full-size, crisp, no shrinking. Tablet/Mobile
+  // render at their true device width, scaled down to fit the panel so responsive layout is faithful.
+  const targetW = dev.w === 0 ? stage.w : dev.w;
+  const scale = stage.w > 0 && targetW > 0 ? Math.min(1, stage.w / targetW) : 1;
+  const frameW = targetW || stage.w || 0;
   const frameH = stage.h > 0 ? stage.h / scale : 0;
 
   const refresh = () => {

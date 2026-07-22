@@ -1582,7 +1582,7 @@ a.adm-badge[data-b="incident"]:hover { background: rgba(168,68,58,0.22); }
 
 /* ── Live PDP preview — side-by-side visual editor (review) ─────────────────── */
 .pe-live { position: fixed; inset: 0; z-index: 1200; display: flex; background: rgba(20,16,12,.5); }
-.pe-live__form { width: min(560px, 46vw); height: 100%; overflow-y: auto; background: var(--surface, #fbf9f5); box-shadow: 2px 0 24px rgba(0,0,0,.16); }
+.pe-live__form { width: min(500px, 42vw); height: 100%; overflow-y: auto; background: var(--surface, #fbf9f5); box-shadow: 2px 0 24px rgba(0,0,0,.16); }
 .pe-live__card { max-width: none !important; width: 100% !important; margin: 0 !important; border-radius: 0 !important; box-shadow: none !important; min-height: 100%; }
 .pe-live__cardhead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .pe-live__panel { flex: 1; min-width: 0; display: flex; flex-direction: column; background: #e6e3dd; }
@@ -1605,3 +1605,11 @@ a.adm-badge[data-b="incident"]:hover { background: rgba(168,68,58,0.22); }
 .pe-variant__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(94px, 1fr)); gap: 8px 10px; }
 .cfg-field--sm > span { font-size: 11px; letter-spacing: .02em; color: #8a8178; }
 .ff-btn.is-disabled { opacity: .55; pointer-events: none; }
+
+/* Details accordion — repeatable rows (review: clearer editing) */
+.pe-acc { border: 1px solid rgba(0,0,0,.1); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; background: rgba(0,0,0,.015); }
+.pe-acc__head { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+.pe-acc__title { flex: 1; font-weight: 600; }
+.pe-acc__act { display: inline-flex; gap: 4px; flex-shrink: 0; }
+.pe-acc__body { width: 100%; resize: vertical; min-height: 2.4em; }
+.ff-btn--mini:disabled { opacity: .4; pointer-events: none; }

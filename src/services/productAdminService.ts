@@ -137,7 +137,7 @@ export async function addProductImage(productId: string, url: string, altText: s
   const { data: existing } = await db.from("product_images").select("id,sort_order").eq("product_id", productId);
   const maxSort = (existing ?? []).reduce((m: number, i: any) => Math.max(m, Number(i.sort_order ?? 0)), -1);
   const isFirst = !(existing ?? []).length;
-  const { error } = await db.from("product_images").insert({ product_id: productId, url: url.trim(), alt_text: altText.trim() || null, is_primary: isFirst, sort_order: maxSort + 1 });
+  const { error } = await db.from("product_images").insert({ product_id: productId, url: url.trim(), alt_text: altText.trim(), is_primary: isFirst, sort_order: maxSort + 1 });
   if (error) return { ok: false, reason: error.message };
   await logEvent({ entityType: "product", entityId: productId, event: "product.image_added", actorType: actorId ? "staff" : "system", actorId });
   return { ok: true };
@@ -145,7 +145,7 @@ export async function addProductImage(productId: string, url: string, altText: s
 export async function updateProductImage(id: string, patch: { altText?: string; sortOrder?: number }, actorId?: string) {
   const db = loose();
   const row: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  if (patch.altText !== undefined) row.alt_text = patch.altText.trim() || null;
+  if (patch.altText !== undefined) row.alt_text = patch.altText.trim();
   if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;
   const { error } = await db.from("product_images").update(row).eq("id", id);
   if (error) return { ok: false, reason: error.message };
