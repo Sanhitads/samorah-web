@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import { PageView } from "@/components/page";
-import { buildAirVolumeFromDb } from "@/lib/airFromProduct";
+import { buildAirVolumeFromDb, airChapterVars } from "@/lib/airFromProduct";
 import { buildAirVolumePage } from "@/lib/airPage";
 
 /**
@@ -52,13 +53,14 @@ export default function ChapterPreviewRoute() {
     return <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", color: "#9a938a", fontSize: 14 }}>Preview loading…</div>;
   }
 
-  let page;
+  let page, vars: Record<string, string> | undefined;
   try {
     const vol = buildAirVolumeFromDb(draft.col, draft.products ?? [], draft.nextCol);
     if (!vol) throw new Error("no air products");
     page = buildAirVolumePage(vol);
+    vars = airChapterVars(vol);
   } catch {
     return <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", color: "#b4534b", fontSize: 14 }}>This chapter has no Room / Linen products to preview yet.</div>;
   }
-  return <PageView page={page} />;
+  return vars ? <div style={vars as CSSProperties}><PageView page={page} /></div> : <PageView page={page} />;
 }

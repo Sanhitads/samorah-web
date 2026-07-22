@@ -112,6 +112,8 @@ export interface AirVolume {
   cover: string; // "gradient:grad-air"
   isComingSoon: boolean;
   heroEyebrow?: string; // "The Hours Collection" — the small label above the volume
+  palette?: string; // section theme token (default "monsoon")
+  customPalette?: { surface: string; ink: string }; // custom section colours (overrides the token)
   groups: HourGroup[];
   nextVolume?: {
     volume: string;

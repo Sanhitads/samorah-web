@@ -105,14 +105,18 @@ export function buildAirVolumeFromDb(col: any, products: any[], nextCol?: any): 
   const groups: HourGroup[] = [];
   if (roomHours.length) groups.push({ kind: "room", label: ch.room?.label || "Shared Hours", title: ch.room?.title || "The Room", note: ch.room?.note || "The atmosphere a room makes for itself.", hours: roomHours });
   if (linenHours.length) groups.push({ kind: "linen", label: ch.linen?.label || "Private Hours", title: ch.linen?.title || "The Linen", note: ch.linen?.note || "For linen, for fabric, for the hours that ask for nothing.", hours: linenHours });
+  const cpc = ch.customPalette;
+  const customPalette = cpc && hex(cpc.surface) && hex(cpc.ink) ? { surface: hex(cpc.surface)!, ink: hex(cpc.ink)! } : undefined;
   return {
     slug: col.slug,
     volume: col.volume ?? "Volume I",
     title: col.name,
     tagline: col.tagline ?? "",
-    cover: col.cover_image_url || "gradient:grad-air",
+    cover: col.cover_image_url || ch.heroGradient || "gradient:grad-air",
     isComingSoon: Boolean(col.is_coming_soon),
     heroEyebrow: ch.heroEyebrow || undefined,
+    palette: ch.palette || undefined,
+    customPalette,
     groups,
     nextVolume: nextCol
       ? {
@@ -123,5 +127,21 @@ export function buildAirVolumeFromDb(col: any, products: any[], nextCol?: any): 
           cta: ch.teaser?.cta || "Available Soon",
         }
       : undefined,
+  };
+}
+
+/** Inline CSS vars for a custom air-chapter palette (surface/ink + derived tones) — applied on a
+ *  wrapper around the chapter page so the sections adopt the colours (paired with the "air-custom"
+ *  token so no preset rule overrides them). Undefined when the chapter uses a preset palette. */
+export function airChapterVars(vol: AirVolume): Record<string, string> | undefined {
+  const cp = vol.customPalette;
+  if (!cp) return undefined;
+  return {
+    "--surface": cp.surface,
+    "--surface-alt": `color-mix(in srgb, ${cp.surface} 92%, ${cp.ink} 8%)`,
+    "--ink": cp.ink,
+    "--ink-soft": `color-mix(in srgb, ${cp.ink} 78%, ${cp.surface})`,
+    "--ink-muted": `color-mix(in srgb, ${cp.ink} 55%, ${cp.surface})`,
+    "--line": `color-mix(in srgb, ${cp.ink} 18%, ${cp.surface})`,
   };
 }

@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import type { CSSProperties } from "react";
 import { getAirVolume, getAirVolumes } from "@/config/theHours";
 import { getAirVolumeData } from "@/services/productService";
-import { buildAirVolumeFromDb } from "@/lib/airFromProduct";
+import { buildAirVolumeFromDb, airChapterVars } from "@/lib/airFromProduct";
 import { buildAirVolumePage } from "@/lib/airPage";
 import { isPagePublished } from "@/platform/pageResolver";
 import { PageView, buildPageMetadata } from "@/components/page";
@@ -47,5 +48,6 @@ export default async function CollectionRoute({
   if (!vol) notFound();
   const page = buildAirVolumePage(vol);
   if (!isPagePublished(page)) notFound();
-  return <PageView page={page} />;
+  const vars = airChapterVars(vol);
+  return vars ? <div style={vars as CSSProperties}><PageView page={page} /></div> : <PageView page={page} />;
 }

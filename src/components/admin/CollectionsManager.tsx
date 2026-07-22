@@ -12,6 +12,9 @@ function assembleAirChapter(c: CEdit) {
     room: { label: c.airRoomLabel || undefined, title: c.airRoomTitle || undefined, note: c.airRoomNote || undefined },
     linen: { label: c.airLinenLabel || undefined, title: c.airLinenTitle || undefined, note: c.airLinenNote || undefined },
     teaser: { closing: c.airTeaserClosing || undefined, cta: c.airTeaserCta || undefined },
+    palette: c.airPalette && c.airPalette !== "custom" ? c.airPalette : undefined,
+    customPalette: c.airPalette === "custom" ? { surface: c.airCustomSurface, ink: c.airCustomInk } : undefined,
+    heroGradient: c.airHeroGradient || undefined,
   };
 }
 
@@ -89,7 +92,15 @@ type CEdit = {
   airRoomLabel: string; airRoomTitle: string; airRoomNote: string;
   airLinenLabel: string; airLinenTitle: string; airLinenNote: string;
   airTeaserClosing: string; airTeaserCta: string;
+  airPalette: string; airCustomSurface: string; airCustomInk: string; airHeroGradient: string;
 };
+
+const AIR_PALETTES = ["morning-blue", "amber-hour", "sand", "deep-indigo", "monsoon"];
+const AIR_GRADIENTS = ["gradient:grad-air", "gradient:grad-chai", "gradient:grad-amethyst", "gradient:grad-blush"];
+// WCAG-ish contrast ratio between two hex colours — a readability hint for custom palettes.
+const rgbOf = (h: string): [number, number, number] => { const m = h.replace("#", ""); const s = m.length === 3 ? m.split("").map((c) => c + c).join("") : m.slice(0, 6); const n = parseInt(s, 16) || 0; return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+const lum = (rgb: [number, number, number]) => { const a = rgb.map((v) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }); return 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2]; };
+const contrastRatio = (h1: string, h2: string) => { const l1 = lum(rgbOf(h1)), l2 = lum(rgbOf(h2)); return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05); };
 
 function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () => void; onSaved: () => void }) {
   const [c, setC] = useState<CEdit | null>(null);
@@ -129,6 +140,7 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
       airRoomLabel: sv(ch.room?.label), airRoomTitle: sv(ch.room?.title), airRoomNote: sv(ch.room?.note),
       airLinenLabel: sv(ch.linen?.label), airLinenTitle: sv(ch.linen?.title), airLinenNote: sv(ch.linen?.note),
       airTeaserClosing: sv(ch.teaser?.closing), airTeaserCta: sv(ch.teaser?.cta),
+      airPalette: ch.customPalette ? "custom" : sv(ch.palette), airCustomSurface: sv(ch.customPalette?.surface) || "#e6e9e6", airCustomInk: sv(ch.customPalette?.ink) || "#26302a", airHeroGradient: sv(ch.heroGradient),
     });
     setProducts(d.products ?? []); setAllProducts(d.allProducts ?? []);
     // Air products + next volume for the live preview (empty for non-air chapters → no preview shown).
@@ -254,6 +266,30 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
             <label className="cfg-field"><span>CTA</span><input value={c.airTeaserCta} onChange={(e) => set({ airTeaserCta: e.target.value })} placeholder="Available Soon" /></label>
           </div>
           <p className="om-field__hint" style={{ margin: "8px 0 0" }}>The teaser shows the next collection marked “Coming soon” (by display order); its volume, title and story come from that collection.</p>
+
+          <p className="om-field__hint" style={{ margin: "12px 0 4px", fontWeight: 600 }}>Section colours</p>
+          <div className="cfg-grid" data-anchor="hours-room">
+            <label className="cfg-field"><span>Section palette <em className="om-field__hint">the page colour</em></span>
+              <select value={c.airPalette} onChange={(e) => set({ airPalette: e.target.value })}>
+                <option value="">Default (monsoon)</option>
+                {AIR_PALETTES.map((p) => <option key={p} value={p}>{p}</option>)}
+                <option value="custom">Custom…</option>
+              </select>
+            </label>
+            <label className="cfg-field"><span>Hero gradient <em className="om-field__hint">used when no hero image</em></span>
+              <select value={c.airHeroGradient} onChange={(e) => set({ airHeroGradient: e.target.value })}>
+                <option value="">Default (grad-air)</option>
+                {AIR_GRADIENTS.map((g) => <option key={g} value={g}>{g.replace("gradient:", "")}</option>)}
+              </select>
+            </label>
+          </div>
+          {c.airPalette === "custom" ? (
+            <div className="cfg-grid" data-anchor="hours-room">
+              <label className="cfg-field"><span>Section background</span><input type="color" value={c.airCustomSurface} onChange={(e) => set({ airCustomSurface: e.target.value })} /></label>
+              <label className="cfg-field"><span>Section text</span><input type="color" value={c.airCustomInk} onChange={(e) => set({ airCustomInk: e.target.value })} /></label>
+              <div className="cfg-field"><span>Readability</span><span style={{ fontSize: 13, color: contrastRatio(c.airCustomSurface, c.airCustomInk) >= 4.5 ? "#2e7d4f" : "#b4534b" }}>{contrastRatio(c.airCustomSurface, c.airCustomInk) >= 4.5 ? "Good contrast ✓" : "Low contrast — hard to read"}</span></div>
+            </div>
+          ) : null}
         </details>
 
         <details className="pe-sec">
