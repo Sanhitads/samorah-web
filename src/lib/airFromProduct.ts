@@ -14,9 +14,19 @@ function primaryImg(images: any[]): string | null {
   return p?.url ?? null;
 }
 
+/** Only accept a real hex colour (guards the inline theme against CSS injection). */
+const hex = (v: any): string | null => (typeof v === "string" && /^#[0-9a-fA-F]{3,8}$/.test(v.trim()) ? v.trim() : null);
+
 export function airHourFromProduct(p: any): HourEntry {
   const ac = (p.air_content ?? {}) as any;
   const price = Number(p.price ?? 0);
+  const cp = ac.customPalette;
+  const customPalette = cp && hex(cp.surface) && hex(cp.ink) ? { surface: hex(cp.surface)!, ink: hex(cp.ink)! } : undefined;
+  const cg = ac.customGradient;
+  const angle = Number.isFinite(Number(cg?.angle)) ? Number(cg.angle) : 135;
+  const customGradientCss = !primaryImg(p.product_images) && cg && hex(cg.from) && hex(cg.to)
+    ? `linear-gradient(${angle}deg, ${hex(cg.from)} 0%, ${hex(cg.to)} 100%)`
+    : undefined;
   return {
     id: p.id,
     time: ac.time ?? "",
@@ -46,6 +56,8 @@ export function airHourFromProduct(p: any): HourEntry {
     labels: ac.labels && typeof ac.labels === "object" ? ac.labels : undefined,
     chapterPosition: p.chapter_position || undefined,
     customSections: Array.isArray(ac.customSections) ? ac.customSections : undefined,
+    customPalette,
+    customGradientCss,
   };
 }
 

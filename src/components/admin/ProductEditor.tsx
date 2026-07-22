@@ -53,6 +53,8 @@ type Core = {
   airTime: string; airMoment: string; airHourReason: string; airHourStory: string; airScentEffect: string;
   airScent: string; airFeels: string; airExperience: string; airPlacement: string; airSignature: string; airComposition: string;
   airPalette: string; airGradient: string; airInterlude: string;
+  airCustomSurface: string; airCustomInk: string; // when airPalette === "custom"
+  airGradFrom: string; airGradTo: string; airGradAngle: string; // when airGradient === "custom"
   airAccordion: { title: string; body: string }[]; // details accordion rows
   airCustomSections: CustomSection[]; // admin-added extra sections
   airHourEyebrow: string; airFragranceEyebrow: string; airFeelsEyebrow: string; airExperienceEyebrow: string;
@@ -66,6 +68,10 @@ const AIR_GRADIENTS = ["gradient:grad-air", "gradient:grad-chai", "gradient:grad
 const placementToText = (arr: { label?: string; note?: string }[]) => (Array.isArray(arr) ? arr.map((p) => `${p.label ?? ""}${p.note ? ` | ${p.note}` : ""}`).join("\n") : "");
 const textToPlacement = (t: string) => t.split("\n").map((l) => l.trim()).filter(Boolean).map((l) => { const [label, note] = l.split("|").map((s) => s.trim()); return { label: label ?? "", note: note ?? "" }; });
 const linesToArr = (t: string) => t.split("\n").map((s) => s.trim()).filter(Boolean);
+// WCAG-ish contrast ratio between two hex colours — a readability hint for custom palettes.
+const rgbOf = (h: string): [number, number, number] => { const m = h.replace("#", ""); const s = m.length === 3 ? m.split("").map((c) => c + c).join("") : m.slice(0, 6); const n = parseInt(s, 16) || 0; return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+const lum = (rgb: [number, number, number]) => { const a = rgb.map((v) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }); return 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2]; };
+const contrastRatio = (h1: string, h2: string) => { const l1 = lum(rgbOf(h1)), l2 = lum(rgbOf(h2)); return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05); };
 
 // Assemble the air_content JSON from the flat form fields — used by BOTH save and the live preview
 // draft, so what you preview is exactly what saves.
@@ -75,7 +81,11 @@ function assembleAirContent(core: Core) {
     scent: core.airScent.split(",").map((s) => s.trim()).filter(Boolean), feels: linesToArr(core.airFeels), experience: core.airExperience,
     placement: textToPlacement(core.airPlacement), signature: core.airSignature, composition: core.airComposition,
     heroLine: core.tagline, // hero line mirrors the product tagline (single source)
-    palette: core.airPalette || undefined, gradient: core.airGradient || undefined, interlude: core.airInterlude || undefined,
+    palette: core.airPalette && core.airPalette !== "custom" ? core.airPalette : undefined,
+    gradient: core.airGradient && core.airGradient !== "custom" ? core.airGradient : undefined,
+    interlude: core.airInterlude || undefined,
+    customPalette: core.airPalette === "custom" ? { surface: core.airCustomSurface, ink: core.airCustomInk } : undefined,
+    customGradient: core.airGradient === "custom" ? { from: core.airGradFrom, to: core.airGradTo, angle: Number(core.airGradAngle) || 135 } : undefined,
     accordion: core.airAccordion.map((r) => ({ title: r.title.trim(), body: r.body.trim() })).filter((r) => r.title || r.body),
     customSections: core.airCustomSections.map((s) => ({
       type: s.type,
@@ -138,7 +148,7 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
       artistEnabled: bv(p.artist_enabled), artistName: sv(p.artist_name), artistRole: sv(p.artist_role), artistStory: sv(p.artist_story), artistQuote: sv(p.artist_quote), artistImage: sv(p.artist_image),
       ...((): Pick<Core,
         "airTime" | "airMoment" | "airHourReason" | "airHourStory" | "airScentEffect" | "airScent" | "airFeels" | "airExperience" | "airPlacement" | "airSignature" | "airComposition" |
-        "airPalette" | "airGradient" | "airInterlude" | "airAccordion" | "airCustomSections" |
+        "airPalette" | "airGradient" | "airInterlude" | "airCustomSurface" | "airCustomInk" | "airGradFrom" | "airGradTo" | "airGradAngle" | "airAccordion" | "airCustomSections" |
         "airHourEyebrow" | "airFragranceEyebrow" | "airFeelsEyebrow" | "airExperienceEyebrow" | "airPlacementEyebrow" | "airPlacementHeading" | "airContinueEyebrow" | "airContinueHeading"> => {
         const ac = (p.air_content ?? {}) as Record<string, unknown>;
         const lb = (ac.labels ?? {}) as Record<string, unknown>;
@@ -146,7 +156,9 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
           airTime: sv(ac.time), airMoment: sv(ac.moment), airHourReason: sv(ac.hourReason), airHourStory: sv(ac.hourStory), airScentEffect: sv(ac.scentEffect),
           airScent: Array.isArray(ac.scent) ? (ac.scent as string[]).join(", ") : "", airFeels: Array.isArray(ac.feels) ? (ac.feels as string[]).join("\n") : "",
           airExperience: sv(ac.experience), airPlacement: placementToText((ac.placement as { label?: string; note?: string }[]) ?? []), airSignature: sv(ac.signature), airComposition: sv(ac.composition),
-          airPalette: sv(ac.palette), airGradient: sv(ac.gradient), airInterlude: sv(ac.interlude),
+          airPalette: ac.customPalette ? "custom" : sv(ac.palette), airGradient: ac.customGradient ? "custom" : sv(ac.gradient), airInterlude: sv(ac.interlude),
+          airCustomSurface: sv((ac.customPalette as { surface?: string })?.surface) || "#14213a", airCustomInk: sv((ac.customPalette as { ink?: string })?.ink) || "#f5f2ed",
+          airGradFrom: sv((ac.customGradient as { from?: string })?.from) || "#6a4090", airGradTo: sv((ac.customGradient as { to?: string })?.to) || "#0a0020", airGradAngle: (ac.customGradient as { angle?: number })?.angle != null ? String((ac.customGradient as { angle?: number }).angle) : "135",
           airAccordion: (() => {
             const rows = Array.isArray(ac.accordion) ? (ac.accordion as { title?: string; body?: string }[]).map((r) => ({ title: sv(r.title), body: sv(r.body) })) : [];
             // No real rows yet → pre-fill the house defaults so Composition / Shipping are editable from the start.
@@ -406,16 +418,32 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
                 <select value={core.airPalette} onChange={(e) => set({ airPalette: e.target.value })}>
                   <option value="">Default (monsoon — light)</option>
                   {AIR_PALETTES.map((p) => <option key={p} value={p}>{p}</option>)}
+                  <option value="custom">Custom…</option>
                 </select>
               </label>
               <label className="cfg-field"><span>Hero gradient <em className="om-field__hint">the image block</em></span>
                 <select value={core.airGradient} onChange={(e) => set({ airGradient: e.target.value })}>
                   <option value="">Default (grad-air)</option>
                   {AIR_GRADIENTS.map((g) => <option key={g} value={g}>{g.replace("gradient:", "")}</option>)}
+                  <option value="custom">Custom…</option>
                 </select>
               </label>
               <label className="cfg-field"><span>Interlude <em className="om-field__hint">line to the next hour</em></span><input value={core.airInterlude} onChange={(e) => set({ airInterlude: e.target.value })} placeholder="The morning arrives quietly." /></label>
             </div>
+            {core.airPalette === "custom" ? (
+              <div className="cfg-grid" data-anchor="pdp-top">
+                <label className="cfg-field"><span>Section background</span><input type="color" value={core.airCustomSurface} onChange={(e) => set({ airCustomSurface: e.target.value })} /></label>
+                <label className="cfg-field"><span>Section text</span><input type="color" value={core.airCustomInk} onChange={(e) => set({ airCustomInk: e.target.value })} /></label>
+                <div className="cfg-field"><span>Readability</span><span style={{ fontSize: 13, color: contrastRatio(core.airCustomSurface, core.airCustomInk) >= 4.5 ? "#2e7d4f" : "#b4534b" }}>{contrastRatio(core.airCustomSurface, core.airCustomInk) >= 4.5 ? "Good contrast ✓" : "Low contrast — hard to read"}</span></div>
+              </div>
+            ) : null}
+            {core.airGradient === "custom" ? (
+              <div className="cfg-grid" data-anchor="pdp-top">
+                <label className="cfg-field"><span>Gradient from</span><input type="color" value={core.airGradFrom} onChange={(e) => set({ airGradFrom: e.target.value })} /></label>
+                <label className="cfg-field"><span>Gradient to</span><input type="color" value={core.airGradTo} onChange={(e) => set({ airGradTo: e.target.value })} /></label>
+                <label className="cfg-field"><span>Angle°</span><input type="number" value={core.airGradAngle} onChange={(e) => set({ airGradAngle: e.target.value })} placeholder="135" /></label>
+              </div>
+            ) : null}
 
             <p className="om-field__hint" style={{ margin: "12px 0 6px", fontWeight: 600 }}>Details accordion</p>
             <p className="om-field__hint" style={{ margin: "0 0 8px" }}>The collapsible rows at the bottom of the PDP (Composition, Shipping, How to use…). Add, edit, reorder or remove freely.</p>

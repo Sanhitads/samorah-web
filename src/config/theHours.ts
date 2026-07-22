@@ -54,6 +54,10 @@ export interface HourEntry {
   /** Admin-added extra sections, rendered from existing block types (after the built-in sections,
    *  before the details accordion). Lets the page grow without new code. */
   customSections?: CustomSection[];
+  /** Custom section palette (overrides the preset token): editorial background + text colour. */
+  customPalette?: { surface: string; ink: string };
+  /** Custom hero gradient CSS (a ready-built linear-gradient) — applied to the gradient hero block. */
+  customGradientCss?: string;
 }
 
 /** An admin-defined extra PDP section, composed from an existing block type so its CSS/layout is

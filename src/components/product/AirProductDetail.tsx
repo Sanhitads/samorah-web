@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import { ProductPurchasePanel } from "@/components/product/ProductPurchasePanel";
 import { ProductGallery } from "@/components/product/ProductGallery";
 import { SectionRenderer } from "@/components/sections/SectionRenderer";
@@ -47,8 +48,27 @@ export function AirProductDetail({
     stockNote: null,
   };
 
+  // A custom palette themes the editorial sections via inline CSS vars + an unregistered token (so no
+  // preset rule overrides them); a custom gradient repaints the hero via one scoped style rule.
+  const cp = hour.customPalette;
+  const themeToken = cp ? "air-custom" : hour.palette || "monsoon";
+  const editorialVars: CSSProperties | undefined = cp
+    ? ({
+        "--surface": cp.surface,
+        "--surface-alt": `color-mix(in srgb, ${cp.surface} 92%, ${cp.ink} 8%)`,
+        "--ink": cp.ink,
+        "--ink-soft": `color-mix(in srgb, ${cp.ink} 78%, ${cp.surface})`,
+        "--ink-muted": `color-mix(in srgb, ${cp.ink} 55%, ${cp.surface})`,
+        "--line": `color-mix(in srgb, ${cp.ink} 18%, ${cp.surface})`,
+      } as CSSProperties)
+    : undefined;
+  const scopeId = `air-${hour.productSlug}`;
+
   return (
-    <main className="pdp pdp--air" data-theme="warm-ivory">
+    <main className="pdp pdp--air" data-theme="warm-ivory" data-cid={scopeId}>
+      {hour.customGradientCss ? (
+        <style dangerouslySetInnerHTML={{ __html: `[data-cid="${scopeId}"] .pdp__layout .asset-image{background:${hour.customGradientCss} !important}` }} />
+      ) : null}
       <div className="pdp__head" id="pdp-top">
         <nav className="pdp__breadcrumb" aria-label="Breadcrumb">
           <Link href="/" className="pdp__crumb">Home</Link>
@@ -92,10 +112,10 @@ export function AirProductDetail({
         </div>
       </div>
 
-      <div className="pdp__editorial">
+      <div className="pdp__editorial" style={editorialVars}>
         <SectionRenderer
           sections={editorial}
-          context={{ pageId: hour.productSlug, themeToken: hour.palette || "monsoon", preview, data: { productSlug: hour.productSlug } }}
+          context={{ pageId: hour.productSlug, themeToken, preview, data: { productSlug: hour.productSlug } }}
         />
       </div>
     </main>
