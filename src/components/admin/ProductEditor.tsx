@@ -485,6 +485,7 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
               {core.airCustomSections.map((sec, i) => (
                 <div key={i} className="pe-acc">
                   <div className="pe-acc__head">
+                    <span className="pe-acc__num">{i + 1}</span>
                     <select className="pe-acc__title" value={sec.type} onChange={(e) => csUpdate(i, { type: e.target.value as CustomSection["type"] })}>
                       <option value="statement">Statement — heading + paragraphs</option>
                       <option value="lines">Lines — verse (one line each)</option>
