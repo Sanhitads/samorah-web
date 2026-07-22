@@ -1611,6 +1611,12 @@ a.adm-badge[data-b="incident"]:hover { background: rgba(168,68,58,0.22); }
 .pe-acc__head { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
 .pe-acc__title { flex: 1; font-weight: 600; }
 .pe-acc__num { font-weight: 700; color: var(--ink-soft, #8a8178); min-width: 1.4em; text-align: center; font-size: 13px; }
+/* Uniform square icon buttons for reorder / remove (review: consistent, aligned) */
+.pe-icon-btn { width: 30px; height: 30px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; padding: 0; font-size: 16px; line-height: 1; border: 1px solid rgba(0,0,0,.14); border-radius: 7px; background: #fff; color: var(--ink, #1f1a16); cursor: pointer; transition: background .12s, border-color .12s; }
+.pe-icon-btn:hover:not(:disabled) { background: rgba(0,0,0,.04); border-color: rgba(0,0,0,.28); }
+.pe-icon-btn:disabled { opacity: .35; cursor: default; }
+.pe-icon-btn--danger { color: #b4534b; }
+.pe-icon-btn--danger:hover:not(:disabled) { background: #fbeceb; border-color: #e0b4b0; }
 .pe-acc__act { display: inline-flex; gap: 4px; flex-shrink: 0; }
 .pe-acc__body { width: 100%; resize: vertical; min-height: 2.4em; }
 .pe-acc > input { width: 100%; margin-bottom: 6px; }

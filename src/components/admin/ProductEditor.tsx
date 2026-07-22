@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type FocusEvent, type TextareaHTMLAttributes } from "react";
 import type { VariantRow, NoteRow, ImageRow, VesselType, ProductStatus } from "@/services/productAdminService";
 import { AirPdpLivePreview } from "@/components/admin/AirPdpLivePreview";
-import { AIR_ACCORDION_DEFAULTS, type CustomSection } from "@/config/theHours";
+import { AIR_ACCORDION_DEFAULTS, AIR_SECTION_POSITIONS, type CustomSection } from "@/config/theHours";
 
 /** A textarea that grows to fit its content, so long editorial text (the Hour story, etc.) is fully
  *  visible while editing instead of scrolling inside a fixed box. */
@@ -88,7 +88,7 @@ function assembleAirContent(core: Core) {
     customGradient: core.airGradient === "custom" ? { from: core.airGradFrom, to: core.airGradTo, angle: Number(core.airGradAngle) || 135 } : undefined,
     accordion: core.airAccordion.map((r) => ({ title: r.title.trim(), body: r.body.trim() })).filter((r) => r.title || r.body),
     customSections: core.airCustomSections.map((s) => ({
-      type: s.type,
+      type: s.type, position: s.position ?? "after-signature",
       eyebrow: (s.eyebrow ?? "").trim() || undefined, heading: (s.heading ?? "").trim() || undefined, body: (s.body ?? "").trim() || undefined,
       lines: (s.lines ?? []).map((l) => l.trim()).filter(Boolean),
       items: (s.items ?? []).map((x) => ({ label: (x.label ?? "").trim(), note: (x.note ?? "").trim() })).filter((x) => x.label || x.note),
@@ -165,7 +165,7 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
             return rows.some((r) => r.title.trim() || r.body.trim()) ? rows : AIR_ACCORDION_DEFAULTS.map((r) => ({ ...r }));
           })(),
           airCustomSections: Array.isArray(ac.customSections) ? (ac.customSections as CustomSection[]).map((s) => ({
-            type: s.type ?? "statement", eyebrow: sv(s.eyebrow), heading: sv(s.heading), body: sv(s.body),
+            type: s.type ?? "statement", position: s.position ?? "after-signature", eyebrow: sv(s.eyebrow), heading: sv(s.heading), body: sv(s.body),
             lines: Array.isArray(s.lines) ? s.lines.map((l) => sv(l)) : [], items: Array.isArray(s.items) ? s.items.map((x) => ({ label: sv(x.label), note: sv(x.note) })) : [],
           })) : [],
           airHourEyebrow: sv(lb.hourEyebrow), airFragranceEyebrow: sv(lb.fragranceEyebrow), airFeelsEyebrow: sv(lb.feelsEyebrow), airExperienceEyebrow: sv(lb.experienceEyebrow),
@@ -234,7 +234,7 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
   // Custom sections — same repeatable-row pattern (functional updates avoid stale state).
   const csUpdate = (i: number, patch: Partial<CustomSection>) =>
     setCore((c) => (c ? { ...c, airCustomSections: c.airCustomSections.map((s, j) => (j === i ? { ...s, ...patch } : s)) } : c));
-  const csAdd = () => setCore((c) => (c ? { ...c, airCustomSections: [...c.airCustomSections, { type: "statement", eyebrow: "", heading: "", body: "", lines: [], items: [] }] } : c));
+  const csAdd = () => setCore((c) => (c ? { ...c, airCustomSections: [...c.airCustomSections, { type: "statement", position: "after-signature", eyebrow: "", heading: "", body: "", lines: [], items: [] }] } : c));
   const csRemove = (i: number) => setCore((c) => (c ? { ...c, airCustomSections: c.airCustomSections.filter((_, j) => j !== i) } : c));
   const csMove = (i: number, dir: -1 | 1) =>
     setCore((c) => {
@@ -453,9 +453,9 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
                   <div className="pe-acc__head">
                     <input className="pe-acc__title" value={row.title} onChange={(e) => accUpdate(i, { title: e.target.value })} placeholder="Title — e.g. Composition" />
                     <span className="pe-acc__act">
-                      <button type="button" className="ff-btn ff-btn--mini" onClick={() => accMove(i, -1)} disabled={i === 0} aria-label="Move up">↑</button>
-                      <button type="button" className="ff-btn ff-btn--mini" onClick={() => accMove(i, 1)} disabled={i === core.airAccordion.length - 1} aria-label="Move down">↓</button>
-                      <button type="button" className="ff-btn ff-btn--mini ff-btn--danger" onClick={() => accRemove(i)} aria-label="Remove row">×</button>
+                      <button type="button" className="pe-icon-btn" onClick={() => accMove(i, -1)} disabled={i === 0} aria-label="Move up" title="Move up">↑</button>
+                      <button type="button" className="pe-icon-btn" onClick={() => accMove(i, 1)} disabled={i === core.airAccordion.length - 1} aria-label="Move down" title="Move down">↓</button>
+                      <button type="button" className="pe-icon-btn pe-icon-btn--danger" onClick={() => accRemove(i)} aria-label="Remove row" title="Remove row">×</button>
                     </span>
                   </div>
                   <AutoTextarea className="pe-acc__body" value={row.body} onChange={(e) => accUpdate(i, { body: e.target.value })} rows={2} placeholder="Body — the text shown when this row is expanded." />
@@ -493,11 +493,16 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
                       <option value="quote">Quote — a single line</option>
                     </select>
                     <span className="pe-acc__act">
-                      <button type="button" className="ff-btn ff-btn--mini" onClick={() => csMove(i, -1)} disabled={i === 0} aria-label="Move up">↑</button>
-                      <button type="button" className="ff-btn ff-btn--mini" onClick={() => csMove(i, 1)} disabled={i === core.airCustomSections.length - 1} aria-label="Move down">↓</button>
-                      <button type="button" className="ff-btn ff-btn--mini ff-btn--danger" onClick={() => csRemove(i)} aria-label="Remove section">×</button>
+                      <button type="button" className="pe-icon-btn" onClick={() => csMove(i, -1)} disabled={i === 0} aria-label="Move up" title="Move up">↑</button>
+                      <button type="button" className="pe-icon-btn" onClick={() => csMove(i, 1)} disabled={i === core.airCustomSections.length - 1} aria-label="Move down" title="Move down">↓</button>
+                      <button type="button" className="pe-icon-btn pe-icon-btn--danger" onClick={() => csRemove(i)} aria-label="Remove section" title="Remove section">×</button>
                     </span>
                   </div>
+                  <label className="cfg-field cfg-field--sm" style={{ marginBottom: 6 }}><span>Position on the page</span>
+                    <select value={sec.position ?? "after-signature"} onChange={(e) => csUpdate(i, { position: e.target.value })}>
+                      {AIR_SECTION_POSITIONS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                    </select>
+                  </label>
                   {sec.type !== "quote" ? <input value={sec.eyebrow ?? ""} onChange={(e) => csUpdate(i, { eyebrow: e.target.value })} placeholder="Eyebrow — e.g. The Ritual" /> : null}
                   {sec.type === "statement" || sec.type === "grid" ? <input value={sec.heading ?? ""} onChange={(e) => csUpdate(i, { heading: e.target.value })} placeholder="Heading" /> : null}
                   {sec.type === "statement" ? <AutoTextarea className="pe-acc__body" value={sec.body ?? ""} onChange={(e) => csUpdate(i, { body: e.target.value })} rows={2} placeholder="Paragraphs — leave a blank line between each." /> : null}

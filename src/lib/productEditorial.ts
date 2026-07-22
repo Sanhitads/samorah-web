@@ -8,7 +8,7 @@ import type { SectionInstance } from "@/platform/section";
 import { composeSections } from "@/platform/template";
 import { CANDLE_PDP_TEMPLATE, AIR_PDP_TEMPLATE } from "@/platform/coreTemplates";
 import type { ProductPageView } from "@/lib/productPage";
-import { airEditionOf, type AirVolume, type HourEntry, type CustomSection } from "@/config/theHours";
+import { airEditionOf, AIR_SECTION_POSITIONS, type AirVolume, type HourEntry, type CustomSection } from "@/config/theHours";
 import type { Artist } from "@/config/artist";
 import { getTestimonials } from "@/config/testimonials";
 import type { ProductCardModel } from "@/components/ui/ProductCard";
@@ -407,13 +407,17 @@ function airScentLayers(scent: string[]): { label: string; notes: string[] }[] {
     .filter((l) => l.notes.length > 0);
 }
 
+const POS_ORDER: Record<string, number> = Object.fromEntries(AIR_SECTION_POSITIONS.map((p) => [p.value, p.order]));
+
 /** Compose admin-defined custom sections from EXISTING block types, so each inherits the design
- *  system's CSS + themed shell (no new styling, can't break the page). Ordered 6.0x so they land
- *  after Signature (order 6) and before the Details accordion (order 7). Empty sections are dropped. */
+ *  system's CSS + themed shell (no new styling, can't break the page). Each section's `position`
+ *  drops it into a gap between the built-in sections (top → end); ties keep their list order.
+ *  Empty sections are dropped. */
 function buildAirCustomSections(list: CustomSection[]): SectionInstance[] {
   return list
     .map((c, i) => {
-      const base = { id: `custom-${i}`, order: 6 + (i + 1) * 0.01, visibility: true, spacing: "lg", animation: "fade" };
+      const order = (POS_ORDER[c.position ?? "after-signature"] ?? 6.5) + i * 0.001;
+      const base = { id: `custom-${i}`, order, visibility: true, spacing: "lg", animation: "fade" };
       if (c.type === "lines") {
         const lines = (c.lines ?? []).map((l) => l.trim()).filter(Boolean);
         return lines.length ? { ...base, type: "PoeticLines", variant: "verse", settings: { eyebrow: c.eyebrow ?? "", lines } } : null;

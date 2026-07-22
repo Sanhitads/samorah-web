@@ -65,12 +65,28 @@ export interface HourEntry {
  *  tiles), or Quote. */
 export interface CustomSection {
   type: "statement" | "lines" | "grid" | "quote";
+  /** Where the section drops into the page flow (top / after a named built-in section / end). */
+  position?: string;
   eyebrow?: string;
   heading?: string;
   body?: string; // statement: paragraphs (blank-line separated); quote: the quote text
   lines?: string[]; // lines block
   items?: { label: string; note: string }[]; // grid block
 }
+
+/** Placement options for a custom section → the base `order` it renders at (built-in sections use
+ *  integer orders 1–8, so the .5 values drop a custom section into each gap). */
+export const AIR_SECTION_POSITIONS: { value: string; label: string; order: number }[] = [
+  { value: "top", label: "At the top (below Add to Bag)", order: 0.5 },
+  { value: "after-hour", label: "After The Hour", order: 1.5 },
+  { value: "after-fragrance", label: "After Fragrance Journey", order: 2.5 },
+  { value: "after-feels", label: "After Feels Like", order: 3.5 },
+  { value: "after-experience", label: "After The Experience", order: 4.5 },
+  { value: "after-placement", label: "After Placement", order: 5.5 },
+  { value: "after-signature", label: "After Signature", order: 6.5 },
+  { value: "after-details", label: "After Details", order: 7.5 },
+  { value: "end", label: "At the very end", order: 8.5 },
+];
 
 /** The house-default accordion rows for an air product — the starting point the editor pre-fills so
  *  Composition / Shipping are visible and editable from the first open (the admin can edit / add / remove). */
