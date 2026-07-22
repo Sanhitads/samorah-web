@@ -93,7 +93,7 @@ type CEdit = {
 
 function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () => void; onSaved: () => void }) {
   const [c, setC] = useState<CEdit | null>(null);
-  const [products, setProducts] = useState<{ id: string; name: string; displayOrder: number; heroProduct: boolean }[]>([]);
+  const [products, setProducts] = useState<{ id: string; name: string; displayOrder: number; heroProduct: boolean; productType: string; chapterImage: string }[]>([]);
   const [allProducts, setAllProducts] = useState<{ id: string; name: string }[]>([]);
   const [busy, setBusy] = useState(false); const [err, setErr] = useState(""); const [msg, setMsg] = useState("");
   const [previewOn, setPreviewOn] = useState(true);
@@ -141,6 +141,22 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
   }, [id]);
 
   const set = (patch: Partial<CEdit>) => setC((v) => (v ? { ...v, ...patch } : v));
+  // Upload a file to Cloudinary via the media API → returns its URL (shared by hero + per-product images).
+  const uploadFile = async (file: File, folder: string, alt: string): Promise<string | null> => {
+    setBusy(true); setErr("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file); fd.append("folder", folder); if (alt) fd.append("alt", alt);
+      const res = await fetch("/api/admin/media", { method: "POST", body: fd });
+      const d = await res.json(); setBusy(false);
+      if (!res.ok || !d.url) { setErr(d.error ?? d.reason ?? "Upload failed"); return null; }
+      return d.url as string;
+    } catch (e) { setBusy(false); setErr(e instanceof Error ? e.message : "Upload failed"); return null; }
+  };
+  const setProductChapterImage = async (productId: string, file: File) => {
+    const url = await uploadFile(file, "chapters", c?.name || "");
+    if (url && await post({ action: "product.chapterImage", productId, url })) { await load(); onSaved(); }
+  };
 
   // Live preview draft — a collection row + its air products + next volume, so /chapter-preview renders
   // the REAL chapter page from the current (unsaved) form.
@@ -200,12 +216,19 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
           <label className="cfg-field"><span>Long story</span><textarea value={c.storyLong} onChange={(e) => set({ storyLong: e.target.value })} rows={4} /></label>
         </details>
 
-        <details className="pe-sec">
+        <details className="pe-sec" data-anchor="hero">
           <summary>Hero &amp; media</summary>
           <div className="cfg-grid">
-            <label className="cfg-field"><span>Hero image URL (desktop)</span><input value={c.coverImageUrl} onChange={(e) => set({ coverImageUrl: e.target.value })} /></label>
+            <label className="cfg-field"><span>Hero image URL (desktop)</span><input value={c.coverImageUrl} onChange={(e) => set({ coverImageUrl: e.target.value })} placeholder="Upload below, or paste a URL" /></label>
             <label className="cfg-field"><span>Hero image URL (mobile)</span><input value={c.heroMobileUrl} onChange={(e) => set({ heroMobileUrl: e.target.value })} /></label>
             <label className="cfg-field"><span>Hero (signature) product</span><select value={c.heroProductId} onChange={(e) => set({ heroProductId: e.target.value })}><option value="">— none —</option>{allProducts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+          </div>
+          <div className="pe-imgadd" style={{ alignItems: "center" }}>
+            {c.coverImageUrl ? (/* eslint-disable-next-line @next/next/no-img-element */ <img className="pl-thumb" src={c.coverImageUrl} alt="" />) : <span className="pl-thumb pl-thumb--empty" />}
+            <label className={`ff-btn ff-btn--primary${busy ? " is-disabled" : ""}`} style={{ cursor: busy ? "default" : "pointer" }}>
+              {busy ? "Uploading…" : "⬆ Upload hero image"}
+              <input type="file" accept="image/*" style={{ display: "none" }} disabled={busy} onChange={async (e) => { const f = e.target.files?.[0]; if (f) { const url = await uploadFile(f, "chapters", c.name); if (url) set({ coverImageUrl: url }); } e.target.value = ""; }} />
+            </label>
           </div>
         </details>
 
@@ -253,14 +276,24 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
 
         <details className="pe-sec" open>
           <summary>Products in this chapter ({products.length})</summary>
-          {products.length ? [...products].sort((a, b) => a.displayOrder - b.displayOrder).map((p) => (
-            <div key={p.id} className="cfg-row" style={{ gridTemplateColumns: "1fr auto auto auto" }}>
-              <span>{p.name}{p.heroProduct ? <span className="pl-flag" style={{ marginLeft: 6 }}>HERO</span> : null}</span>
-              <span className="admin__muted admin__mono">#{p.displayOrder}</span>
-              <button type="button" className="ff-btn ff-btn--mini" onClick={() => moveProduct(p.id, -1)}>↑</button>
-              <button type="button" className="ff-btn ff-btn--mini" onClick={() => moveProduct(p.id, 1)}>↓</button>
-            </div>
-          )) : <p className="admin__muted">No products assigned. Assign products to this chapter from the product editor (Collection &amp; chapter).</p>}
+          <p className="om-field__hint" style={{ margin: "0 0 8px" }}>Product text is edited in the product editor. Here you set the <b>order</b> and the <b>card image</b> — the picture shown on this chapter page, which can differ from the product’s PDP image. No card image → it uses the product’s photo.</p>
+          {products.length ? [...products].sort((a, b) => a.displayOrder - b.displayOrder).map((p) => {
+            const isAir = p.productType === "room_spray" || p.productType === "linen_spray";
+            return (
+              <div key={p.id} className="cfg-row" style={{ gridTemplateColumns: "auto 1fr auto auto auto", alignItems: "center", gap: 10 }}>
+                {p.chapterImage ? (/* eslint-disable-next-line @next/next/no-img-element */ <img className="pl-thumb" src={p.chapterImage} alt="" />) : <span className="pl-thumb pl-thumb--empty" />}
+                <span>{p.name}{p.heroProduct ? <span className="pl-flag" style={{ marginLeft: 6 }}>HERO</span> : null} <span className="admin__muted admin__mono">#{p.displayOrder}</span></span>
+                {isAir ? (
+                  <label className={`ff-btn ff-btn--mini${busy ? " is-disabled" : ""}`} style={{ cursor: busy ? "default" : "pointer" }} title="A different image for the chapter card (separate from the PDP)">
+                    {p.chapterImage ? "Replace card image" : "⬆ Card image"}
+                    <input type="file" accept="image/*" style={{ display: "none" }} disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; if (f) void setProductChapterImage(p.id, f); e.target.value = ""; }} />
+                  </label>
+                ) : <span />}
+                <button type="button" className="pe-icon-btn" onClick={() => moveProduct(p.id, -1)} aria-label="Move up" title="Move up">↑</button>
+                <button type="button" className="pe-icon-btn" onClick={() => moveProduct(p.id, 1)} aria-label="Move down" title="Move down">↓</button>
+              </div>
+            );
+          }) : <p className="admin__muted">No products assigned. Assign products to this chapter from the product editor (Collection &amp; chapter).</p>}
         </details>
 
         {err ? <p className="ff-err">{err}</p> : null}

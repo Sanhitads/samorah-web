@@ -70,7 +70,7 @@ function toHourBlock(
     category: categoryOf(kind),
     scent: h.scent,
     story: h.story,
-    media: imageMedia(h.gradient, h.name, "landscape"),
+    media: imageMedia(h.cardImage ?? h.gradient, h.name, "landscape"),
     priceLabel: h.priceLabel,
     href: `/shop/${h.productSlug}`,
     // alternate Image-Left / Image-Right continuously across the volume

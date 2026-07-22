@@ -20,11 +20,16 @@ const hex = (v: any): string | null => (typeof v === "string" && /^#[0-9a-fA-F]{
 export function airHourFromProduct(p: any): HourEntry {
   const ac = (p.air_content ?? {}) as any;
   const price = Number(p.price ?? 0);
+  const primary = primaryImg(p.product_images);
+  // PDP hero image = the product's own photo (or gradient); the chapter card can override with its
+  // own image (air_content.chapterImage) so the same product shows a different picture in each place.
+  const heroImg = primary ?? ac.gradient ?? "gradient:grad-air";
+  const cardImg = ac.chapterImage || heroImg;
   const cp = ac.customPalette;
   const customPalette = cp && hex(cp.surface) && hex(cp.ink) ? { surface: hex(cp.surface)!, ink: hex(cp.ink)! } : undefined;
   const cg = ac.customGradient;
   const angle = Number.isFinite(Number(cg?.angle)) ? Number(cg.angle) : 135;
-  const customGradientCss = !primaryImg(p.product_images) && cg && hex(cg.from) && hex(cg.to)
+  const customGradientCss = !primary && cg && hex(cg.from) && hex(cg.to)
     ? `linear-gradient(${angle}deg, ${hex(cg.from)} 0%, ${hex(cg.to)} 100%)`
     : undefined;
   return {
@@ -48,7 +53,8 @@ export function airHourFromProduct(p: any): HourEntry {
     priceLabel: price ? `From ₹${price}` : "",
     price,
     palette: ac.palette || "monsoon",
-    gradient: primaryImg(p.product_images) ?? ac.gradient ?? "gradient:grad-air",
+    gradient: heroImg,
+    cardImage: cardImg,
     interlude: ac.interlude || undefined,
     accordion: Array.isArray(ac.accordion)
       ? ac.accordion.map((x: any) => ({ title: String(x.title ?? "").trim(), body: String(x.body ?? "").trim() })).filter((x: any) => x.title || x.body)

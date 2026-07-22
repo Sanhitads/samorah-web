@@ -31,17 +31,29 @@ export async function listCollectionsAdmin(): Promise<CollectionRow[]> {
   }));
 }
 
-export async function getCollectionForEdit(id: string): Promise<{ collection: any; products: { id: string; name: string; displayOrder: number; heroProduct: boolean }[]; allProducts: { id: string; name: string }[] } | null> {
+export async function getCollectionForEdit(id: string): Promise<{ collection: any; products: { id: string; name: string; displayOrder: number; heroProduct: boolean; productType: string; chapterImage: string }[]; allProducts: { id: string; name: string }[] } | null> {
   const db = loose();
   const { data: collection } = await db.from("collections").select("*").eq("id", id).maybeSingle();
   if (!collection) return null;
   const [{ data: inCol }, { data: all }] = await Promise.all([
-    db.from("products").select("id,name,display_order").eq("collection_id", id).order("display_order"),
+    db.from("products").select("id,name,display_order,product_type,air_content").eq("collection_id", id).order("display_order"),
     db.from("products").select("id,name").order("name"),
   ]);
-  const products = (inCol ?? []).map((p: any) => ({ id: p.id, name: p.name, displayOrder: Number(p.display_order ?? 0), heroProduct: p.id === collection.hero_product_id }));
+  const products = (inCol ?? []).map((p: any) => ({ id: p.id, name: p.name, displayOrder: Number(p.display_order ?? 0), heroProduct: p.id === collection.hero_product_id, productType: p.product_type ?? "candle", chapterImage: String((p.air_content ?? {}).chapterImage ?? "") }));
   const allProducts = (all ?? []).map((p: any) => ({ id: p.id, name: p.name }));
   return { collection, products, allProducts };
+}
+
+/** Set a product's chapter-listing card image (air_content.chapterImage) — a different picture from its
+ *  PDP hero. Merges into air_content so nothing else is lost. */
+export async function setProductChapterImage(productId: string, url: string, actorId?: string) {
+  const db = loose();
+  const { data: p } = await db.from("products").select("air_content").eq("id", productId).maybeSingle();
+  const ac = ((p?.air_content ?? {}) as Record<string, unknown>);
+  const { error } = await db.from("products").update({ air_content: { ...ac, chapterImage: url || undefined }, updated_at: new Date().toISOString() }).eq("id", productId);
+  if (error) return { ok: false, reason: error.message };
+  await logEvent({ entityType: "product", entityId: productId, event: "product.chapter_image", actorType: actorId ? "staff" : "system", actorId });
+  return { ok: true };
 }
 
 export interface CollectionInput {

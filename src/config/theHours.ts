@@ -31,7 +31,8 @@ export interface HourEntry {
   priceLabel: string; // "From ₹599" until the commerce projection resolves it
   price: number; // commerce price (placeholder until air products exist)
   palette: string; // per-hour atmosphere theme token (the PDP editorial palette)
-  gradient: string; // "gradient:grad-air"
+  gradient: string; // "gradient:grad-air" — the PDP hero image
+  cardImage?: string; // the chapter-listing card image (may differ from the PDP hero); falls back to gradient
   /** A short editorial line shown between this Hour and the next (turning a leaf). */
   interlude?: string;
   /** Chapter position (e.g. "1.4") — drives the "VOL. I.4" edition when set. */
