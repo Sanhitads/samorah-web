@@ -50,12 +50,34 @@ export async function getProductBySlug(slug: string) {
   const { data, error } = await db
     .from("products")
     .select(
-      "*, collection:collections!products_collection_id_fkey(id, name, slug, volume), variants(*), product_images(*), fragrance_notes(layer, note, sort_order)",
+      "*, collection:collections!products_collection_id_fkey(id, name, slug, volume, tagline, cover_image_url, is_coming_soon), variants(*), product_images(*), fragrance_notes(layer, note, sort_order)",
     )
     .eq("slug", slug)
     .maybeSingle();
   if (error) throw error;
   return data;
+}
+
+// Product types that render the AIR PDP (room / linen fresheners, etc.).
+export const AIR_PRODUCT_TYPES = ["room_spray", "linen_spray"];
+
+/** Other air products in the same collection (the air PDP's "Continue the volume"). Ordered by
+ *  display order. Returns the fields the air view builder needs; empty if the column set isn't there
+ *  yet (pre-migration). */
+export async function getAirSiblings(collectionId: string, excludeProductId: string) {
+  const db = createPublicClient();
+  try {
+    const { data } = await db
+      .from("products")
+      .select("id, slug, name, tagline, price, air_content, product_type, display_order, product_images(url, is_primary, sort_order)")
+      .eq("collection_id", collectionId)
+      .in("product_type", AIR_PRODUCT_TYPES)
+      .neq("id", excludeProductId)
+      .order("display_order");
+    return data ?? [];
+  } catch {
+    return [];
+  }
 }
 
 /** Active variants for a product, ordered. */

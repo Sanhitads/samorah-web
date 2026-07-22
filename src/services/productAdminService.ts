@@ -180,6 +180,8 @@ export interface ProductCoreInput {
   chapterPosition?: string; displayOrder?: number;
   // Artist section (per-product; PDP falls back to the house artist)
   artistEnabled?: boolean; artistName?: string; artistRole?: string; artistStory?: string; artistQuote?: string; artistImage?: string;
+  // Air-product PDP content (room / linen fresheners)
+  airContent?: Record<string, unknown> | null;
   // Merchandising flags (added by 20260730120000_product_cms)
   isBestseller?: boolean; isNewArrival?: boolean; isLimitedEdition?: boolean; isSeasonal?: boolean; isStaffPick?: boolean; isComingSoon?: boolean;
   // Visibility controls
@@ -200,6 +202,7 @@ function productRow(i: ProductCoreInput): Record<string, unknown> {
   s("chapter_position", i.chapterPosition);
   s("artist_name", i.artistName); s("artist_role", i.artistRole); s("artist_story", i.artistStory); s("artist_quote", i.artistQuote); s("artist_image", i.artistImage);
   b("artist_enabled", i.artistEnabled);
+  if (i.airContent !== undefined) r.air_content = i.airContent;
   if (i.moodTags !== undefined) r.mood_tags = i.moodTags.map((t) => t.trim()).filter(Boolean);
   if (i.collectionId !== undefined) r.collection_id = i.collectionId || null;
   if (i.categoryId !== undefined && i.categoryId) r.category_id = i.categoryId;
@@ -225,7 +228,7 @@ const CMS_COLUMNS = [
   "is_bestseller", "is_new_arrival", "is_limited_edition", "is_seasonal", "is_staff_pick", "is_coming_soon",
   "visible_website", "visible_search", "visible_homepage", "visible_chapter", "visible_bundles",
   "chapter_position", "display_order", "seo_og_image", "seo_canonical", "product_type",
-  "artist_enabled", "artist_name", "artist_role", "artist_story", "artist_quote", "artist_image",
+  "artist_enabled", "artist_name", "artist_role", "artist_story", "artist_quote", "artist_image", "air_content",
 ];
 
 export async function updateProduct(id: string, input: ProductCoreInput, actorId?: string) {

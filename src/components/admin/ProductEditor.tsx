@@ -36,7 +36,16 @@ type Core = {
   isFeatured: boolean; isHero: boolean; isBestseller: boolean; isNewArrival: boolean; isLimitedEdition: boolean; isSeasonal: boolean; isStaffPick: boolean; isComingSoon: boolean;
   visibleWebsite: boolean; visibleSearch: boolean; visibleHomepage: boolean; visibleChapter: boolean; visibleBundles: boolean; allowBackorder: boolean;
   artistEnabled: boolean; artistName: string; artistRole: string; artistStory: string; artistQuote: string; artistImage: string;
+  // Air PDP content (room / linen fresheners) — flat in the form, assembled to JSON on save.
+  airTime: string; airMoment: string; airHeroLine: string; airHourReason: string; airHourStory: string; airScentEffect: string;
+  airScent: string; airFeels: string; airExperience: string; airPlacement: string; airSignature: string; airComposition: string;
 };
+
+const AIR_TYPES = ["room_spray", "linen_spray"];
+// Placement is edited as "label | note" per line.
+const placementToText = (arr: { label?: string; note?: string }[]) => (Array.isArray(arr) ? arr.map((p) => `${p.label ?? ""}${p.note ? ` | ${p.note}` : ""}`).join("\n") : "");
+const textToPlacement = (t: string) => t.split("\n").map((l) => l.trim()).filter(Boolean).map((l) => { const [label, note] = l.split("|").map((s) => s.trim()); return { label: label ?? "", note: note ?? "" }; });
+const linesToArr = (t: string) => t.split("\n").map((s) => s.trim()).filter(Boolean);
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const bv = (v: any) => Boolean(v);
@@ -84,6 +93,14 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
       visibleHomepage: p.visible_homepage == null ? true : bv(p.visible_homepage), visibleChapter: p.visible_chapter == null ? true : bv(p.visible_chapter),
       visibleBundles: p.visible_bundles == null ? true : bv(p.visible_bundles), allowBackorder: bv(p.allow_backorder),
       artistEnabled: bv(p.artist_enabled), artistName: sv(p.artist_name), artistRole: sv(p.artist_role), artistStory: sv(p.artist_story), artistQuote: sv(p.artist_quote), artistImage: sv(p.artist_image),
+      ...((): Pick<Core, "airTime" | "airMoment" | "airHeroLine" | "airHourReason" | "airHourStory" | "airScentEffect" | "airScent" | "airFeels" | "airExperience" | "airPlacement" | "airSignature" | "airComposition"> => {
+        const ac = (p.air_content ?? {}) as Record<string, unknown>;
+        return {
+          airTime: sv(ac.time), airMoment: sv(ac.moment), airHeroLine: sv(ac.heroLine), airHourReason: sv(ac.hourReason), airHourStory: sv(ac.hourStory), airScentEffect: sv(ac.scentEffect),
+          airScent: Array.isArray(ac.scent) ? (ac.scent as string[]).join(", ") : "", airFeels: Array.isArray(ac.feels) ? (ac.feels as string[]).join("\n") : "",
+          airExperience: sv(ac.experience), airPlacement: placementToText((ac.placement as { label?: string; note?: string }[]) ?? []), airSignature: sv(ac.signature), airComposition: sv(ac.composition),
+        };
+      })(),
     });
     setVariants(d.variants ?? []); setNotes(d.notes ?? []); setImages(d.images ?? []);
   };
@@ -97,10 +114,17 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
 
   const saveCore = async () => {
     if (!core) return;
+    const isAir = AIR_TYPES.includes(core.productType);
+    const airContent = isAir ? {
+      time: core.airTime, moment: core.airMoment, heroLine: core.airHeroLine, hourReason: core.airHourReason, hourStory: core.airHourStory, scentEffect: core.airScentEffect,
+      scent: core.airScent.split(",").map((s) => s.trim()).filter(Boolean), feels: linesToArr(core.airFeels), experience: core.airExperience,
+      placement: textToPlacement(core.airPlacement), signature: core.airSignature, composition: core.airComposition,
+    } : undefined;
     const product = {
       ...core, salePrice: numOrNull(core.salePrice), weightGrams: numOrNull(core.weightGrams),
       moodTags: core.moodTags.split(",").map((t) => t.trim()).filter(Boolean),
       collectionId: core.collectionId || null, displayOrder: Number(core.displayOrder || 0), publishAt: core.publishAt || null,
+      ...(airContent ? { airContent } : {}),
     };
     if (await post({ action: "update", id: productId, product })) { setMsg("Saved"); onSaved(); setTimeout(() => setMsg(""), 1500); }
   };
@@ -219,6 +243,29 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
           <label className="cfg-field"><span>Artist story <em className="om-field__hint">one paragraph per line</em></span><textarea value={core.artistStory} onChange={(e) => set({ artistStory: e.target.value })} rows={4} disabled={!core.artistEnabled} /></label>
           <label className="cfg-field"><span>Artist quote</span><input value={core.artistQuote} onChange={(e) => set({ artistQuote: e.target.value })} placeholder="Every colour begins with a feeling." disabled={!core.artistEnabled} /></label>
         </details>
+
+        {AIR_TYPES.includes(core.productType) ? (
+          <details className="pe-sec" open>
+            <summary>Air PDP content (room / linen freshener)</summary>
+            <p className="om-field__hint" style={{ margin: "0 0 8px" }}>Room &amp; linen fresheners use the air PDP — The Hour, Fragrance Journey (Opening / Heart / Lingering), Feels Like, The Experience, Placement, Signature. Fill these; they render on the storefront.</p>
+            <div className="cfg-grid">
+              <label className="cfg-field"><span>Hour (time)</span><input value={core.airTime} onChange={(e) => set({ airTime: e.target.value })} placeholder="18:40" /></label>
+              <label className="cfg-field"><span>Moment</span><input value={core.airMoment} onChange={(e) => set({ airMoment: e.target.value })} placeholder="The Day Loosens" /></label>
+              <label className="cfg-field"><span>Hero line (tagline)</span><input value={core.airHeroLine} onChange={(e) => set({ airHeroLine: e.target.value })} placeholder="Air after the first light." /></label>
+            </div>
+            <label className="cfg-field"><span>The Hour — reason (short)</span><input value={core.airHourReason} onChange={(e) => set({ airHourReason: e.target.value })} placeholder="The hour the day finally forgets to hurry." /></label>
+            <label className="cfg-field"><span>The Hour — story (long, one line per paragraph)</span><textarea value={core.airHourStory} onChange={(e) => set({ airHourStory: e.target.value })} rows={5} /></label>
+            <label className="cfg-field"><span>Fragrance journey — effect (intro)</span><input value={core.airScentEffect} onChange={(e) => set({ airScentEffect: e.target.value })} placeholder="Soft. Comforting. Slightly indulgent…" /></label>
+            <label className="cfg-field"><span>Scent — Opening · Heart · Lingering <em className="om-field__hint">comma-separated (3)</em></span><input value={core.airScent} onChange={(e) => set({ airScent: e.target.value })} placeholder="Ripe Fig Flesh, Brown Sugar Warmth, Soft Amber &amp; Sandalwood" /></label>
+            <label className="cfg-field"><span>Feels like <em className="om-field__hint">one line each</em></span><textarea value={core.airFeels} onChange={(e) => set({ airFeels: e.target.value })} rows={2} /></label>
+            <label className="cfg-field"><span>The Experience</span><textarea value={core.airExperience} onChange={(e) => set({ airExperience: e.target.value })} rows={3} /></label>
+            <label className="cfg-field"><span>Placement <em className="om-field__hint">one per line — "label | note"</em></span><textarea value={core.airPlacement} onChange={(e) => set({ airPlacement: e.target.value })} rows={3} placeholder="Evenings with no plans&#10;Post-work silence" /></label>
+            <div className="cfg-grid">
+              <label className="cfg-field"><span>Signature line</span><input value={core.airSignature} onChange={(e) => set({ airSignature: e.target.value })} placeholder="Best experienced when you stop trying to be productive." /></label>
+              <label className="cfg-field"><span>Composition (accordion body)</span><input value={core.airComposition} onChange={(e) => set({ airComposition: e.target.value })} placeholder="A room mist spray. 100 ml. Made in India." /></label>
+            </div>
+          </details>
+        ) : null}
 
         <details className="pe-sec">
           <summary>Fragrance Journey ({notes.filter((n) => n.note.trim()).length})</summary>

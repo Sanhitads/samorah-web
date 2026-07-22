@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { withRouteSeo } from "@/services/seoRedirectService";
-import { getProductBySlug, getProducts, getRelatedProducts } from "@/services/productService";
+import { getProductBySlug, getProducts, getRelatedProducts, getAirSiblings, AIR_PRODUCT_TYPES } from "@/services/productService";
+import { buildAirViewFromDb } from "@/lib/airFromProduct";
 import { buildProductPage, type ProductInput } from "@/lib/productPage";
 import { buildCandleEditorial, type RelatedProductInput } from "@/lib/productEditorial";
 import { chapterTheme } from "@/lib/chapterPage";
@@ -84,6 +85,15 @@ export default async function ProductRoute({
       .filter((h) => h.productSlug !== slug);
     return <AirProductDetail hour={air.hour} group={air.group} volume={air.volume} others={others} />;
   }
+  // Air products (room / linen fresheners) render the air PDP — now from the DB, not config.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const dbp = product as any;
+  if (AIR_PRODUCT_TYPES.includes(dbp.product_type)) {
+    const siblings = dbp.collection?.id ? await getAirSiblings(dbp.collection.id, dbp.id) : [];
+    const { hour, group, volume, others } = buildAirViewFromDb(dbp, siblings);
+    return <AirProductDetail hour={hour} group={group} volume={volume} others={others} />;
+  }
+
   const raw = product as unknown as ProductInput & {
     id: string;
     fragrance_family: string | null;
