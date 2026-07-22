@@ -254,6 +254,21 @@ export async function setProductStatus(id: string, status: ProductStatus, actorI
   return { ok: true };
 }
 
+/** Permanently delete a product — guarded: never delete one with order history (archive it instead).
+ *  Removes its variants, images and fragrance notes first so no orphans remain. */
+export async function deleteProduct(id: string, actorId?: string) {
+  const db = loose();
+  const { data: sold } = await db.from("order_items").select("id").eq("product_id", id).limit(1);
+  if ((sold ?? []).length) return { ok: false, reason: "This product has order history — set it to Archived instead of deleting." };
+  await db.from("fragrance_notes").delete().eq("product_id", id);
+  await db.from("product_images").delete().eq("product_id", id);
+  await db.from("variants").delete().eq("product_id", id);
+  const { error } = await db.from("products").delete().eq("id", id);
+  if (error) return { ok: false, reason: error.message };
+  await logEvent({ entityType: "product", entityId: id, event: "product.deleted", actorType: actorId ? "staff" : "system", actorId });
+  return { ok: true };
+}
+
 export async function setProductFeatured(id: string, isFeatured: boolean, actorId?: string) {
   const db = loose();
   const { error } = await db.from("products").update({ is_featured: isFeatured, updated_at: new Date().toISOString() }).eq("id", id);

@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { ProductRow, ProductStatus } from "@/services/productAdminService";
 import { ProductEditor } from "@/components/admin/ProductEditor";
 
+const PAGE_SIZE = 12;
 const STATUSES: ProductStatus[] = ["draft", "active", "out_of_stock", "archived"];
 const GST = [0, 5, 12, 18, 28];
 const STATUS_TONE: Record<string, string> = { active: "paid", draft: "pending", out_of_stock: "refundprog", archived: "refunded" };
@@ -28,6 +29,8 @@ export function ProductsManager({ products, categories, collections }: {
   const [search, setSearch] = useState("");
   const [fStatus, setFStatus] = useState(""); const [fCollection, setFCollection] = useState(""); const [fFamily, setFFamily] = useState(""); const [fFlag, setFFlag] = useState("");
   const [sort, setSort] = useState("updated");
+  const [page, setPage] = useState(0);
+  const [confirmDel, setConfirmDel] = useState<string | null>(null);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const post = async (body: Record<string, unknown>): Promise<any> => {
@@ -74,6 +77,12 @@ export function ProductsManager({ products, categories, collections }: {
   const anyFilter = search || fStatus || fCollection || fFamily || fFlag;
   const collectionNames = useMemo(() => [...new Set(products.map((p) => p.collectionName).filter(Boolean))] as string[], [products]);
 
+  // Pagination — reset to page 1 whenever the filtered set changes.
+  useEffect(() => { setPage(0); }, [search, fStatus, fCollection, fFamily, fFlag, sort]);
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const pageRows = rows.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
+
   return (
     <div className="cfg">
       <div className="oms-strip">
@@ -104,7 +113,7 @@ export function ProductsManager({ products, categories, collections }: {
         <table className="admin__table admin__table--board">
           <thead><tr><th></th><th>Product</th><th>Collection</th><th>Price</th><th>Stock</th><th>Sales</th><th>Flags</th><th>Status</th><th>Updated</th><th>Actions</th></tr></thead>
           <tbody>
-            {rows.map((p) => (
+            {pageRows.map((p) => (
               <tr key={p.id}>
                 <td>{p.imageUrl ? (/* eslint-disable-next-line @next/next/no-img-element */ <img className="pl-thumb" src={p.imageUrl} alt="" />) : <span className="pl-thumb pl-thumb--empty" />}</td>
                 <td>{p.name}<div className="admin__muted admin__mono">{p.baseSku}{p.fragranceFamily ? ` · ${p.fragranceFamily}` : ""}</div></td>
@@ -125,14 +134,38 @@ export function ProductsManager({ products, categories, collections }: {
                 </td>
                 <td className="admin__muted">{shortDate(p.updatedAt)}</td>
                 <td className="ff-actions">
-                  <button type="button" className="ff-btn" onClick={() => setEditId(p.id)}>Edit</button>
-                  <button type="button" className="ff-btn ff-btn--mini" disabled={busy} title="Duplicate" onClick={async () => { const d = await post({ action: "duplicate", id: p.id }); if (d?.ok) { refresh(); setEditId(d.id); } }}>⧉</button>
+                  {confirmDel === p.id ? (
+                    <>
+                      <span className="admin__muted" style={{ marginRight: 4 }}>Delete?</span>
+                      <button type="button" className="ff-btn ff-btn--mini ff-btn--danger" disabled={busy} onClick={async () => { if (await post({ action: "delete", id: p.id })) { setConfirmDel(null); refresh(); } }}>Yes, delete</button>
+                      <button type="button" className="ff-btn ff-btn--mini" disabled={busy} onClick={() => setConfirmDel(null)}>Cancel</button>
+                    </>
+                  ) : (
+                    <>
+                      <button type="button" className="ff-btn" onClick={() => setEditId(p.id)}>Edit</button>
+                      <button type="button" className="ff-btn ff-btn--mini" disabled={busy} title="Duplicate" onClick={async () => { const d = await post({ action: "duplicate", id: p.id }); if (d?.ok) { refresh(); setEditId(d.id); } }}>⧉</button>
+                      <button type="button" className="ff-btn ff-btn--mini ff-btn--danger" disabled={busy} title="Delete" onClick={() => setConfirmDel(p.id)}>🗑</button>
+                    </>
+                  )}
                 </td>
               </tr>
             ))}
             {rows.length === 0 ? <tr><td colSpan={10} className="admin__empty">No products{anyFilter ? " match these filters" : " yet"}.</td></tr> : null}
           </tbody>
         </table>
+      </div>
+
+      <div className="adm-pager">
+        <span className="adm-pager__info">
+          {rows.length === 0 ? "No products" : `Showing ${safePage * PAGE_SIZE + 1}–${Math.min(rows.length, (safePage + 1) * PAGE_SIZE)} of ${rows.length}`}
+        </span>
+        {totalPages > 1 ? (
+          <div className="adm-pager__nav">
+            <button type="button" className="ff-btn ff-btn--mini" disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>← Prev</button>
+            <span className="adm-pager__pages">Page {safePage + 1} of {totalPages}</span>
+            <button type="button" className="ff-btn ff-btn--mini" disabled={safePage >= totalPages - 1} onClick={() => setPage(safePage + 1)}>Next →</button>
+          </div>
+        ) : null}
       </div>
 
       {creating ? <CreateModal categories={categories} busy={busy} err={err} onClose={() => setCreating(false)} onCreate={async (c) => { const d = await post({ action: "create", product: c }); if (d?.ok) { setCreating(false); refresh(); } }} /> : null}

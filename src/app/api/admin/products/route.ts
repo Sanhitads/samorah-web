@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireCapability } from "@/lib/auth/requireStaff";
 import {
-  createProduct, updateProduct, setProductStatus, setProductFeatured, getProductForEdit, duplicateProduct,
+  createProduct, updateProduct, setProductStatus, setProductFeatured, getProductForEdit, duplicateProduct, deleteProduct,
   upsertVariant, deleteVariant, setFragranceNotes, addProductImage, updateProductImage, setPrimaryImage, deleteProductImage,
   type CreateProductInput, type ProductCoreInput, type VariantInput, type ProductStatus,
 } from "@/services/productAdminService";
@@ -36,6 +36,8 @@ export async function POST(request: Request) {
         return NextResponse.json(await setProductFeatured(body.id, Boolean(body.isFeatured), a));
       case "duplicate":
         return NextResponse.json(await duplicateProduct(body.id, a));
+      case "delete":
+        return NextResponse.json(await deleteProduct(body.id, a));
       case "variant.upsert":
         return NextResponse.json(await upsertVariant(body.variant as VariantInput, a));
       case "variant.delete":
