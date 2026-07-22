@@ -31,7 +31,7 @@ export async function listCollectionsAdmin(): Promise<CollectionRow[]> {
   }));
 }
 
-export async function getCollectionForEdit(id: string): Promise<{ collection: any; products: { id: string; name: string; displayOrder: number; heroProduct: boolean; productType: string; chapterImage: string }[]; allProducts: { id: string; name: string }[] } | null> {
+export async function getCollectionForEdit(id: string): Promise<{ collection: any; products: { id: string; name: string; displayOrder: number; heroProduct: boolean; productType: string; chapterImage: string; interlude: string }[]; allProducts: { id: string; name: string }[] } | null> {
   const db = loose();
   const { data: collection } = await db.from("collections").select("*").eq("id", id).maybeSingle();
   if (!collection) return null;
@@ -39,7 +39,7 @@ export async function getCollectionForEdit(id: string): Promise<{ collection: an
     db.from("products").select("id,name,display_order,product_type,air_content").eq("collection_id", id).order("display_order"),
     db.from("products").select("id,name").order("name"),
   ]);
-  const products = (inCol ?? []).map((p: any) => ({ id: p.id, name: p.name, displayOrder: Number(p.display_order ?? 0), heroProduct: p.id === collection.hero_product_id, productType: p.product_type ?? "candle", chapterImage: String((p.air_content ?? {}).chapterImage ?? "") }));
+  const products = (inCol ?? []).map((p: any) => ({ id: p.id, name: p.name, displayOrder: Number(p.display_order ?? 0), heroProduct: p.id === collection.hero_product_id, productType: p.product_type ?? "candle", chapterImage: String((p.air_content ?? {}).chapterImage ?? ""), interlude: String((p.air_content ?? {}).interlude ?? "") }));
   const allProducts = (all ?? []).map((p: any) => ({ id: p.id, name: p.name }));
   return { collection, products, allProducts };
 }
@@ -47,12 +47,24 @@ export async function getCollectionForEdit(id: string): Promise<{ collection: an
 /** Set a product's chapter-listing card image (air_content.chapterImage) — a different picture from its
  *  PDP hero. Merges into air_content so nothing else is lost. */
 export async function setProductChapterImage(productId: string, url: string, actorId?: string) {
+  return mergeProductAir(productId, { chapterImage: url || undefined }, "product.chapter_image", actorId);
+}
+
+/** Set a product's interlude line (air_content.interlude) — the quote shown after its card on the
+ *  chapter page. */
+export async function setProductInterlude(productId: string, value: string, actorId?: string) {
+  return mergeProductAir(productId, { interlude: value.trim() || undefined }, "product.interlude", actorId);
+}
+
+/** Merge a patch into a product's air_content (read-modify-write) — shared by the chapter editor's
+ *  per-product fields (card image, interlude). */
+async function mergeProductAir(productId: string, patch: Record<string, unknown>, event: string, actorId?: string) {
   const db = loose();
   const { data: p } = await db.from("products").select("air_content").eq("id", productId).maybeSingle();
   const ac = ((p?.air_content ?? {}) as Record<string, unknown>);
-  const { error } = await db.from("products").update({ air_content: { ...ac, chapterImage: url || undefined }, updated_at: new Date().toISOString() }).eq("id", productId);
+  const { error } = await db.from("products").update({ air_content: { ...ac, ...patch }, updated_at: new Date().toISOString() }).eq("id", productId);
   if (error) return { ok: false, reason: error.message };
-  await logEvent({ entityType: "product", entityId: productId, event: "product.chapter_image", actorType: actorId ? "staff" : "system", actorId });
+  await logEvent({ entityType: "product", entityId: productId, event, actorType: actorId ? "staff" : "system", actorId });
   return { ok: true };
 }
 

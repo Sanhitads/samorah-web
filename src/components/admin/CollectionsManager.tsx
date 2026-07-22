@@ -104,7 +104,7 @@ const contrastRatio = (h1: string, h2: string) => { const l1 = lum(rgbOf(h1)), l
 
 function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () => void; onSaved: () => void }) {
   const [c, setC] = useState<CEdit | null>(null);
-  const [products, setProducts] = useState<{ id: string; name: string; displayOrder: number; heroProduct: boolean; productType: string; chapterImage: string }[]>([]);
+  const [products, setProducts] = useState<{ id: string; name: string; displayOrder: number; heroProduct: boolean; productType: string; chapterImage: string; interlude: string }[]>([]);
   const [allProducts, setAllProducts] = useState<{ id: string; name: string }[]>([]);
   const [busy, setBusy] = useState(false); const [err, setErr] = useState(""); const [msg, setMsg] = useState("");
   const [previewOn, setPreviewOn] = useState(true);
@@ -169,6 +169,14 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
     const url = await uploadFile(file, "chapters", c?.name || "");
     if (url && await post({ action: "product.chapterImage", productId, url })) { await load(); onSaved(); }
   };
+  // Interlude — the quote after a product's card. Edit live (updates the input + the preview draft),
+  // persist on blur.
+  const editInterlude = (productId: string, value: string) => {
+    setProducts((ps) => ps.map((p) => (p.id === productId ? { ...p, interlude: value } : p)));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    setAirProducts((aps) => aps.map((p: any) => (p.id === productId ? { ...p, air_content: { ...(p.air_content || {}), interlude: value } } : p)));
+  };
+  const saveInterlude = (productId: string, value: string) => { void post({ action: "product.interlude", productId, value }); };
 
   // Live preview draft — a collection row + its air products + next volume, so /chapter-preview renders
   // the REAL chapter page from the current (unsaved) form.
@@ -312,21 +320,26 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
 
         <details className="pe-sec" open>
           <summary>Products in this chapter ({products.length})</summary>
-          <p className="om-field__hint" style={{ margin: "0 0 8px" }}>Product text is edited in the product editor. Here you set the <b>order</b> and the <b>card image</b> — the picture shown on this chapter page, which can differ from the product’s PDP image. No card image → it uses the product’s photo.</p>
+          <p className="om-field__hint" style={{ margin: "0 0 8px" }}>Product text is edited in the product editor. Here you set the <b>order</b>, the <b>card image</b> (the picture on this chapter page — can differ from the PDP), and the <b>interlude</b> (the quote shown after the card).</p>
           {products.length ? [...products].sort((a, b) => a.displayOrder - b.displayOrder).map((p) => {
             const isAir = p.productType === "room_spray" || p.productType === "linen_spray";
             return (
-              <div key={p.id} className="cfg-row" style={{ gridTemplateColumns: "auto 1fr auto auto auto", alignItems: "center", gap: 10 }}>
-                {p.chapterImage ? (/* eslint-disable-next-line @next/next/no-img-element */ <img className="pl-thumb" src={p.chapterImage} alt="" />) : <span className="pl-thumb pl-thumb--empty" />}
-                <span>{p.name}{p.heroProduct ? <span className="pl-flag" style={{ marginLeft: 6 }}>HERO</span> : null} <span className="admin__muted admin__mono">#{p.displayOrder}</span></span>
+              <div key={p.id} className="pe-chprod" data-anchor={p.productType === "linen_spray" ? "hours-linen" : "hours-room"}>
+                <div className="cfg-row" style={{ gridTemplateColumns: "auto 1fr auto auto auto", alignItems: "center", gap: 10 }}>
+                  {p.chapterImage ? (/* eslint-disable-next-line @next/next/no-img-element */ <img className="pl-thumb" src={p.chapterImage} alt="" />) : <span className="pl-thumb pl-thumb--empty" />}
+                  <span>{p.name}{p.heroProduct ? <span className="pl-flag" style={{ marginLeft: 6 }}>HERO</span> : null} <span className="admin__muted admin__mono">#{p.displayOrder}</span></span>
+                  {isAir ? (
+                    <label className={`ff-btn ff-btn--mini${busy ? " is-disabled" : ""}`} style={{ cursor: busy ? "default" : "pointer" }} title="A different image for the chapter card (separate from the PDP)">
+                      {p.chapterImage ? "Replace card image" : "⬆ Card image"}
+                      <input type="file" accept="image/*" style={{ display: "none" }} disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; if (f) void setProductChapterImage(p.id, f); e.target.value = ""; }} />
+                    </label>
+                  ) : <span />}
+                  <button type="button" className="pe-icon-btn" onClick={() => moveProduct(p.id, -1)} aria-label="Move up" title="Move up">↑</button>
+                  <button type="button" className="pe-icon-btn" onClick={() => moveProduct(p.id, 1)} aria-label="Move down" title="Move down">↓</button>
+                </div>
                 {isAir ? (
-                  <label className={`ff-btn ff-btn--mini${busy ? " is-disabled" : ""}`} style={{ cursor: busy ? "default" : "pointer" }} title="A different image for the chapter card (separate from the PDP)">
-                    {p.chapterImage ? "Replace card image" : "⬆ Card image"}
-                    <input type="file" accept="image/*" style={{ display: "none" }} disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; if (f) void setProductChapterImage(p.id, f); e.target.value = ""; }} />
-                  </label>
-                ) : <span />}
-                <button type="button" className="pe-icon-btn" onClick={() => moveProduct(p.id, -1)} aria-label="Move up" title="Move up">↑</button>
-                <button type="button" className="pe-icon-btn" onClick={() => moveProduct(p.id, 1)} aria-label="Move down" title="Move down">↓</button>
+                  <input className="pe-chprod__interlude" value={p.interlude} onChange={(e) => editInterlude(p.id, e.target.value)} onBlur={(e) => saveInterlude(p.id, e.target.value)} placeholder={`Interlude — the quote after this card, e.g. “The morning arrives quietly.”`} />
+                ) : null}
               </div>
             );
           }) : <p className="admin__muted">No products assigned. Assign products to this chapter from the product editor (Collection &amp; chapter).</p>}
