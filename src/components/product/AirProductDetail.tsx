@@ -45,7 +45,7 @@ export function AirProductDetail({
 
   return (
     <main className="pdp pdp--air" data-theme="warm-ivory">
-      <div className="pdp__head">
+      <div className="pdp__head" id="pdp-top">
         <nav className="pdp__breadcrumb" aria-label="Breadcrumb">
           <Link href="/" className="pdp__crumb">Home</Link>
           <span className="pdp__crumb-sep" aria-hidden="true">·</span>

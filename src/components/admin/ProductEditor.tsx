@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState, type FocusEvent } from "react";
 import type { VariantRow, NoteRow, ImageRow, VesselType, ProductStatus } from "@/services/productAdminService";
+import { AirPdpLivePreview } from "@/components/admin/AirPdpLivePreview";
 
 /**
  * Full editorial product editor (review: Products CMS). Collapsible sections so the long form doesn't
@@ -55,6 +56,22 @@ const linesToArr = (t: string) => t.split("\n").map((s) => s.trim()).filter(Bool
 // Details accordion is edited as "Title | body" per line (split on the first "|" so bodies may contain "|").
 const accordionToText = (arr: { title?: string; body?: string }[]) => (Array.isArray(arr) ? arr.map((a) => `${a.title ?? ""}${a.body ? ` | ${a.body}` : ""}`).join("\n") : "");
 const textToAccordion = (t: string) => t.split("\n").map((l) => l.trim()).filter(Boolean).map((l) => { const i = l.indexOf("|"); return { title: (i >= 0 ? l.slice(0, i) : l).trim(), body: (i >= 0 ? l.slice(i + 1) : "").trim() }; });
+
+// Assemble the air_content JSON from the flat form fields — used by BOTH save and the live preview
+// draft, so what you preview is exactly what saves.
+function assembleAirContent(core: Core) {
+  return {
+    time: core.airTime, moment: core.airMoment, heroLine: core.airHeroLine, hourReason: core.airHourReason, hourStory: core.airHourStory, scentEffect: core.airScentEffect,
+    scent: core.airScent.split(",").map((s) => s.trim()).filter(Boolean), feels: linesToArr(core.airFeels), experience: core.airExperience,
+    placement: textToPlacement(core.airPlacement), signature: core.airSignature, composition: core.airComposition,
+    palette: core.airPalette || undefined, gradient: core.airGradient || undefined, interlude: core.airInterlude || undefined,
+    accordion: textToAccordion(core.airAccordion),
+    labels: {
+      hourEyebrow: core.airHourEyebrow || undefined, fragranceEyebrow: core.airFragranceEyebrow || undefined, feelsEyebrow: core.airFeelsEyebrow || undefined, experienceEyebrow: core.airExperienceEyebrow || undefined,
+      placementEyebrow: core.airPlacementEyebrow || undefined, placementHeading: core.airPlacementHeading || undefined, continueEyebrow: core.airContinueEyebrow || undefined, continueHeading: core.airContinueHeading || undefined,
+    },
+  };
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const bv = (v: any) => Boolean(v);
@@ -126,23 +143,31 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productId]);
 
+  const [previewOn, setPreviewOn] = useState(true);
+  const [focusId, setFocusId] = useState<string | null>(null);
+
+  // The live preview draft — a product-row shaped object built from the current (unsaved) form, so the
+  // /pdp-preview iframe can render the REAL AirProductDetail from it. Rebuilt on every edit.
+  const draft = useMemo(() => {
+    if (!core) return null;
+    const col = collections.find((c) => c.id === core.collectionId);
+    return {
+      id: productId, name: core.name, slug: core.slug, tagline: core.airHeroLine || core.tagline,
+      price: core.price, product_type: core.productType,
+      air_content: assembleAirContent(core),
+      product_images: [...images].sort((a, b) => a.sortOrder - b.sortOrder).map((im) => ({ url: im.url, is_primary: im.isPrimary, sort_order: im.sortOrder })),
+      collection: col ? { id: col.id, name: col.name, slug: "", volume: col.volume, tagline: "", cover_image_url: "", is_coming_soon: false } : {},
+      __siblings: [],
+    };
+  }, [core, images, collections, productId]);
+
   const set = (patch: Partial<Core>) => setCore((c) => (c ? { ...c, ...patch } : c));
   const numOrNull = (s: string) => (s.trim() === "" ? null : Number(s));
 
   const saveCore = async () => {
     if (!core) return;
     const isAir = AIR_TYPES.includes(core.productType);
-    const airContent = isAir ? {
-      time: core.airTime, moment: core.airMoment, heroLine: core.airHeroLine, hourReason: core.airHourReason, hourStory: core.airHourStory, scentEffect: core.airScentEffect,
-      scent: core.airScent.split(",").map((s) => s.trim()).filter(Boolean), feels: linesToArr(core.airFeels), experience: core.airExperience,
-      placement: textToPlacement(core.airPlacement), signature: core.airSignature, composition: core.airComposition,
-      palette: core.airPalette || undefined, gradient: core.airGradient || undefined, interlude: core.airInterlude || undefined,
-      accordion: textToAccordion(core.airAccordion),
-      labels: {
-        hourEyebrow: core.airHourEyebrow || undefined, fragranceEyebrow: core.airFragranceEyebrow || undefined, feelsEyebrow: core.airFeelsEyebrow || undefined, experienceEyebrow: core.airExperienceEyebrow || undefined,
-        placementEyebrow: core.airPlacementEyebrow || undefined, placementHeading: core.airPlacementHeading || undefined, continueEyebrow: core.airContinueEyebrow || undefined, continueHeading: core.airContinueHeading || undefined,
-      },
-    } : undefined;
+    const airContent = isAir ? assembleAirContent(core) : undefined;
     const product = {
       ...core, salePrice: numOrNull(core.salePrice), weightGrams: numOrNull(core.weightGrams),
       moodTags: core.moodTags.split(",").map((t) => t.trim()).filter(Boolean),
@@ -189,12 +214,20 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
     <div className="om-modal" role="dialog" aria-modal="true" onClick={onClose}><div className="om-modal__card om-modal__card--wide" onClick={(e) => e.stopPropagation()}><p className="admin__muted">Loading…</p></div></div>
   );
 
-  return (
-    <div className="om-modal" role="dialog" aria-modal="true" onClick={() => !busy && onClose()}>
-      <div className="om-modal__card om-modal__card--wide" onClick={(e) => e.stopPropagation()}>
+  const isAir = AIR_TYPES.includes(core.productType);
+  const showPreview = isAir && previewOn;
+  const onFieldFocus = (e: FocusEvent<HTMLDivElement>) => {
+    const anchor = (e.target as HTMLElement).closest?.("[data-anchor]")?.getAttribute("data-anchor");
+    if (anchor) setFocusId(anchor);
+  };
+  const formCol = (
+    <div className={`om-modal__card om-modal__card--wide${showPreview ? " pe-live__card" : ""}`} onClick={(e) => e.stopPropagation()} onFocusCapture={onFieldFocus}>
+      <div className="pe-live__cardhead">
         <h2 className="om-modal__title">Edit {core.name}</h2>
+        {isAir ? <button type="button" className="ff-btn ff-btn--mini" onClick={() => setPreviewOn((v) => !v)}>{previewOn ? "Hide live preview" : "Live preview"}</button> : null}
+      </div>
 
-        <details className="pe-sec" open>
+        <details className="pe-sec" open data-anchor="pdp-top">
           <summary>Basic &amp; SEO</summary>
           <div className="cfg-grid">
             <label className="cfg-field"><span>Name</span><input value={core.name} onChange={(e) => set({ name: e.target.value })} /></label>
@@ -271,22 +304,22 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
           <details className="pe-sec" open>
             <summary>Air PDP content (room / linen freshener)</summary>
             <p className="om-field__hint" style={{ margin: "0 0 8px" }}>Room &amp; linen fresheners use the air PDP — The Hour, Fragrance Journey (Opening / Heart / Lingering), Feels Like, The Experience, Placement, Signature. Fill these; they render on the storefront.</p>
-            <div className="cfg-grid">
-              <label className="cfg-field"><span>Hour (time)</span><input value={core.airTime} onChange={(e) => set({ airTime: e.target.value })} placeholder="18:40" /></label>
-              <label className="cfg-field"><span>Moment</span><input value={core.airMoment} onChange={(e) => set({ airMoment: e.target.value })} placeholder="The Day Loosens" /></label>
-              <label className="cfg-field"><span>Hero line (tagline)</span><input value={core.airHeroLine} onChange={(e) => set({ airHeroLine: e.target.value })} placeholder="Air after the first light." /></label>
+            <div className="cfg-grid" data-anchor="pdp-top">
+              <label className="cfg-field" data-anchor="the-hour"><span>Hour (time)</span><input value={core.airTime} onChange={(e) => set({ airTime: e.target.value })} placeholder="18:40" /></label>
+              <label className="cfg-field" data-anchor="pdp-top"><span>Moment</span><input value={core.airMoment} onChange={(e) => set({ airMoment: e.target.value })} placeholder="The Day Loosens" /></label>
+              <label className="cfg-field" data-anchor="pdp-top"><span>Hero line (tagline)</span><input value={core.airHeroLine} onChange={(e) => set({ airHeroLine: e.target.value })} placeholder="Air after the first light." /></label>
             </div>
-            <label className="cfg-field"><span>The Hour — reason (short)</span><input value={core.airHourReason} onChange={(e) => set({ airHourReason: e.target.value })} placeholder="The hour the day finally forgets to hurry." /></label>
-            <label className="cfg-field"><span>The Hour — story (long, one line per paragraph)</span><textarea value={core.airHourStory} onChange={(e) => set({ airHourStory: e.target.value })} rows={5} /></label>
-            <label className="cfg-field"><span>Fragrance journey — effect (intro)</span><input value={core.airScentEffect} onChange={(e) => set({ airScentEffect: e.target.value })} placeholder="Soft. Comforting. Slightly indulgent…" /></label>
-            <label className="cfg-field"><span>Scent — Opening · Heart · Lingering <em className="om-field__hint">comma-separated (3)</em></span><input value={core.airScent} onChange={(e) => set({ airScent: e.target.value })} placeholder="Ripe Fig Flesh, Brown Sugar Warmth, Soft Amber &amp; Sandalwood" /></label>
-            <label className="cfg-field"><span>Feels like <em className="om-field__hint">one line each</em></span><textarea value={core.airFeels} onChange={(e) => set({ airFeels: e.target.value })} rows={2} /></label>
-            <label className="cfg-field"><span>The Experience</span><textarea value={core.airExperience} onChange={(e) => set({ airExperience: e.target.value })} rows={3} /></label>
-            <label className="cfg-field"><span>Placement <em className="om-field__hint">one per line — "label | note"</em></span><textarea value={core.airPlacement} onChange={(e) => set({ airPlacement: e.target.value })} rows={3} placeholder="Evenings with no plans&#10;Post-work silence" /></label>
-            <label className="cfg-field"><span>Signature line</span><input value={core.airSignature} onChange={(e) => set({ airSignature: e.target.value })} placeholder="Best experienced when you stop trying to be productive." /></label>
+            <label className="cfg-field" data-anchor="the-hour"><span>The Hour — reason (short)</span><input value={core.airHourReason} onChange={(e) => set({ airHourReason: e.target.value })} placeholder="The hour the day finally forgets to hurry." /></label>
+            <label className="cfg-field" data-anchor="the-hour"><span>The Hour — story (long, one line per paragraph)</span><textarea value={core.airHourStory} onChange={(e) => set({ airHourStory: e.target.value })} rows={5} /></label>
+            <label className="cfg-field" data-anchor="smells-like"><span>Fragrance journey — effect (intro)</span><input value={core.airScentEffect} onChange={(e) => set({ airScentEffect: e.target.value })} placeholder="Soft. Comforting. Slightly indulgent…" /></label>
+            <label className="cfg-field" data-anchor="smells-like"><span>Scent — Opening · Heart · Lingering <em className="om-field__hint">comma-separated (3)</em></span><input value={core.airScent} onChange={(e) => set({ airScent: e.target.value })} placeholder="Ripe Fig Flesh, Brown Sugar Warmth, Soft Amber &amp; Sandalwood" /></label>
+            <label className="cfg-field" data-anchor="feels-like"><span>Feels like <em className="om-field__hint">one line each</em></span><textarea value={core.airFeels} onChange={(e) => set({ airFeels: e.target.value })} rows={2} /></label>
+            <label className="cfg-field" data-anchor="experience"><span>The Experience</span><textarea value={core.airExperience} onChange={(e) => set({ airExperience: e.target.value })} rows={3} /></label>
+            <label className="cfg-field" data-anchor="placement"><span>Placement <em className="om-field__hint">one per line — "label | note"</em></span><textarea value={core.airPlacement} onChange={(e) => set({ airPlacement: e.target.value })} rows={3} placeholder="Evenings with no plans&#10;Post-work silence" /></label>
+            <label className="cfg-field" data-anchor="signature"><span>Signature line</span><input value={core.airSignature} onChange={(e) => set({ airSignature: e.target.value })} placeholder="Best experienced when you stop trying to be productive." /></label>
 
             <p className="om-field__hint" style={{ margin: "12px 0 6px", fontWeight: 600 }}>Section colours</p>
-            <div className="cfg-grid">
+            <div className="cfg-grid" data-anchor="pdp-top">
               <label className="cfg-field"><span>Section palette <em className="om-field__hint">the page colour</em></span>
                 <select value={core.airPalette} onChange={(e) => set({ airPalette: e.target.value })}>
                   <option value="">Default (monsoon — light)</option>
@@ -303,10 +336,10 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
             </div>
 
             <p className="om-field__hint" style={{ margin: "12px 0 6px", fontWeight: 600 }}>Details accordion</p>
-            <label className="cfg-field"><span>Rows <em className="om-field__hint">one per line — &quot;Title | body&quot;. Add / rename / reorder freely (Composition, Shipping, How to use…)</em></span>
+            <label className="cfg-field" data-anchor="details"><span>Rows <em className="om-field__hint">one per line — &quot;Title | body&quot;. Add / rename / reorder freely (Composition, Shipping, How to use…)</em></span>
               <textarea value={core.airAccordion} onChange={(e) => set({ airAccordion: e.target.value })} rows={5} placeholder={"Composition | A 100ml room & linen mist. Alcohol-free, made in India.\nHow to use | Mist lightly into the air, or over linen and soft furnishings.\nShipping & Exchanges | Dispatched within 2–3 business days."} />
             </label>
-            <label className="cfg-field"><span>Composition <em className="om-field__hint">fallback body — used only when the accordion above is empty</em></span><input value={core.airComposition} onChange={(e) => set({ airComposition: e.target.value })} placeholder="A room mist spray. 100 ml. Made in India." /></label>
+            <label className="cfg-field" data-anchor="details"><span>Composition <em className="om-field__hint">fallback body — used only when the accordion above is empty</em></span><input value={core.airComposition} onChange={(e) => set({ airComposition: e.target.value })} placeholder="A room mist spray. 100 ml. Made in India." /></label>
 
             <details className="pe-sec" style={{ marginTop: 12 }}>
               <summary>Section headings (optional — blank uses the house wording)</summary>
@@ -405,7 +438,20 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
           {msg ? <span className="ff-done">{msg}</span> : null}
           <button type="button" className="ff-btn ff-btn--primary" disabled={busy} onClick={saveCore}>{busy ? "Saving…" : "Save product"}</button>
         </div>
+    </div>
+  );
+
+  if (showPreview) {
+    return (
+      <div className="pe-live" role="dialog" aria-modal="true">
+        <div className="pe-live__form">{formCol}</div>
+        <AirPdpLivePreview draft={draft} focusId={focusId} onRefresh={load} />
       </div>
+    );
+  }
+  return (
+    <div className="om-modal" role="dialog" aria-modal="true" onClick={() => !busy && onClose()}>
+      {formCol}
     </div>
   );
 }
