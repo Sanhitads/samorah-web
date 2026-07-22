@@ -87,8 +87,9 @@ export function buildAirViewFromDb(product: any, siblings: any[]): { hour: HourE
 
 /** Build an AirVolume (the air chapter page) from a DB collection + its air products, grouped into
  *  the Room / Linen groups. The group label/title/note default to the house wording (a per-group
- *  editable column is a later refinement). Returns null when the collection has no air products. */
-export function buildAirVolumeFromDb(col: any, products: any[]): AirVolume | null {
+ *  editable column is a later refinement). `nextCol` (the next coming-soon collection) becomes the
+ *  "next volume" teaser. Returns null when the collection has no air products. */
+export function buildAirVolumeFromDb(col: any, products: any[], nextCol?: any): AirVolume | null {
   const air = (products ?? []).filter((p) => p.product_type === "room_spray" || p.product_type === "linen_spray");
   if (!air.length) return null;
   const room = air.filter((p) => p.product_type === "room_spray").map(airHourFromProduct);
@@ -104,5 +105,14 @@ export function buildAirVolumeFromDb(col: any, products: any[]): AirVolume | nul
     cover: col.cover_image_url || "gradient:grad-air",
     isComingSoon: Boolean(col.is_coming_soon),
     groups,
+    nextVolume: nextCol
+      ? {
+          volume: nextCol.volume ?? "",
+          title: nextCol.name ?? "",
+          story: nextCol.tagline ?? "",
+          closing: "Coming in the next volume.",
+          cta: "Available Soon",
+        }
+      : undefined,
   };
 }

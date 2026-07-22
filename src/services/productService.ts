@@ -85,7 +85,7 @@ export async function getAirSiblings(collectionId: string, excludeProductId: str
 export async function getAirVolumeData(slug: string) {
   const db = createPublicClient();
   try {
-    const { data: col } = await db.from("collections").select("id,name,slug,volume,tagline,cover_image_url,is_coming_soon").eq("slug", slug).maybeSingle();
+    const { data: col } = await db.from("collections").select("id,name,slug,volume,tagline,cover_image_url,is_coming_soon,sort_order").eq("slug", slug).maybeSingle();
     if (!col) return null;
     const { data: products } = await db
       .from("products")
@@ -95,7 +95,16 @@ export async function getAirVolumeData(slug: string) {
       .eq("status", "active")
       .order("display_order");
     if (!products || !products.length) return null;
-    return { col, products };
+    // The next coming-soon collection becomes the "next volume" teaser at the foot of the page.
+    const { data: nextCol } = await db
+      .from("collections")
+      .select("name,volume,tagline")
+      .eq("is_coming_soon", true)
+      .gt("sort_order", col.sort_order ?? 0)
+      .order("sort_order")
+      .limit(1)
+      .maybeSingle();
+    return { col, products, nextCol: nextCol ?? undefined };
   } catch {
     return null;
   }

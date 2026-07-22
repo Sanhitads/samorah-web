@@ -22,6 +22,12 @@ main[data-experience="air-chapters"] #hours-divider {
 main[data-experience="air-chapters"] #future-volume {
   padding-block: clamp(64px, 8vw, 110px) 0; /* the dark band carries its own padding */
 }
+/* The last content group was flush against the closing band (0 bottom padding by design) — give the
+   last product room to breathe before the next section, whether the closing band follows or not. */
+main[data-experience="air-chapters"] .section-shell:has(+ #future-volume),
+main[data-experience="air-chapters"] .section-shell:last-of-type:not(#future-volume) {
+  padding-bottom: clamp(80px, 10vw, 140px);
+}
 /* Almost-invisible tonal shifts between movements — the atmosphere changes as
    the day does: airy Shared Hours, a slightly deeper Private Hours. */
 main[data-experience="air-chapters"] #hours-room {

@@ -24,7 +24,7 @@ export function generateStaticParams() {
 /** Prefer a DB-managed air volume (collection + its air products); fall back to the config volume. */
 async function loadAirVolume(slug: string) {
   const db = await getAirVolumeData(slug);
-  return (db ? buildAirVolumeFromDb(db.col, db.products) : null) ?? getAirVolume(slug);
+  return (db ? buildAirVolumeFromDb(db.col, db.products, db.nextCol) : null) ?? getAirVolume(slug);
 }
 
 export async function generateMetadata({
