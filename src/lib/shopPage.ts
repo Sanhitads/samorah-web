@@ -52,6 +52,8 @@ export interface ShopProductInput extends Priceable {
   tagline?: string | null;
   is_hero?: boolean | null;
   is_featured?: boolean | null;
+  is_bestseller?: boolean | null;
+  is_new_arrival?: boolean | null;
   created_at?: string | null;
   /** Reserved for future product-type filtering; absent today → treated as candle. */
   product_type?: string | null;
@@ -93,11 +95,13 @@ export interface ShopView {
   typeOptions: ShopFilterChoice[];
   chapterOptions: ShopFilterChoice[];
   vesselOptions: ShopFilterChoice[];
+  tagOptions: ShopFilterChoice[]; // Highlights: All / Best Sellers / New Arrivals
   activeType: string; // "all" | product type
   activeChapter: string; // "all" | slug
   activeVessel: string; // "all" | vessel enum
+  activeTag: string; // "all" | "bestseller" | "new-arrival"
   activeSort: ShopSort;
-  activeCount: number; // non-default filters (type/chapter/vessel) → "Refine (N)"
+  activeCount: number; // non-default filters (type/chapter/vessel/tag) → "Refine (N)"
   showVessel: boolean; // vessel section shows for candles / all only
 }
 
@@ -131,6 +135,21 @@ const TYPE_ALIAS: Record<string, string> = {
 };
 const resolveType = (v?: string): string => (v ? TYPE_ALIAS[v] ?? v : "all");
 
+// Highlight facet — editorially-flagged lists (Best Sellers, New Arrivals). Driven by the
+// is_bestseller / is_new_arrival merchandising flags, so the admin controls what appears.
+const TAG_FILTER: { key: string; label: string }[] = [
+  { key: "bestseller", label: "Best Sellers" },
+  { key: "new-arrival", label: "New Arrivals" },
+];
+const TAG_ALIAS: Record<string, string> = {
+  "best-seller": "bestseller", bestsellers: "bestseller", "best-sellers": "bestseller",
+  "new-arrivals": "new-arrival", new: "new-arrival",
+};
+const resolveTag = (v?: string): string => (v ? TAG_ALIAS[v] ?? v : "all");
+const matchesTag = (p: ShopProductInput, tag: string) =>
+  tag === "all" ||
+  (tag === "bestseller" ? !!p.is_bestseller : tag === "new-arrival" ? !!p.is_new_arrival : true);
+
 // Vessels available at launch (terracotta is future — not surfaced yet).
 const LAUNCH_VESSELS: { key: string; label: string }[] = [
   { key: "glass", label: "Glass" },
@@ -148,17 +167,18 @@ const isSort = (v: string | undefined): v is ShopSort =>
   v === "featured" || v === "newest" || v === "price-asc" || v === "price-desc";
 
 /** Canonical `/shop` URL for a set of (possibly aliased) params — for rel=canonical. */
-export function canonicalShopUrl(params: { type?: string; chapter?: string; vessel?: string; sort?: string }): string {
+export function canonicalShopUrl(params: { type?: string; chapter?: string; vessel?: string; sort?: string; tag?: string }): string {
   const sort: ShopSort = isSort(params.sort) ? params.sort : "featured";
-  return href(resolveType(params.type), resolveChapter(params.chapter), params.vessel ?? "all", sort);
+  return href(resolveType(params.type), resolveChapter(params.chapter), params.vessel ?? "all", sort, resolveTag(params.tag));
 }
 
-/** Build a `/shop` query string, dropping defaults (type/chapter/vessel=all, sort=featured). */
-function href(type: string, chapter: string, vessel: string, sort: ShopSort): string {
+/** Build a `/shop` query string, dropping defaults (type/chapter/vessel/tag=all, sort=featured). */
+function href(type: string, chapter: string, vessel: string, sort: ShopSort, tag: string = "all"): string {
   const params = new URLSearchParams();
   if (type !== "all") params.set("type", type);
   if (chapter !== "all") params.set("chapter", chapter);
   if (vessel !== "all") params.set("vessel", vessel);
+  if (tag !== "all") params.set("tag", tag);
   if (sort !== "featured") params.set("sort", sort);
   const qs = params.toString();
   return qs ? `/shop?${qs}` : "/shop";
@@ -223,12 +243,13 @@ function toCard(p: ShopProductInput, editions?: ReadonlyMap<string, { edition: s
  */
 export function buildShopPage(
   products: ShopProductInput[],
-  params: { chapter?: string; vessel?: string; sort?: string; type?: string } = {},
+  params: { chapter?: string; vessel?: string; sort?: string; type?: string; tag?: string } = {},
   editions?: ReadonlyMap<string, { edition: string }>,
 ): ShopView {
   const activeSort: ShopSort = isSort(params.sort) ? params.sort : "featured";
   const activeType = resolveType(params.type); // hyphen aliases → canonical
   const activeChapter = resolveChapter(params.chapter); // aliases → canonical slug
+  const activeTag = resolveTag(params.tag); // "all" | bestseller | new-arrival
   const showVessel = VESSEL_TYPES.has(activeType); // vessel applies to candles only
   const activeVessel = showVessel ? params.vessel ?? "all" : "all";
 
@@ -266,20 +287,30 @@ export function buildShopPage(
     ...LAUNCH_VESSELS.map((v) => ({ key: v.key, label: v.label })),
   ];
 
+  // Highlights facet — only surface a tag when products carry that flag.
+  const tagOptions: ShopFilterChoice[] = [
+    { key: "all", label: "All" },
+    ...TAG_FILTER.filter((t) => products.some((p) => matchesTag(p, t.key))).map((t) => ({ key: t.key, label: t.label })),
+  ];
+
   const sorts: ShopSortOption[] = (Object.keys(SORT_LABEL) as ShopSort[]).map((key) => ({
     key,
     label: SORT_LABEL[key],
-    href: href(activeType, activeChapter, activeVessel, key),
+    href: href(activeType, activeChapter, activeVessel, key, activeTag),
     active: activeSort === key,
   }));
 
   const filtered = products.filter(
-    (p) => matchesType(p, activeType) && matchesChapter(p, activeChapter) && matchesVessel(p, activeVessel),
+    (p) =>
+      matchesType(p, activeType) &&
+      matchesChapter(p, activeChapter) &&
+      matchesVessel(p, activeVessel) &&
+      matchesTag(p, activeTag),
   );
   const cards = sortProducts(filtered, activeSort).map((p) => toCard(p, editions));
 
   const activeCount =
-    (activeType !== "all" ? 1 : 0) + (activeChapter !== "all" ? 1 : 0) + (activeVessel !== "all" ? 1 : 0);
+    (activeType !== "all" ? 1 : 0) + (activeChapter !== "all" ? 1 : 0) + (activeVessel !== "all" ? 1 : 0) + (activeTag !== "all" ? 1 : 0);
 
   return {
     cards,
@@ -289,9 +320,11 @@ export function buildShopPage(
     typeOptions,
     chapterOptions,
     vesselOptions,
+    tagOptions,
     activeType,
     activeChapter,
     activeVessel,
+    activeTag,
     activeSort,
     activeCount,
     showVessel,

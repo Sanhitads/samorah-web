@@ -76,3 +76,37 @@ describe("shop PLP — type × chapter × vessel filters", () => {
     expect(buildShopPage(CATALOG, { type: "room-spray" }).shown).toBe(1);
   });
 });
+
+describe("shop PLP — highlight (Best Sellers / New Arrivals) filter", () => {
+  const FLAGGED: ShopProductInput[] = [
+    { ...candle("a", "dessert-chapter", "Dessert Chapter", ["glass"]), is_bestseller: true },
+    { ...candle("b", "mood-library", "Mood Library", ["glass"]), is_new_arrival: true },
+    candle("c", "nature-chapter", "Nature Chapter", ["glass"]),
+  ];
+
+  it("tag=bestseller → only bestsellers", () => {
+    const v = buildShopPage(FLAGGED, { tag: "bestseller" });
+    expect(v.shown).toBe(1);
+    expect(v.cards[0].slug).toBe("a");
+    expect(v.activeTag).toBe("bestseller");
+    expect(v.activeCount).toBe(1);
+  });
+
+  it("tag=new-arrival (and the ?tag=new-arrivals alias) → only new arrivals", () => {
+    expect(buildShopPage(FLAGGED, { tag: "new-arrival" }).cards.map((c) => c.slug)).toEqual(["b"]);
+    expect(buildShopPage(FLAGGED, { tag: "new-arrivals" }).cards.map((c) => c.slug)).toEqual(["b"]);
+  });
+
+  it("tagOptions only surface tags that have products", () => {
+    const keys = buildShopPage(FLAGGED, {}).tagOptions.map((o) => o.key);
+    expect(keys).toEqual(["all", "bestseller", "new-arrival"]);
+    // none flagged → no highlight options
+    expect(buildShopPage([candle("x", "dessert-chapter", "Dessert Chapter", ["glass"])], {}).tagOptions.map((o) => o.key)).toEqual(["all"]);
+  });
+
+  it("highlight combines with chapter/type", () => {
+    const v = buildShopPage(FLAGGED, { tag: "bestseller", chapter: "mood-library" });
+    expect(v.shown).toBe(0); // 'a' is a bestseller but in dessert-chapter
+    expect(v.activeCount).toBe(2);
+  });
+});

@@ -1212,6 +1212,8 @@ export type Database = {
           is_featured: boolean
           is_hero: boolean
           is_bestseller: boolean
+          is_new_arrival: boolean
+          product_type: string
           lifestyle_use: string | null
           mood_tags: string[]
           name: string
@@ -1247,6 +1249,8 @@ export type Database = {
           is_featured?: boolean
           is_hero?: boolean
           is_bestseller?: boolean
+          is_new_arrival?: boolean
+          product_type?: string
           lifestyle_use?: string | null
           mood_tags?: string[]
           name: string
@@ -1282,6 +1286,8 @@ export type Database = {
           is_featured?: boolean
           is_hero?: boolean
           is_bestseller?: boolean
+          is_new_arrival?: boolean
+          product_type?: string
           lifestyle_use?: string | null
           mood_tags?: string[]
           name?: string

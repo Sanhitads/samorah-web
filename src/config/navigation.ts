@@ -55,8 +55,8 @@ export const MENU_BRANCHES: MenuBranch[] = [
       { label: "Scented Candles", href: "/shop" },
       { label: "Room & Linen Sprays", href: "/collections/the-everyday" },
       { label: "Ritual Bundles", href: "/bundles" },
-      { label: "Best Sellers", href: "/shop?sort=featured" },
-      { label: "New Arrivals", href: "/shop?sort=newest" },
+      { label: "Best Sellers", href: "/shop?tag=bestseller" },
+      { label: "New Arrivals", href: "/shop?tag=new-arrival" },
     ],
     campaign: {
       eyebrow: "Featured",
@@ -164,7 +164,8 @@ export const FOOTER_SECTIONS: FooterSection[] = [
       { label: "All Products", href: "/shop" },
       { label: "Room & Linen Sprays", href: "/collections/the-everyday" },
       { label: "Ritual Bundles", href: "/bundles" },
-      { label: "New Arrivals", href: "/shop?sort=newest" },
+      { label: "New Arrivals", href: "/shop?tag=new-arrival" },
+      { label: "Best Sellers", href: "/shop?tag=bestseller" },
     ],
   },
   {

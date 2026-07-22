@@ -19,7 +19,7 @@ export const revalidate = 300;
 export async function generateMetadata({
   searchParams,
 }: {
-  searchParams: Promise<{ type?: string; chapter?: string; vessel?: string; sort?: string }>;
+  searchParams: Promise<{ type?: string; chapter?: string; vessel?: string; sort?: string; tag?: string }>;
 }): Promise<Metadata> {
   const params = await searchParams;
   return withRouteSeo("/shop", {
@@ -35,7 +35,7 @@ export async function generateMetadata({
 export default async function ShopRoute({
   searchParams,
 }: {
-  searchParams: Promise<{ type?: string; chapter?: string; vessel?: string; sort?: string }>;
+  searchParams: Promise<{ type?: string; chapter?: string; vessel?: string; sort?: string; tag?: string }>;
 }) {
   const params = await searchParams;
   let products: ShopProductInput[] = [];
@@ -51,7 +51,9 @@ export default async function ShopRoute({
     <main className="plp">
       <header className="plp__head">
         <p className="plp__eyebrow">Shop</p>
-        <h1 className="plp__title">The Collection</h1>
+        <h1 className="plp__title">
+          {view.activeTag === "bestseller" ? "Best Sellers" : view.activeTag === "new-arrival" ? "New Arrivals" : "The Collection"}
+        </h1>
       </header>
 
       <ShopToolbar
@@ -60,10 +62,12 @@ export default async function ShopRoute({
         activeType={view.activeType}
         activeChapter={view.activeChapter}
         activeVessel={view.activeVessel}
+        activeTag={view.activeTag}
         activeSort={view.activeSort}
         typeOptions={view.typeOptions}
         chapterOptions={view.chapterOptions}
         vesselOptions={view.vesselOptions}
+        tagOptions={view.tagOptions}
         sorts={view.sorts}
       />
 

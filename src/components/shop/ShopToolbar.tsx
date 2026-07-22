@@ -10,11 +10,12 @@ import type { ShopFilterChoice, ShopSort, ShopSortOption } from "@/lib/shopPage"
 
 /** Build a /shop URL, dropping defaults — mirrors the server's href() so
  *  shareable, SSR, combined filtering all keep working. */
-function shopHref(type: string, chapter: string, vessel: string, sort: ShopSort): string {
+function shopHref(type: string, chapter: string, vessel: string, sort: ShopSort, tag: string): string {
   const p = new URLSearchParams();
   if (type !== "all") p.set("type", type);
   if (chapter !== "all") p.set("chapter", chapter);
   if (vessel !== "all") p.set("vessel", vessel);
+  if (tag !== "all") p.set("tag", tag);
   if (sort !== "featured") p.set("sort", sort);
   const qs = p.toString();
   return qs ? `/shop?${qs}` : "/shop";
@@ -28,10 +29,12 @@ export interface ShopToolbarProps {
   activeType: string;
   activeChapter: string;
   activeVessel: string;
+  activeTag: string;
   activeSort: ShopSort;
   typeOptions: ShopFilterChoice[];
   chapterOptions: ShopFilterChoice[];
   vesselOptions: ShopFilterChoice[];
+  tagOptions: ShopFilterChoice[];
   sorts: ShopSortOption[];
 }
 
@@ -117,10 +120,12 @@ function RefineDrawer({
   activeType,
   activeChapter,
   activeVessel,
+  activeTag,
   activeSort,
   typeOptions,
   chapterOptions,
   vesselOptions,
+  tagOptions,
   onClose,
 }: ShopToolbarProps & { onClose: () => void }) {
   const router = useRouter();
@@ -130,17 +135,19 @@ function RefineDrawer({
   const [type, setType] = useState(activeType);
   const [chapter, setChapter] = useState(activeChapter);
   const [vessel, setVessel] = useState(activeVessel);
+  const [tag, setTag] = useState(activeTag);
 
   const showVessel = vesselApplies(type);
 
   const apply = () => {
-    router.push(shopHref(type, chapter, showVessel ? vessel : "all", activeSort), { scroll: false });
+    router.push(shopHref(type, chapter, showVessel ? vessel : "all", activeSort, tag), { scroll: false });
     onClose();
   };
   const clearAll = () => {
     setType("all");
     setChapter("all");
     setVessel("all");
+    setTag("all");
   };
 
   const scrim = reduce
@@ -191,6 +198,7 @@ function RefineDrawer({
         </div>
 
         <div className="refine-drawer__body">
+          {tagOptions.length > 1 ? <Group label="Highlights" options={tagOptions} value={tag} onChange={setTag} /> : null}
           <Group label="Product Type" options={typeOptions} value={type} onChange={setType} />
           <Group label="Chapter" options={chapterOptions} value={chapter} onChange={setChapter} />
           {showVessel ? <Group label="Vessel" options={vesselOptions} value={vessel} onChange={setVessel} /> : null}

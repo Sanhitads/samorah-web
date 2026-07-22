@@ -16,18 +16,37 @@ export async function getShopCatalog(): Promise<{
 }> {
   const [candles, editions] = await Promise.all([getShopProducts(), getEditionMap()]);
 
-  const candleEntries = (candles as unknown as ShopProductInput[]).map((c) => ({
-    ...c,
-    product_type: "candle" as const,
-  }));
+  // Config gradient + edition per air hour — used to enrich DB air products (which have no photo yet)
+  // and to set the "NO. I.4" edition on their cards. Also the source for air volumes not yet in the DB.
+  const airGradient = new Map<string, string>();
+  for (const volume of getAirVolumes()) {
+    for (const group of volume.groups) {
+      for (const h of group.hours) {
+        airGradient.set(h.productSlug, h.gradient);
+        editions.set(h.productSlug, { edition: airEditionOf(volume, h.productSlug), chapterLabel: `The Hours · ${volume.title}` });
+      }
+    }
+  }
 
-  // Air sprays → the same shape (no vessels; a single price; gradient art).
+  // DB rows keep their real product_type (candles + now the seeded Room/Linen sprays). Air products
+  // with no uploaded image fall back to the config gradient so the grid stays colourful.
+  const dbEntries = (candles as unknown as ShopProductInput[]).map((c) => {
+    const type = c.product_type ?? "candle";
+    const isAir = type === "room_spray" || type === "linen_spray";
+    const hasImg = (c.product_images ?? []).length > 0;
+    const product_images = !hasImg && isAir && airGradient.has(c.slug)
+      ? [{ url: airGradient.get(c.slug)!, alt_text: c.name, is_primary: true, sort_order: 0 }]
+      : c.product_images;
+    return { ...c, product_type: type, product_images };
+  });
+  const dbSlugs = new Set(dbEntries.map((c) => c.slug));
+
+  // Air sprays from config — only for hours NOT yet in the DB (DB wins → no duplicates).
   const airEntries: ShopProductInput[] = getAirVolumes().flatMap((volume) =>
     volume.groups.flatMap((group) =>
-      group.hours.map((h) => {
-        const edition = airEditionOf(volume, h.productSlug);
-        editions.set(h.productSlug, { edition, chapterLabel: `The Hours · ${volume.title}` });
-        return {
+      group.hours
+        .filter((h) => !dbSlugs.has(h.productSlug))
+        .map((h) => ({
           id: h.id,
           slug: h.productSlug,
           name: h.name,
@@ -41,10 +60,9 @@ export async function getShopCatalog(): Promise<{
           collection: { slug: volume.slug, name: volume.title, volume: volume.volume },
           variants: [],
           product_images: [{ url: h.gradient, alt_text: h.name, is_primary: true, sort_order: 0 }],
-        } satisfies ShopProductInput;
-      }),
+        } satisfies ShopProductInput)),
     ),
   );
 
-  return { products: [...candleEntries, ...airEntries], editions };
+  return { products: [...dbEntries, ...airEntries], editions };
 }
