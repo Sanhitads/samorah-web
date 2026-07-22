@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type FocusEvent, type TextareaHTMLAttributes } from "react";
 import type { VariantRow, NoteRow, ImageRow, VesselType, ProductStatus } from "@/services/productAdminService";
-import { AirPdpLivePreview } from "@/components/admin/AirPdpLivePreview";
+import { LivePreviewPanel } from "@/components/admin/LivePreviewPanel";
 import { AIR_ACCORDION_DEFAULTS, AIR_SECTION_POSITIONS, type CustomSection } from "@/config/theHours";
 
 /** A textarea that grows to fit its content, so long editorial text (the Hour story, etc.) is fully
@@ -615,7 +615,7 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
     return (
       <div className="pe-live" role="dialog" aria-modal="true">
         <div className="pe-live__form">{formCol}</div>
-        <AirPdpLivePreview draft={draft} focusId={focusId} onRefresh={load} />
+        <LivePreviewPanel draft={draft} focusId={focusId} onRefresh={load} />
       </div>
     );
   }

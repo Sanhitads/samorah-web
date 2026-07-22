@@ -1,8 +1,19 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition, type FocusEvent } from "react";
 import { useRouter } from "next/navigation";
 import type { CollectionRow } from "@/services/collectionAdminService";
+import { LivePreviewPanel } from "@/components/admin/LivePreviewPanel";
+
+/** Assemble the air_chapter config from the editor fields — used by BOTH save and the live preview. */
+function assembleAirChapter(c: CEdit) {
+  return {
+    heroEyebrow: c.airHeroEyebrow || undefined,
+    room: { label: c.airRoomLabel || undefined, title: c.airRoomTitle || undefined, note: c.airRoomNote || undefined },
+    linen: { label: c.airLinenLabel || undefined, title: c.airLinenTitle || undefined, note: c.airLinenNote || undefined },
+    teaser: { closing: c.airTeaserClosing || undefined, cta: c.airTeaserCta || undefined },
+  };
+}
 
 /**
  * Chapter CMS (review: the biggest architectural gap). List + create + a full chapter editor —
@@ -85,6 +96,12 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
   const [products, setProducts] = useState<{ id: string; name: string; displayOrder: number; heroProduct: boolean }[]>([]);
   const [allProducts, setAllProducts] = useState<{ id: string; name: string }[]>([]);
   const [busy, setBusy] = useState(false); const [err, setErr] = useState(""); const [msg, setMsg] = useState("");
+  const [previewOn, setPreviewOn] = useState(true);
+  const [focusId, setFocusId] = useState<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [airProducts, setAirProducts] = useState<any[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [nextCol, setNextCol] = useState<any>(undefined);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const post = async (body: Record<string, unknown>): Promise<any> => {
@@ -114,6 +131,9 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
       airTeaserClosing: sv(ch.teaser?.closing), airTeaserCta: sv(ch.teaser?.cta),
     });
     setProducts(d.products ?? []); setAllProducts(d.allProducts ?? []);
+    // Air products + next volume for the live preview (empty for non-air chapters → no preview shown).
+    const ad = await post({ action: "air.data", id });
+    setAirProducts(ad?.products ?? []); setNextCol(ad?.nextCol);
   };
   useEffect(() => {
     void load();
@@ -121,15 +141,24 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
   }, [id]);
 
   const set = (patch: Partial<CEdit>) => setC((v) => (v ? { ...v, ...patch } : v));
+
+  // Live preview draft — a collection row + its air products + next volume, so /chapter-preview renders
+  // the REAL chapter page from the current (unsaved) form.
+  const draft = useMemo(() => {
+    if (!c) return null;
+    return {
+      col: { slug: c.slug, volume: c.volume, name: c.name, tagline: c.tagline, cover_image_url: c.coverImageUrl, is_coming_soon: c.isComingSoon, air_chapter: assembleAirChapter(c) },
+      products: airProducts,
+      nextCol,
+    };
+  }, [c, airProducts, nextCol]);
+  const onFieldFocus = (e: FocusEvent<HTMLDivElement>) => {
+    const anchor = (e.target as HTMLElement).closest?.("[data-anchor]")?.getAttribute("data-anchor");
+    if (anchor) setFocusId(anchor);
+  };
   const save = async () => {
     if (!c) return;
-    const airChapter = {
-      heroEyebrow: c.airHeroEyebrow || undefined,
-      room: { label: c.airRoomLabel || undefined, title: c.airRoomTitle || undefined, note: c.airRoomNote || undefined },
-      linen: { label: c.airLinenLabel || undefined, title: c.airLinenTitle || undefined, note: c.airLinenNote || undefined },
-      teaser: { closing: c.airTeaserClosing || undefined, cta: c.airTeaserCta || undefined },
-    };
-    const collection = { ...c, heroProductId: c.heroProductId || null, sortOrder: Number(c.sortOrder || 0), airChapter };
+    const collection = { ...c, heroProductId: c.heroProductId || null, sortOrder: Number(c.sortOrder || 0), airChapter: assembleAirChapter(c) };
     if (await post({ action: "update", id, collection })) { setMsg("Saved"); onSaved(); setTimeout(() => setMsg(""), 1500); }
   };
   const moveProduct = async (pid: string, dir: number) => {
@@ -143,12 +172,16 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
 
   if (!c) return <div className="om-modal" role="dialog" aria-modal="true" onClick={onClose}><div className="om-modal__card om-modal__card--wide" onClick={(e) => e.stopPropagation()}><p className="admin__muted">Loading…</p></div></div>;
 
-  return (
-    <div className="om-modal" role="dialog" aria-modal="true" onClick={() => !busy && onClose()}>
-      <div className="om-modal__card om-modal__card--wide" onClick={(e) => e.stopPropagation()}>
+  const isAirChapter = airProducts.length > 0;
+  const showPreview = isAirChapter && previewOn;
+  const formCol = (
+    <div className={`om-modal__card om-modal__card--wide${showPreview ? " pe-live__card" : ""}`} onClick={(e) => e.stopPropagation()} onFocusCapture={onFieldFocus}>
+      <div className="pe-live__cardhead">
         <h2 className="om-modal__title">Edit {c.name}</h2>
+        {isAirChapter ? <button type="button" className="ff-btn ff-btn--mini" onClick={() => setPreviewOn((v) => !v)}>{previewOn ? "Hide live preview" : "Live preview"}</button> : null}
+      </div>
 
-        <details className="pe-sec" open>
+        <details className="pe-sec" open data-anchor="hero">
           <summary>Basic</summary>
           <div className="cfg-grid">
             <label className="cfg-field"><span>Name</span><input value={c.name} onChange={(e) => set({ name: e.target.value })} /></label>
@@ -176,24 +209,24 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
           </div>
         </details>
 
-        <details className="pe-sec">
+        <details className="pe-sec" open>
           <summary>Air chapter (Room / Linen sprays)</summary>
           <p className="om-field__hint" style={{ margin: "0 0 8px" }}>The group headings + next-volume teaser for the air chapter page. Blank uses the house wording (shown as the placeholder). Applies when this collection holds Room / Linen sprays.</p>
-          <label className="cfg-field"><span>Hero eyebrow</span><input value={c.airHeroEyebrow} onChange={(e) => set({ airHeroEyebrow: e.target.value })} placeholder="The Hours Collection" /></label>
+          <label className="cfg-field" data-anchor="hero"><span>Hero eyebrow</span><input value={c.airHeroEyebrow} onChange={(e) => set({ airHeroEyebrow: e.target.value })} placeholder="The Hours Collection" /></label>
           <p className="om-field__hint" style={{ margin: "10px 0 4px", fontWeight: 600 }}>The Room — room sprays</p>
-          <div className="cfg-grid">
+          <div className="cfg-grid" data-anchor="hours-room">
             <label className="cfg-field"><span>Eyebrow</span><input value={c.airRoomLabel} onChange={(e) => set({ airRoomLabel: e.target.value })} placeholder="Shared Hours" /></label>
             <label className="cfg-field"><span>Title</span><input value={c.airRoomTitle} onChange={(e) => set({ airRoomTitle: e.target.value })} placeholder="The Room" /></label>
           </div>
-          <label className="cfg-field"><span>Note</span><input value={c.airRoomNote} onChange={(e) => set({ airRoomNote: e.target.value })} placeholder="The atmosphere a room makes for itself." /></label>
+          <label className="cfg-field" data-anchor="hours-room"><span>Note</span><input value={c.airRoomNote} onChange={(e) => set({ airRoomNote: e.target.value })} placeholder="The atmosphere a room makes for itself." /></label>
           <p className="om-field__hint" style={{ margin: "10px 0 4px", fontWeight: 600 }}>The Linen — linen sprays</p>
-          <div className="cfg-grid">
+          <div className="cfg-grid" data-anchor="hours-linen">
             <label className="cfg-field"><span>Eyebrow</span><input value={c.airLinenLabel} onChange={(e) => set({ airLinenLabel: e.target.value })} placeholder="Private Hours" /></label>
             <label className="cfg-field"><span>Title</span><input value={c.airLinenTitle} onChange={(e) => set({ airLinenTitle: e.target.value })} placeholder="The Linen" /></label>
           </div>
-          <label className="cfg-field"><span>Note</span><input value={c.airLinenNote} onChange={(e) => set({ airLinenNote: e.target.value })} placeholder="For linen, for fabric, for the hours that ask for nothing." /></label>
+          <label className="cfg-field" data-anchor="hours-linen"><span>Note</span><input value={c.airLinenNote} onChange={(e) => set({ airLinenNote: e.target.value })} placeholder="For linen, for fabric, for the hours that ask for nothing." /></label>
           <p className="om-field__hint" style={{ margin: "10px 0 4px", fontWeight: 600 }}>Next-volume teaser</p>
-          <div className="cfg-grid">
+          <div className="cfg-grid" data-anchor="future-volume">
             <label className="cfg-field"><span>Closing line</span><input value={c.airTeaserClosing} onChange={(e) => set({ airTeaserClosing: e.target.value })} placeholder="Coming in the next volume." /></label>
             <label className="cfg-field"><span>CTA</span><input value={c.airTeaserCta} onChange={(e) => set({ airTeaserCta: e.target.value })} placeholder="Available Soon" /></label>
           </div>
@@ -236,7 +269,20 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
           {msg ? <span className="ff-done">{msg}</span> : null}
           <button type="button" className="ff-btn ff-btn--primary" disabled={busy} onClick={save}>{busy ? "Saving…" : "Save chapter"}</button>
         </div>
+    </div>
+  );
+
+  if (showPreview) {
+    return (
+      <div className="pe-live" role="dialog" aria-modal="true">
+        <div className="pe-live__form">{formCol}</div>
+        <LivePreviewPanel src="/chapter-preview" draft={draft} focusId={focusId} onRefresh={load} />
       </div>
+    );
+  }
+  return (
+    <div className="om-modal" role="dialog" aria-modal="true" onClick={() => !busy && onClose()}>
+      {formCol}
     </div>
   );
 }

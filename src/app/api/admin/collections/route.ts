@@ -5,6 +5,7 @@ import {
   setProductDisplayOrder, assignProductToCollection,
   type CollectionInput,
 } from "@/services/collectionAdminService";
+import { getAirChapterProducts } from "@/services/productService";
 
 /** POST /api/admin/collections { action, ... } — Chapter/Collection CMS. catalog.manage. */
 export const runtime = "nodejs";
@@ -26,6 +27,7 @@ export async function POST(request: Request) {
       case "delete": return NextResponse.json(await deleteCollection(body.id, a));
       case "product.order": return NextResponse.json(await setProductDisplayOrder(body.productId, Number(body.displayOrder), a));
       case "product.assign": return NextResponse.json(await assignProductToCollection(body.productId, body.collectionId ?? null, a));
+      case "air.data": return NextResponse.json({ ok: true, ...(await getAirChapterProducts(body.id)) });
       default: return NextResponse.json({ error: "unknown action" }, { status: 400 });
     }
   } catch (e) {

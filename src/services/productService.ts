@@ -111,6 +111,34 @@ export async function getAirVolumeData(slug: string) {
   }
 }
 
+/** The air products + next coming-soon collection for a chapter (by collection id) — feeds the
+ *  collection editor's live preview. Mirrors getAirVolumeData but keyed by id (the editor has the id). */
+export async function getAirChapterProducts(collectionId: string) {
+  const db = createPublicClient();
+  try {
+    const { data: col } = await db.from("collections").select("id,sort_order").eq("id", collectionId).maybeSingle();
+    if (!col) return { products: [], nextCol: undefined };
+    const { data: products } = await db
+      .from("products")
+      .select("id, slug, name, tagline, price, air_content, product_type, display_order, product_images(url, is_primary, sort_order)")
+      .eq("collection_id", collectionId)
+      .in("product_type", AIR_PRODUCT_TYPES)
+      .eq("status", "active")
+      .order("display_order");
+    const { data: nextCol } = await db
+      .from("collections")
+      .select("name,volume,tagline")
+      .eq("is_coming_soon", true)
+      .gt("sort_order", col.sort_order ?? 0)
+      .order("sort_order")
+      .limit(1)
+      .maybeSingle();
+    return { products: products ?? [], nextCol: nextCol ?? undefined };
+  } catch {
+    return { products: [], nextCol: undefined };
+  }
+}
+
 /** Active variants for a product, ordered. */
 export async function getVariants(productId: string) {
   const db = createPublicClient();

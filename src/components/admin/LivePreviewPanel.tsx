@@ -3,24 +3,26 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
- * Side-by-side live preview panel for the air PDP (review: visual CMS). Embeds the /pdp-preview route
- * in an <iframe> and streams the editor's *draft* product to it via postMessage — so edits appear
- * instantly, WITHOUT saving. A Desktop / Tablet / Mobile switch renders the real page at true device
- * widths (the iframe is scaled to fit the panel). "Refresh from live" reloads the saved DB state
- * (discarding the unsaved draft). `focusId` scrolls + highlights the matching storefront section.
+ * Reusable side-by-side live preview panel (review: visual CMS). Embeds a preview route (`src`) in an
+ * <iframe> and streams the editor's *draft* to it via postMessage — so edits appear instantly, WITHOUT
+ * saving. A Desktop / Tablet / Mobile switch renders the real page at true device widths (the iframe is
+ * scaled to fit the panel). "Refresh from live" reloads the saved DB state. `focusId` scrolls +
+ * highlights the matching section. Used by the product PDP editor and the air-chapter editor.
  */
-const SRC = "samorah-pdp-preview"; // shared message tag (also used by /pdp-preview)
+const SRC = "samorah-pdp-preview"; // shared message tag (also used by the preview routes)
 const DEVICES = [
   { k: "desktop", l: "Desktop", w: 0 }, // 0 = native panel width (full size, no down-scaling)
   { k: "tablet", l: "Tablet", w: 834 },
   { k: "mobile", l: "Mobile", w: 390 },
 ] as const;
 
-export function AirPdpLivePreview({
+export function LivePreviewPanel({
+  src = "/pdp-preview",
   draft,
   focusId,
   onRefresh,
 }: {
+  src?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   draft: any;
   focusId: string | null;
@@ -88,7 +90,7 @@ export function AirPdpLivePreview({
   const refresh = () => {
     readyRef.current = false;
     onRefresh(); // reload saved DB state into the editor → draft memo updates → re-posted on ready
-    if (iframeRef.current) iframeRef.current.src = `/pdp-preview?r=${Date.now()}`; // force reload → fresh ready handshake
+    if (iframeRef.current) iframeRef.current.src = `${src}?r=${Date.now()}`; // force reload → fresh ready handshake
   };
 
   return (
@@ -112,8 +114,8 @@ export function AirPdpLivePreview({
       <div className="pe-live__stage" ref={stageRef}>
         <iframe
           ref={iframeRef}
-          src="/pdp-preview"
-          title="PDP live preview"
+          src={src}
+          title="Live preview"
           className="pe-live__frame"
           style={{
             width: frameW,
