@@ -186,6 +186,8 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
   // automatically from the chapter; nothing to set).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [siblings, setSiblings] = useState<any[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [candleSiblings, setCandleSiblings] = useState<any[]>([]);
 
   // The live preview draft — a product-row shaped object built from the current (unsaved) form, so the
   // /pdp-preview iframe can render the REAL AirProductDetail from it. Rebuilt on every edit.
@@ -202,6 +204,33 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
     };
   }, [core, images, collections, productId, siblings]);
 
+  // The candle PDP live preview draft — a getProductBySlug-row shaped object built from the current
+  // (unsaved) form, so the /candle-preview iframe rebuilds the REAL CandleProductDetail from it.
+  const candleDraft = useMemo(() => {
+    if (!core) return null;
+    const col = collections.find((c) => c.id === core.collectionId);
+    return {
+      id: productId, slug: core.slug, name: core.name, tagline: core.tagline, price: core.price,
+      product_type: core.productType,
+      scent_group: core.scentGroup || null, fragrance_family: core.fragranceFamily || null,
+      story: core.story || null, story_long: core.storyLong || null, burn_time: core.burnTime || null,
+      flame_persona: core.flamePersona || null, cultural_reference: core.culturalReference || null,
+      lifestyle_use: core.lifestyleUse || null, wax_blend: core.waxBlend || null, wick: core.wick || null,
+      mood_tags: core.moodTags.split(",").map((t) => t.trim()).filter(Boolean),
+      artist_enabled: core.artistEnabled, artist_name: core.artistName, artist_role: core.artistRole,
+      artist_story: core.artistStory, artist_quote: core.artistQuote, artist_image: core.artistImage,
+      collection: col ? { name: col.name, slug: col.slug ?? "", volume: col.volume } : null,
+      variants: variants.map((v, i) => ({
+        id: v.id || `tmp-${i}`, sku: v.sku, variant_name: v.variantName, vessel_type: v.vesselType, size_label: v.sizeLabel,
+        price: v.price, sale_price: v.salePrice, stock: v.stock, low_stock_threshold: v.lowStockThreshold ?? 0,
+        is_active: v.isActive, sort_order: v.sortOrder,
+      })),
+      product_images: [...images].sort((a, b) => a.sortOrder - b.sortOrder).map((im) => ({ url: im.url, alt_text: im.altText, is_primary: im.isPrimary, sort_order: im.sortOrder })),
+      fragrance_notes: notes.map((n) => ({ layer: n.layer, note: n.note, sort_order: n.sortOrder })),
+      __related: candleSiblings,
+    };
+  }, [core, variants, notes, images, collections, productId, candleSiblings]);
+
   // Load the chapter's other air products (the preview's "Continue" section fills automatically).
   useEffect(() => {
     const air = core && AIR_TYPES.includes(core.productType);
@@ -209,6 +238,17 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
     let cancelled = false;
     fetch("/api/admin/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "air.siblings", collectionId: core.collectionId, excludeId: productId }) })
       .then((r) => r.json()).then((d) => { if (!cancelled && Array.isArray(d?.siblings)) setSiblings(d.siblings); }).catch(() => {});
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [core?.productType, core?.collectionId, productId]);
+
+  // Load the chapter's other candle products (the candle preview's "Continue the Chapter" grid).
+  useEffect(() => {
+    const candle = core && !AIR_TYPES.includes(core.productType);
+    if (!candle || !core?.collectionId) { setCandleSiblings([]); return; }
+    let cancelled = false;
+    fetch("/api/admin/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "candle.siblings", collectionId: core.collectionId, excludeId: productId }) })
+      .then((r) => r.json()).then((d) => { if (!cancelled && Array.isArray(d?.siblings)) setCandleSiblings(d.siblings); }).catch(() => {});
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [core?.productType, core?.collectionId, productId]);
@@ -309,7 +349,8 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
   );
 
   const isAir = AIR_TYPES.includes(core.productType);
-  const showPreview = isAir && previewOn;
+  const isCandle = !isAir; // everything that isn't an air freshener renders the candle PDP
+  const showPreview = previewOn; // both PDP types now have a live preview
   const onFieldFocus = (e: FocusEvent<HTMLDivElement>) => {
     const anchor = (e.target as HTMLElement).closest?.("[data-anchor]")?.getAttribute("data-anchor");
     if (anchor) setFocusId(anchor);
@@ -318,7 +359,7 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
     <div className={`om-modal__card om-modal__card--wide${showPreview ? " pe-live__card" : ""}`} onClick={(e) => e.stopPropagation()} onFocusCapture={onFieldFocus}>
       <div className="pe-live__cardhead">
         <h2 className="om-modal__title">Edit {core.name}</h2>
-        {isAir ? <button type="button" className="ff-btn ff-btn--mini" onClick={() => setPreviewOn((v) => !v)}>{previewOn ? "Hide live preview" : "Live preview"}</button> : null}
+        <button type="button" className="ff-btn ff-btn--mini" onClick={() => setPreviewOn((v) => !v)}>{previewOn ? "Hide live preview" : "Live preview"}</button>
       </div>
 
         <details className="pe-sec" open data-anchor="pdp-top">
@@ -372,26 +413,26 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
 
         <details className="pe-sec">
           <summary>Editorial content</summary>
-          <label className="cfg-field"><span>Story (short)</span><textarea value={core.story} onChange={(e) => set({ story: e.target.value })} rows={2} /></label>
-          <label className="cfg-field"><span>Story (long — The Story Within)</span><textarea value={core.storyLong} onChange={(e) => set({ storyLong: e.target.value })} rows={4} /></label>
-          <div className="cfg-grid">
+          <label className="cfg-field" data-anchor="story"><span>Story (short)</span><textarea value={core.story} onChange={(e) => set({ story: e.target.value })} rows={2} /></label>
+          <label className="cfg-field" data-anchor="story"><span>Story (long — The Story Within)</span><textarea value={core.storyLong} onChange={(e) => set({ storyLong: e.target.value })} rows={4} /></label>
+          <div className="cfg-grid" data-anchor="mood">
             <label className="cfg-field"><span>Flame persona</span><input value={core.flamePersona} onChange={(e) => set({ flamePersona: e.target.value })} placeholder="The Storyteller" /></label>
             <label className="cfg-field"><span>Mood tags <em className="om-field__hint">comma-separated</em></span><input value={core.moodTags} onChange={(e) => set({ moodTags: e.target.value })} placeholder="Warm, Comforting, Cozy" /></label>
           </div>
-          <label className="cfg-field"><span>Lifestyle (Living With It)</span><textarea value={core.lifestyleUse} onChange={(e) => set({ lifestyleUse: e.target.value })} rows={3} /></label>
-          <label className="cfg-field"><span>Centre quote (cultural reference)</span><input value={core.culturalReference} onChange={(e) => set({ culturalReference: e.target.value })} /></label>
+          <label className="cfg-field" data-anchor="lifestyle"><span>Lifestyle (Living With It)</span><textarea value={core.lifestyleUse} onChange={(e) => set({ lifestyleUse: e.target.value })} rows={3} /></label>
+          <label className="cfg-field" data-anchor="cultural"><span>Centre quote (cultural reference)</span><input value={core.culturalReference} onChange={(e) => set({ culturalReference: e.target.value })} /></label>
         </details>
 
         <details className="pe-sec">
           <summary>Artist ({core.artistEnabled ? "custom" : "house default"})</summary>
           <label className="om-check" style={{ marginBottom: 8 }}><input type="checkbox" checked={core.artistEnabled} onChange={(e) => set({ artistEnabled: e.target.checked })} /><span>Use a custom artist for this product (otherwise the house artist shows)</span></label>
-          <div className="cfg-grid">
+          <div className="cfg-grid" data-anchor="artist">
             <label className="cfg-field"><span>Artist name</span><input value={core.artistName} onChange={(e) => set({ artistName: e.target.value })} placeholder="The Samorah Artist" disabled={!core.artistEnabled} /></label>
             <label className="cfg-field"><span>Artist role</span><input value={core.artistRole} onChange={(e) => set({ artistRole: e.target.value })} placeholder="Painter · Colourist" disabled={!core.artistEnabled} /></label>
             <label className="cfg-field"><span>Artist image URL</span><input value={core.artistImage} onChange={(e) => set({ artistImage: e.target.value })} disabled={!core.artistEnabled} /></label>
           </div>
-          <label className="cfg-field"><span>Artist story <em className="om-field__hint">one paragraph per line</em></span><textarea value={core.artistStory} onChange={(e) => set({ artistStory: e.target.value })} rows={4} disabled={!core.artistEnabled} /></label>
-          <label className="cfg-field"><span>Artist quote</span><input value={core.artistQuote} onChange={(e) => set({ artistQuote: e.target.value })} placeholder="Every colour begins with a feeling." disabled={!core.artistEnabled} /></label>
+          <label className="cfg-field" data-anchor="artist"><span>Artist story <em className="om-field__hint">one paragraph per line</em></span><textarea value={core.artistStory} onChange={(e) => set({ artistStory: e.target.value })} rows={4} disabled={!core.artistEnabled} /></label>
+          <label className="cfg-field" data-anchor="artist-quote"><span>Artist quote</span><input value={core.artistQuote} onChange={(e) => set({ artistQuote: e.target.value })} placeholder="Every colour begins with a feeling." disabled={!core.artistEnabled} /></label>
         </details>
 
         {AIR_TYPES.includes(core.productType) ? (
@@ -518,7 +559,7 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
 
         <details className="pe-sec">
           <summary>Fragrance Journey ({notes.filter((n) => n.note.trim()).length})</summary>
-          <div className="pe-journey">
+          <div className="pe-journey" data-anchor="journey">
             {LAYERS.map(({ k, l }) => (
               <div key={k} className="pe-journey__col">
                 <div className="pe-journey__head">{l}</div>
@@ -534,7 +575,7 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
 
         <details className="pe-sec">
           <summary>Ingredients</summary>
-          <div className="cfg-grid">
+          <div className="cfg-grid" data-anchor="craft">
             <label className="cfg-field"><span>Wax blend</span><input value={core.waxBlend} onChange={(e) => set({ waxBlend: e.target.value })} /></label>
             <label className="cfg-field"><span>Wick</span><input value={core.wick} onChange={(e) => set({ wick: e.target.value })} /></label>
             <label className="cfg-field"><span>Burn time</span><input value={core.burnTime} onChange={(e) => set({ burnTime: e.target.value })} placeholder="~45 hours" /></label>
@@ -615,7 +656,12 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
     return (
       <div className="pe-live" role="dialog" aria-modal="true">
         <div className="pe-live__form">{formCol}</div>
-        <LivePreviewPanel draft={draft} focusId={focusId} onRefresh={load} />
+        <LivePreviewPanel
+          src={isAir ? "/pdp-preview" : "/candle-preview"}
+          draft={isAir ? draft : candleDraft}
+          focusId={focusId}
+          onRefresh={load}
+        />
       </div>
     );
   }

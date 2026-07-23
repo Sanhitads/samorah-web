@@ -5,7 +5,7 @@ import {
   upsertVariant, deleteVariant, setFragranceNotes, addProductImage, updateProductImage, setPrimaryImage, deleteProductImage,
   type CreateProductInput, type ProductCoreInput, type VariantInput, type ProductStatus,
 } from "@/services/productAdminService";
-import { getAirSiblings } from "@/services/productService";
+import { getAirSiblings, getCandleSiblings } from "@/services/productService";
 
 /** POST /api/admin/products { action, ... } — catalog CRUD. catalog.manage. */
 export const runtime = "nodejs";
@@ -54,6 +54,8 @@ export async function POST(request: Request) {
         return NextResponse.json(await deleteProductImage(body.id, body.productId, a));
       case "air.siblings":
         return NextResponse.json({ ok: true, siblings: await getAirSiblings(body.collectionId, body.excludeId ?? "") });
+      case "candle.siblings":
+        return NextResponse.json({ ok: true, siblings: await getCandleSiblings(body.collectionId, body.excludeId ?? "") });
       default:
         return NextResponse.json({ error: "unknown action" }, { status: 400 });
     }

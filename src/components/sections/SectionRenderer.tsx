@@ -41,8 +41,14 @@ export function SectionRenderer({
   const ordered = candidates
     .filter((s) => !s.dependsOn || s.dependsOn.every((d) => candidateIds.has(d)))
     .sort((a, b) => a.order - b.order)
-    // theme inheritance: a section without its own token uses the page's
-    .map((s) => ({ ...s, themeToken: s.themeToken ?? context.themeToken }));
+    // theme inheritance: a section without its own token uses the page's;
+    // in preview, scroll-reveal is disabled so the whole page renders at its
+    // final state immediately (a true WYSIWYG editing surface, not hidden-till-scrolled).
+    .map((s) => ({
+      ...s,
+      themeToken: s.themeToken ?? context.themeToken,
+      animation: context.preview ? "none" : s.animation,
+    }));
 
   return (
     <>

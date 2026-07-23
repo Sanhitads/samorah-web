@@ -9,7 +9,7 @@ import { composeSections } from "@/platform/template";
 import { CANDLE_PDP_TEMPLATE, AIR_PDP_TEMPLATE } from "@/platform/coreTemplates";
 import type { ProductPageView } from "@/lib/productPage";
 import { airEditionOf, AIR_SECTION_POSITIONS, type AirVolume, type HourEntry, type CustomSection } from "@/config/theHours";
-import type { Artist } from "@/config/artist";
+import { getArtist, type Artist } from "@/config/artist";
 import { getTestimonials } from "@/config/testimonials";
 import type { ProductCardModel } from "@/components/ui/ProductCard";
 import { imageMedia, type MediaContent } from "@/lib/presentation";
@@ -134,6 +134,28 @@ export interface RelatedProductInput extends Priceable {
   is_hero?: boolean | null;
   is_featured?: boolean | null;
   product_images?: ImageLike[] | null;
+}
+
+/**
+ * Per-product artist for the candle PDP — when a product enables a custom artist, the PDP + preview
+ * use it; otherwise the house artist. Shared by the route and the live-preview surface so both build
+ * the identical Artist Feature / Artwork / Quote blocks.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function buildProductArtist(pa: any): Artist | undefined {
+  return pa?.artist_enabled
+    ? {
+        id: "product",
+        name: pa.artist_name || "The Samorah Artist",
+        role: pa.artist_role || "Painter · Colourist",
+        story: String(pa.artist_story || "").split(/\n{2,}|\n/).map((t: string) => t.trim()).filter(Boolean),
+        portrait: pa.artist_image || "gradient:grad-blush",
+        processImages: [pa.artist_image || "gradient:grad-chai"],
+        artworkImages: ["gradient:grad-amethyst"],
+        signature: `— ${pa.artist_name || "The Samorah Artist"}`,
+        quote: pa.artist_quote || "",
+      }
+    : getArtist(null);
 }
 
 export interface CandleEditorialInput {

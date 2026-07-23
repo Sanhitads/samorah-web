@@ -1,21 +1,15 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { withRouteSeo } from "@/services/seoRedirectService";
 import { getProductBySlug, getProducts, getRelatedProducts, getAirSiblings, AIR_PRODUCT_TYPES } from "@/services/productService";
 import { buildAirViewFromDb } from "@/lib/airFromProduct";
 import { buildProductPage, type ProductInput } from "@/lib/productPage";
-import { buildCandleEditorial, type RelatedProductInput } from "@/lib/productEditorial";
+import { buildCandleEditorial, buildProductArtist, type RelatedProductInput } from "@/lib/productEditorial";
 import { chapterTheme } from "@/lib/chapterPage";
 import { productLd } from "@/lib/seo/productLd";
-import { TrackEvent } from "@/components/analytics/TrackEvent";
 import { getEditionMap } from "@/services/collectionService";
-import { getArtist } from "@/config/artist";
-import { ProductPurchasePanel } from "@/components/product/ProductPurchasePanel";
-import { ProductGallery } from "@/components/product/ProductGallery";
 import { AirProductDetail } from "@/components/product/AirProductDetail";
-import { SectionRenderer } from "@/components/sections/SectionRenderer";
-import { bootstrapPlatform } from "@/components/page/bootstrap";
+import { CandleProductDetail } from "@/components/product/CandleProductDetail";
 import { getAirVolumes, getHourBySlug } from "@/config/theHours";
 
 /**
@@ -101,8 +95,6 @@ export default async function ProductRoute({
   };
   const p = buildProductPage(raw);
 
-  bootstrapPlatform();
-
   // Samorah numbering — from the shared edition map, so the PDP, cart, and
   // composition all show identical "VOL. I.1" editions.
   const editions = await getEditionMap();
@@ -114,89 +106,10 @@ export default async function ProductRoute({
     { id: raw.id, fragrance_family: null, collection_id: raw.collection_id },
     4,
   )) as unknown as RelatedProductInput[];
-  // Per-product artist (review) — when a product enables a custom artist, the PDP uses it; otherwise
-  // it falls back to the house artist. Fields come straight off the product row (getProductBySlug *).
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const pa = product as any;
-  const artist = pa.artist_enabled
-    ? {
-        id: "product", name: pa.artist_name || "The Samorah Artist", role: pa.artist_role || "Painter · Colourist",
-        story: String(pa.artist_story || "").split(/\n{2,}|\n/).map((t: string) => t.trim()).filter(Boolean),
-        portrait: pa.artist_image || "gradient:grad-blush",
-        processImages: [pa.artist_image || "gradient:grad-chai"],
-        artworkImages: ["gradient:grad-amethyst"],
-        signature: `— ${pa.artist_name || "The Samorah Artist"}`,
-        quote: pa.artist_quote || "",
-      }
-    : getArtist(null);
+  const artist = buildProductArtist(product);
   const editorial = buildCandleEditorial({ view: p, artist, related });
   const palette = chapterTheme(p.chapterSlug);
   const ld = productLd({ name: p.name, slug: p.slug, description: p.tagline, gallery: p.gallery, priceLabel: p.priceLabel, variants: p.variants });
 
-  return (
-    <main className="pdp" data-theme="warm-ivory">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld) }} />
-      <TrackEvent event="view_item" params={{ item_id: p.slug, item_name: p.name, price: p.variants[0]?.price }} />
-      <div className="pdp__head">
-        <nav className="pdp__breadcrumb" aria-label="Breadcrumb">
-          {p.breadcrumb.map((c, i) => (
-            <span key={c.href}>
-              {i > 0 ? <span className="pdp__crumb-sep" aria-hidden="true">·</span> : null}
-              {i < p.breadcrumb.length - 1 ? (
-                <Link href={c.href} className="pdp__crumb">{c.label}</Link>
-              ) : (
-                <span className="pdp__crumb pdp__crumb--current">{c.label}</span>
-              )}
-            </span>
-          ))}
-        </nav>
-
-        <div className="pdp__layout">
-          <ProductGallery images={p.gallery} name={p.name} itemId={p.slug} />
-
-        <div className="pdp__info">
-          {p.chapterName ? (
-            p.chapterHref ? (
-              <Link href={p.chapterHref} className="pdp__chapter">{p.chapterName}</Link>
-            ) : (
-              <p className="pdp__chapter">{p.chapterName}</p>
-            )
-          ) : null}
-          {p.edition ? <p className="pdp__edition">{p.edition}</p> : null}
-          <h1 className="pdp__name">{p.name}</h1>
-          {p.tagline ? <p className="pdp__tagline">{p.tagline}</p> : null}
-          <p className="pdp__meta">
-            {p.collectionType}
-            {p.scentGroup ? <span className="pdp__meta-sep"> · </span> : null}
-            {p.scentGroup ?? ""}
-          </p>
-
-          <ProductPurchasePanel
-            product={{
-              id: p.id,
-              slug: p.slug,
-              name: p.name,
-              chapterName: p.chapterName,
-              edition: p.edition,
-              vessels: p.vessels,
-              sizes: p.sizes,
-              variants: p.variants,
-              defaultVariantId: p.defaultVariantId,
-              priceLabel: p.priceLabel,
-              image: p.gallery[0]?.src ?? "",
-            }}
-          />
-
-        </div>
-        </div>
-      </div>
-
-      <div className="pdp__editorial">
-        <SectionRenderer
-          sections={editorial}
-          context={{ pageId: p.slug, themeToken: palette, preview: false, data: { productSlug: p.slug } }}
-        />
-      </div>
-    </main>
-  );
+  return <CandleProductDetail p={p} editorial={editorial} palette={palette} ld={ld} />;
 }

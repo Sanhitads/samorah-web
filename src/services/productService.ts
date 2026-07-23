@@ -80,6 +80,25 @@ export async function getAirSiblings(collectionId: string, excludeProductId: str
   }
 }
 
+/** Other candle products in the same chapter — feeds the candle PDP preview's "Continue the Chapter"
+ *  grid (the live route uses getRelatedProducts; this mirrors its SAME-chapter rule for the editor).
+ *  Returns RelatedProductInput-shaped rows; empty on any error. */
+export async function getCandleSiblings(collectionId: string, excludeProductId: string) {
+  const db = createPublicClient();
+  try {
+    const { data } = await db
+      .from("products")
+      .select("id, slug, name, tagline, price, product_type, display_order, product_images(url, is_primary, sort_order)")
+      .eq("collection_id", collectionId)
+      .neq("id", excludeProductId)
+      .order("display_order");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (data ?? []).filter((p: any) => !AIR_PRODUCT_TYPES.includes(p.product_type)).slice(0, 4);
+  } catch {
+    return [];
+  }
+}
+
 /** An air volume (chapter) + its active air products, for the DB-driven air chapter page. Returns null
  *  when the collection doesn't exist or has no air products (route falls back to config). */
 export async function getAirVolumeData(slug: string) {
