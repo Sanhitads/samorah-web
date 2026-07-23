@@ -158,10 +158,38 @@ export function buildProductArtist(pa: any): Artist | undefined {
     : getArtist(null);
 }
 
+/**
+ * Candle-PDP CMS extras (stored in products.pdp_content). All optional — every field falls back to
+ * the house default, so a candle with no pdp_content renders exactly as before. Threaded into
+ * buildCandleEditorial so headings, the memory line, the accordion, custom sections and section
+ * images become per-product editable without new columns.
+ */
+export interface CandlePdpContent {
+  palette?: string; // a preset theme token override (else the chapter default); customPalette wins over this
+  customPalette?: { surface: string; ink: string };
+  customGradient?: { from: string; to: string; angle: number };
+  labels?: {
+    storyEyebrow?: string;
+    journeyEyebrow?: string; journeyHeading?: string; journeyIntro?: string;
+    moodEyebrow?: string; moodHeading?: string;
+    craftEyebrow?: string; craftHeading?: string;
+    artistEyebrow?: string;
+    lifestyleEyebrow?: string; lifestyleHeading?: string;
+    testimonialsEyebrow?: string; testimonialsHeading?: string;
+    memoryLine?: string;
+    continueEyebrow?: string;
+  };
+  accordion?: { title: string; body: string }[];
+  customSections?: CustomSection[];
+  storyImage?: string; lifestyleImage?: string; artworkImage?: string;
+  testimonials?: { quote: string; attribution: string }[];
+}
+
 export interface CandleEditorialInput {
   view: ProductPageView;
   artist?: Artist;
   related: RelatedProductInput[];
+  content?: CandlePdpContent;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -242,9 +270,15 @@ const fill = (id: string, settings: object, extra: Partial<SectionInstance> = {}
 
 // ── The builder ──────────────────────────────────────────────────────────────
 
-export function buildCandleEditorial({ view, artist, related }: CandleEditorialInput): SectionInstance[] {
+export function buildCandleEditorial({ view, artist, related, content }: CandleEditorialInput): SectionInstance[] {
+  const L = content?.labels ?? {};
   const storyBody = splitParagraphs(view.mood.story);
-  const storyImage = view.gallery[1]?.src ?? view.gallery[0]?.src;
+  const galleryImage = view.gallery[1]?.src ?? view.gallery[0]?.src;
+  const storyImage = content?.storyImage || galleryImage; // Story Within — own image, else product image #2
+  const lifestyleImage = content?.lifestyleImage || galleryImage; // Living With It — own image, else the same
+  const testimonialQuotes = content?.testimonials?.length
+    ? content.testimonials.filter((t) => t.quote?.trim()).map((t) => ({ quote: t.quote, attribution: t.attribution }))
+    : getTestimonials(view.chapterSlug).map((t) => ({ quote: t.quote, attribution: t.attribution }));
 
   const moodCards: MoodCard[] = [];
   if (view.mood.tags.length) moodCards.push({ label: "Mood", value: view.mood.tags.join(" · ") });
@@ -277,7 +311,7 @@ export function buildCandleEditorial({ view, artist, related }: CandleEditorialI
     fill(
       "story",
       {
-        eyebrow: "The Story Within",
+        eyebrow: L.storyEyebrow || "The Story Within",
         body: storyBody,
         media: storyImage ? imageMedia(storyImage, view.name, "landscape") : undefined,
         align: "image-left",
@@ -287,9 +321,9 @@ export function buildCandleEditorial({ view, artist, related }: CandleEditorialI
     fill(
       "journey",
       {
-        eyebrow: "Fragrance Journey",
-        heading: "The composition unfolds",
-        intro: "Each layer is built to evolve — opening in brightness, settling into warmth, and lingering as atmosphere.",
+        eyebrow: L.journeyEyebrow || "Fragrance Journey",
+        heading: L.journeyHeading || "The composition unfolds",
+        intro: L.journeyIntro || "Each layer is built to evolve — opening in brightness, settling into warmth, and lingering as atmosphere.",
         layers: view.notes.map((n) => ({ label: n.label, notes: n.notes })),
       } satisfies FragrancePyramidSettings,
       { visibility: view.notes.length > 0 },
@@ -298,7 +332,7 @@ export function buildCandleEditorial({ view, artist, related }: CandleEditorialI
       "artist",
       artist
         ? ({
-            eyebrow: "The Artist Behind This Candle",
+            eyebrow: L.artistEyebrow || "The Artist Behind This Candle",
             name: artist.name,
             role: artist.role,
             story: artist.story,
@@ -312,11 +346,11 @@ export function buildCandleEditorial({ view, artist, related }: CandleEditorialI
       "artwork",
       artist
         ? ({
-            media: imageMedia(artist.artworkImages[0] ?? artist.portrait, `Artwork by ${artist.name}`, "cinematic"),
+            media: imageMedia(content?.artworkImage || artist.artworkImages[0] || artist.portrait, `Artwork by ${artist.name}`, "cinematic"),
             caption: artist.signature,
           } satisfies ArtworkFeatureSettings)
         : {},
-      { visibility: Boolean(artist?.artworkImages.length) },
+      { visibility: Boolean(content?.artworkImage || artist?.artworkImages.length) },
     ),
     fill(
       "artist-quote",
@@ -327,20 +361,20 @@ export function buildCandleEditorial({ view, artist, related }: CandleEditorialI
     ),
     fill(
       "mood",
-      { eyebrow: "Scent Mood", heading: "The feeling it leaves", cards: moodCards } satisfies MoodGridSettings,
+      { eyebrow: L.moodEyebrow || "Scent Mood", heading: L.moodHeading || "The feeling it leaves", cards: moodCards } satisfies MoodGridSettings,
       { visibility: moodCards.length > 0 },
     ),
     fill(
       "craft",
-      { eyebrow: "Craft & Composition", heading: "Made by hand", items: craftItems } satisfies CraftDetailsSettings,
+      { eyebrow: L.craftEyebrow || "Craft & Composition", heading: L.craftHeading || "Made by hand", items: craftItems } satisfies CraftDetailsSettings,
       { visibility: craftItems.length > 1 },
     ),
     fill(
       "lifestyle",
       {
-        eyebrow: "Lifestyle",
-        heading: "Living with it",
-        media: storyImage ? imageMedia(storyImage, view.name, "landscape") : undefined,
+        eyebrow: L.lifestyleEyebrow || "Lifestyle",
+        heading: L.lifestyleHeading || "Living with it",
+        media: lifestyleImage ? imageMedia(lifestyleImage, view.name, "landscape") : undefined,
         rows: lifestyleRows,
         moments: lifestyleMoments,
         align: "image-left",
@@ -354,24 +388,27 @@ export function buildCandleEditorial({ view, artist, related }: CandleEditorialI
     ),
     fill(
       "divider-memory",
-      { line: "Every fragrance begins with a memory." } satisfies EditorialDividerSettings,
+      { line: L.memoryLine || "Every fragrance begins with a memory." } satisfies EditorialDividerSettings,
       { visibility: storyBody.length > 0 || view.notes.length > 0 },
     ),
     fill(
       "testimonials",
       {
-        eyebrow: "Letters From Our Community",
-        heading: "In their words",
-        quotes: getTestimonials(view.chapterSlug).map((t) => ({ quote: t.quote, attribution: t.attribution })),
+        eyebrow: L.testimonialsEyebrow || "Letters From Our Community",
+        heading: L.testimonialsHeading || "In their words",
+        quotes: testimonialQuotes,
       } satisfies TestimonialsSettings,
-      { visibility: getTestimonials(view.chapterSlug).length > 0 },
+      { visibility: testimonialQuotes.length > 0 },
     ),
     fill("divider-close", {} satisfies EditorialDividerSettings),
-    fill("details", { items: candleAccordion(view) } satisfies EditorialAccordionSettings),
+    fill(
+      "details",
+      { items: content?.accordion?.length ? content.accordion.filter((r) => r.title?.trim() || r.body?.trim()) : candleAccordion(view) } satisfies EditorialAccordionSettings,
+    ),
     fill(
       "related",
       {
-        eyebrow: "Continue",
+        eyebrow: L.continueEyebrow || "Continue",
         heading: view.chapterName ? `Continue the ${stripVolume(view.chapterName)}` : "More to discover",
         products: related.map(toCard),
       } satisfies RelatedProductsSettings,
@@ -379,7 +416,20 @@ export function buildCandleEditorial({ view, artist, related }: CandleEditorialI
     ),
   ];
 
-  return composeSections(CANDLE_PDP_TEMPLATE.sections, overrides);
+  return composeSections(CANDLE_PDP_TEMPLATE.sections, applyCandleCustomSections(overrides, content?.customSections));
+}
+
+/**
+ * Insert admin-added custom sections at their chosen positions. Mirrors the air PDP: each
+ * CustomSection maps to a core editorial block (statement / lines / grid / quote) with a fractional
+ * order so it lands before/after the fixed sections. No custom sections → overrides unchanged.
+ */
+function applyCandleCustomSections(overrides: SectionInstance[], custom?: CustomSection[]): SectionInstance[] {
+  if (!custom?.length) return overrides;
+  const extra = custom
+    .map((s, i) => buildCustomSection(s, i, CANDLE_POS_ORDER, 14.5, "candle-custom"))
+    .filter((s): s is SectionInstance => s !== null);
+  return [...overrides, ...extra];
 }
 
 // ── Air PDP (Experience B; data from config/theHours until air products exist) ──
@@ -431,31 +481,48 @@ function airScentLayers(scent: string[]): { label: string; notes: string[] }[] {
 
 const POS_ORDER: Record<string, number> = Object.fromEntries(AIR_SECTION_POSITIONS.map((p) => [p.value, p.order]));
 
-/** Compose admin-defined custom sections from EXISTING block types, so each inherits the design
- *  system's CSS + themed shell (no new styling, can't break the page). Each section's `position`
- *  drops it into a gap between the built-in sections (top → end); ties keep their list order.
- *  Empty sections are dropped. */
+/** Candle PDP — where an admin-added custom section can be dropped, and the fractional order that
+ *  places it in the gap between the fixed sections (story 1 … related 14). Used by both the builder
+ *  and the editor's position dropdown. */
+export const CANDLE_SECTION_POSITIONS: { value: string; label: string; order: number }[] = [
+  { value: "top", label: "Top — before The Story", order: 0.5 },
+  { value: "after-story", label: "After The Story Within", order: 1.5 },
+  { value: "after-journey", label: "After Fragrance Journey", order: 2.5 },
+  { value: "after-mood", label: "After Scent Mood", order: 4.5 },
+  { value: "after-craft", label: "After Craft & Composition", order: 5.5 },
+  { value: "after-artist", label: "After The Artist", order: 8.5 },
+  { value: "after-lifestyle", label: "After Living With It", order: 9.5 },
+  { value: "after-testimonials", label: "After In Their Words", order: 11.5 },
+  { value: "end", label: "End — after Continue the Chapter", order: 14.5 },
+];
+const CANDLE_POS_ORDER: Record<string, number> = Object.fromEntries(CANDLE_SECTION_POSITIONS.map((p) => [p.value, p.order]));
+
+/** Map one admin CustomSection to a SectionInstance built from an EXISTING block type, so it inherits
+ *  the design system's CSS + themed shell (no new styling, can't break the page). `posOrder` places
+ *  it into a gap between the built-in sections; `fallbackOrder` is used for an unknown position; ties
+ *  keep list order. Returns null for an empty section. Shared by the air + candle PDPs. */
+function buildCustomSection(c: CustomSection, i: number, posOrder: Record<string, number>, fallbackOrder: number, idPrefix = "custom"): SectionInstance | null {
+  const order = (posOrder[c.position ?? ""] ?? fallbackOrder) + i * 0.001;
+  const base = { id: `${idPrefix}-${i}`, order, visibility: true, spacing: "lg", animation: "fade" };
+  if (c.type === "lines") {
+    const lines = (c.lines ?? []).map((l) => l.trim()).filter(Boolean);
+    return lines.length ? ({ ...base, type: "PoeticLines", variant: "verse", settings: { eyebrow: c.eyebrow ?? "", lines } } as unknown as SectionInstance) : null;
+  }
+  if (c.type === "grid") {
+    const items = (c.items ?? []).map((x) => ({ label: (x.label ?? "").trim(), note: (x.note ?? "").trim() })).filter((x) => x.label || x.note);
+    return items.length ? ({ ...base, type: "PlacementGrid", variant: "grid", settings: { eyebrow: c.eyebrow ?? "", heading: c.heading ?? "", items } } as unknown as SectionInstance) : null;
+  }
+  if (c.type === "quote") {
+    const quote = (c.body ?? "").trim();
+    return quote ? ({ ...base, type: "EditorialQuote", variant: "handwritten", settings: { quote, variant: "handwritten" } } as unknown as SectionInstance) : null;
+  }
+  const body = (c.body ?? "").split(/\n{2,}/).map((t) => t.trim()).filter(Boolean);
+  return body.length ? ({ ...base, type: "EditorialStatement", variant: "statement", settings: { eyebrow: c.eyebrow ?? "", heading: c.heading ?? "", body, align: "none" } } as unknown as SectionInstance) : null;
+}
+
+/** Compose admin-defined custom sections for the air PDP (see buildCustomSection). */
 function buildAirCustomSections(list: CustomSection[]): SectionInstance[] {
-  return list
-    .map((c, i) => {
-      const order = (POS_ORDER[c.position ?? "after-signature"] ?? 6.5) + i * 0.001;
-      const base = { id: `custom-${i}`, order, visibility: true, spacing: "lg", animation: "fade" };
-      if (c.type === "lines") {
-        const lines = (c.lines ?? []).map((l) => l.trim()).filter(Boolean);
-        return lines.length ? { ...base, type: "PoeticLines", variant: "verse", settings: { eyebrow: c.eyebrow ?? "", lines } } : null;
-      }
-      if (c.type === "grid") {
-        const items = (c.items ?? []).map((x) => ({ label: (x.label ?? "").trim(), note: (x.note ?? "").trim() })).filter((x) => x.label || x.note);
-        return items.length ? { ...base, type: "PlacementGrid", variant: "grid", settings: { eyebrow: c.eyebrow ?? "", heading: c.heading ?? "", items } } : null;
-      }
-      if (c.type === "quote") {
-        const quote = (c.body ?? "").trim();
-        return quote ? { ...base, type: "EditorialQuote", variant: "handwritten", settings: { quote, variant: "handwritten" } } : null;
-      }
-      const body = (c.body ?? "").split(/\n{2,}/).map((t) => t.trim()).filter(Boolean);
-      return body.length ? { ...base, type: "EditorialStatement", variant: "statement", settings: { eyebrow: c.eyebrow ?? "", heading: c.heading ?? "", body, align: "none" } } : null;
-    })
-    .filter(Boolean) as unknown as SectionInstance[];
+  return list.map((c, i) => buildCustomSection(c, i, POS_ORDER, 6.5)).filter((s): s is SectionInstance => s !== null);
 }
 
 export function buildAirEditorial({ hour, volume, others }: AirEditorialInput): SectionInstance[] {

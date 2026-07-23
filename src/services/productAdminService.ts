@@ -182,6 +182,8 @@ export interface ProductCoreInput {
   artistEnabled?: boolean; artistName?: string; artistRole?: string; artistStory?: string; artistQuote?: string; artistImage?: string;
   // Air-product PDP content (room / linen fresheners)
   airContent?: Record<string, unknown> | null;
+  // Candle-PDP CMS extras (custom palette/gradient, section headings, accordion, custom sections, images, testimonials)
+  pdpContent?: Record<string, unknown> | null;
   // Merchandising flags (added by 20260730120000_product_cms)
   isBestseller?: boolean; isNewArrival?: boolean; isLimitedEdition?: boolean; isSeasonal?: boolean; isStaffPick?: boolean; isComingSoon?: boolean;
   // Visibility controls
@@ -203,6 +205,7 @@ function productRow(i: ProductCoreInput): Record<string, unknown> {
   s("artist_name", i.artistName); s("artist_role", i.artistRole); s("artist_story", i.artistStory); s("artist_quote", i.artistQuote); s("artist_image", i.artistImage);
   b("artist_enabled", i.artistEnabled);
   if (i.airContent !== undefined) r.air_content = i.airContent;
+  if (i.pdpContent !== undefined) r.pdp_content = i.pdpContent;
   if (i.moodTags !== undefined) r.mood_tags = i.moodTags.map((t) => t.trim()).filter(Boolean);
   if (i.collectionId !== undefined) r.collection_id = i.collectionId || null;
   if (i.categoryId !== undefined && i.categoryId) r.category_id = i.categoryId;
@@ -229,6 +232,7 @@ const CMS_COLUMNS = [
   "visible_website", "visible_search", "visible_homepage", "visible_chapter", "visible_bundles",
   "chapter_position", "display_order", "seo_og_image", "seo_canonical", "product_type",
   "artist_enabled", "artist_name", "artist_role", "artist_story", "artist_quote", "artist_image", "air_content",
+  "pdp_content",
 ];
 
 export async function updateProduct(id: string, input: ProductCoreInput, actorId?: string) {

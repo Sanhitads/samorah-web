@@ -1,6 +1,8 @@
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import type { ProductPageView } from "@/lib/productPage";
 import type { SectionInstance } from "@/platform/section";
+import type { CandlePdpContent } from "@/lib/productEditorial";
 import { TrackEvent } from "@/components/analytics/TrackEvent";
 import { ProductPurchasePanel } from "@/components/product/ProductPurchasePanel";
 import { ProductGallery } from "@/components/product/ProductGallery";
@@ -19,17 +21,40 @@ export function CandleProductDetail({
   editorial,
   palette,
   ld,
+  content,
   preview = false,
 }: {
   p: ProductPageView;
   editorial: SectionInstance[];
   palette: string;
   ld?: object;
+  content?: CandlePdpContent;
   preview?: boolean;
 }) {
   bootstrapPlatform(); // register the section library so SectionRenderer resolves each type (also in preview)
+
+  // A custom palette themes the editorial sections via inline CSS vars + an unregistered token (so no
+  // preset rule overrides them); a custom gradient repaints the hero media via one scoped style rule.
+  const cp = content?.customPalette;
+  const themeToken = cp ? "candle-custom" : palette;
+  const editorialVars: CSSProperties | undefined = cp
+    ? ({
+        "--surface": cp.surface,
+        "--surface-alt": `color-mix(in srgb, ${cp.surface} 92%, ${cp.ink} 8%)`,
+        "--ink": cp.ink,
+        "--ink-soft": `color-mix(in srgb, ${cp.ink} 78%, ${cp.surface})`,
+        "--ink-muted": `color-mix(in srgb, ${cp.ink} 55%, ${cp.surface})`,
+      } as CSSProperties)
+    : undefined;
+  const cg = content?.customGradient;
+  const gradientCss = cg?.from && cg?.to ? `linear-gradient(${cg.angle || 135}deg, ${cg.from}, ${cg.to})` : null;
+  const scopeId = `pdp-${p.slug}`;
+
   return (
-    <main className="pdp" data-theme="warm-ivory">
+    <main className="pdp" data-theme="warm-ivory" data-cid={scopeId}>
+      {gradientCss ? (
+        <style dangerouslySetInnerHTML={{ __html: `[data-cid="${scopeId}"] .pdp__layout .asset-image{background:${gradientCss} !important}` }} />
+      ) : null}
       {ld && !preview ? (
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld) }} />
       ) : null}
@@ -89,10 +114,10 @@ export function CandleProductDetail({
         </div>
       </div>
 
-      <div className="pdp__editorial">
+      <div className="pdp__editorial" style={editorialVars}>
         <SectionRenderer
           sections={editorial}
-          context={{ pageId: p.slug, themeToken: palette, preview, data: { productSlug: p.slug } }}
+          context={{ pageId: p.slug, themeToken, preview, data: { productSlug: p.slug } }}
         />
       </div>
     </main>

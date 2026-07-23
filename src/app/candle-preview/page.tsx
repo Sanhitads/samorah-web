@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CandleProductDetail } from "@/components/product/CandleProductDetail";
 import { buildProductPage, type ProductInput } from "@/lib/productPage";
-import { buildCandleEditorial, buildProductArtist, type RelatedProductInput } from "@/lib/productEditorial";
+import { buildCandleEditorial, buildProductArtist, type RelatedProductInput, type CandlePdpContent } from "@/lib/productEditorial";
 import { chapterTheme } from "@/lib/chapterPage";
 
 /**
@@ -62,9 +62,10 @@ export default function CandlePreviewRoute() {
     if (product.__edition) p.edition = product.__edition;
     const artist = buildProductArtist(product);
     const related = (product.__related ?? []) as RelatedProductInput[];
-    const editorial = buildCandleEditorial({ view: p, artist, related });
-    const palette = chapterTheme(p.chapterSlug);
-    return <CandleProductDetail p={p} editorial={editorial} palette={palette} preview />;
+    const content = (product.pdp_content ?? undefined) as CandlePdpContent | undefined;
+    const editorial = buildCandleEditorial({ view: p, artist, related, content });
+    const palette = content?.palette || chapterTheme(p.chapterSlug);
+    return <CandleProductDetail p={p} editorial={editorial} palette={palette} content={content} preview />;
   } catch {
     return <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", color: "#b4534b", fontSize: 14 }}>Preview unavailable for this product.</div>;
   }

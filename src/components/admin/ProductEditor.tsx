@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type FocusEvent, type TextareaHTM
 import type { VariantRow, NoteRow, ImageRow, VesselType, ProductStatus } from "@/services/productAdminService";
 import { LivePreviewPanel } from "@/components/admin/LivePreviewPanel";
 import { AIR_ACCORDION_DEFAULTS, AIR_SECTION_POSITIONS, type CustomSection } from "@/config/theHours";
+import { CANDLE_SECTION_POSITIONS } from "@/lib/productEditorial";
 
 /** A textarea that grows to fit its content, so long editorial text (the Hour story, etc.) is fully
  *  visible while editing instead of scrolling inside a fixed box. */
@@ -59,6 +60,17 @@ type Core = {
   airCustomSections: CustomSection[]; // admin-added extra sections
   airHourEyebrow: string; airFragranceEyebrow: string; airFeelsEyebrow: string; airExperienceEyebrow: string;
   airPlacementEyebrow: string; airPlacementHeading: string; airContinueEyebrow: string; airContinueHeading: string;
+  // Candle PDP CMS extras (room/linen use air fields above; candles use these) — assembled to pdp_content.
+  cPalette: string; cCustomSurface: string; cCustomInk: string; // "" = chapter default, token, or "custom"
+  cGradient: string; cGradFrom: string; cGradTo: string; cGradAngle: string; // "" = none, or "custom"
+  cAccordion: { title: string; body: string }[]; // overrides the Details accordion
+  cCustomSections: CustomSection[]; // admin-added extra sections (move anywhere)
+  cStoryEyebrow: string; cJourneyEyebrow: string; cJourneyHeading: string; cJourneyIntro: string;
+  cMoodEyebrow: string; cMoodHeading: string; cCraftEyebrow: string; cCraftHeading: string; cArtistEyebrow: string;
+  cLifestyleEyebrow: string; cLifestyleHeading: string; cTestimonialsEyebrow: string; cTestimonialsHeading: string;
+  cMemoryLine: string; cContinueEyebrow: string;
+  cStoryImage: string; cLifestyleImage: string; cArtworkImage: string; // section-specific images
+  cTestimonials: { quote: string; attribution: string }[]; // In their words — per-product
 };
 
 const AIR_TYPES = ["room_spray", "linen_spray"];
@@ -97,6 +109,56 @@ function assembleAirContent(core: Core) {
       hourEyebrow: core.airHourEyebrow || undefined, fragranceEyebrow: core.airFragranceEyebrow || undefined, feelsEyebrow: core.airFeelsEyebrow || undefined, experienceEyebrow: core.airExperienceEyebrow || undefined,
       placementEyebrow: core.airPlacementEyebrow || undefined, placementHeading: core.airPlacementHeading || undefined, continueEyebrow: core.airContinueEyebrow || undefined, continueHeading: core.airContinueHeading || undefined,
     },
+  };
+}
+
+// Candle PDP palette presets (registered theme tokens) — the chapter default applies when blank.
+const CANDLE_PALETTES = ["warm-ivory", "clay", "forest", "dark-library", "sage"];
+
+// The house Details-accordion rows, so the editor can load them for editing (blank = the storefront
+// keeps its own dynamic rows). Wax/Wick reflect the product where the admin has filled them.
+const candleAccordionDefaults = (waxBlend: string, wick: string, vessels: string): { title: string; body: string }[] => [
+  { title: "Candle Care & Safety", body: "Always burn within sight, and extinguish before leaving the room or sleeping. Trim the wick to ¼ inch before each use for a clean, even burn. Keep at least two feet from anything flammable, and away from drafts, fans, or open windows. Place on a stable, heat-resistant surface. Limit each session to four hours, and stop burning when ½ inch of wax remains. Never move a burning candle." },
+  { title: "Wax & Wick Details", body: `${waxBlend || "A creamy coconut wax blend"} for a slow, clean, even burn. ${wick || "A lead-free cotton wick"}, trimmed for a steady, low-soot flame. Burn time scales with size — a longer, slower burn in the larger vessels.` },
+  { title: "Ingredients & Materials", body: `Hand-poured with a premium coconut wax blend and a 100% natural, lead-free cotton wick. Premium-grade, phthalate-free fragrance and essential oils, IFRA-compliant. Free from parabens and sulfates, and never tested on animals. Poured into a reusable ${vessels || "ceramic or glass"} vessel.` },
+  { title: "Shipping & Exchanges", body: "Carefully packed and dispatched within 1–3 business days (a little longer during festive periods). Complimentary standard shipping within India on qualifying orders; most orders arrive in 3–7 business days. Worldwide shipping via trusted couriers (duties/taxes at checkout). Due to the handcrafted nature of our candles we do not accept returns, but if your order arrives damaged or incorrect, write to us within 48 hours and we will make it right." },
+  { title: "Sustainability & Reusability", body: "Cured for 10–14 days before shipping for a stronger, truer scent throw. Once the last of the wax is gone, the vessel can be cleaned and upcycled — a keepsake for flowers, brushes or small things. Made slowly, meant to last beyond the flame." },
+];
+
+// Assemble the pdp_content JSON from the flat candle CMS fields — used by BOTH save and the live
+// preview draft, so what you preview is exactly what saves. Every field is optional (blank → house
+// default), so a candle with nothing set renders exactly as before.
+function assembleCandleContent(core: Core) {
+  const labels = {
+    storyEyebrow: core.cStoryEyebrow || undefined,
+    journeyEyebrow: core.cJourneyEyebrow || undefined, journeyHeading: core.cJourneyHeading || undefined, journeyIntro: core.cJourneyIntro || undefined,
+    moodEyebrow: core.cMoodEyebrow || undefined, moodHeading: core.cMoodHeading || undefined,
+    craftEyebrow: core.cCraftEyebrow || undefined, craftHeading: core.cCraftHeading || undefined,
+    artistEyebrow: core.cArtistEyebrow || undefined,
+    lifestyleEyebrow: core.cLifestyleEyebrow || undefined, lifestyleHeading: core.cLifestyleHeading || undefined,
+    testimonialsEyebrow: core.cTestimonialsEyebrow || undefined, testimonialsHeading: core.cTestimonialsHeading || undefined,
+    memoryLine: core.cMemoryLine || undefined, continueEyebrow: core.cContinueEyebrow || undefined,
+  };
+  const hasLabels = Object.values(labels).some(Boolean);
+  const accordion = core.cAccordion.map((r) => ({ title: r.title.trim(), body: r.body.trim() })).filter((r) => r.title || r.body);
+  const testimonials = core.cTestimonials.map((t) => ({ quote: t.quote.trim(), attribution: t.attribution.trim() })).filter((t) => t.quote);
+  const customSections = core.cCustomSections.map((s) => ({
+    type: s.type, position: s.position ?? "after-story",
+    eyebrow: (s.eyebrow ?? "").trim() || undefined, heading: (s.heading ?? "").trim() || undefined, body: (s.body ?? "").trim() || undefined,
+    lines: (s.lines ?? []).map((l) => l.trim()).filter(Boolean),
+    items: (s.items ?? []).map((x) => ({ label: (x.label ?? "").trim(), note: (x.note ?? "").trim() })).filter((x) => x.label || x.note),
+  })).filter((s) => s.body || s.lines.length || s.items.length);
+  return {
+    palette: core.cPalette && core.cPalette !== "custom" ? core.cPalette : undefined,
+    customPalette: core.cPalette === "custom" ? { surface: core.cCustomSurface, ink: core.cCustomInk } : undefined,
+    customGradient: core.cGradient === "custom" ? { from: core.cGradFrom, to: core.cGradTo, angle: Number(core.cGradAngle) || 135 } : undefined,
+    labels: hasLabels ? labels : undefined,
+    accordion: accordion.length ? accordion : undefined,
+    customSections: customSections.length ? customSections : undefined,
+    storyImage: core.cStoryImage || undefined,
+    lifestyleImage: core.cLifestyleImage || undefined,
+    artworkImage: core.cArtworkImage || undefined,
+    testimonials: testimonials.length ? testimonials : undefined,
   };
 }
 
@@ -172,6 +234,34 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
           airPlacementEyebrow: sv(lb.placementEyebrow), airPlacementHeading: sv(lb.placementHeading), airContinueEyebrow: sv(lb.continueEyebrow), airContinueHeading: sv(lb.continueHeading),
         };
       })(),
+      ...((): Pick<Core,
+        "cPalette" | "cCustomSurface" | "cCustomInk" | "cGradient" | "cGradFrom" | "cGradTo" | "cGradAngle" | "cAccordion" | "cCustomSections" |
+        "cStoryEyebrow" | "cJourneyEyebrow" | "cJourneyHeading" | "cJourneyIntro" | "cMoodEyebrow" | "cMoodHeading" | "cCraftEyebrow" | "cCraftHeading" | "cArtistEyebrow" |
+        "cLifestyleEyebrow" | "cLifestyleHeading" | "cTestimonialsEyebrow" | "cTestimonialsHeading" | "cMemoryLine" | "cContinueEyebrow" |
+        "cStoryImage" | "cLifestyleImage" | "cArtworkImage" | "cTestimonials"> => {
+        const pc = (p.pdp_content ?? {}) as Record<string, unknown>;
+        const clb = (pc.labels ?? {}) as Record<string, unknown>;
+        return {
+          cPalette: pc.customPalette ? "custom" : sv(pc.palette),
+          cCustomSurface: sv((pc.customPalette as { surface?: string })?.surface) || "#efe7db",
+          cCustomInk: sv((pc.customPalette as { ink?: string })?.ink) || "#2a2018",
+          cGradient: pc.customGradient ? "custom" : "",
+          cGradFrom: sv((pc.customGradient as { from?: string })?.from) || "#caa46a",
+          cGradTo: sv((pc.customGradient as { to?: string })?.to) || "#3a2415",
+          cGradAngle: (pc.customGradient as { angle?: number })?.angle != null ? String((pc.customGradient as { angle?: number }).angle) : "135",
+          cAccordion: Array.isArray(pc.accordion) ? (pc.accordion as { title?: string; body?: string }[]).map((r) => ({ title: sv(r.title), body: sv(r.body) })) : [],
+          cCustomSections: Array.isArray(pc.customSections) ? (pc.customSections as CustomSection[]).map((s) => ({
+            type: s.type ?? "statement", position: s.position ?? "after-story", eyebrow: sv(s.eyebrow), heading: sv(s.heading), body: sv(s.body),
+            lines: Array.isArray(s.lines) ? s.lines.map((l) => sv(l)) : [], items: Array.isArray(s.items) ? s.items.map((x) => ({ label: sv(x.label), note: sv(x.note) })) : [],
+          })) : [],
+          cStoryEyebrow: sv(clb.storyEyebrow), cJourneyEyebrow: sv(clb.journeyEyebrow), cJourneyHeading: sv(clb.journeyHeading), cJourneyIntro: sv(clb.journeyIntro),
+          cMoodEyebrow: sv(clb.moodEyebrow), cMoodHeading: sv(clb.moodHeading), cCraftEyebrow: sv(clb.craftEyebrow), cCraftHeading: sv(clb.craftHeading), cArtistEyebrow: sv(clb.artistEyebrow),
+          cLifestyleEyebrow: sv(clb.lifestyleEyebrow), cLifestyleHeading: sv(clb.lifestyleHeading), cTestimonialsEyebrow: sv(clb.testimonialsEyebrow), cTestimonialsHeading: sv(clb.testimonialsHeading),
+          cMemoryLine: sv(clb.memoryLine), cContinueEyebrow: sv(clb.continueEyebrow),
+          cStoryImage: sv(pc.storyImage), cLifestyleImage: sv(pc.lifestyleImage), cArtworkImage: sv(pc.artworkImage),
+          cTestimonials: Array.isArray(pc.testimonials) ? (pc.testimonials as { quote?: string; attribution?: string }[]).map((t) => ({ quote: sv(t.quote), attribution: sv(t.attribution) })) : [],
+        };
+      })(),
     });
     setVariants(d.variants ?? []); setNotes(d.notes ?? []); setImages(d.images ?? []);
   };
@@ -227,6 +317,7 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
       })),
       product_images: [...images].sort((a, b) => a.sortOrder - b.sortOrder).map((im) => ({ url: im.url, alt_text: im.altText, is_primary: im.isPrimary, sort_order: im.sortOrder })),
       fragrance_notes: notes.map((n) => ({ layer: n.layer, note: n.note, sort_order: n.sortOrder })),
+      pdp_content: assembleCandleContent(core),
       __related: candleSiblings,
     };
   }, [core, variants, notes, images, collections, productId, candleSiblings]);
@@ -286,15 +377,59 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
       return { ...c, airCustomSections: rows };
     });
 
+  // ── Candle PDP: Details accordion (overrides the storefront rows) ──
+  const cAccUpdate = (i: number, patch: Partial<{ title: string; body: string }>) =>
+    setCore((c) => (c ? { ...c, cAccordion: c.cAccordion.map((r, j) => (j === i ? { ...r, ...patch } : r)) } : c));
+  const cAccAdd = () => setCore((c) => (c ? { ...c, cAccordion: [...c.cAccordion, { title: "", body: "" }] } : c));
+  const cAccRemove = (i: number) => setCore((c) => (c ? { ...c, cAccordion: c.cAccordion.filter((_, j) => j !== i) } : c));
+  const cAccMove = (i: number, dir: -1 | 1) =>
+    setCore((c) => {
+      if (!c) return c;
+      const rows = [...c.cAccordion];
+      const j = i + dir;
+      if (j < 0 || j >= rows.length) return c;
+      [rows[i], rows[j]] = [rows[j], rows[i]];
+      return { ...c, cAccordion: rows };
+    });
+  const cAccLoadDefaults = () =>
+    setCore((c) => {
+      if (!c) return c;
+      const vessels = Array.from(new Set(variants.map((v) => v.vesselType).filter((v): v is VesselType => !!v))).join(" · ");
+      return { ...c, cAccordion: candleAccordionDefaults(c.waxBlend, c.wick, vessels) };
+    });
+
+  // ── Candle PDP: custom sections (move anywhere) ──
+  const cCsUpdate = (i: number, patch: Partial<CustomSection>) =>
+    setCore((c) => (c ? { ...c, cCustomSections: c.cCustomSections.map((s, j) => (j === i ? { ...s, ...patch } : s)) } : c));
+  const cCsAdd = () => setCore((c) => (c ? { ...c, cCustomSections: [...c.cCustomSections, { type: "statement", position: "after-story", eyebrow: "", heading: "", body: "", lines: [], items: [] }] } : c));
+  const cCsRemove = (i: number) => setCore((c) => (c ? { ...c, cCustomSections: c.cCustomSections.filter((_, j) => j !== i) } : c));
+  const cCsMove = (i: number, dir: -1 | 1) =>
+    setCore((c) => {
+      if (!c) return c;
+      const rows = [...c.cCustomSections];
+      const j = i + dir;
+      if (j < 0 || j >= rows.length) return c;
+      [rows[i], rows[j]] = [rows[j], rows[i]];
+      return { ...c, cCustomSections: rows };
+    });
+
+  // ── Candle PDP: testimonials (In their words) ──
+  const cTesUpdate = (i: number, patch: Partial<{ quote: string; attribution: string }>) =>
+    setCore((c) => (c ? { ...c, cTestimonials: c.cTestimonials.map((t, j) => (j === i ? { ...t, ...patch } : t)) } : c));
+  const cTesAdd = () => setCore((c) => (c ? { ...c, cTestimonials: [...c.cTestimonials, { quote: "", attribution: "" }] } : c));
+  const cTesRemove = (i: number) => setCore((c) => (c ? { ...c, cTestimonials: c.cTestimonials.filter((_, j) => j !== i) } : c));
+
   const saveCore = async () => {
     if (!core) return;
     const isAir = AIR_TYPES.includes(core.productType);
     const airContent = isAir ? assembleAirContent(core) : undefined;
+    const pdpContent = isAir ? undefined : assembleCandleContent(core);
     const product = {
       ...core, salePrice: numOrNull(core.salePrice), weightGrams: numOrNull(core.weightGrams),
       moodTags: core.moodTags.split(",").map((t) => t.trim()).filter(Boolean),
       collectionId: core.collectionId || null, displayOrder: Number(core.displayOrder || 0), publishAt: core.publishAt || null,
       ...(airContent ? { airContent } : {}),
+      ...(pdpContent ? { pdpContent } : {}),
     };
     if (await post({ action: "update", id: productId, product })) { setMsg("Saved"); onSaved(); setTimeout(() => setMsg(""), 1500); }
   };
@@ -328,6 +463,20 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
       const d = await res.json(); setBusy(false);
       if (!res.ok || !d.url) { setErr(d.error ?? d.reason ?? "Upload failed"); return; }
       if (await post({ action: "image.add", productId, url: d.url, altText: alt })) { setImgAlt(""); await load(); onSaved(); }
+    } catch (e) { setBusy(false); setErr(e instanceof Error ? e.message : "Upload failed"); }
+  };
+
+  // Upload a single image and hand the URL to a setter — for the candle PDP's section-specific images
+  // (Story / Living With It / Artwork), which live in pdp_content, not the product gallery.
+  const uploadInto = async (file: File, apply: (url: string) => void) => {
+    setBusy(true); setErr("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file); fd.append("folder", "products"); fd.append("alt", core?.name || "");
+      const res = await fetch("/api/admin/media", { method: "POST", body: fd });
+      const d = await res.json(); setBusy(false);
+      if (!res.ok || !d.url) { setErr(d.error ?? d.reason ?? "Upload failed"); return; }
+      apply(d.url);
     } catch (e) { setBusy(false); setErr(e instanceof Error ? e.message : "Upload failed"); }
   };
   const primaryImage = async (id: string) => { if (await post({ action: "image.primary", productId, id })) { await load(); onSaved(); } };
@@ -553,6 +702,156 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
                 </div>
               ))}
               <button type="button" className="ff-btn ff-btn--mini" onClick={csAdd}>+ Add section</button>
+            </details>
+          </details>
+        ) : null}
+
+        {isCandle ? (
+          <details className="pe-sec" open>
+            <summary>Candle PDP — colours, headings, accordion &amp; sections</summary>
+            <p className="om-field__hint" style={{ margin: "0 0 8px" }}>Every field below is optional — leave it blank to keep the house default. Use the live preview to see each change instantly.</p>
+
+            <p className="om-field__hint" style={{ margin: "12px 0 6px", fontWeight: 600 }}>Section colours</p>
+            <div className="cfg-grid" data-anchor="story">
+              <label className="cfg-field"><span>Palette <em className="om-field__hint">the page colour</em></span>
+                <select value={core.cPalette} onChange={(e) => set({ cPalette: e.target.value })}>
+                  <option value="">Chapter default</option>
+                  {CANDLE_PALETTES.map((p) => <option key={p} value={p}>{p}</option>)}
+                  <option value="custom">Custom…</option>
+                </select>
+              </label>
+              <label className="cfg-field"><span>Hero gradient <em className="om-field__hint">behind the product image</em></span>
+                <select value={core.cGradient} onChange={(e) => set({ cGradient: e.target.value })}>
+                  <option value="">Default</option>
+                  <option value="custom">Custom…</option>
+                </select>
+              </label>
+            </div>
+            {core.cPalette === "custom" ? (
+              <div className="cfg-grid" data-anchor="story">
+                <label className="cfg-field"><span>Section background</span><input type="color" value={core.cCustomSurface} onChange={(e) => set({ cCustomSurface: e.target.value })} /></label>
+                <label className="cfg-field"><span>Section text</span><input type="color" value={core.cCustomInk} onChange={(e) => set({ cCustomInk: e.target.value })} /></label>
+                <div className="cfg-field"><span>Readability</span><span style={{ fontSize: 13, color: contrastRatio(core.cCustomSurface, core.cCustomInk) >= 4.5 ? "#2e7d4f" : "#b4534b" }}>{contrastRatio(core.cCustomSurface, core.cCustomInk) >= 4.5 ? "Good contrast ✓" : "Low contrast — hard to read"}</span></div>
+              </div>
+            ) : null}
+            {core.cGradient === "custom" ? (
+              <div className="cfg-grid" data-anchor="story">
+                <label className="cfg-field"><span>Gradient from</span><input type="color" value={core.cGradFrom} onChange={(e) => set({ cGradFrom: e.target.value })} /></label>
+                <label className="cfg-field"><span>Gradient to</span><input type="color" value={core.cGradTo} onChange={(e) => set({ cGradTo: e.target.value })} /></label>
+                <label className="cfg-field"><span>Angle°</span><input type="number" value={core.cGradAngle} onChange={(e) => set({ cGradAngle: e.target.value })} placeholder="135" /></label>
+              </div>
+            ) : null}
+
+            <p className="om-field__hint" style={{ margin: "14px 0 6px", fontWeight: 600 }}>Section images</p>
+            <p className="om-field__hint" style={{ margin: "0 0 8px" }}>Give the Story, Living With It and Artwork sections their own images. Blank uses the product photo (Story / Living) or the artist artwork (Artwork).</p>
+            {([
+              { k: "cStoryImage", label: "Story Within image", anchor: "story" },
+              { k: "cLifestyleImage", label: "Living With It image", anchor: "lifestyle" },
+              { k: "cArtworkImage", label: "Artwork image", anchor: "artwork" },
+            ] as const).map(({ k, label, anchor }) => (
+              <div key={k} className="pe-imgadd" data-anchor={anchor}>
+                <input value={core[k]} onChange={(e) => set({ [k]: e.target.value } as Partial<Core>)} placeholder={`${label} — paste a URL, or upload →`} />
+                <label className={`ff-btn${busy ? " is-disabled" : ""}`} style={{ cursor: busy ? "default" : "pointer" }}>
+                  {busy ? "…" : "⬆ Upload"}
+                  <input type="file" accept="image/*" style={{ display: "none" }} disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadInto(f, (url) => set({ [k]: url } as Partial<Core>)); e.target.value = ""; }} />
+                </label>
+                {core[k] ? <button type="button" className="ff-btn ff-btn--mini" onClick={() => set({ [k]: "" } as Partial<Core>)}>Clear</button> : null}
+              </div>
+            ))}
+
+            <p className="om-field__hint" style={{ margin: "14px 0 6px", fontWeight: 600 }}>Details accordion</p>
+            <p className="om-field__hint" style={{ margin: "0 0 8px" }}>The collapsible rows at the bottom of the PDP (Candle Care, Wax &amp; Wick, Ingredients, Shipping, Sustainability). Leave empty to keep the house rows, or load them below to edit / reorder / add.</p>
+            <div data-anchor="details">
+              {core.cAccordion.map((row, i) => (
+                <div key={i} className="pe-acc">
+                  <div className="pe-acc__head">
+                    <input className="pe-acc__title" value={row.title} onChange={(e) => cAccUpdate(i, { title: e.target.value })} placeholder="Title — e.g. Candle Care & Safety" />
+                    <span className="pe-acc__act">
+                      <button type="button" className="pe-icon-btn" onClick={() => cAccMove(i, -1)} disabled={i === 0} aria-label="Move up" title="Move up">↑</button>
+                      <button type="button" className="pe-icon-btn" onClick={() => cAccMove(i, 1)} disabled={i === core.cAccordion.length - 1} aria-label="Move down" title="Move down">↓</button>
+                      <button type="button" className="pe-icon-btn pe-icon-btn--danger" onClick={() => cAccRemove(i)} aria-label="Remove row" title="Remove row">×</button>
+                    </span>
+                  </div>
+                  <AutoTextarea className="pe-acc__body" value={row.body} onChange={(e) => cAccUpdate(i, { body: e.target.value })} rows={2} placeholder="Body — the text shown when this row is expanded." />
+                </div>
+              ))}
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button type="button" className="ff-btn ff-btn--mini" onClick={cAccAdd}>+ Add row</button>
+                {core.cAccordion.length === 0 ? <button type="button" className="ff-btn ff-btn--mini" onClick={cAccLoadDefaults}>Load the house rows to edit</button> : null}
+              </div>
+            </div>
+
+            <details className="pe-sec" style={{ marginTop: 12 }}>
+              <summary>Section titles (optional — rename the labels &amp; headings)</summary>
+              <p className="om-field__hint" style={{ margin: "0 0 8px" }}>Rename the small eyebrow labels and headings above each PDP section. Blank keeps the house wording (the grey placeholder).</p>
+              <div className="cfg-grid">
+                <label className="cfg-field" data-anchor="story"><span>Story — eyebrow</span><input value={core.cStoryEyebrow} onChange={(e) => set({ cStoryEyebrow: e.target.value })} placeholder="The Story Within" /></label>
+                <label className="cfg-field" data-anchor="journey"><span>Fragrance Journey — eyebrow</span><input value={core.cJourneyEyebrow} onChange={(e) => set({ cJourneyEyebrow: e.target.value })} placeholder="Fragrance Journey" /></label>
+                <label className="cfg-field" data-anchor="journey"><span>Fragrance Journey — heading</span><input value={core.cJourneyHeading} onChange={(e) => set({ cJourneyHeading: e.target.value })} placeholder="The composition unfolds" /></label>
+                <label className="cfg-field" data-anchor="journey"><span>Fragrance Journey — intro</span><input value={core.cJourneyIntro} onChange={(e) => set({ cJourneyIntro: e.target.value })} placeholder="Each layer is built to evolve…" /></label>
+                <label className="cfg-field" data-anchor="mood"><span>Scent Mood — eyebrow</span><input value={core.cMoodEyebrow} onChange={(e) => set({ cMoodEyebrow: e.target.value })} placeholder="Scent Mood" /></label>
+                <label className="cfg-field" data-anchor="mood"><span>Scent Mood — heading</span><input value={core.cMoodHeading} onChange={(e) => set({ cMoodHeading: e.target.value })} placeholder="The feeling it leaves" /></label>
+                <label className="cfg-field" data-anchor="craft"><span>Craft — eyebrow</span><input value={core.cCraftEyebrow} onChange={(e) => set({ cCraftEyebrow: e.target.value })} placeholder="Craft & Composition" /></label>
+                <label className="cfg-field" data-anchor="craft"><span>Craft — heading</span><input value={core.cCraftHeading} onChange={(e) => set({ cCraftHeading: e.target.value })} placeholder="Made by hand" /></label>
+                <label className="cfg-field" data-anchor="artist"><span>Artist — eyebrow</span><input value={core.cArtistEyebrow} onChange={(e) => set({ cArtistEyebrow: e.target.value })} placeholder="The Artist Behind This Candle" /></label>
+                <label className="cfg-field" data-anchor="lifestyle"><span>Lifestyle — eyebrow</span><input value={core.cLifestyleEyebrow} onChange={(e) => set({ cLifestyleEyebrow: e.target.value })} placeholder="Lifestyle" /></label>
+                <label className="cfg-field" data-anchor="lifestyle"><span>Lifestyle — heading</span><input value={core.cLifestyleHeading} onChange={(e) => set({ cLifestyleHeading: e.target.value })} placeholder="Living with it" /></label>
+                <label className="cfg-field" data-anchor="testimonials"><span>Testimonials — eyebrow</span><input value={core.cTestimonialsEyebrow} onChange={(e) => set({ cTestimonialsEyebrow: e.target.value })} placeholder="Letters From Our Community" /></label>
+                <label className="cfg-field" data-anchor="testimonials"><span>Testimonials — heading</span><input value={core.cTestimonialsHeading} onChange={(e) => set({ cTestimonialsHeading: e.target.value })} placeholder="In their words" /></label>
+                <label className="cfg-field"><span>Memory divider line</span><input value={core.cMemoryLine} onChange={(e) => set({ cMemoryLine: e.target.value })} placeholder="Every fragrance begins with a memory." /></label>
+                <label className="cfg-field" data-anchor="related"><span>Continue — eyebrow</span><input value={core.cContinueEyebrow} onChange={(e) => set({ cContinueEyebrow: e.target.value })} placeholder="Continue" /></label>
+              </div>
+            </details>
+
+            <details className="pe-sec" style={{ marginTop: 12 }} data-anchor="testimonials">
+              <summary>In their words ({core.cTestimonials.length}) — testimonials</summary>
+              <p className="om-field__hint" style={{ margin: "0 0 8px" }}>Per-product testimonials. Leave empty to use the chapter&rsquo;s shared voices.</p>
+              {core.cTestimonials.map((t, i) => (
+                <div key={i} className="pe-acc">
+                  <div className="pe-acc__head">
+                    <span className="pe-acc__num">{i + 1}</span>
+                    <input className="pe-acc__title" value={t.attribution} onChange={(e) => cTesUpdate(i, { attribution: e.target.value })} placeholder="Attribution — e.g. Aditi, Mumbai" />
+                    <span className="pe-acc__act"><button type="button" className="pe-icon-btn pe-icon-btn--danger" onClick={() => cTesRemove(i)} aria-label="Remove" title="Remove">×</button></span>
+                  </div>
+                  <AutoTextarea className="pe-acc__body" value={t.quote} onChange={(e) => cTesUpdate(i, { quote: e.target.value })} rows={2} placeholder="The quote." />
+                </div>
+              ))}
+              <button type="button" className="ff-btn ff-btn--mini" onClick={cTesAdd}>+ Add testimonial</button>
+            </details>
+
+            <details className="pe-sec" style={{ marginTop: 12 }}>
+              <summary>Custom sections ({core.cCustomSections.length}) — add your own, anywhere</summary>
+              <p className="om-field__hint" style={{ margin: "0 0 8px" }}>Extra sections built from the same blocks as the rest of the page (styling automatic, the layout never breaks). Choose where each one lands.</p>
+              {core.cCustomSections.map((sec, i) => (
+                <div key={i} className="pe-acc">
+                  <div className="pe-acc__head">
+                    <span className="pe-acc__num">{i + 1}</span>
+                    <select className="pe-acc__title" value={sec.type} onChange={(e) => cCsUpdate(i, { type: e.target.value as CustomSection["type"] })}>
+                      <option value="statement">Statement — heading + paragraphs</option>
+                      <option value="lines">Lines — verse (one line each)</option>
+                      <option value="grid">Grid — label + note tiles</option>
+                      <option value="quote">Quote — a single line</option>
+                    </select>
+                    <span className="pe-acc__act">
+                      <button type="button" className="pe-icon-btn" onClick={() => cCsMove(i, -1)} disabled={i === 0} aria-label="Move up" title="Move up">↑</button>
+                      <button type="button" className="pe-icon-btn" onClick={() => cCsMove(i, 1)} disabled={i === core.cCustomSections.length - 1} aria-label="Move down" title="Move down">↓</button>
+                      <button type="button" className="pe-icon-btn pe-icon-btn--danger" onClick={() => cCsRemove(i)} aria-label="Remove section" title="Remove section">×</button>
+                    </span>
+                  </div>
+                  <label className="cfg-field cfg-field--sm" style={{ marginBottom: 6 }}><span>Position on the page</span>
+                    <select value={sec.position ?? "after-story"} onChange={(e) => cCsUpdate(i, { position: e.target.value })}>
+                      {CANDLE_SECTION_POSITIONS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                    </select>
+                  </label>
+                  {sec.type !== "quote" ? <input value={sec.eyebrow ?? ""} onChange={(e) => cCsUpdate(i, { eyebrow: e.target.value })} placeholder="Eyebrow — e.g. The Ritual" /> : null}
+                  {sec.type === "statement" || sec.type === "grid" ? <input value={sec.heading ?? ""} onChange={(e) => cCsUpdate(i, { heading: e.target.value })} placeholder="Heading" /> : null}
+                  {sec.type === "statement" ? <AutoTextarea className="pe-acc__body" value={sec.body ?? ""} onChange={(e) => cCsUpdate(i, { body: e.target.value })} rows={2} placeholder="Paragraphs — leave a blank line between each." /> : null}
+                  {sec.type === "quote" ? <AutoTextarea className="pe-acc__body" value={sec.body ?? ""} onChange={(e) => cCsUpdate(i, { body: e.target.value })} rows={2} placeholder="The quote." /> : null}
+                  {sec.type === "lines" ? <AutoTextarea className="pe-acc__body" value={(sec.lines ?? []).join("\n")} onChange={(e) => cCsUpdate(i, { lines: e.target.value.split("\n") })} rows={3} placeholder={"One line each\nlike a little verse"} /> : null}
+                  {sec.type === "grid" ? <AutoTextarea className="pe-acc__body" value={placementToText(sec.items ?? [])} onChange={(e) => cCsUpdate(i, { items: textToPlacement(e.target.value) })} rows={3} placeholder={"label | note   (one per line)"} /> : null}
+                </div>
+              ))}
+              <button type="button" className="ff-btn ff-btn--mini" onClick={cCsAdd}>+ Add section</button>
             </details>
           </details>
         ) : null}
