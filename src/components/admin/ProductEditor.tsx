@@ -1043,11 +1043,12 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
         </details>
 
         <details className="pe-sec">
-          <summary>Ingredients</summary>
+          <summary>Ingredients — base wax &amp; wick</summary>
+          <p className="om-field__hint" style={{ margin: "0 0 8px" }}>The base wax &amp; wick used across the page — the “Wax Blend”/“Cotton Wick” craft tiles and the “Wax &amp; Wick Details” accordion read these. The <b>Craft</b> section (in Candle PDP above) overrides how the tiles read. <b>Burn time is now per size</b> — set it in the Candle PDP → Hero section; this single value is only a fallback for a product with no sized variants.</p>
           <div className="cfg-grid" data-anchor="craft">
             <label className="cfg-field"><span>Wax blend</span><input value={core.waxBlend} onChange={(e) => set({ waxBlend: e.target.value })} /></label>
             <label className="cfg-field"><span>Wick</span><input value={core.wick} onChange={(e) => set({ wick: e.target.value })} /></label>
-            <label className="cfg-field"><span>Burn time</span><input value={core.burnTime} onChange={(e) => set({ burnTime: e.target.value })} placeholder="~45 hours" /></label>
+            <label className="cfg-field"><span>Burn time <em className="om-field__hint">fallback only</em></span><input value={core.burnTime} onChange={(e) => set({ burnTime: e.target.value })} placeholder="~45 hours" /></label>
           </div>
         </details>
 

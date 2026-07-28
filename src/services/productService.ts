@@ -1,4 +1,5 @@
 import { createPublicClient } from "@/lib/supabase/public";
+import { getEditionMap } from "@/services/collectionService";
 
 // Columns needed to render a product card (listings, rails, recommendations).
 const CARD_FIELDS =
@@ -86,14 +87,21 @@ export async function getAirSiblings(collectionId: string, excludeProductId: str
 export async function getCandleSiblings(collectionId: string, excludeProductId: string) {
   const db = createPublicClient();
   try {
-    const { data } = await db
-      .from("products")
-      .select("id, slug, name, tagline, price, product_type, display_order, product_images(url, is_primary, sort_order)")
-      .eq("collection_id", collectionId)
-      .neq("id", excludeProductId)
-      .order("display_order");
+    const [{ data }, editions] = await Promise.all([
+      db
+        .from("products")
+        .select("id, slug, name, tagline, price, product_type, display_order, product_images(url, is_primary, sort_order)")
+        .eq("collection_id", collectionId)
+        .neq("id", excludeProductId)
+        .order("display_order"),
+      getEditionMap().catch(() => new Map()),
+    ]);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (data ?? []).filter((p: any) => !AIR_PRODUCT_TYPES.includes(p.product_type)).slice(0, 4);
+    return (data ?? [])
+      .filter((p: any) => !AIR_PRODUCT_TYPES.includes(p.product_type))
+      .slice(0, 4)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((p: any) => ({ ...p, edition: editions.get(p.slug)?.edition ?? null }));
   } catch {
     return [];
   }
