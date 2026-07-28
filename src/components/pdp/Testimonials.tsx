@@ -19,12 +19,13 @@ export function Testimonials({ settings }: SectionComponentProps) {
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
   const count = s.quotes?.length ?? 0;
+  const interval = s.intervalMs && s.intervalMs >= 2000 ? s.intervalMs : INTERVAL;
 
   useEffect(() => {
     if (reduce || paused || count < 2) return;
-    const id = setInterval(() => setActive((i) => (i + 1) % count), INTERVAL);
+    const id = setInterval(() => setActive((i) => (i + 1) % count), interval);
     return () => clearInterval(id);
-  }, [reduce, paused, count]);
+  }, [reduce, paused, count, interval]);
 
   if (!count) return null;
 

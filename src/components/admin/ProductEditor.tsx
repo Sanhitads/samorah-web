@@ -71,6 +71,11 @@ type Core = {
   cMemoryLine: string; cContinueEyebrow: string;
   cStoryImage: string; cLifestyleImage: string; cArtworkImage: string; // section-specific images
   cTestimonials: { quote: string; attribution: string }[]; // In their words — per-product
+  cTestimonialInterval: string; // crossfade seconds
+  cEdition: string; // hero edition override "NO. I.1"
+  cCollectionType: string; // "Core Collection" | "Limited Collection" | "Seasonal Collection" | "Archive"
+  cBurnTimes: Record<string, string>; // size label -> burn time
+  cLifestyleMoments: string; // one moment per line (else derived)
 };
 
 const AIR_TYPES = ["room_spray", "linen_spray"];
@@ -114,6 +119,25 @@ function assembleAirContent(core: Core) {
 
 // Candle PDP palette presets (registered theme tokens) — the chapter default applies when blank.
 const CANDLE_PALETTES = ["warm-ivory", "clay", "forest", "dark-library", "sage"];
+const CANDLE_COLLECTION_TYPES = ["Core Collection", "Limited Collection", "Seasonal Collection", "Archive"];
+// The house artist — used to pre-fill the fields when an admin switches a candle to a custom artist,
+// so editing starts from what's already shown (not a blank section).
+const HOUSE_ARTIST = {
+  name: "The Samorah Artist",
+  role: "Painter · Colourist",
+  story: [
+    "The artwork across every Samorah collection is created by a special artist whose creativity flows through colour and imagination.",
+    "He experiences the world differently and communicates in ways beyond words — yet through painting, his expression is vivid, intuitive, and deeply emotional.",
+    "Each illustration is hand-painted with focus, time and sincerity. No two pieces are ever identical; no design is digitally manufactured.",
+    "By choosing Samorah you encourage an artist's confidence, independence and creative journey. We are honoured to share his art with your home.",
+  ].join("\n"),
+  quote: "Every colour begins with a feeling.",
+};
+// Edition label from a volume + position — mirrors editionLabel() so the preview matches the live page.
+const editionOf = (volume: string | null | undefined, n: number) => {
+  const roman = volume ? volume.replace(/vol\.?\s*/i, "").trim().toUpperCase() : "";
+  return roman ? `NO. ${roman}.${n}` : `NO. ${n}`;
+};
 
 // The house Details-accordion rows, so the editor can load them for editing (blank = the storefront
 // keeps its own dynamic rows). Wax/Wick reflect the product where the admin has filled them.
@@ -159,6 +183,14 @@ function assembleCandleContent(core: Core) {
     lifestyleImage: core.cLifestyleImage || undefined,
     artworkImage: core.cArtworkImage || undefined,
     testimonials: testimonials.length ? testimonials : undefined,
+    testimonialInterval: Number(core.cTestimonialInterval) > 0 ? Number(core.cTestimonialInterval) : undefined,
+    collectionType: core.cCollectionType || undefined,
+    edition: core.cEdition.trim() || undefined,
+    burnTimes: (() => {
+      const e = Object.entries(core.cBurnTimes).filter(([, v]) => v.trim());
+      return e.length ? Object.fromEntries(e.map(([k, v]) => [k, v.trim()])) : undefined;
+    })(),
+    lifestyleMoments: (() => { const m = linesToArr(core.cLifestyleMoments); return m.length ? m : undefined; })(),
   };
 }
 
@@ -238,7 +270,8 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
         "cPalette" | "cCustomSurface" | "cCustomInk" | "cGradient" | "cGradFrom" | "cGradTo" | "cGradAngle" | "cAccordion" | "cCustomSections" |
         "cStoryEyebrow" | "cJourneyEyebrow" | "cJourneyHeading" | "cJourneyIntro" | "cMoodEyebrow" | "cMoodHeading" | "cCraftEyebrow" | "cCraftHeading" | "cArtistEyebrow" |
         "cLifestyleEyebrow" | "cLifestyleHeading" | "cTestimonialsEyebrow" | "cTestimonialsHeading" | "cMemoryLine" | "cContinueEyebrow" |
-        "cStoryImage" | "cLifestyleImage" | "cArtworkImage" | "cTestimonials"> => {
+        "cStoryImage" | "cLifestyleImage" | "cArtworkImage" | "cTestimonials" |
+        "cTestimonialInterval" | "cEdition" | "cCollectionType" | "cBurnTimes" | "cLifestyleMoments"> => {
         const pc = (p.pdp_content ?? {}) as Record<string, unknown>;
         const clb = (pc.labels ?? {}) as Record<string, unknown>;
         return {
@@ -260,6 +293,10 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
           cMemoryLine: sv(clb.memoryLine), cContinueEyebrow: sv(clb.continueEyebrow),
           cStoryImage: sv(pc.storyImage), cLifestyleImage: sv(pc.lifestyleImage), cArtworkImage: sv(pc.artworkImage),
           cTestimonials: Array.isArray(pc.testimonials) ? (pc.testimonials as { quote?: string; attribution?: string }[]).map((t) => ({ quote: sv(t.quote), attribution: sv(t.attribution) })) : [],
+          cTestimonialInterval: pc.testimonialInterval != null ? String(pc.testimonialInterval) : "",
+          cEdition: sv(pc.edition), cCollectionType: sv(pc.collectionType),
+          cBurnTimes: (pc.burnTimes && typeof pc.burnTimes === "object") ? Object.fromEntries(Object.entries(pc.burnTimes as Record<string, unknown>).map(([k, v]) => [k, sv(v)])) : {},
+          cLifestyleMoments: Array.isArray(pc.lifestyleMoments) ? (pc.lifestyleMoments as string[]).join("\n") : "",
         };
       })(),
     });
@@ -318,6 +355,7 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
       product_images: [...images].sort((a, b) => a.sortOrder - b.sortOrder).map((im) => ({ url: im.url, alt_text: im.altText, is_primary: im.isPrimary, sort_order: im.sortOrder })),
       fragrance_notes: notes.map((n) => ({ layer: n.layer, note: n.note, sort_order: n.sortOrder })),
       pdp_content: assembleCandleContent(core),
+      __edition: core.cEdition.trim() || editionOf(col?.volume, Number(core.chapterPosition) || 1),
       __related: candleSiblings,
     };
   }, [core, variants, notes, images, collections, productId, candleSiblings]);
@@ -418,6 +456,20 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
     setCore((c) => (c ? { ...c, cTestimonials: c.cTestimonials.map((t, j) => (j === i ? { ...t, ...patch } : t)) } : c));
   const cTesAdd = () => setCore((c) => (c ? { ...c, cTestimonials: [...c.cTestimonials, { quote: "", attribution: "" }] } : c));
   const cTesRemove = (i: number) => setCore((c) => (c ? { ...c, cTestimonials: c.cTestimonials.filter((_, j) => j !== i) } : c));
+
+  // Per-size burn time (Living the hero panel) — keyed by size label from the variants.
+  const cBurnUpdate = (size: string, time: string) => setCore((c) => (c ? { ...c, cBurnTimes: { ...c.cBurnTimes, [size]: time } } : c));
+  const sizeLabels = Array.from(new Set(variants.map((v) => v.sizeLabel).filter((s): s is string => !!s)));
+
+  // Enabling a custom artist pre-fills the house artist so editing starts from what's shown (not blank).
+  const toggleArtist = (on: boolean) =>
+    setCore((c) => {
+      if (!c) return c;
+      if (on && !c.artistStory.trim() && !c.artistName.trim() && !c.artistQuote.trim()) {
+        return { ...c, artistEnabled: true, artistName: HOUSE_ARTIST.name, artistRole: HOUSE_ARTIST.role, artistStory: HOUSE_ARTIST.story, artistQuote: HOUSE_ARTIST.quote };
+      }
+      return { ...c, artistEnabled: on };
+    });
 
   const saveCore = async () => {
     if (!core) return;
@@ -574,14 +626,31 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
 
         <details className="pe-sec">
           <summary>Artist ({core.artistEnabled ? "custom" : "house default"})</summary>
-          <label className="om-check" style={{ marginBottom: 8 }}><input type="checkbox" checked={core.artistEnabled} onChange={(e) => set({ artistEnabled: e.target.checked })} /><span>Use a custom artist for this product (otherwise the house artist shows)</span></label>
+          <label className="om-check" style={{ marginBottom: 4 }}><input type="checkbox" checked={core.artistEnabled} onChange={(e) => toggleArtist(e.target.checked)} /><span>Use a custom artist for this product (otherwise the house artist shows)</span></label>
+          <p className="om-field__hint" style={{ margin: "0 0 8px" }}>Tick the box to edit the artist for this candle — the fields fill with the house artist so you can change from there. Leave it unticked to keep the shared house artist. The <b>artwork image</b> below applies either way.</p>
           <div className="cfg-grid" data-anchor="artist">
             <label className="cfg-field"><span>Artist name</span><input value={core.artistName} onChange={(e) => set({ artistName: e.target.value })} placeholder="The Samorah Artist" disabled={!core.artistEnabled} /></label>
             <label className="cfg-field"><span>Artist role</span><input value={core.artistRole} onChange={(e) => set({ artistRole: e.target.value })} placeholder="Painter · Colourist" disabled={!core.artistEnabled} /></label>
-            <label className="cfg-field"><span>Artist image URL</span><input value={core.artistImage} onChange={(e) => set({ artistImage: e.target.value })} disabled={!core.artistEnabled} /></label>
           </div>
           <label className="cfg-field" data-anchor="artist"><span>Artist story <em className="om-field__hint">one paragraph per line</em></span><textarea value={core.artistStory} onChange={(e) => set({ artistStory: e.target.value })} rows={4} disabled={!core.artistEnabled} /></label>
           <label className="cfg-field" data-anchor="artist-quote"><span>Artist quote</span><input value={core.artistQuote} onChange={(e) => set({ artistQuote: e.target.value })} placeholder="Every colour begins with a feeling." disabled={!core.artistEnabled} /></label>
+          <p className="om-field__hint" style={{ margin: "12px 0 6px", fontWeight: 600 }}>Artist images (two)</p>
+          <p className="om-field__hint" style={{ margin: "0 0 8px" }}>The portrait sits beside “The Artist Behind This Candle”; the artwork is the full-width piece shown below it. Blank uses the house gradients.</p>
+          <div className="pe-imgadd" data-anchor="artist">
+            <input value={core.artistImage} onChange={(e) => set({ artistImage: e.target.value })} placeholder="Artist portrait — paste a URL, or upload →" disabled={!core.artistEnabled} />
+            <label className={`ff-btn${busy || !core.artistEnabled ? " is-disabled" : ""}`} style={{ cursor: busy || !core.artistEnabled ? "default" : "pointer" }}>
+              {busy ? "…" : "⬆ Upload"}
+              <input type="file" accept="image/*" style={{ display: "none" }} disabled={busy || !core.artistEnabled} onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadInto(f, (url) => set({ artistImage: url })); e.target.value = ""; }} />
+            </label>
+          </div>
+          <div className="pe-imgadd" data-anchor="artwork">
+            <input value={core.cArtworkImage} onChange={(e) => set({ cArtworkImage: e.target.value })} placeholder="Artist artwork (full-width) — paste a URL, or upload →" />
+            <label className={`ff-btn${busy ? " is-disabled" : ""}`} style={{ cursor: busy ? "default" : "pointer" }}>
+              {busy ? "…" : "⬆ Upload"}
+              <input type="file" accept="image/*" style={{ display: "none" }} disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadInto(f, (url) => set({ cArtworkImage: url })); e.target.value = ""; }} />
+            </label>
+            {core.cArtworkImage ? <button type="button" className="ff-btn ff-btn--mini" onClick={() => set({ cArtworkImage: "" })}>Clear</button> : null}
+          </div>
         </details>
 
         {AIR_TYPES.includes(core.productType) ? (
@@ -711,7 +780,29 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
             <summary>Candle PDP — colours, headings, accordion &amp; sections</summary>
             <p className="om-field__hint" style={{ margin: "0 0 8px" }}>Every field below is optional — leave it blank to keep the house default. Use the live preview to see each change instantly.</p>
 
-            <p className="om-field__hint" style={{ margin: "12px 0 6px", fontWeight: 600 }}>Section colours</p>
+            <p className="om-field__hint" style={{ margin: "12px 0 6px", fontWeight: 600 }}>Hero — edition, collection &amp; burn time</p>
+            <div className="cfg-grid" data-anchor="pdp-top">
+              <label className="cfg-field"><span>Edition label <em className="om-field__hint">the NO. I.1 line</em></span><input value={core.cEdition} onChange={(e) => set({ cEdition: e.target.value })} placeholder={editionOf(collections.find((c) => c.id === core.collectionId)?.volume, Number(core.chapterPosition) || 1)} /></label>
+              <label className="cfg-field"><span>Collection type <em className="om-field__hint">the meta line</em></span>
+                <select value={core.cCollectionType} onChange={(e) => set({ cCollectionType: e.target.value })}>
+                  <option value="">Core Collection (default)</option>
+                  {CANDLE_COLLECTION_TYPES.filter((t) => t !== "Core Collection").map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </label>
+            </div>
+            <p className="om-field__hint" style={{ margin: "0 0 8px" }}>The volume (the “I” in NO. I.1) comes from the chapter — edit it in <b>Collections</b>. A Seasonal or Archive edition is set here; archiving the chapter itself is done in Collections (set it inactive).</p>
+            {sizeLabels.length ? (
+              <>
+                <p className="om-field__hint" style={{ margin: "6px 0 6px", fontWeight: 600 }}>Burn time per size <em className="om-field__hint">— updates as the size is chosen on the PDP</em></p>
+                <div className="cfg-grid">
+                  {sizeLabels.map((sz) => (
+                    <label key={sz} className="cfg-field"><span>{sz}</span><input value={core.cBurnTimes[sz] ?? ""} onChange={(e) => cBurnUpdate(sz, e.target.value)} placeholder="~25 hours" /></label>
+                  ))}
+                </div>
+              </>
+            ) : null}
+
+            <p className="om-field__hint" style={{ margin: "14px 0 6px", fontWeight: 600 }}>Section colours</p>
             <div className="cfg-grid" data-anchor="story">
               <label className="cfg-field"><span>Palette <em className="om-field__hint">the page colour</em></span>
                 <select value={core.cPalette} onChange={(e) => set({ cPalette: e.target.value })}>
@@ -743,11 +834,10 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
             ) : null}
 
             <p className="om-field__hint" style={{ margin: "14px 0 6px", fontWeight: 600 }}>Section images</p>
-            <p className="om-field__hint" style={{ margin: "0 0 8px" }}>Give the Story, Living With It and Artwork sections their own images. Blank uses the product photo (Story / Living) or the artist artwork (Artwork).</p>
+            <p className="om-field__hint" style={{ margin: "0 0 8px" }}>Give the Story and Living With It sections their own images (blank uses the product photo). The artist&rsquo;s two images live in the Artist section above. Uploading here stores the file and points this section at it — it does <b>not</b> add to the product gallery.</p>
             {([
               { k: "cStoryImage", label: "Story Within image", anchor: "story" },
               { k: "cLifestyleImage", label: "Living With It image", anchor: "lifestyle" },
-              { k: "cArtworkImage", label: "Artwork image", anchor: "artwork" },
             ] as const).map(({ k, label, anchor }) => (
               <div key={k} className="pe-imgadd" data-anchor={anchor}>
                 <input value={core[k]} onChange={(e) => set({ [k]: e.target.value } as Partial<Core>)} placeholder={`${label} — paste a URL, or upload →`} />
@@ -758,6 +848,8 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
                 {core[k] ? <button type="button" className="ff-btn ff-btn--mini" onClick={() => set({ [k]: "" } as Partial<Core>)}>Clear</button> : null}
               </div>
             ))}
+
+            <label className="cfg-field" data-anchor="lifestyle" style={{ marginTop: 12 }}><span>Lifestyle — moment tags <em className="om-field__hint">one per line (Mornings, Evenings, Reading…); blank auto-derives from the lifestyle text</em></span><AutoTextarea value={core.cLifestyleMoments} onChange={(e) => set({ cLifestyleMoments: e.target.value })} rows={2} placeholder={"Mornings\nEvenings\nReading\nQuiet Moments\nGatherings"} /></label>
 
             <p className="om-field__hint" style={{ margin: "14px 0 6px", fontWeight: 600 }}>Details accordion</p>
             <p className="om-field__hint" style={{ margin: "0 0 8px" }}>The collapsible rows at the bottom of the PDP (Candle Care, Wax &amp; Wick, Ingredients, Shipping, Sustainability). Leave empty to keep the house rows, or load them below to edit / reorder / add.</p>
@@ -805,7 +897,8 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
 
             <details className="pe-sec" style={{ marginTop: 12 }} data-anchor="testimonials">
               <summary>In their words ({core.cTestimonials.length}) — testimonials</summary>
-              <p className="om-field__hint" style={{ margin: "0 0 8px" }}>Per-product testimonials. Leave empty to use the chapter&rsquo;s shared voices.</p>
+              <p className="om-field__hint" style={{ margin: "0 0 8px" }}>Per-product testimonials. Leave empty to use the chapter&rsquo;s shared voices. Two or more auto-rotate as a crossfade.</p>
+              <label className="cfg-field" style={{ maxWidth: 260, marginBottom: 8 }}><span>Rotation seconds <em className="om-field__hint">between voices (blank = 5.5)</em></span><input type="number" min={2} value={core.cTestimonialInterval} onChange={(e) => set({ cTestimonialInterval: e.target.value })} placeholder="5.5" /></label>
               {core.cTestimonials.map((t, i) => (
                 <div key={i} className="pe-acc">
                   <div className="pe-acc__head">

@@ -74,6 +74,7 @@ export interface TestimonialsSettings {
   eyebrow: string;
   heading: string;
   quotes: TestimonialQuote[];
+  intervalMs?: number; // crossfade interval (default 5500)
 }
 export interface MoodCard {
   label: string;
@@ -134,6 +135,18 @@ export interface RelatedProductInput extends Priceable {
   is_hero?: boolean | null;
   is_featured?: boolean | null;
   product_images?: ImageLike[] | null;
+  edition?: string | null; // "NO. I.2" — the shared chapter numbering, shown on the card
+}
+
+/** Apply pdp_content overrides that belong to the hero/commerce view (not the editorial section
+ *  stack): the edition label, the collection-type meta line, and per-size burn times. Mutates and
+ *  returns the view. Shared by the route and the live preview so both show the same hero. */
+export function applyCandleViewOverrides(p: ProductPageView, content?: CandlePdpContent): ProductPageView {
+  if (!content) return p;
+  if (content.edition) p.edition = content.edition;
+  if (content.collectionType) p.collectionType = content.collectionType;
+  if (content.burnTimes) p.variants = p.variants.map((v) => ({ ...v, burnTime: content.burnTimes?.[v.size] || v.burnTime }));
+  return p;
 }
 
 /**
@@ -183,6 +196,11 @@ export interface CandlePdpContent {
   customSections?: CustomSection[];
   storyImage?: string; lifestyleImage?: string; artworkImage?: string;
   testimonials?: { quote: string; attribution: string }[];
+  testimonialInterval?: number; // crossfade seconds between voices (default 5.5)
+  collectionType?: string; // hero meta — "Core Collection" | "Limited Collection" | "Seasonal Collection" | "Archive"
+  edition?: string; // hero edition override — "NO. I.1" (else the shared chapter numbering)
+  burnTimes?: Record<string, string>; // size label -> burn time, e.g. { "100g": "~25 hours" }
+  lifestyleMoments?: string[]; // the tag row under Living With It (else derived from the text)
 }
 
 export interface CandleEditorialInput {
@@ -209,6 +227,7 @@ function toCard(p: RelatedProductInput): ProductCardModel {
     slug: p.slug,
     name: p.name,
     tagline: p.tagline ?? null,
+    edition: p.edition ?? undefined,
     media: imageMedia(img?.url ?? "gradient:grad-chai", img?.alt_text ?? p.name, "portrait"),
     priceLabel: `From ${formatINR(price)}`,
     commerce: {
@@ -376,7 +395,7 @@ export function buildCandleEditorial({ view, artist, related, content }: CandleE
         heading: L.lifestyleHeading || "Living with it",
         media: lifestyleImage ? imageMedia(lifestyleImage, view.name, "landscape") : undefined,
         rows: lifestyleRows,
-        moments: lifestyleMoments,
+        moments: content?.lifestyleMoments?.length ? content.lifestyleMoments : lifestyleMoments,
         align: "image-left",
       } satisfies LifestyleFeatureSettings,
       { visibility: lifestyleRows.length > 0 || lifestyleMoments.length > 0 },
@@ -397,6 +416,7 @@ export function buildCandleEditorial({ view, artist, related, content }: CandleE
         eyebrow: L.testimonialsEyebrow || "Letters From Our Community",
         heading: L.testimonialsHeading || "In their words",
         quotes: testimonialQuotes,
+        intervalMs: content?.testimonialInterval ? Math.max(2, content.testimonialInterval) * 1000 : undefined,
       } satisfies TestimonialsSettings,
       { visibility: testimonialQuotes.length > 0 },
     ),

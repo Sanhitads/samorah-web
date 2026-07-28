@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CandleProductDetail } from "@/components/product/CandleProductDetail";
 import { buildProductPage, type ProductInput } from "@/lib/productPage";
-import { buildCandleEditorial, buildProductArtist, type RelatedProductInput, type CandlePdpContent } from "@/lib/productEditorial";
+import { buildCandleEditorial, buildProductArtist, applyCandleViewOverrides, type RelatedProductInput, type CandlePdpContent } from "@/lib/productEditorial";
 import { chapterTheme } from "@/lib/chapterPage";
 
 /**
@@ -60,9 +60,10 @@ export default function CandlePreviewRoute() {
   try {
     const p = buildProductPage(product as ProductInput);
     if (product.__edition) p.edition = product.__edition;
+    const content = (product.pdp_content ?? undefined) as CandlePdpContent | undefined;
+    applyCandleViewOverrides(p, content); // edition / collection-type / per-size burn time overrides
     const artist = buildProductArtist(product);
     const related = (product.__related ?? []) as RelatedProductInput[];
-    const content = (product.pdp_content ?? undefined) as CandlePdpContent | undefined;
     const editorial = buildCandleEditorial({ view: p, artist, related, content });
     const palette = content?.palette || chapterTheme(p.chapterSlug);
     return <CandleProductDetail p={p} editorial={editorial} palette={palette} content={content} preview />;

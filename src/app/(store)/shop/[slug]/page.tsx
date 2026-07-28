@@ -4,7 +4,7 @@ import { withRouteSeo } from "@/services/seoRedirectService";
 import { getProductBySlug, getProducts, getRelatedProducts, getAirSiblings, AIR_PRODUCT_TYPES } from "@/services/productService";
 import { buildAirViewFromDb } from "@/lib/airFromProduct";
 import { buildProductPage, type ProductInput } from "@/lib/productPage";
-import { buildCandleEditorial, buildProductArtist, type RelatedProductInput, type CandlePdpContent } from "@/lib/productEditorial";
+import { buildCandleEditorial, buildProductArtist, applyCandleViewOverrides, type RelatedProductInput, type CandlePdpContent } from "@/lib/productEditorial";
 import { chapterTheme } from "@/lib/chapterPage";
 import { productLd } from "@/lib/seo/productLd";
 import { getEditionMap } from "@/services/collectionService";
@@ -106,8 +106,11 @@ export default async function ProductRoute({
     { id: raw.id, fragrance_family: null, collection_id: raw.collection_id },
     4,
   )) as unknown as RelatedProductInput[];
+  // Number the "Continue the Chapter" cards with the same shared edition map as everything else.
+  for (const r of related) r.edition = editions.get(r.slug)?.edition ?? r.edition ?? null;
   const artist = buildProductArtist(product);
   const pdpContent = ((product as { pdp_content?: CandlePdpContent | null }).pdp_content) ?? undefined;
+  applyCandleViewOverrides(p, pdpContent); // edition / collection-type / per-size burn time overrides
   const editorial = buildCandleEditorial({ view: p, artist, related, content: pdpContent });
   const palette = pdpContent?.palette || chapterTheme(p.chapterSlug);
   const ld = productLd({ name: p.name, slug: p.slug, description: p.tagline, gallery: p.gallery, priceLabel: p.priceLabel, variants: p.variants });

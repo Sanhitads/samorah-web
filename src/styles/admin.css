@@ -704,8 +704,9 @@
 .pe-preview__title { color: #1a0dab; font-family: var(--font-sans); font-size: 14px; }
 .pe-preview__url { color: #006621; font-family: var(--font-sans); font-size: 11px; }
 .pe-preview__desc { color: var(--smoke, #6b6259); font-family: var(--font-sans); font-size: 12px; }
-.pe-journey { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 10px; }
-.pe-journey__col { display: flex; flex-direction: column; gap: 5px; }
+.pe-journey { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 10px; }
+.pe-journey__col { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.pe-journey__row input { min-width: 0; }
 .pe-journey__head { font-family: var(--font-sans); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--smoke, #6b6259); }
 .pe-journey__row { display: flex; align-items: center; gap: 4px; }
 .pe-journey__row input { flex: 1; padding: 5px 8px; font-family: var(--font-sans); font-size: 13px; border: 1px solid var(--ad-hair); border-radius: 4px; }
