@@ -17,6 +17,31 @@ function AutoTextarea({ value, ...rest }: TextareaHTMLAttributes<HTMLTextAreaEle
   return <textarea ref={ref} value={value} {...rest} />;
 }
 
+/** A single image field — URL input + Upload + a thumbnail preview (so uploads are visibly confirmed
+ *  and each field is clearly its own image). Uploads use the `uploading` flag, NOT the Save busy flag. */
+function ImgField({ value, onChange, onUpload, placeholder, disabled, uploading, onClear }: {
+  value: string; onChange: (v: string) => void; onUpload: (f: File) => void; placeholder: string;
+  disabled?: boolean; uploading?: boolean; onClear?: () => void;
+}) {
+  const isImg = /^https?:\/\//i.test(value);
+  return (
+    <div className="pe-imgfield">
+      {isImg ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={value} alt="" className="pe-imgfield__thumb" />
+      ) : (
+        <span className="pe-imgfield__thumb pe-imgfield__thumb--empty" aria-hidden="true">{value ? "◧" : "—"}</span>
+      )}
+      <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} disabled={disabled} />
+      <label className={`ff-btn${disabled || uploading ? " is-disabled" : ""}`} style={{ cursor: disabled || uploading ? "default" : "pointer" }}>
+        {uploading ? "Uploading…" : "⬆ Upload"}
+        <input type="file" accept="image/*" style={{ display: "none" }} disabled={disabled || uploading} onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(f); e.target.value = ""; }} />
+      </label>
+      {value && onClear ? <button type="button" className="ff-btn ff-btn--mini" onClick={onClear}>Clear</button> : null}
+    </div>
+  );
+}
+
 /**
  * Full editorial product editor (review: Products CMS). Collapsible sections so the long form doesn't
  * overwhelm — Basic & SEO, Collection & chapter, Merchandising, Visibility, Editorial content,
@@ -76,6 +101,7 @@ type Core = {
   cCollectionType: string; // "Core Collection" | "Limited Collection" | "Seasonal Collection" | "Archive"
   cBurnTimes: Record<string, string>; // size label -> burn time
   cLifestyleMoments: string; // one moment per line (else derived)
+  cCraft: { label: string; value: string; note: string }[]; // "Made by hand" tiles (else house set)
 };
 
 const AIR_TYPES = ["room_spray", "linen_spray"];
@@ -149,6 +175,15 @@ const candleAccordionDefaults = (waxBlend: string, wick: string, vessels: string
   { title: "Sustainability & Reusability", body: "Cured for 10–14 days before shipping for a stronger, truer scent throw. Once the last of the wax is gone, the vessel can be cleaned and upcycled — a keepsake for flowers, brushes or small things. Made slowly, meant to last beyond the flame." },
 ];
 
+// The house "Made by hand" tiles, so the editor can load them for editing (Hand Poured / Wax / Wick /
+// Vessel). Wax & Wick reflect the product's own values where set.
+const candleCraftDefaults = (waxBlend: string, wick: string, vessels: string): { label: string; value: string; note: string }[] => [
+  { label: "Hand Poured", value: "In small batches", note: "Poured slowly, by hand — never mass-produced." },
+  { label: "Wax Blend", value: waxBlend || "Natural coconut & soy blend", note: "Crafted for a slow, clean, even burn." },
+  { label: "Cotton Wick", value: wick || "Lead-free cotton", note: "Trimmed for a steady, low-soot flame." },
+  { label: "The Vessel", value: vessels || "ceramic · glass", note: "Reusable once the wax is gone — a keepsake, not waste." },
+];
+
 // Assemble the pdp_content JSON from the flat candle CMS fields — used by BOTH save and the live
 // preview draft, so what you preview is exactly what saves. Every field is optional (blank → house
 // default), so a candle with nothing set renders exactly as before.
@@ -191,6 +226,7 @@ function assembleCandleContent(core: Core) {
       return e.length ? Object.fromEntries(e.map(([k, v]) => [k, v.trim()])) : undefined;
     })(),
     lifestyleMoments: (() => { const m = linesToArr(core.cLifestyleMoments); return m.length ? m : undefined; })(),
+    craft: (() => { const c = core.cCraft.map((r) => ({ label: r.label.trim(), value: r.value.trim(), note: r.note.trim() })).filter((r) => r.label || r.value); return c.length ? c : undefined; })(),
   };
 }
 
@@ -206,6 +242,7 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
   const [notes, setNotes] = useState<NoteRow[]>([]);
   const [images, setImages] = useState<ImageRow[]>([]);
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false); // section/artist image uploads — kept off the Save button's busy flag
   const [err, setErr] = useState("");
   const [msg, setMsg] = useState("");
   const [imgUrl, setImgUrl] = useState(""); const [imgAlt, setImgAlt] = useState("");
@@ -271,7 +308,7 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
         "cStoryEyebrow" | "cJourneyEyebrow" | "cJourneyHeading" | "cJourneyIntro" | "cMoodEyebrow" | "cMoodHeading" | "cCraftEyebrow" | "cCraftHeading" | "cArtistEyebrow" |
         "cLifestyleEyebrow" | "cLifestyleHeading" | "cTestimonialsEyebrow" | "cTestimonialsHeading" | "cMemoryLine" | "cContinueEyebrow" |
         "cStoryImage" | "cLifestyleImage" | "cArtworkImage" | "cTestimonials" |
-        "cTestimonialInterval" | "cEdition" | "cCollectionType" | "cBurnTimes" | "cLifestyleMoments"> => {
+        "cTestimonialInterval" | "cEdition" | "cCollectionType" | "cBurnTimes" | "cLifestyleMoments" | "cCraft"> => {
         const pc = (p.pdp_content ?? {}) as Record<string, unknown>;
         const clb = (pc.labels ?? {}) as Record<string, unknown>;
         return {
@@ -297,6 +334,7 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
           cEdition: sv(pc.edition), cCollectionType: sv(pc.collectionType),
           cBurnTimes: (pc.burnTimes && typeof pc.burnTimes === "object") ? Object.fromEntries(Object.entries(pc.burnTimes as Record<string, unknown>).map(([k, v]) => [k, sv(v)])) : {},
           cLifestyleMoments: Array.isArray(pc.lifestyleMoments) ? (pc.lifestyleMoments as string[]).join("\n") : "",
+          cCraft: Array.isArray(pc.craft) ? (pc.craft as { label?: string; value?: string; note?: string }[]).map((r) => ({ label: sv(r.label), value: sv(r.value), note: sv(r.note) })) : [],
         };
       })(),
     });
@@ -461,6 +499,27 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
   const cBurnUpdate = (size: string, time: string) => setCore((c) => (c ? { ...c, cBurnTimes: { ...c.cBurnTimes, [size]: time } } : c));
   const sizeLabels = Array.from(new Set(variants.map((v) => v.sizeLabel).filter((s): s is string => !!s)));
 
+  // ── Candle PDP: "Made by hand" craft tiles ──
+  const cCraftUpdate = (i: number, patch: Partial<{ label: string; value: string; note: string }>) =>
+    setCore((c) => (c ? { ...c, cCraft: c.cCraft.map((r, j) => (j === i ? { ...r, ...patch } : r)) } : c));
+  const cCraftAdd = () => setCore((c) => (c ? { ...c, cCraft: [...c.cCraft, { label: "", value: "", note: "" }] } : c));
+  const cCraftRemove = (i: number) => setCore((c) => (c ? { ...c, cCraft: c.cCraft.filter((_, j) => j !== i) } : c));
+  const cCraftMove = (i: number, dir: -1 | 1) =>
+    setCore((c) => {
+      if (!c) return c;
+      const rows = [...c.cCraft];
+      const j = i + dir;
+      if (j < 0 || j >= rows.length) return c;
+      [rows[i], rows[j]] = [rows[j], rows[i]];
+      return { ...c, cCraft: rows };
+    });
+  const cCraftLoadDefaults = () =>
+    setCore((c) => {
+      if (!c) return c;
+      const vessels = Array.from(new Set(variants.map((v) => v.vesselType).filter((v): v is VesselType => !!v))).join(" · ");
+      return { ...c, cCraft: candleCraftDefaults(c.waxBlend, c.wick, vessels) };
+    });
+
   // Enabling a custom artist pre-fills the house artist so editing starts from what's shown (not blank).
   const toggleArtist = (on: boolean) =>
     setCore((c) => {
@@ -521,15 +580,15 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
   // Upload a single image and hand the URL to a setter — for the candle PDP's section-specific images
   // (Story / Living With It / Artwork), which live in pdp_content, not the product gallery.
   const uploadInto = async (file: File, apply: (url: string) => void) => {
-    setBusy(true); setErr("");
+    setUploading(true); setErr("");
     try {
       const fd = new FormData();
       fd.append("file", file); fd.append("folder", "products"); fd.append("alt", core?.name || "");
       const res = await fetch("/api/admin/media", { method: "POST", body: fd });
-      const d = await res.json(); setBusy(false);
+      const d = await res.json(); setUploading(false);
       if (!res.ok || !d.url) { setErr(d.error ?? d.reason ?? "Upload failed"); return; }
       apply(d.url);
-    } catch (e) { setBusy(false); setErr(e instanceof Error ? e.message : "Upload failed"); }
+    } catch (e) { setUploading(false); setErr(e instanceof Error ? e.message : "Upload failed"); }
   };
   const primaryImage = async (id: string) => { if (await post({ action: "image.primary", productId, id })) { await load(); onSaved(); } };
   const delImage = async (id: string) => { if (await post({ action: "image.delete", id, productId })) { await load(); onSaved(); } };
@@ -636,20 +695,17 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
           <label className="cfg-field" data-anchor="artist-quote"><span>Artist quote</span><input value={core.artistQuote} onChange={(e) => set({ artistQuote: e.target.value })} placeholder="Every colour begins with a feeling." disabled={!core.artistEnabled} /></label>
           <p className="om-field__hint" style={{ margin: "12px 0 6px", fontWeight: 600 }}>Artist images (two)</p>
           <p className="om-field__hint" style={{ margin: "0 0 8px" }}>The portrait sits beside “The Artist Behind This Candle”; the artwork is the full-width piece shown below it. Blank uses the house gradients.</p>
-          <div className="pe-imgadd" data-anchor="artist">
-            <input value={core.artistImage} onChange={(e) => set({ artistImage: e.target.value })} placeholder="Artist portrait — paste a URL, or upload →" disabled={!core.artistEnabled} />
-            <label className={`ff-btn${busy || !core.artistEnabled ? " is-disabled" : ""}`} style={{ cursor: busy || !core.artistEnabled ? "default" : "pointer" }}>
-              {busy ? "…" : "⬆ Upload"}
-              <input type="file" accept="image/*" style={{ display: "none" }} disabled={busy || !core.artistEnabled} onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadInto(f, (url) => set({ artistImage: url })); e.target.value = ""; }} />
-            </label>
+          <div data-anchor="artist">
+            <ImgField value={core.artistImage} placeholder="Artist portrait — paste a URL, or upload →" uploading={uploading} disabled={!core.artistEnabled}
+              onChange={(v) => set({ artistImage: v })}
+              onUpload={(f) => void uploadInto(f, (url) => set({ artistImage: url }))}
+              onClear={() => set({ artistImage: "" })} />
           </div>
-          <div className="pe-imgadd" data-anchor="artwork">
-            <input value={core.cArtworkImage} onChange={(e) => set({ cArtworkImage: e.target.value })} placeholder="Artist artwork (full-width) — paste a URL, or upload →" />
-            <label className={`ff-btn${busy ? " is-disabled" : ""}`} style={{ cursor: busy ? "default" : "pointer" }}>
-              {busy ? "…" : "⬆ Upload"}
-              <input type="file" accept="image/*" style={{ display: "none" }} disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadInto(f, (url) => set({ cArtworkImage: url })); e.target.value = ""; }} />
-            </label>
-            {core.cArtworkImage ? <button type="button" className="ff-btn ff-btn--mini" onClick={() => set({ cArtworkImage: "" })}>Clear</button> : null}
+          <div data-anchor="artwork">
+            <ImgField value={core.cArtworkImage} placeholder="Artist artwork (full-width) — paste a URL, or upload →" uploading={uploading}
+              onChange={(v) => set({ cArtworkImage: v })}
+              onUpload={(f) => void uploadInto(f, (url) => set({ cArtworkImage: url }))}
+              onClear={() => set({ cArtworkImage: "" })} />
           </div>
         </details>
 
@@ -834,18 +890,16 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
             ) : null}
 
             <p className="om-field__hint" style={{ margin: "14px 0 6px", fontWeight: 600 }}>Section images</p>
-            <p className="om-field__hint" style={{ margin: "0 0 8px" }}>Give the Story and Living With It sections their own images (blank uses the product photo). The artist&rsquo;s two images live in the Artist section above. Uploading here stores the file and points this section at it — it does <b>not</b> add to the product gallery.</p>
+            <p className="om-field__hint" style={{ margin: "0 0 8px" }}>Each field here is its own image. <b>Blank</b> falls back to the main product photo — so if you leave both blank they show the same picture; set them to make Story and Living With It different. The main product photo is uploaded in the <b>Images</b> section below (not here). The artist&rsquo;s two images live in the Artist section above. Uploading here does <b>not</b> add to the product gallery.</p>
             {([
               { k: "cStoryImage", label: "Story Within image", anchor: "story" },
               { k: "cLifestyleImage", label: "Living With It image", anchor: "lifestyle" },
             ] as const).map(({ k, label, anchor }) => (
-              <div key={k} className="pe-imgadd" data-anchor={anchor}>
-                <input value={core[k]} onChange={(e) => set({ [k]: e.target.value } as Partial<Core>)} placeholder={`${label} — paste a URL, or upload →`} />
-                <label className={`ff-btn${busy ? " is-disabled" : ""}`} style={{ cursor: busy ? "default" : "pointer" }}>
-                  {busy ? "…" : "⬆ Upload"}
-                  <input type="file" accept="image/*" style={{ display: "none" }} disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadInto(f, (url) => set({ [k]: url } as Partial<Core>)); e.target.value = ""; }} />
-                </label>
-                {core[k] ? <button type="button" className="ff-btn ff-btn--mini" onClick={() => set({ [k]: "" } as Partial<Core>)}>Clear</button> : null}
+              <div key={k} data-anchor={anchor}>
+                <ImgField value={core[k]} placeholder={`${label} — paste a URL, or upload →`} uploading={uploading}
+                  onChange={(v) => set({ [k]: v } as Partial<Core>)}
+                  onUpload={(f) => void uploadInto(f, (url) => set({ [k]: url } as Partial<Core>))}
+                  onClear={() => set({ [k]: "" } as Partial<Core>)} />
               </div>
             ))}
 
@@ -892,6 +946,29 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
                 <label className="cfg-field" data-anchor="testimonials"><span>Testimonials — heading</span><input value={core.cTestimonialsHeading} onChange={(e) => set({ cTestimonialsHeading: e.target.value })} placeholder="In their words" /></label>
                 <label className="cfg-field"><span>Memory divider line</span><input value={core.cMemoryLine} onChange={(e) => set({ cMemoryLine: e.target.value })} placeholder="Every fragrance begins with a memory." /></label>
                 <label className="cfg-field" data-anchor="related"><span>Continue — eyebrow</span><input value={core.cContinueEyebrow} onChange={(e) => set({ cContinueEyebrow: e.target.value })} placeholder="Continue" /></label>
+              </div>
+            </details>
+
+            <details className="pe-sec" style={{ marginTop: 12 }} data-anchor="craft">
+              <summary>Craft — the “Made by hand” tiles</summary>
+              <p className="om-field__hint" style={{ margin: "0 0 8px" }}>The tiles under “Made by hand” — Hand Poured, Wax Blend, Cotton Wick, The Vessel. Leave empty to keep the house tiles (Wax &amp; Wick read the Ingredients fields), or load them below to edit, reorder or add.</p>
+              {core.cCraft.map((row, i) => (
+                <div key={i} className="pe-acc">
+                  <div className="pe-acc__head">
+                    <input className="pe-acc__title" value={row.label} onChange={(e) => cCraftUpdate(i, { label: e.target.value })} placeholder="Label — e.g. Hand Poured" />
+                    <span className="pe-acc__act">
+                      <button type="button" className="pe-icon-btn" onClick={() => cCraftMove(i, -1)} disabled={i === 0} aria-label="Move up" title="Move up">↑</button>
+                      <button type="button" className="pe-icon-btn" onClick={() => cCraftMove(i, 1)} disabled={i === core.cCraft.length - 1} aria-label="Move down" title="Move down">↓</button>
+                      <button type="button" className="pe-icon-btn pe-icon-btn--danger" onClick={() => cCraftRemove(i)} aria-label="Remove tile" title="Remove tile">×</button>
+                    </span>
+                  </div>
+                  <input className="pe-acc__title" style={{ margin: "6px 0" }} value={row.value} onChange={(e) => cCraftUpdate(i, { value: e.target.value })} placeholder="Value — e.g. In small batches" />
+                  <AutoTextarea className="pe-acc__body" value={row.note} onChange={(e) => cCraftUpdate(i, { note: e.target.value })} rows={1} placeholder="Note — the small line beneath" />
+                </div>
+              ))}
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button type="button" className="ff-btn ff-btn--mini" onClick={cCraftAdd}>+ Add tile</button>
+                {core.cCraft.length === 0 ? <button type="button" className="ff-btn ff-btn--mini" onClick={cCraftLoadDefaults}>Load the house tiles to edit</button> : null}
               </div>
             </details>
 

@@ -718,6 +718,11 @@
 .pe-img__actions { display: flex; flex-wrap: wrap; gap: 3px; }
 .pe-imgadd { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .pe-imgadd input { flex: 1 1 200px; padding: 6px 8px; font-family: var(--font-sans); font-size: 13px; border: 1px solid var(--ad-hair); border-radius: 4px; }
+/* One image field: thumbnail + URL input + upload, so each field's image is clearly its own. */
+.pe-imgfield { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+.pe-imgfield input { flex: 1 1 180px; min-width: 0; padding: 6px 8px; font-family: var(--font-sans); font-size: 13px; border: 1px solid var(--ad-hair); border-radius: 4px; }
+.pe-imgfield__thumb { flex: 0 0 auto; width: 44px; height: 44px; border-radius: 6px; border: 1px solid var(--ad-hair); object-fit: cover; background: var(--ad-soft, #f2ede4); }
+.pe-imgfield__thumb--empty { display: grid; place-items: center; color: var(--smoke, #b3a996); font-size: 16px; }
 .pe-variant { border: 1px solid var(--ad-hair); border-radius: 6px; padding: 8px; margin-bottom: 8px; }
 .pe-variant__sub { margin-top: 6px; }
 .pe-variant__sub input { background: rgba(31,26,22,0.02); }

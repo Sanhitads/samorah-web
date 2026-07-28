@@ -136,6 +136,7 @@ export interface RelatedProductInput extends Priceable {
   is_featured?: boolean | null;
   product_images?: ImageLike[] | null;
   edition?: string | null; // "NO. I.2" — the shared chapter numbering, shown on the card
+  collectionType?: string | null; // "Core Collection" — the card's meta line
 }
 
 /** Apply pdp_content overrides that belong to the hero/commerce view (not the editorial section
@@ -201,6 +202,7 @@ export interface CandlePdpContent {
   edition?: string; // hero edition override — "NO. I.1" (else the shared chapter numbering)
   burnTimes?: Record<string, string>; // size label -> burn time, e.g. { "100g": "~25 hours" }
   lifestyleMoments?: string[]; // the tag row under Living With It (else derived from the text)
+  craft?: CraftItem[]; // "Made by hand" tiles — Hand Poured / Wax / Wick / Vessel (else the house set)
 }
 
 export interface CandleEditorialInput {
@@ -228,6 +230,8 @@ function toCard(p: RelatedProductInput): ProductCardModel {
     name: p.name,
     tagline: p.tagline ?? null,
     edition: p.edition ?? undefined,
+    collectionType: p.collectionType ?? "Core Collection",
+    cta: { label: "Discover", href: `/shop/${p.slug}` },
     media: imageMedia(img?.url ?? "gradient:grad-chai", img?.alt_text ?? p.name, "portrait"),
     priceLabel: `From ${formatINR(price)}`,
     commerce: {
@@ -385,8 +389,12 @@ export function buildCandleEditorial({ view, artist, related, content }: CandleE
     ),
     fill(
       "craft",
-      { eyebrow: L.craftEyebrow || "Craft & Composition", heading: L.craftHeading || "Made by hand", items: craftItems } satisfies CraftDetailsSettings,
-      { visibility: craftItems.length > 1 },
+      {
+        eyebrow: L.craftEyebrow || "Craft & Composition",
+        heading: L.craftHeading || "Made by hand",
+        items: content?.craft?.length ? content.craft.filter((c) => c.label?.trim() || c.value?.trim()) : craftItems,
+      } satisfies CraftDetailsSettings,
+      { visibility: (content?.craft?.length ? content.craft : craftItems).filter((c) => c.label?.trim() || c.value?.trim()).length > 1 },
     ),
     fill(
       "lifestyle",
