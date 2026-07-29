@@ -23,6 +23,30 @@ function sign(params: Record<string, string>): string {
   return createHash("sha1").update(toSign + SECRET).digest("hex");
 }
 
+const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
+/** Reduce dimensions to a clean CSS aspect-ratio string ("1600 x 2000" → "4 / 5"). */
+function aspectOf(w: number, h: number): string {
+  const g = gcd(w, h) || 1;
+  return `${w / g} / ${h / g}`;
+}
+
+/** A tiny base64 LQIP for blur-up — a heavily-blurred 24px derivative of the master. Best-effort:
+ *  returns undefined (no blur) on any failure so an upload never fails just because the LQIP didn't. */
+async function fetchBlur(secureUrl: string): Promise<string | undefined> {
+  if (!secureUrl?.includes("/upload/")) return undefined;
+  try {
+    const blurUrl = secureUrl.replace("/upload/", "/upload/e_blur:2000,q_30,w_24,c_limit/");
+    const r = await fetch(blurUrl);
+    if (!r.ok) return undefined;
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.length > 4096) return undefined; // keep the LQIP tiny (a few hundred bytes typically)
+    const ct = r.headers.get("content-type") || "image/jpeg";
+    return `data:${ct};base64,${buf.toString("base64")}`;
+  } catch {
+    return undefined;
+  }
+}
+
 export const cloudinaryProvider: MediaProvider = {
   name: "cloudinary",
 
@@ -30,20 +54,27 @@ export const cloudinaryProvider: MediaProvider = {
     if (!cloudinaryConfigured()) throw new Error("Cloudinary is not configured (CLOUDINARY_* env).");
     const folder = opts.folder ? `${BASE_FOLDER}/${opts.folder}` : BASE_FOLDER;
     const timestamp = String(Math.floor(readClock() / 1000));
-    const signed = { folder, timestamp };
+    // Store a capped, metadata-free "web master": re-encode to ≤3000px at q_90 (drops EXIF/GPS on the
+    // way), so a 20–40MB DSLR original never sits in Cloudinary. Delivery derivatives come off this.
+    const transformation = "c_limit,w_3000,q_90";
+    // Sign every param we send (Cloudinary requires the signature to cover them). `colors` returns the
+    // palette so we can store the dominant colour.
+    const signed: Record<string, string> = { colors: "true", folder, timestamp, transformation };
     const signature = sign(signed);
 
     const form = new FormData();
     form.append("file", new Blob([new Uint8Array(bytes)]), opts.filename ?? "upload");
     form.append("api_key", KEY);
-    form.append("timestamp", timestamp);
-    form.append("folder", folder);
+    for (const [k, v] of Object.entries(signed)) form.append(k, v);
     form.append("signature", signature);
 
     const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD}/auto/upload`, { method: "POST", body: form });
     if (!res.ok) throw new Error(`Cloudinary upload failed (${res.status}): ${await res.text()}`);
     const d = await res.json();
-    return { publicId: d.public_id, url: d.secure_url, width: d.width, height: d.height, bytes: d.bytes, format: d.format };
+    const dominantColor: string | undefined = Array.isArray(d.colors) && d.colors[0]?.[0] ? String(d.colors[0][0]) : undefined;
+    const aspectRatio = d.width && d.height ? aspectOf(d.width, d.height) : undefined;
+    const blurDataUrl = await fetchBlur(d.secure_url as string);
+    return { publicId: d.public_id, url: d.secure_url, width: d.width, height: d.height, bytes: d.bytes, format: d.format, dominantColor, aspectRatio, blurDataUrl };
   },
 
   async destroy(publicId: string): Promise<void> {

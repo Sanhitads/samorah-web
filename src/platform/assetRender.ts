@@ -9,7 +9,7 @@
  */
 import type { Asset } from "./asset";
 import { isGradientRef, gradientClassOf } from "./assetResolver";
-import { isCloudinary, cldUrl, cldSrcSet } from "@/lib/cloudinaryUrl";
+import { isCloudinary, cldUrl, cldSrcSet, cldBlur } from "@/lib/cloudinaryUrl";
 
 export type AssetRenderKind =
   | "gradient"
@@ -70,7 +70,8 @@ export function planAssetRender(
     alt,
     focalPosition,
     aspectRatio: asset.aspectRatio,
-    blur: asset.blurPlaceholder,
+    // Explicit LQIP wins; otherwise generate a tiny blur for Cloudinary images so they fade in.
+    blur: asset.blurPlaceholder ?? (isCloudinary(asset.desktop) ? cldBlur(asset.desktop) : undefined),
   };
 
   if (isGradientRef(asset.desktop)) {

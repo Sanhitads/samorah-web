@@ -54,16 +54,23 @@ export async function listFolders(): Promise<string[]> {
   return [...new Set((data ?? []).map((r: any) => r.folder as string))].sort() as string[];
 }
 
-/** Upload bytes via the storage provider, then register the row. */
-export async function uploadMedia(bytes: Buffer, meta: { filename?: string; folder?: string; alt?: string; title?: string }, actorId?: string): Promise<{ ok: boolean; id?: string; url?: string; reason?: string }> {
+/** The narrowest master we'd want on a large-screen luxury PDP; below this we upload but warn. */
+export const MIN_RECOMMENDED_WIDTH = 1400;
+
+/** Upload bytes via the storage provider (capped web-master + LQIP + colour), then register the row. */
+export async function uploadMedia(bytes: Buffer, meta: { filename?: string; folder?: string; alt?: string; title?: string }, actorId?: string): Promise<{ ok: boolean; id?: string; url?: string; reason?: string; warning?: string; width?: number; height?: number }> {
   if (!cloudinaryConfigured()) return { ok: false, reason: "Storage not configured — paste a URL instead." };
   try {
     const up = await cloudinaryProvider.upload(bytes, { filename: meta.filename, folder: meta.folder });
     const reg = await registerMedia({
       provider: "cloudinary", publicId: up.publicId, url: up.url, width: up.width, height: up.height, bytes: up.bytes, format: up.format,
+      dominantColor: up.dominantColor, aspectRatio: up.aspectRatio, blurDataUrl: up.blurDataUrl,
       alt: meta.alt, title: meta.title ?? meta.filename, folder: meta.folder,
     }, actorId);
-    return { ...reg, url: reg.ok ? up.url : undefined };
+    const warning = up.width && up.width < MIN_RECOMMENDED_WIDTH
+      ? `Uploaded, but this image is only ${up.width}px wide — under the recommended ${MIN_RECOMMENDED_WIDTH}px. It may look soft on large screens.`
+      : undefined;
+    return { ...reg, url: reg.ok ? up.url : undefined, warning, width: up.width, height: up.height };
   } catch (e) {
     return { ok: false, reason: e instanceof Error ? e.message : "upload failed" };
   }
@@ -73,21 +80,30 @@ export interface RegisterInput {
   provider?: string; publicId?: string | null; url: string; kind?: string;
   width?: number; height?: number; bytes?: number; format?: string;
   alt?: string; title?: string; role?: string; folder?: string; tags?: string[];
+  dominantColor?: string; aspectRatio?: string; blurDataUrl?: string;
 }
 
 /** Insert a media row (post-upload, or register-by-URL for an existing asset). */
 export async function registerMedia(input: RegisterInput, actorId?: string): Promise<{ ok: boolean; id?: string; reason?: string }> {
   if (!input.url?.trim()) return { ok: false, reason: "url required" };
   const db = createAdminClient() as any;
-  const row = {
+  const row: Record<string, unknown> = {
     kind: input.kind ?? "image", provider: input.provider ?? "external", public_id: input.publicId ?? null, url: input.url.trim(),
     width: input.width ?? null, height: input.height ?? null, bytes: input.bytes ?? null, format: input.format ?? null,
     alt: input.alt ?? null, title: input.title ?? null, role: input.role ?? "support",
+    dominant_color: input.dominantColor ?? null, aspect_ratio: input.aspectRatio ?? null,
     folder: (input.folder || "general").trim(), tags: input.tags ?? [], updated_at: new Date().toISOString(),
   };
-  const { data, error } = await db.from("media").insert(row).select("id").maybeSingle();
+  if (input.blurDataUrl) row.blur_data_url = input.blurDataUrl;
+  // The blur column is added by a later migration — retry without it so a pre-migration upload still works.
+  let ins = await db.from("media").insert(row).select("id").maybeSingle();
+  if (ins.error && /blur_data_url|could not find|schema cache|PGRST204/i.test(ins.error.message)) {
+    delete row.blur_data_url;
+    ins = await db.from("media").insert(row).select("id").maybeSingle();
+  }
+  const { data, error } = ins;
   if (error) return { ok: false, reason: error.message };
-  await logEvent({ entityType: "settings", event: "media.uploaded", entityId: data?.id, actorType: actorId ? "staff" : "system", actorId, notes: row.title ?? row.url });
+  await logEvent({ entityType: "settings", event: "media.uploaded", entityId: data?.id, actorType: actorId ? "staff" : "system", actorId, notes: String(row.title ?? row.url ?? "") });
   return { ok: true, id: data?.id };
 }
 

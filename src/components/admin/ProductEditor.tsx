@@ -584,6 +584,7 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
       const res = await fetch("/api/admin/media", { method: "POST", body: fd });
       const d = await res.json(); setBusy(false);
       if (!res.ok || !d.url) { setErr(d.error ?? d.reason ?? "Upload failed"); return; }
+      if (d.warning) setErr(d.warning); // uploaded, but flag a too-small image
       if (await post({ action: "image.add", productId, url: d.url, altText: alt })) { setImgAlt(""); await load(); onSaved(); }
     } catch (e) { setBusy(false); setErr(e instanceof Error ? e.message : "Upload failed"); }
   };
@@ -598,6 +599,7 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
       const res = await fetch("/api/admin/media", { method: "POST", body: fd });
       const d = await res.json(); setUploading(false);
       if (!res.ok || !d.url) { setErr(d.error ?? d.reason ?? "Upload failed"); return; }
+      if (d.warning) setErr(d.warning); // uploaded, but flag a too-small image
       apply(d.url);
     } catch (e) { setUploading(false); setErr(e instanceof Error ? e.message : "Upload failed"); }
   };

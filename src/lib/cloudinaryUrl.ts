@@ -31,3 +31,13 @@ export function cldSrcSet(url: string, widths: number[] = CLD_WIDTHS): string | 
   if (!isCloudinary(url)) return undefined;
   return widths.map((w) => `${cldUrl(url, w)} ${w}w`).join(", ");
 }
+
+/** A tiny blurred LQIP URL for a Cloudinary image (~a few hundred bytes) — used as the blur-up
+ *  background so imagery fades in instead of popping. Non-Cloudinary URLs return undefined. */
+export function cldBlur(url: string): string | undefined {
+  if (!isCloudinary(url)) return undefined;
+  const i = url.indexOf(UPLOAD);
+  const post = url.slice(i + UPLOAD.length);
+  if (!/^v\d+\//.test(post)) return undefined;
+  return `${url.slice(0, i)}${UPLOAD}e_blur:2000,q_30,w_24,c_limit,f_auto/${post}`;
+}

@@ -47,6 +47,7 @@ export function MediaManager({ items, folders, canManage, uploadsOn, folder, q }
       const res = await fetch("/api/admin/media", { method: "POST", body: fd });
       const d = await res.json(); setBusy(false);
       if (!res.ok || d.ok === false) { setErr(d.error ?? d.reason ?? "Upload failed"); return; }
+      if (d.warning) setErr(d.warning); // uploaded, but flag a too-small image
       refresh();
     } catch { setBusy(false); setErr("Upload failed"); }
   };

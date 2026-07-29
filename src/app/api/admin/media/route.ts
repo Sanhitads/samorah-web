@@ -17,7 +17,14 @@ export async function POST(request: Request) {
       const form = await request.formData();
       const file = form.get("file");
       if (!(file instanceof File)) return NextResponse.json({ error: "file required" }, { status: 400 });
-      if (file.size > 15 * 1024 * 1024) return NextResponse.json({ error: "Max 15MB." }, { status: 413 });
+      // Reject unsupported file types — this endpoint stores images only (video has its own path).
+      if (file.type && !file.type.startsWith("image/")) {
+        return NextResponse.json({ error: `Unsupported file type "${file.type}". Please upload an image (JPEG, PNG, WebP, AVIF, TIFF).` }, { status: 415 });
+      }
+      // Generous cap for a high-quality web master; the server re-encodes it to a ≤3000px master anyway.
+      if (file.size > 25 * 1024 * 1024) {
+        return NextResponse.json({ error: "Max 25MB — please upload a web master (≤3000px), not the full-resolution original. Keep the original in your archive." }, { status: 413 });
+      }
       const bytes = Buffer.from(await file.arrayBuffer());
       const res = await uploadMedia(bytes, {
         filename: file.name, folder: (form.get("folder") as string) || undefined,

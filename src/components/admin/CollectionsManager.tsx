@@ -221,6 +221,7 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
       const res = await fetch("/api/admin/media", { method: "POST", body: fd });
       const d = await res.json(); setBusy(false);
       if (!res.ok || !d.url) { setErr(d.error ?? d.reason ?? "Upload failed"); return null; }
+      if (d.warning) setErr(d.warning); // uploaded, but flag a too-small image
       return d.url as string;
     } catch (e) { setBusy(false); setErr(e instanceof Error ? e.message : "Upload failed"); return null; }
   };

@@ -11,6 +11,9 @@ export interface UploadResult {
   height?: number;
   bytes?: number;
   format?: string;
+  dominantColor?: string; // "#752e35" — from Cloudinary colour analysis
+  aspectRatio?: string; // "4 / 5" — prevents layout shift
+  blurDataUrl?: string; // tiny base64 LQIP for blur-up
 }
 
 export interface MediaProvider {

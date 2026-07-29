@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isCloudinary, cldUrl, cldSrcSet, CLD_WIDTHS } from "./cloudinaryUrl";
+import { isCloudinary, cldUrl, cldSrcSet, cldBlur, CLD_WIDTHS } from "./cloudinaryUrl";
 
 const RAW = "https://res.cloudinary.com/samorah/image/upload/v1710000000/products/kashmiri-chai.jpg";
 
@@ -35,5 +35,11 @@ describe("cloudinaryUrl", () => {
     expect(entries.at(-1)).toMatch(/w_2048\/.*2048w$/);
     for (const e of entries) expect(e).toContain("f_auto,q_auto,c_limit");
     expect(cldSrcSet("https://example.com/x.jpg")).toBeUndefined();
+  });
+
+  it("builds a tiny blur LQIP url for Cloudinary images only", () => {
+    expect(cldBlur(RAW)).toBe("https://res.cloudinary.com/samorah/image/upload/e_blur:2000,q_30,w_24,c_limit,f_auto/v1710000000/products/kashmiri-chai.jpg");
+    expect(cldBlur("https://example.com/x.jpg")).toBeUndefined();
+    expect(cldBlur("gradient:grad-chai")).toBeUndefined();
   });
 });
