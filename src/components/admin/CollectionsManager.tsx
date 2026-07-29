@@ -113,6 +113,11 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
   const [airProducts, setAirProducts] = useState<any[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [nextCol, setNextCol] = useState<any>(undefined);
+  // Candle chapter preview data (the collection's candle products + all chapters) — loaded for non-air chapters.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [candleChapter, setCandleChapter] = useState<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [allChapters, setAllChapters] = useState<any[]>([]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const post = async (body: Record<string, unknown>): Promise<any> => {
@@ -143,9 +148,14 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
       airPalette: ch.customPalette ? "custom" : sv(ch.palette), airCustomSurface: sv(ch.customPalette?.surface) || "#e6e9e6", airCustomInk: sv(ch.customPalette?.ink) || "#26302a", airHeroGradient: sv(ch.heroGradient),
     });
     setProducts(d.products ?? []); setAllProducts(d.allProducts ?? []);
-    // Air products + next volume for the live preview (empty for non-air chapters → no preview shown).
+    // Air products + next volume for the air-chapter live preview (empty for non-air chapters).
     const ad = await post({ action: "air.data", id });
     setAirProducts(ad?.products ?? []); setNextCol(ad?.nextCol);
+    // Candle chapter data for the candle-chapter live preview (when it isn't an air chapter).
+    if (!(ad?.products ?? []).length) {
+      const cd = await post({ action: "chapter.data", id });
+      setCandleChapter(cd?.chapter ?? null); setAllChapters(cd?.allChapters ?? []);
+    }
   };
   useEffect(() => {
     void load();
@@ -188,6 +198,22 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
       nextCol,
     };
   }, [c, airProducts, nextCol]);
+
+  // Candle chapter preview draft — the live collection fields merged with its candle products + all
+  // chapters, so /candle-chapter-preview rebuilds the REAL chapter page from the current (unsaved) form.
+  const candleDraft = useMemo(() => {
+    if (!c || !candleChapter) return null;
+    return {
+      chapter: {
+        id: candleChapter.id, slug: c.slug, name: c.name, volume: c.volume || null,
+        tagline: c.tagline || null, poetic_line: c.poeticLine || null, description: c.description || null,
+        cover_image_url: c.coverImageUrl || null, is_coming_soon: c.isComingSoon,
+        hero_product_id: c.heroProductId || null, created_at: candleChapter.created_at,
+        products: candleChapter.products ?? [],
+      },
+      allChapters,
+    };
+  }, [c, candleChapter, allChapters]);
   const onFieldFocus = (e: FocusEvent<HTMLDivElement>) => {
     const anchor = (e.target as HTMLElement).closest?.("[data-anchor]")?.getAttribute("data-anchor");
     if (anchor) setFocusId(anchor);
@@ -209,12 +235,13 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
   if (!c) return <div className="om-modal" role="dialog" aria-modal="true" onClick={onClose}><div className="om-modal__card om-modal__card--wide" onClick={(e) => e.stopPropagation()}><p className="admin__muted">Loading…</p></div></div>;
 
   const isAirChapter = airProducts.length > 0;
-  const showPreview = isAirChapter && previewOn;
+  const isCandleChapter = !isAirChapter && candleChapter != null; // a non-air chapter → candle chapter page
+  const showPreview = (isAirChapter || isCandleChapter) && previewOn;
   const formCol = (
     <div className={`om-modal__card om-modal__card--wide${showPreview ? " pe-live__card" : ""}`} onClick={(e) => e.stopPropagation()} onFocusCapture={onFieldFocus}>
       <div className="pe-live__cardhead">
         <h2 className="om-modal__title">Edit {c.name}</h2>
-        {isAirChapter ? <button type="button" className="ff-btn ff-btn--mini" onClick={() => setPreviewOn((v) => !v)}>{previewOn ? "Hide live preview" : "Live preview"}</button> : null}
+        {isAirChapter || isCandleChapter ? <button type="button" className="ff-btn ff-btn--mini" onClick={() => setPreviewOn((v) => !v)}>{previewOn ? "Hide live preview" : "Live preview"}</button> : null}
       </div>
 
         <details className="pe-sec" open data-anchor="hero">
@@ -358,7 +385,12 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
     return (
       <div className="pe-live" role="dialog" aria-modal="true">
         <div className="pe-live__form">{formCol}</div>
-        <LivePreviewPanel src="/chapter-preview" draft={draft} focusId={focusId} onRefresh={load} />
+        <LivePreviewPanel
+          src={isAirChapter ? "/chapter-preview" : "/candle-chapter-preview"}
+          draft={isAirChapter ? draft : candleDraft}
+          focusId={focusId}
+          onRefresh={load}
+        />
       </div>
     );
   }

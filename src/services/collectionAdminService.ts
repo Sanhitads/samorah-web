@@ -44,6 +44,27 @@ export async function getCollectionForEdit(id: string): Promise<{ collection: an
   return { collection, products, allProducts };
 }
 
+/** A candle chapter + its products + all chapters — everything buildChapterPage needs to render the
+ *  live preview of the (non-air) chapter collection page. Products are the active candle ones. */
+export async function getCandleChapterPreviewData(collectionId: string) {
+  const db = loose();
+  const [{ data: chapter }, { data: all }] = await Promise.all([
+    db
+      .from("collections")
+      .select(
+        "id, slug, name, volume, tagline, poetic_line, description, cover_image_url, is_coming_soon, hero_product_id, created_at, products:products!products_collection_id_fkey(id, slug, name, tagline, price, sale_price, is_hero, is_featured, created_at, product_type, status, pdp_content, product_images(url, alt_text, is_primary, sort_order))",
+      )
+      .eq("id", collectionId)
+      .maybeSingle(),
+    db.from("collections").select("id, name, slug, volume, tagline, cover_image_url, is_coming_soon, created_at").order("sort_order"),
+  ]);
+  const AIR = ["room_spray", "linen_spray"];
+  const products = (chapter?.products ?? [])
+    .filter((p: any) => !AIR.includes(p.product_type) && p.status !== "archived")
+    .map((p: any) => ({ ...p, collection_type: (p.pdp_content ?? {}).collectionType ?? undefined }));
+  return { chapter: chapter ? { ...chapter, products } : null, allChapters: all ?? [] };
+}
+
 /** Set a product's chapter-listing card image (air_content.chapterImage) — a different picture from its
  *  PDP hero. Merges into air_content so nothing else is lost. */
 export async function setProductChapterImage(productId: string, url: string, actorId?: string) {
