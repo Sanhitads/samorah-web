@@ -529,7 +529,7 @@ const CANDLE_POS_ORDER: Record<string, number> = Object.fromEntries(CANDLE_SECTI
  *  the design system's CSS + themed shell (no new styling, can't break the page). `posOrder` places
  *  it into a gap between the built-in sections; `fallbackOrder` is used for an unknown position; ties
  *  keep list order. Returns null for an empty section. Shared by the air + candle PDPs. */
-function buildCustomSection(c: CustomSection, i: number, posOrder: Record<string, number>, fallbackOrder: number, idPrefix = "custom"): SectionInstance | null {
+export function buildCustomSection(c: CustomSection, i: number, posOrder: Record<string, number>, fallbackOrder: number, idPrefix = "custom"): SectionInstance | null {
   const order = (posOrder[c.position ?? ""] ?? fallbackOrder) + i * 0.001;
   const base = { id: `${idPrefix}-${i}`, order, visibility: true, spacing: "lg", animation: "fade" };
   if (c.type === "lines") {

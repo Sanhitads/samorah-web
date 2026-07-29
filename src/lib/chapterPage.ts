@@ -18,6 +18,8 @@ import type { EditorialVoice } from "@/config/voices";
 import { formatPrice, effectivePrice, formatINR, type Priceable } from "@/lib/pricing";
 import { primaryImage, productBadge, type ImageLike } from "@/lib/product";
 import { chapterTitle } from "@/lib/collection";
+import { buildCustomSection } from "@/lib/productEditorial";
+import type { CustomSection } from "@/config/theHours";
 import {
   imageMedia,
   type A11yMeta,
@@ -167,7 +169,21 @@ export interface ChapterContent {
     quoteLine?: string; // the closing quote line
     nextHeading?: string; // "Continue to the next chapter"
   };
+  customSections?: CustomSection[]; // admin-added extra sections, placed anywhere
 }
+
+/** Where an admin-added custom section can land on the chapter page + the fractional order that slots
+ *  it between the fixed sections (hero 1 · intro 2 · signature 3 · rest 4 · quote 5 · next 7). */
+export const CHAPTER_SECTION_POSITIONS: { value: string; label: string; order: number }[] = [
+  { value: "top", label: "Top — before the hero", order: 0.5 },
+  { value: "after-hero", label: "After the hero", order: 1.5 },
+  { value: "after-intro", label: "After the intro", order: 2.5 },
+  { value: "after-signature", label: "After the signature", order: 3.5 },
+  { value: "after-rest", label: "After the rest of the chapter", order: 4.5 },
+  { value: "after-quote", label: "After the quote", order: 5.5 },
+  { value: "end", label: "End — after Continue", order: 7.5 },
+];
+const CHAPTER_POS_ORDER: Record<string, number> = Object.fromEntries(CHAPTER_SECTION_POSITIONS.map((p) => [p.value, p.order]));
 
 /** CSS vars for a chapter's custom palette (surface / ink / accent) — applied on a wrapper around
  *  PageView so the whole page recolours, including the edition numbering (--accent). Mirrors
@@ -193,6 +209,14 @@ export function chapterContentVars(content?: ChapterContent): Record<string, str
 export function chapterAccentCss(content: ChapterContent | undefined, cid: string): string | null {
   const accent = content?.customPalette?.accent;
   return accent ? `[data-cid="${cid}"] [data-theme]{--accent:${accent}}` : null;
+}
+
+/** A scoped stylesheet repainting the chapter hero background with a custom gradient (an alternative to
+ *  uploading a cover image). Returns null when no gradient is set. */
+export function chapterGradientCss(content: ChapterContent | undefined, cid: string): string | null {
+  const cg = content?.customGradient;
+  if (!cg?.from || !cg?.to) return null;
+  return `[data-cid="${cid}"] .chapter-hero__bg .asset-image{background:linear-gradient(${cg.angle || 135}deg, ${cg.from}, ${cg.to}) !important}`;
 }
 
 const DEFAULT_EMPTY: Record<ChapterSectionId, EmptyStrategy> = {
@@ -603,6 +627,13 @@ export function buildChapterPage(
       trackingId: "chapter:next",
     }),
   ];
+
+  // Admin-added custom sections — built from the same blocks as the rest of the page (composeSections
+  // appends new-id sections; each fractional order slots it between the fixed sections).
+  for (const [i, cs] of (content.customSections ?? []).entries()) {
+    const built = buildCustomSection(cs, i, CHAPTER_POS_ORDER, 7.5, "chapter-custom");
+    if (built) sections.push(built);
+  }
 
   return {
     id: `chapter-${chapter.slug}`,

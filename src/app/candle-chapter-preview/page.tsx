@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { PageView } from "@/components/page";
-import { buildChapterPage, chapterContentVars, chapterAccentCss, type ChapterInput, type ChapterSummary, type ChapterContent } from "@/lib/chapterPage";
+import { buildChapterPage, chapterContentVars, chapterAccentCss, chapterGradientCss, type ChapterInput, type ChapterSummary, type ChapterContent } from "@/lib/chapterPage";
 
 /**
  * Live candle-chapter preview surface (review: visual CMS). Rendered inside an <iframe> by the
@@ -56,11 +56,11 @@ export default function CandleChapterPreviewRoute() {
     const page = buildChapterPage(draft.chapter as ChapterInput, (draft.allChapters ?? []) as ChapterSummary[], {}, content);
     const vars = chapterContentVars(content);
     const cid = `chapter-${page.slug}`;
-    const accentCss = chapterAccentCss(content, cid);
+    const scoped = [chapterAccentCss(content, cid), chapterGradientCss(content, cid)].filter(Boolean).join("");
     const view = <PageView page={page} options={{ preview: true }} />;
-    return vars || accentCss ? (
+    return vars || scoped ? (
       <div style={vars as CSSProperties} data-cid={cid}>
-        {accentCss ? <style dangerouslySetInnerHTML={{ __html: accentCss }} /> : null}
+        {scoped ? <style dangerouslySetInnerHTML={{ __html: scoped }} /> : null}
         {view}
       </div>
     ) : view;

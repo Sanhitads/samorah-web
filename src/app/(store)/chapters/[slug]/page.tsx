@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import type { CSSProperties } from "react";
 import { getCollectionBySlug, getCollections } from "@/services/collectionService";
-import { buildChapterPage, chapterContentVars, chapterAccentCss, type ChapterInput, type ChapterSummary, type ChapterContent } from "@/lib/chapterPage";
+import { buildChapterPage, chapterContentVars, chapterAccentCss, chapterGradientCss, type ChapterInput, type ChapterSummary, type ChapterContent } from "@/lib/chapterPage";
 import { isPagePublished } from "@/platform/pageResolver";
 import { PageView, buildPageMetadata } from "@/components/page";
 import { withRouteSeo } from "@/services/seoRedirectService";
@@ -63,10 +63,10 @@ export default async function ChapterRoute({
   if (!result || !isPagePublished(result.page)) notFound();
   const vars = chapterContentVars(result.content);
   const cid = `chapter-${slug}`;
-  const accentCss = chapterAccentCss(result.content, cid);
-  return vars || accentCss ? (
+  const scoped = [chapterAccentCss(result.content, cid), chapterGradientCss(result.content, cid)].filter(Boolean).join("");
+  return vars || scoped ? (
     <div style={vars as CSSProperties} data-cid={cid}>
-      {accentCss ? <style dangerouslySetInnerHTML={{ __html: accentCss }} /> : null}
+      {scoped ? <style dangerouslySetInnerHTML={{ __html: scoped }} /> : null}
       <PageView page={result.page} />
     </div>
   ) : (

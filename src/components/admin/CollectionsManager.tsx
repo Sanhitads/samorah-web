@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState, useTransition, type FocusEvent } from "re
 import { useRouter } from "next/navigation";
 import type { CollectionRow } from "@/services/collectionAdminService";
 import { LivePreviewPanel } from "@/components/admin/LivePreviewPanel";
+import type { CustomSection } from "@/config/theHours";
+import { CHAPTER_SECTION_POSITIONS } from "@/lib/chapterPage";
 
 /** Assemble the air_chapter config from the editor fields — used by BOTH save and the live preview. */
 // Assemble the chapter_content JSON from the flat candle-chapter fields — used by BOTH save and the
@@ -17,9 +19,17 @@ function assembleChapterContent(c: CEdit) {
   const palette: Record<string, string> = {};
   if (c.chPalette === "custom") { palette.surface = c.chCustomSurface; palette.ink = c.chCustomInk; }
   if (c.chAccent) palette.accent = c.chAccent;
+  const customSections = c.chCustomSections.map((s) => ({
+    type: s.type, position: s.position ?? "after-signature",
+    eyebrow: (s.eyebrow ?? "").trim() || undefined, heading: (s.heading ?? "").trim() || undefined, body: (s.body ?? "").trim() || undefined,
+    lines: (s.lines ?? []).map((l) => l.trim()).filter(Boolean),
+    items: (s.items ?? []).map((x) => ({ label: (x.label ?? "").trim(), note: (x.note ?? "").trim() })).filter((x) => x.label || x.note),
+  })).filter((s) => s.body || s.lines.length || s.items.length);
   return {
     customPalette: Object.keys(palette).length ? palette : undefined,
+    customGradient: c.chGradient === "custom" ? { from: c.chGradFrom, to: c.chGradTo, angle: Number(c.chGradAngle) || 135 } : undefined,
     labels: hasLabels ? labels : undefined,
+    customSections: customSections.length ? customSections : undefined,
   };
 }
 
@@ -117,7 +127,9 @@ type CEdit = {
   airPalette: string; airCustomSurface: string; airCustomInk: string; airCustomAccent: string; airHeroGradient: string;
   // Candle chapter CMS (colours + section headings + the three independent poetic lines) — blanks use house wording.
   chPalette: string; chCustomSurface: string; chCustomInk: string; chAccent: string;
+  chGradient: string; chGradFrom: string; chGradTo: string; chGradAngle: string; // hero gradient ("" or "custom")
   chBreadcrumb: string; chHeroPoeticLine: string; chIntroLine: string; chSignatureEyebrow: string; chRestHeading: string; chQuoteLine: string; chNextHeading: string;
+  chCustomSections: CustomSection[];
 };
 
 const AIR_PALETTES = ["morning-blue", "amber-hour", "sand", "deep-indigo", "monsoon"];
@@ -176,8 +188,13 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
       airTeaserClosing: sv(ch.teaser?.closing), airTeaserCta: sv(ch.teaser?.cta),
       airPalette: ch.customPalette?.surface ? "custom" : sv(ch.palette), airCustomSurface: sv(ch.customPalette?.surface) || "#e6e9e6", airCustomInk: sv(ch.customPalette?.ink) || "#26302a", airCustomAccent: sv(ch.customPalette?.accent), airHeroGradient: sv(ch.heroGradient),
       chPalette: cc.customPalette?.surface ? "custom" : "", chCustomSurface: sv(cc.customPalette?.surface) || "#e8e0d4", chCustomInk: sv(cc.customPalette?.ink) || "#2a2018", chAccent: sv(cc.customPalette?.accent),
+      chGradient: cc.customGradient ? "custom" : "", chGradFrom: sv(cc.customGradient?.from) || "#caa46a", chGradTo: sv(cc.customGradient?.to) || "#3a2415", chGradAngle: cc.customGradient?.angle != null ? String(cc.customGradient.angle) : "135",
       chBreadcrumb: sv(ccl.breadcrumb), chHeroPoeticLine: sv(ccl.heroPoeticLine), chIntroLine: sv(ccl.introLine),
       chSignatureEyebrow: sv(ccl.signatureEyebrow), chRestHeading: sv(ccl.restHeading), chQuoteLine: sv(ccl.quoteLine), chNextHeading: sv(ccl.nextHeading),
+      chCustomSections: Array.isArray(cc.customSections) ? (cc.customSections as CustomSection[]).map((s) => ({
+        type: s.type ?? "statement", position: s.position ?? "after-signature", eyebrow: sv(s.eyebrow), heading: sv(s.heading), body: sv(s.body),
+        lines: Array.isArray(s.lines) ? s.lines.map((l) => sv(l)) : [], items: Array.isArray(s.items) ? s.items.map((x) => ({ label: sv(x.label), note: sv(x.note) })) : [],
+      })) : [],
     });
     setProducts(d.products ?? []); setAllProducts(d.allProducts ?? []);
     // Air products + next volume for the air-chapter live preview (empty for non-air chapters).
@@ -226,6 +243,17 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
     setCandleChapter((cc: any) => (cc ? { ...cc, products: (cc.products ?? []).map((p: any) => (p.id === productId ? { ...p, chapterFromPrice: value && Number(value) > 0 ? Number(value) : null } : p)) } : cc));
   };
   const saveChapterFromPrice = (productId: string, value: string) => { void post({ action: "product.chapterFromPrice", productId, value }); };
+  // Chapter custom sections — repeatable rows (functional updates avoid stale state).
+  const chCsUpdate = (i: number, patch: Partial<CustomSection>) => setC((v) => (v ? { ...v, chCustomSections: v.chCustomSections.map((s, j) => (j === i ? { ...s, ...patch } : s)) } : v));
+  const chCsAdd = () => setC((v) => (v ? { ...v, chCustomSections: [...v.chCustomSections, { type: "statement", position: "after-signature", eyebrow: "", heading: "", body: "", lines: [], items: [] }] } : v));
+  const chCsRemove = (i: number) => setC((v) => (v ? { ...v, chCustomSections: v.chCustomSections.filter((_, j) => j !== i) } : v));
+  const chCsMove = (i: number, dir: number) => setC((v) => {
+    if (!v) return v;
+    const rows = [...v.chCustomSections]; const j = i + dir;
+    if (j < 0 || j >= rows.length) return v;
+    [rows[i], rows[j]] = [rows[j], rows[i]];
+    return { ...v, chCustomSections: rows };
+  });
 
   // Live preview draft — a collection row + its air products + next volume, so /chapter-preview renders
   // the REAL chapter page from the current (unsaved) form.
@@ -385,12 +413,25 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
               </select>
             </label>
             <label className="cfg-field"><span>Numbering / accent colour <em className="om-field__hint">the NO. I.2 colour</em></span><input type="color" value={c.chAccent || "#c9a96e"} onChange={(e) => set({ chAccent: e.target.value })} /></label>
+            <label className="cfg-field"><span>Hero gradient <em className="om-field__hint">behind the hero, else the cover</em></span>
+              <select value={c.chGradient} onChange={(e) => set({ chGradient: e.target.value })}>
+                <option value="">Cover image</option>
+                <option value="custom">Custom gradient…</option>
+              </select>
+            </label>
           </div>
           {c.chPalette === "custom" ? (
             <div className="cfg-grid" data-anchor="hero">
               <label className="cfg-field"><span>Page background</span><input type="color" value={c.chCustomSurface} onChange={(e) => set({ chCustomSurface: e.target.value })} /></label>
               <label className="cfg-field"><span>Page text</span><input type="color" value={c.chCustomInk} onChange={(e) => set({ chCustomInk: e.target.value })} /></label>
               <div className="cfg-field"><span>Readability</span><span style={{ fontSize: 13, color: contrastRatio(c.chCustomSurface, c.chCustomInk) >= 4.5 ? "#2e7d4f" : "#b4534b" }}>{contrastRatio(c.chCustomSurface, c.chCustomInk) >= 4.5 ? "Good contrast ✓" : "Low contrast — hard to read"}</span></div>
+            </div>
+          ) : null}
+          {c.chGradient === "custom" ? (
+            <div className="cfg-grid" data-anchor="hero">
+              <label className="cfg-field"><span>Gradient from</span><input type="color" value={c.chGradFrom} onChange={(e) => set({ chGradFrom: e.target.value })} /></label>
+              <label className="cfg-field"><span>Gradient to</span><input type="color" value={c.chGradTo} onChange={(e) => set({ chGradTo: e.target.value })} /></label>
+              <label className="cfg-field"><span>Angle°</span><input type="number" value={c.chGradAngle} onChange={(e) => set({ chGradAngle: e.target.value })} placeholder="135" /></label>
             </div>
           ) : null}
           <p className="om-field__hint" style={{ margin: "0 0 8px" }}>To fix only the hard-to-read numbering, set the accent colour above — no need for a full custom palette.</p>
@@ -405,7 +446,42 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
             <label className="cfg-field" data-anchor="quote"><span>Closing quote line</span><input value={c.chQuoteLine} onChange={(e) => set({ chQuoteLine: e.target.value })} placeholder={c.poeticLine || "the closing quote"} /></label>
             <label className="cfg-field" data-anchor="next-chapter"><span>Next-chapter heading</span><input value={c.chNextHeading} onChange={(e) => set({ chNextHeading: e.target.value })} placeholder="Continue to the next chapter" /></label>
           </div>
-          <p className="om-field__hint" style={{ margin: "8px 0 0" }}>The “Introduction” &amp; “Long story” in Editorial content now render as the opening line + paragraphs. Custom sections and per-product chapter images are coming next.</p>
+          <p className="om-field__hint" style={{ margin: "8px 0 0" }}>The “Introduction” &amp; “Long story” in Editorial content render as the opening line + paragraphs. Per-product chapter images &amp; “From” prices are set in “Products in this chapter” below.</p>
+
+          <details className="pe-sec" style={{ marginTop: 12 }}>
+            <summary>Custom sections ({c.chCustomSections.length}) — add your own, anywhere</summary>
+            <p className="om-field__hint" style={{ margin: "0 0 8px" }}>Extra sections built from the same blocks as the rest of the page (styling automatic, layout never breaks). Choose where each one lands.</p>
+            {c.chCustomSections.map((sec, i) => (
+              <div key={i} className="pe-acc">
+                <div className="pe-acc__head">
+                  <span className="pe-acc__num">{i + 1}</span>
+                  <select className="pe-acc__title" value={sec.type} onChange={(e) => chCsUpdate(i, { type: e.target.value as CustomSection["type"] })}>
+                    <option value="statement">Statement — heading + paragraphs</option>
+                    <option value="lines">Lines — verse (one line each)</option>
+                    <option value="grid">Grid — label + note tiles</option>
+                    <option value="quote">Quote — a single line</option>
+                  </select>
+                  <span className="pe-acc__act">
+                    <button type="button" className="pe-icon-btn" onClick={() => chCsMove(i, -1)} disabled={i === 0} aria-label="Move up" title="Move up">↑</button>
+                    <button type="button" className="pe-icon-btn" onClick={() => chCsMove(i, 1)} disabled={i === c.chCustomSections.length - 1} aria-label="Move down" title="Move down">↓</button>
+                    <button type="button" className="pe-icon-btn pe-icon-btn--danger" onClick={() => chCsRemove(i)} aria-label="Remove section" title="Remove section">×</button>
+                  </span>
+                </div>
+                <label className="cfg-field cfg-field--sm" style={{ marginBottom: 6 }}><span>Position on the page</span>
+                  <select value={sec.position ?? "after-signature"} onChange={(e) => chCsUpdate(i, { position: e.target.value })}>
+                    {CHAPTER_SECTION_POSITIONS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                  </select>
+                </label>
+                {sec.type !== "quote" ? <input value={sec.eyebrow ?? ""} onChange={(e) => chCsUpdate(i, { eyebrow: e.target.value })} placeholder="Eyebrow — e.g. The Ritual" /> : null}
+                {sec.type === "statement" || sec.type === "grid" ? <input value={sec.heading ?? ""} onChange={(e) => chCsUpdate(i, { heading: e.target.value })} placeholder="Heading" /> : null}
+                {sec.type === "statement" ? <textarea className="pe-acc__body" value={sec.body ?? ""} onChange={(e) => chCsUpdate(i, { body: e.target.value })} rows={2} placeholder="Paragraphs — leave a blank line between each." /> : null}
+                {sec.type === "quote" ? <textarea className="pe-acc__body" value={sec.body ?? ""} onChange={(e) => chCsUpdate(i, { body: e.target.value })} rows={2} placeholder="The quote." /> : null}
+                {sec.type === "lines" ? <textarea className="pe-acc__body" value={(sec.lines ?? []).join("\n")} onChange={(e) => chCsUpdate(i, { lines: e.target.value.split("\n") })} rows={3} placeholder={"One line each\nlike a little verse"} /> : null}
+                {sec.type === "grid" ? <textarea className="pe-acc__body" value={(sec.items ?? []).map((x) => `${x.label ?? ""}${x.note ? ` | ${x.note}` : ""}`).join("\n")} onChange={(e) => chCsUpdate(i, { items: e.target.value.split("\n").map((l) => l.trim()).filter(Boolean).map((l) => { const [label, note] = l.split("|").map((t) => t.trim()); return { label: label ?? "", note: note ?? "" }; }) })} rows={3} placeholder={"label | note   (one per line)"} /> : null}
+              </div>
+            ))}
+            <button type="button" className="ff-btn ff-btn--mini" onClick={chCsAdd}>+ Add section</button>
+          </details>
         </details>
         ) : null}
 
