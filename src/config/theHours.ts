@@ -55,8 +55,8 @@ export interface HourEntry {
   /** Admin-added extra sections, rendered from existing block types (after the built-in sections,
    *  before the details accordion). Lets the page grow without new code. */
   customSections?: CustomSection[];
-  /** Custom section palette (overrides the preset token): editorial background + text colour. */
-  customPalette?: { surface: string; ink: string };
+  /** Custom section palette (overrides the preset token): editorial background + text colour + accent (numbering). */
+  customPalette?: { surface?: string; ink?: string; accent?: string };
   /** Custom hero gradient CSS (a ready-built linear-gradient) — applied to the gradient hero block. */
   customGradientCss?: string;
 }
@@ -113,7 +113,7 @@ export interface AirVolume {
   isComingSoon: boolean;
   heroEyebrow?: string; // "The Hours Collection" — the small label above the volume
   palette?: string; // section theme token (default "monsoon")
-  customPalette?: { surface: string; ink: string }; // custom section colours (overrides the token)
+  customPalette?: { surface?: string; ink?: string; accent?: string }; // custom section colours + accent (overrides the token)
   groups: HourGroup[];
   nextVolume?: {
     volume: string;

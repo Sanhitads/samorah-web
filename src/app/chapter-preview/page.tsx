@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { PageView } from "@/components/page";
-import { buildAirVolumeFromDb, airChapterVars } from "@/lib/airFromProduct";
+import { buildAirVolumeFromDb, airChapterVars, airChapterAccentCss } from "@/lib/airFromProduct";
 import { buildAirVolumePage } from "@/lib/airPage";
 
 /**
@@ -53,14 +53,23 @@ export default function ChapterPreviewRoute() {
     return <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", color: "#9a938a", fontSize: 14 }}>Preview loading…</div>;
   }
 
-  let page, vars: Record<string, string> | undefined;
+  let page, vars: Record<string, string> | undefined, accentCss: string | null = null;
+  const cid = "air-chapter-preview";
   try {
     const vol = buildAirVolumeFromDb(draft.col, draft.products ?? [], draft.nextCol);
     if (!vol) throw new Error("no air products");
     page = buildAirVolumePage(vol);
     vars = airChapterVars(vol);
+    accentCss = airChapterAccentCss(vol, cid);
   } catch {
     return <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", color: "#b4534b", fontSize: 14 }}>This chapter has no Room / Linen products to preview yet.</div>;
   }
-  return vars ? <div style={vars as CSSProperties}><PageView page={page} /></div> : <PageView page={page} />;
+  return vars || accentCss ? (
+    <div style={vars as CSSProperties} data-cid={cid}>
+      {accentCss ? <style dangerouslySetInnerHTML={{ __html: accentCss }} /> : null}
+      <PageView page={page} />
+    </div>
+  ) : (
+    <PageView page={page} />
+  );
 }

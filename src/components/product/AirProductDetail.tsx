@@ -51,8 +51,7 @@ export function AirProductDetail({
   // A custom palette themes the editorial sections via inline CSS vars + an unregistered token (so no
   // preset rule overrides them); a custom gradient repaints the hero via one scoped style rule.
   const cp = hour.customPalette;
-  const themeToken = cp ? "air-custom" : hour.palette || "monsoon";
-  const editorialVars: CSSProperties | undefined = cp
+  const editorialVars: CSSProperties | undefined = cp?.surface && cp?.ink
     ? ({
         "--surface": cp.surface,
         "--surface-alt": `color-mix(in srgb, ${cp.surface} 92%, ${cp.ink} 8%)`,
@@ -62,12 +61,17 @@ export function AirProductDetail({
         "--line": `color-mix(in srgb, ${cp.ink} 18%, ${cp.surface})`,
       } as CSSProperties)
     : undefined;
+  const themeToken = editorialVars ? "air-custom" : hour.palette || "monsoon";
   const scopeId = `air-${hour.productSlug}`;
+  const mainStyle = cp?.accent ? ({ "--accent": cp.accent } as CSSProperties) : undefined;
 
   return (
-    <main className="pdp pdp--air" data-theme="warm-ivory" data-cid={scopeId}>
+    <main className="pdp pdp--air" data-theme="warm-ivory" data-cid={scopeId} style={mainStyle}>
       {hour.customGradientCss ? (
         <style dangerouslySetInnerHTML={{ __html: `[data-cid="${scopeId}"] .pdp__layout .asset-image{background:${hour.customGradientCss} !important}` }} />
+      ) : null}
+      {cp?.accent ? (
+        <style dangerouslySetInnerHTML={{ __html: `[data-cid="${scopeId}"] [data-theme]{--accent:${cp.accent}}` }} />
       ) : null}
       <div className="pdp__head" id="pdp-top">
         <nav className="pdp__breadcrumb" aria-label="Breadcrumb">

@@ -26,7 +26,7 @@ export function airHourFromProduct(p: any): HourEntry {
   const heroImg = primary ?? ac.gradient ?? "gradient:grad-air";
   const cardImg = ac.chapterImage || heroImg;
   const cp = ac.customPalette;
-  const customPalette = cp && hex(cp.surface) && hex(cp.ink) ? { surface: hex(cp.surface)!, ink: hex(cp.ink)! } : undefined;
+  const customPalette = airCustomPalette(cp);
   const cg = ac.customGradient;
   const angle = Number.isFinite(Number(cg?.angle)) ? Number(cg.angle) : 135;
   const customGradientCss = !primary && cg && hex(cg.from) && hex(cg.to)
@@ -105,8 +105,7 @@ export function buildAirVolumeFromDb(col: any, products: any[], nextCol?: any): 
   const groups: HourGroup[] = [];
   if (roomHours.length) groups.push({ kind: "room", label: ch.room?.label || "Shared Hours", title: ch.room?.title || "The Room", note: ch.room?.note || "The atmosphere a room makes for itself.", hours: roomHours });
   if (linenHours.length) groups.push({ kind: "linen", label: ch.linen?.label || "Private Hours", title: ch.linen?.title || "The Linen", note: ch.linen?.note || "For linen, for fabric, for the hours that ask for nothing.", hours: linenHours });
-  const cpc = ch.customPalette;
-  const customPalette = cpc && hex(cpc.surface) && hex(cpc.ink) ? { surface: hex(cpc.surface)!, ink: hex(cpc.ink)! } : undefined;
+  const customPalette = airCustomPalette(ch.customPalette);
   return {
     slug: col.slug,
     volume: col.volume ?? "Volume I",
@@ -133,15 +132,36 @@ export function buildAirVolumeFromDb(col: any, products: any[], nextCol?: any): 
 /** Inline CSS vars for a custom air-chapter palette (surface/ink + derived tones) — applied on a
  *  wrapper around the chapter page so the sections adopt the colours (paired with the "air-custom"
  *  token so no preset rule overrides them). Undefined when the chapter uses a preset palette. */
+/** Sanitize a raw custom palette (surface / ink / accent). Surface+ink apply together; accent alone is
+ *  allowed (edit just the numbering colour). Returns undefined when nothing valid is set. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function airCustomPalette(cp: any): { surface?: string; ink?: string; accent?: string } | undefined {
+  if (!cp) return undefined;
+  const pal: { surface?: string; ink?: string; accent?: string } = {};
+  if (hex(cp.surface) && hex(cp.ink)) { pal.surface = hex(cp.surface)!; pal.ink = hex(cp.ink)!; }
+  if (hex(cp.accent)) pal.accent = hex(cp.accent)!;
+  return pal.surface || pal.accent ? pal : undefined;
+}
+
 export function airChapterVars(vol: AirVolume): Record<string, string> | undefined {
   const cp = vol.customPalette;
   if (!cp) return undefined;
-  return {
-    "--surface": cp.surface,
-    "--surface-alt": `color-mix(in srgb, ${cp.surface} 92%, ${cp.ink} 8%)`,
-    "--ink": cp.ink,
-    "--ink-soft": `color-mix(in srgb, ${cp.ink} 78%, ${cp.surface})`,
-    "--ink-muted": `color-mix(in srgb, ${cp.ink} 55%, ${cp.surface})`,
-    "--line": `color-mix(in srgb, ${cp.ink} 18%, ${cp.surface})`,
-  };
+  const vars: Record<string, string> = {};
+  if (cp.surface && cp.ink) {
+    vars["--surface"] = cp.surface;
+    vars["--surface-alt"] = `color-mix(in srgb, ${cp.surface} 92%, ${cp.ink} 8%)`;
+    vars["--ink"] = cp.ink;
+    vars["--ink-soft"] = `color-mix(in srgb, ${cp.ink} 78%, ${cp.surface})`;
+    vars["--ink-muted"] = `color-mix(in srgb, ${cp.ink} 55%, ${cp.surface})`;
+    vars["--line"] = `color-mix(in srgb, ${cp.ink} 18%, ${cp.surface})`;
+  }
+  if (cp.accent) vars["--accent"] = cp.accent;
+  return Object.keys(vars).length ? vars : undefined;
+}
+
+/** Scoped stylesheet forcing the air chapter's custom accent onto every themed section (beats each
+ *  section's own theme --accent). Returns null when no accent is set. */
+export function airChapterAccentCss(vol: AirVolume, cid: string): string | null {
+  const accent = vol.customPalette?.accent;
+  return accent ? `[data-cid="${cid}"] [data-theme]{--accent:${accent}}` : null;
 }

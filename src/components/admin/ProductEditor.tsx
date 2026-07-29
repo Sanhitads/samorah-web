@@ -79,7 +79,7 @@ type Core = {
   airTime: string; airMoment: string; airHourReason: string; airHourStory: string; airScentEffect: string;
   airScent: string; airFeels: string; airExperience: string; airPlacement: string; airSignature: string; airComposition: string;
   airPalette: string; airGradient: string; airInterlude: string;
-  airCustomSurface: string; airCustomInk: string; // when airPalette === "custom"
+  airCustomSurface: string; airCustomInk: string; airCustomAccent: string; // when airPalette === "custom"; accent recolours numbering
   airGradFrom: string; airGradTo: string; airGradAngle: string; // when airGradient === "custom"
   airAccordion: { title: string; body: string }[]; // details accordion rows
   airCustomSections: CustomSection[]; // admin-added extra sections
@@ -127,7 +127,12 @@ function assembleAirContent(core: Core) {
     palette: core.airPalette && core.airPalette !== "custom" ? core.airPalette : undefined,
     gradient: core.airGradient && core.airGradient !== "custom" ? core.airGradient : undefined,
     interlude: core.airInterlude || undefined,
-    customPalette: core.airPalette === "custom" ? { surface: core.airCustomSurface, ink: core.airCustomInk } : undefined,
+    customPalette: (() => {
+      const pal: Record<string, string> = {};
+      if (core.airPalette === "custom") { pal.surface = core.airCustomSurface; pal.ink = core.airCustomInk; }
+      if (core.airCustomAccent) pal.accent = core.airCustomAccent;
+      return Object.keys(pal).length ? pal : undefined;
+    })(),
     customGradient: core.airGradient === "custom" ? { from: core.airGradFrom, to: core.airGradTo, angle: Number(core.airGradAngle) || 135 } : undefined,
     accordion: core.airAccordion.map((r) => ({ title: r.title.trim(), body: r.body.trim() })).filter((r) => r.title || r.body),
     customSections: core.airCustomSections.map((s) => ({
@@ -284,7 +289,7 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
       artistEnabled: bv(p.artist_enabled), artistName: sv(p.artist_name), artistRole: sv(p.artist_role), artistStory: sv(p.artist_story), artistQuote: sv(p.artist_quote), artistImage: sv(p.artist_image),
       ...((): Pick<Core,
         "airTime" | "airMoment" | "airHourReason" | "airHourStory" | "airScentEffect" | "airScent" | "airFeels" | "airExperience" | "airPlacement" | "airSignature" | "airComposition" |
-        "airPalette" | "airGradient" | "airInterlude" | "airCustomSurface" | "airCustomInk" | "airGradFrom" | "airGradTo" | "airGradAngle" | "airAccordion" | "airCustomSections" |
+        "airPalette" | "airGradient" | "airInterlude" | "airCustomSurface" | "airCustomInk" | "airCustomAccent" | "airGradFrom" | "airGradTo" | "airGradAngle" | "airAccordion" | "airCustomSections" |
         "airHourEyebrow" | "airFragranceEyebrow" | "airFeelsEyebrow" | "airExperienceEyebrow" | "airPlacementEyebrow" | "airPlacementHeading" | "airContinueEyebrow" | "airContinueHeading"> => {
         const ac = (p.air_content ?? {}) as Record<string, unknown>;
         const lb = (ac.labels ?? {}) as Record<string, unknown>;
@@ -293,7 +298,7 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
           airScent: Array.isArray(ac.scent) ? (ac.scent as string[]).join(", ") : "", airFeels: Array.isArray(ac.feels) ? (ac.feels as string[]).join("\n") : "",
           airExperience: sv(ac.experience), airPlacement: placementToText((ac.placement as { label?: string; note?: string }[]) ?? []), airSignature: sv(ac.signature), airComposition: sv(ac.composition),
           airPalette: ac.customPalette ? "custom" : sv(ac.palette), airGradient: ac.customGradient ? "custom" : sv(ac.gradient), airInterlude: sv(ac.interlude),
-          airCustomSurface: sv((ac.customPalette as { surface?: string })?.surface) || "#14213a", airCustomInk: sv((ac.customPalette as { ink?: string })?.ink) || "#f5f2ed",
+          airCustomSurface: sv((ac.customPalette as { surface?: string })?.surface) || "#14213a", airCustomInk: sv((ac.customPalette as { ink?: string })?.ink) || "#f5f2ed", airCustomAccent: sv((ac.customPalette as { accent?: string })?.accent),
           airGradFrom: sv((ac.customGradient as { from?: string })?.from) || "#6a4090", airGradTo: sv((ac.customGradient as { to?: string })?.to) || "#0a0020", airGradAngle: (ac.customGradient as { angle?: number })?.angle != null ? String((ac.customGradient as { angle?: number }).angle) : "135",
           airAccordion: (() => {
             const rows = Array.isArray(ac.accordion) ? (ac.accordion as { title?: string; body?: string }[]).map((r) => ({ title: sv(r.title), body: sv(r.body) })) : [];
@@ -750,6 +755,7 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
                 </select>
               </label>
               <label className="cfg-field"><span>Interlude <em className="om-field__hint">line to the next hour</em></span><input value={core.airInterlude} onChange={(e) => set({ airInterlude: e.target.value })} placeholder="The morning arrives quietly." /></label>
+              <label className="cfg-field"><span>Numbering / accent colour <em className="om-field__hint">the edition numbering</em></span><input type="color" value={core.airCustomAccent || "#c9a96e"} onChange={(e) => set({ airCustomAccent: e.target.value })} /></label>
             </div>
             {core.airPalette === "custom" ? (
               <div className="cfg-grid" data-anchor="pdp-top">

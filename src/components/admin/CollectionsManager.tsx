@@ -30,7 +30,12 @@ function assembleAirChapter(c: CEdit) {
     linen: { label: c.airLinenLabel || undefined, title: c.airLinenTitle || undefined, note: c.airLinenNote || undefined },
     teaser: { closing: c.airTeaserClosing || undefined, cta: c.airTeaserCta || undefined },
     palette: c.airPalette && c.airPalette !== "custom" ? c.airPalette : undefined,
-    customPalette: c.airPalette === "custom" ? { surface: c.airCustomSurface, ink: c.airCustomInk } : undefined,
+    customPalette: (() => {
+      const pal: Record<string, string> = {};
+      if (c.airPalette === "custom") { pal.surface = c.airCustomSurface; pal.ink = c.airCustomInk; }
+      if (c.airCustomAccent) pal.accent = c.airCustomAccent;
+      return Object.keys(pal).length ? pal : undefined;
+    })(),
     heroGradient: c.airHeroGradient || undefined,
   };
 }
@@ -109,7 +114,7 @@ type CEdit = {
   airRoomLabel: string; airRoomTitle: string; airRoomNote: string;
   airLinenLabel: string; airLinenTitle: string; airLinenNote: string;
   airTeaserClosing: string; airTeaserCta: string;
-  airPalette: string; airCustomSurface: string; airCustomInk: string; airHeroGradient: string;
+  airPalette: string; airCustomSurface: string; airCustomInk: string; airCustomAccent: string; airHeroGradient: string;
   // Candle chapter CMS (colours + section headings + the three independent poetic lines) — blanks use house wording.
   chPalette: string; chCustomSurface: string; chCustomInk: string; chAccent: string;
   chBreadcrumb: string; chHeroPoeticLine: string; chIntroLine: string; chSignatureEyebrow: string; chRestHeading: string; chQuoteLine: string; chNextHeading: string;
@@ -169,7 +174,7 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
       airRoomLabel: sv(ch.room?.label), airRoomTitle: sv(ch.room?.title), airRoomNote: sv(ch.room?.note),
       airLinenLabel: sv(ch.linen?.label), airLinenTitle: sv(ch.linen?.title), airLinenNote: sv(ch.linen?.note),
       airTeaserClosing: sv(ch.teaser?.closing), airTeaserCta: sv(ch.teaser?.cta),
-      airPalette: ch.customPalette ? "custom" : sv(ch.palette), airCustomSurface: sv(ch.customPalette?.surface) || "#e6e9e6", airCustomInk: sv(ch.customPalette?.ink) || "#26302a", airHeroGradient: sv(ch.heroGradient),
+      airPalette: ch.customPalette?.surface ? "custom" : sv(ch.palette), airCustomSurface: sv(ch.customPalette?.surface) || "#e6e9e6", airCustomInk: sv(ch.customPalette?.ink) || "#26302a", airCustomAccent: sv(ch.customPalette?.accent), airHeroGradient: sv(ch.heroGradient),
       chPalette: cc.customPalette?.surface ? "custom" : "", chCustomSurface: sv(cc.customPalette?.surface) || "#e8e0d4", chCustomInk: sv(cc.customPalette?.ink) || "#2a2018", chAccent: sv(cc.customPalette?.accent),
       chBreadcrumb: sv(ccl.breadcrumb), chHeroPoeticLine: sv(ccl.heroPoeticLine), chIntroLine: sv(ccl.introLine),
       chSignatureEyebrow: sv(ccl.signatureEyebrow), chRestHeading: sv(ccl.restHeading), chQuoteLine: sv(ccl.quoteLine), chNextHeading: sv(ccl.nextHeading),
@@ -354,6 +359,7 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
                 {AIR_GRADIENTS.map((g) => <option key={g} value={g}>{g.replace("gradient:", "")}</option>)}
               </select>
             </label>
+            <label className="cfg-field"><span>Numbering / accent colour <em className="om-field__hint">the edition numbering</em></span><input type="color" value={c.airCustomAccent || "#c9a96e"} onChange={(e) => set({ airCustomAccent: e.target.value })} /></label>
           </div>
           {c.airPalette === "custom" ? (
             <div className="cfg-grid" data-anchor="hours-room">

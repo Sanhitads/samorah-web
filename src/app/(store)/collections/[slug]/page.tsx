@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import type { CSSProperties } from "react";
 import { getAirVolume, getAirVolumes } from "@/config/theHours";
 import { getAirVolumeData } from "@/services/productService";
-import { buildAirVolumeFromDb, airChapterVars } from "@/lib/airFromProduct";
+import { buildAirVolumeFromDb, airChapterVars, airChapterAccentCss } from "@/lib/airFromProduct";
 import { buildAirVolumePage } from "@/lib/airPage";
 import { isPagePublished } from "@/platform/pageResolver";
 import { PageView, buildPageMetadata } from "@/components/page";
@@ -49,5 +49,14 @@ export default async function CollectionRoute({
   const page = buildAirVolumePage(vol);
   if (!isPagePublished(page)) notFound();
   const vars = airChapterVars(vol);
-  return vars ? <div style={vars as CSSProperties}><PageView page={page} /></div> : <PageView page={page} />;
+  const cid = `air-chapter-${slug}`;
+  const accentCss = airChapterAccentCss(vol, cid);
+  return vars || accentCss ? (
+    <div style={vars as CSSProperties} data-cid={cid}>
+      {accentCss ? <style dangerouslySetInnerHTML={{ __html: accentCss }} /> : null}
+      <PageView page={page} />
+    </div>
+  ) : (
+    <PageView page={page} />
+  );
 }
