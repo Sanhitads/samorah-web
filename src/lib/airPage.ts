@@ -163,7 +163,7 @@ export function buildAirVolumePage(vol: AirVolume): Page {
     visibility: !vol.isComingSoon,
     // Section theme — a custom palette uses an unregistered token so no preset rule overrides the
     // inline --surface/--ink the route injects; otherwise the chosen preset (default monsoon).
-    palette: vol.customPalette ? "air-custom" : vol.palette || "monsoon",
+    palette: vol.customPalette?.surface ? "air-custom" : vol.palette || "monsoon",
     navigation: { chapter: vol.slug },
     seo: buildSeo(vol),
     breadcrumb: [
