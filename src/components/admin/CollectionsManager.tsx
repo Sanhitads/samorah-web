@@ -6,6 +6,23 @@ import type { CollectionRow } from "@/services/collectionAdminService";
 import { LivePreviewPanel } from "@/components/admin/LivePreviewPanel";
 
 /** Assemble the air_chapter config from the editor fields — used by BOTH save and the live preview. */
+// Assemble the chapter_content JSON from the flat candle-chapter fields — used by BOTH save and the
+// live preview draft, so what you preview is exactly what saves. Blank fields → house defaults.
+function assembleChapterContent(c: CEdit) {
+  const labels = {
+    breadcrumb: c.chBreadcrumb || undefined, heroPoeticLine: c.chHeroPoeticLine || undefined, introLine: c.chIntroLine || undefined,
+    signatureEyebrow: c.chSignatureEyebrow || undefined, restHeading: c.chRestHeading || undefined, quoteLine: c.chQuoteLine || undefined, nextHeading: c.chNextHeading || undefined,
+  };
+  const hasLabels = Object.values(labels).some(Boolean);
+  const palette: Record<string, string> = {};
+  if (c.chPalette === "custom") { palette.surface = c.chCustomSurface; palette.ink = c.chCustomInk; }
+  if (c.chAccent) palette.accent = c.chAccent;
+  return {
+    customPalette: Object.keys(palette).length ? palette : undefined,
+    labels: hasLabels ? labels : undefined,
+  };
+}
+
 function assembleAirChapter(c: CEdit) {
   return {
     heroEyebrow: c.airHeroEyebrow || undefined,
@@ -93,6 +110,9 @@ type CEdit = {
   airLinenLabel: string; airLinenTitle: string; airLinenNote: string;
   airTeaserClosing: string; airTeaserCta: string;
   airPalette: string; airCustomSurface: string; airCustomInk: string; airHeroGradient: string;
+  // Candle chapter CMS (colours + section headings + the three independent poetic lines) — blanks use house wording.
+  chPalette: string; chCustomSurface: string; chCustomInk: string; chAccent: string;
+  chBreadcrumb: string; chHeroPoeticLine: string; chIntroLine: string; chSignatureEyebrow: string; chRestHeading: string; chQuoteLine: string; chNextHeading: string;
 };
 
 const AIR_PALETTES = ["morning-blue", "amber-hour", "sand", "deep-indigo", "monsoon"];
@@ -136,6 +156,10 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
     const x = d.collection;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const ch = (x.air_chapter ?? {}) as any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cc = (x.chapter_content ?? {}) as any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ccl = (cc.labels ?? {}) as any;
     setC({
       name: sv(x.name), slug: sv(x.slug), volume: sv(x.volume), tagline: sv(x.tagline), poeticLine: sv(x.poetic_line), description: sv(x.description),
       intro: sv(x.intro), storyLong: sv(x.story_long), coverImageUrl: sv(x.cover_image_url), heroMobileUrl: sv(x.hero_mobile_url), heroProductId: sv(x.hero_product_id),
@@ -146,6 +170,9 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
       airLinenLabel: sv(ch.linen?.label), airLinenTitle: sv(ch.linen?.title), airLinenNote: sv(ch.linen?.note),
       airTeaserClosing: sv(ch.teaser?.closing), airTeaserCta: sv(ch.teaser?.cta),
       airPalette: ch.customPalette ? "custom" : sv(ch.palette), airCustomSurface: sv(ch.customPalette?.surface) || "#e6e9e6", airCustomInk: sv(ch.customPalette?.ink) || "#26302a", airHeroGradient: sv(ch.heroGradient),
+      chPalette: cc.customPalette?.surface ? "custom" : "", chCustomSurface: sv(cc.customPalette?.surface) || "#e8e0d4", chCustomInk: sv(cc.customPalette?.ink) || "#2a2018", chAccent: sv(cc.customPalette?.accent),
+      chBreadcrumb: sv(ccl.breadcrumb), chHeroPoeticLine: sv(ccl.heroPoeticLine), chIntroLine: sv(ccl.introLine),
+      chSignatureEyebrow: sv(ccl.signatureEyebrow), chRestHeading: sv(ccl.restHeading), chQuoteLine: sv(ccl.quoteLine), chNextHeading: sv(ccl.nextHeading),
     });
     setProducts(d.products ?? []); setAllProducts(d.allProducts ?? []);
     // Air products + next volume for the air-chapter live preview (empty for non-air chapters).
@@ -209,7 +236,9 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
         tagline: c.tagline || null, poetic_line: c.poeticLine || null, description: c.description || null,
         cover_image_url: c.coverImageUrl || null, is_coming_soon: c.isComingSoon,
         hero_product_id: c.heroProductId || null, created_at: candleChapter.created_at,
+        intro: c.intro || null, story_long: c.storyLong || null,
         products: candleChapter.products ?? [],
+        chapter_content: assembleChapterContent(c),
       },
       allChapters,
     };
@@ -220,7 +249,7 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
   };
   const save = async () => {
     if (!c) return;
-    const collection = { ...c, heroProductId: c.heroProductId || null, sortOrder: Number(c.sortOrder || 0), airChapter: assembleAirChapter(c) };
+    const collection = { ...c, heroProductId: c.heroProductId || null, sortOrder: Number(c.sortOrder || 0), airChapter: assembleAirChapter(c), chapterContent: assembleChapterContent(c) };
     if (await post({ action: "update", id, collection })) { setMsg("Saved"); onSaved(); setTimeout(() => setMsg(""), 1500); }
   };
   const moveProduct = async (pid: string, dir: number) => {
@@ -279,6 +308,7 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
           </div>
         </details>
 
+        {isAirChapter ? (
         <details className="pe-sec" open>
           <summary>Air chapter (Room / Linen sprays)</summary>
           <p className="om-field__hint" style={{ margin: "0 0 8px" }}>The group headings + next-volume teaser for the air chapter page. Blank uses the house wording (shown as the placeholder). Applies when this collection holds Room / Linen sprays.</p>
@@ -326,6 +356,45 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
             </div>
           ) : null}
         </details>
+        ) : null}
+
+        {isCandleChapter ? (
+        <details className="pe-sec" open data-anchor="hero">
+          <summary>Chapter page — colours &amp; headings</summary>
+          <p className="om-field__hint" style={{ margin: "0 0 8px" }}>Every field is optional — blank keeps the house wording. Use the live preview to see each change instantly. The three poetic lines (hero, intro, closing quote) are independent.</p>
+
+          <p className="om-field__hint" style={{ margin: "10px 0 6px", fontWeight: 600 }}>Colours</p>
+          <div className="cfg-grid" data-anchor="hero">
+            <label className="cfg-field"><span>Page palette <em className="om-field__hint">the page colour</em></span>
+              <select value={c.chPalette} onChange={(e) => set({ chPalette: e.target.value })}>
+                <option value="">Chapter default</option>
+                <option value="custom">Custom…</option>
+              </select>
+            </label>
+            <label className="cfg-field"><span>Numbering / accent colour <em className="om-field__hint">the NO. I.2 colour</em></span><input type="color" value={c.chAccent || "#c9a96e"} onChange={(e) => set({ chAccent: e.target.value })} /></label>
+          </div>
+          {c.chPalette === "custom" ? (
+            <div className="cfg-grid" data-anchor="hero">
+              <label className="cfg-field"><span>Page background</span><input type="color" value={c.chCustomSurface} onChange={(e) => set({ chCustomSurface: e.target.value })} /></label>
+              <label className="cfg-field"><span>Page text</span><input type="color" value={c.chCustomInk} onChange={(e) => set({ chCustomInk: e.target.value })} /></label>
+              <div className="cfg-field"><span>Readability</span><span style={{ fontSize: 13, color: contrastRatio(c.chCustomSurface, c.chCustomInk) >= 4.5 ? "#2e7d4f" : "#b4534b" }}>{contrastRatio(c.chCustomSurface, c.chCustomInk) >= 4.5 ? "Good contrast ✓" : "Low contrast — hard to read"}</span></div>
+            </div>
+          ) : null}
+          <p className="om-field__hint" style={{ margin: "0 0 8px" }}>To fix only the hard-to-read numbering, set the accent colour above — no need for a full custom palette.</p>
+
+          <p className="om-field__hint" style={{ margin: "12px 0 6px", fontWeight: 600 }}>Section headings &amp; poetic lines</p>
+          <div className="cfg-grid">
+            <label className="cfg-field" data-anchor="hero"><span>Hero breadcrumb</span><input value={c.chBreadcrumb} onChange={(e) => set({ chBreadcrumb: e.target.value })} placeholder="The Fragrance Library" /></label>
+            <label className="cfg-field" data-anchor="hero"><span>Hero poetic line</span><input value={c.chHeroPoeticLine} onChange={(e) => set({ chHeroPoeticLine: e.target.value })} placeholder={c.poeticLine || "the hero quote"} /></label>
+            <label className="cfg-field" data-anchor="story"><span>Intro line</span><input value={c.chIntroLine} onChange={(e) => set({ chIntroLine: e.target.value })} placeholder={c.intro || c.poeticLine || "the opening intro line"} /></label>
+            <label className="cfg-field" data-anchor="featured"><span>Signature eyebrow</span><input value={c.chSignatureEyebrow} onChange={(e) => set({ chSignatureEyebrow: e.target.value })} placeholder="The signature of this chapter" /></label>
+            <label className="cfg-field" data-anchor="supporting"><span>“Rest of the chapter” heading</span><input value={c.chRestHeading} onChange={(e) => set({ chRestHeading: e.target.value })} placeholder="The rest of the chapter" /></label>
+            <label className="cfg-field" data-anchor="quote"><span>Closing quote line</span><input value={c.chQuoteLine} onChange={(e) => set({ chQuoteLine: e.target.value })} placeholder={c.poeticLine || "the closing quote"} /></label>
+            <label className="cfg-field" data-anchor="next-chapter"><span>Next-chapter heading</span><input value={c.chNextHeading} onChange={(e) => set({ chNextHeading: e.target.value })} placeholder="Continue to the next chapter" /></label>
+          </div>
+          <p className="om-field__hint" style={{ margin: "8px 0 0" }}>The “Introduction” &amp; “Long story” in Editorial content now render as the opening line + paragraphs. Custom sections and per-product chapter images are coming next.</p>
+        </details>
+        ) : null}
 
         <details className="pe-sec">
           <summary>SEO</summary>

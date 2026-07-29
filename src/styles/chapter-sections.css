@@ -43,6 +43,15 @@
 /* each clause on its own measured line — two or three, like a stanza */
 .chapter-intro__clause { display: block; }
 .chapter-intro__clause + .chapter-intro__clause { margin-top: 6px; }
+/* the optional long-story narrative beneath the intro line */
+.chapter-intro__body { max-width: 62ch; margin: 28px auto 0; }
+.chapter-intro__para {
+  font-family: var(--font-sans);
+  font-size: clamp(0.95rem, 1.4vw, 1.05rem);
+  line-height: 1.85;
+  color: var(--ink-muted, var(--muted));
+}
+.chapter-intro__para + .chapter-intro__para { margin-top: 16px; }
 
 /* ── Editorial rhythm ──
    Each section pads the TOP only (bottom 0), so gaps never double up. Scoped to

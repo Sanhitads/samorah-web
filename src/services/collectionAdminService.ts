@@ -94,10 +94,11 @@ export interface CollectionInput {
   intro?: string; storyLong?: string; coverImageUrl?: string; heroMobileUrl?: string; heroProductId?: string | null;
   seoTitle?: string; seoDescription?: string; seoOgImage?: string; sortOrder?: number; isActive?: boolean; isComingSoon?: boolean;
   airChapter?: Record<string, unknown> | null; // air chapter CMS config (group headings/notes, teaser, hero eyebrow, colours)
+  chapterContent?: Record<string, unknown> | null; // candle chapter CMS extras (palette, gradient, section headings, poetic lines)
 }
 
 // Columns added by later CMS migrations — stripped on retry if the migration isn't applied yet.
-const CMS_COLUMNS = ["hero_mobile_url", "intro", "story_long", "seo_og_image", "air_chapter"];
+const CMS_COLUMNS = ["hero_mobile_url", "intro", "story_long", "seo_og_image", "air_chapter", "chapter_content"];
 
 function collectionRow(i: CollectionInput): Record<string, unknown> {
   const r: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -112,6 +113,7 @@ function collectionRow(i: CollectionInput): Record<string, unknown> {
   if (i.isActive !== undefined) r.is_active = i.isActive;
   if (i.isComingSoon !== undefined) r.is_coming_soon = i.isComingSoon;
   if (i.airChapter !== undefined) r.air_chapter = i.airChapter;
+  if (i.chapterContent !== undefined) r.chapter_content = i.chapterContent;
   return r;
 }
 

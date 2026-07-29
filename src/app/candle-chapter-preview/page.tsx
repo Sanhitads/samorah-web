@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import { PageView } from "@/components/page";
-import { buildChapterPage, type ChapterInput, type ChapterSummary } from "@/lib/chapterPage";
+import { buildChapterPage, chapterContentVars, chapterAccentCss, type ChapterInput, type ChapterSummary, type ChapterContent } from "@/lib/chapterPage";
 
 /**
  * Live candle-chapter preview surface (review: visual CMS). Rendered inside an <iframe> by the
@@ -51,8 +52,18 @@ export default function CandleChapterPreviewRoute() {
   }
 
   try {
-    const page = buildChapterPage(draft.chapter as ChapterInput, (draft.allChapters ?? []) as ChapterSummary[]);
-    return <PageView page={page} options={{ preview: true }} />;
+    const content = (draft.chapter?.chapter_content ?? undefined) as ChapterContent | undefined;
+    const page = buildChapterPage(draft.chapter as ChapterInput, (draft.allChapters ?? []) as ChapterSummary[], {}, content);
+    const vars = chapterContentVars(content);
+    const cid = `chapter-${page.slug}`;
+    const accentCss = chapterAccentCss(content, cid);
+    const view = <PageView page={page} options={{ preview: true }} />;
+    return vars || accentCss ? (
+      <div style={vars as CSSProperties} data-cid={cid}>
+        {accentCss ? <style dangerouslySetInnerHTML={{ __html: accentCss }} /> : null}
+        {view}
+      </div>
+    ) : view;
   } catch {
     return <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", color: "#b4534b", fontSize: 14 }}>Preview unavailable for this chapter.</div>;
   }

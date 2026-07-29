@@ -84,6 +84,8 @@ export interface ChapterSeoInput {
 export interface ChapterInput extends ChapterSummary {
   poetic_line?: string | null;
   description?: string | null;
+  intro?: string | null; // the "Introduction" — renders as the opening intro line
+  story_long?: string | null; // the "Long story" — renders as intro body paragraphs
   hero_product_id?: string | null;
   products: ChapterProductInput[];
   identity?: ChapterIdentity;
@@ -143,6 +145,52 @@ export interface ChapterPageConfig {
   empty?: Partial<Record<ChapterSectionId, EmptyStrategy>>;
 }
 
+/**
+ * Candle-chapter CMS extras (stored in collections.chapter_content). All optional — every field falls
+ * back to the house default, so a chapter with no chapter_content renders exactly as before. The three
+ * poetic lines are INDEPENDENT: the hero quote, the opening intro line, and the closing quote each get
+ * their own field. `accent` recolours the edition numbering (--accent) across the page.
+ */
+export interface ChapterContent {
+  customPalette?: { surface: string; ink: string; accent?: string };
+  customGradient?: { from: string; to: string; angle: number };
+  labels?: {
+    breadcrumb?: string; // "The Fragrance Library"
+    heroPoeticLine?: string; // hero quote line
+    introLine?: string; // the opening intro line
+    signatureEyebrow?: string; // "The signature of this chapter"
+    restHeading?: string; // "The rest of the chapter"
+    quoteLine?: string; // the closing quote line
+    nextHeading?: string; // "Continue to the next chapter"
+  };
+}
+
+/** CSS vars for a chapter's custom palette (surface / ink / accent) — applied on a wrapper around
+ *  PageView so the whole page recolours, including the edition numbering (--accent). Mirrors
+ *  airChapterVars. Accent alone is allowed (edit just the number colour). */
+export function chapterContentVars(content?: ChapterContent): Record<string, string> | undefined {
+  const cp = content?.customPalette;
+  if (!cp) return undefined;
+  const vars: Record<string, string> = {};
+  if (cp.surface && cp.ink) {
+    vars["--surface"] = cp.surface;
+    vars["--surface-alt"] = `color-mix(in srgb, ${cp.surface} 92%, ${cp.ink} 8%)`;
+    vars["--ink"] = cp.ink;
+    vars["--ink-soft"] = `color-mix(in srgb, ${cp.ink} 78%, ${cp.surface})`;
+    vars["--ink-muted"] = `color-mix(in srgb, ${cp.ink} 55%, ${cp.surface})`;
+  }
+  if (cp.accent) vars["--accent"] = cp.accent;
+  return Object.keys(vars).length ? vars : undefined;
+}
+
+/** A scoped stylesheet that forces the custom accent onto every themed section — each section carries
+ *  a `[data-theme]` that sets its own `--accent`, so a wrapper var alone is overridden; this two-part
+ *  selector wins. Returns null when no accent is set. */
+export function chapterAccentCss(content: ChapterContent | undefined, cid: string): string | null {
+  const accent = content?.customPalette?.accent;
+  return accent ? `[data-cid="${cid}"] [data-theme]{--accent:${accent}}` : null;
+}
+
 const DEFAULT_EMPTY: Record<ChapterSectionId, EmptyStrategy> = {
   hero: "placeholder",
   story: "hide",
@@ -200,6 +248,7 @@ export interface ChapterIntroSettings {
   volume: string | null;
   title: string;
   intro: string | null;
+  body?: string[]; // the "Long story" — optional narrative paragraphs beneath the intro line
   chapterContext: string;
   a11y: A11yMeta;
 }
@@ -311,8 +360,8 @@ function toChapterCard(c: ChapterSummary): ChapterCardView {
   return { slug: c.slug, volume: c.volume, name: c.name, tagline: c.tagline ?? null, image: c.cover_image_url ?? GRADIENT("grad-chai"), comingSoon: c.is_coming_soon };
 }
 
-function poeticVoice(chapter: ChapterInput): EditorialVoice | null {
-  const line = chapter.poetic_line ?? chapter.tagline;
+function poeticVoice(chapter: ChapterInput, override?: string): EditorialVoice | null {
+  const line = override || chapter.poetic_line || chapter.tagline;
   if (!line) return null;
   return { id: `chapter-${chapter.slug}`, quote: line, author: chapterTitle(chapter), type: "Brand Promise", displayOrder: 1, homepageFeatured: true, isVisible: true };
 }
@@ -452,8 +501,10 @@ export function buildChapterPage(
   chapter: ChapterInput,
   allChapters: ChapterSummary[] = [],
   config: ChapterPageConfig = {},
+  content: ChapterContent = {},
 ): Page {
   const empty = { ...DEFAULT_EMPTY, ...config.empty };
+  const L = content.labels ?? {}; // per-chapter heading / poetic-line overrides (blank → house default)
   const products = chapter.products ?? [];
 
   const heroProduct = selectHero(products, chapter, config.hero);
@@ -467,7 +518,7 @@ export function buildChapterPage(
 
   const title = chapterTitle(chapter);
   const description = chapter.description ?? chapter.tagline ?? `${chapter.name} — a Samorah chapter.`;
-  const voice = poeticVoice(chapter);
+  const voice = poeticVoice(chapter, L.quoteLine); // independent closing quote line
   // "VOL. I — The Dessert Chapter": the reminder carried through every section.
   const chapterContext = chapter.volume ? `${chapter.volume.toUpperCase()} — ${chapter.name}` : chapter.name;
 
@@ -476,8 +527,8 @@ export function buildChapterPage(
     volume: chapter.volume,
     title: chapter.name,
     tagline: chapter.tagline ?? null,
-    poeticLine: chapter.poetic_line ?? null,
-    breadcrumb: "The Fragrance Library",
+    poeticLine: L.heroPoeticLine || chapter.poetic_line || null, // independent hero poetic line
+    breadcrumb: L.breadcrumb || "The Fragrance Library",
     media: imageMedia(cover, `${chapter.name} atmosphere`, "cinematic"),
     overlay: "gradient",
     layout: config.hero?.layout ?? "immersive",
@@ -491,7 +542,10 @@ export function buildChapterPage(
   const intro: ChapterIntroSettings = {
     volume: chapter.volume,
     title: chapter.name,
-    intro: chapter.poetic_line ?? chapter.tagline ?? null,
+    // Independent intro line; the "Introduction" field now renders (point 3), else the poetic line.
+    intro: L.introLine || chapter.intro || chapter.poetic_line || chapter.tagline || null,
+    // The "Long story" field renders as paragraphs beneath the intro line (point 3).
+    body: (chapter.story_long ?? "").split(/\n{2,}|\n/).map((t) => t.trim()).filter(Boolean),
     chapterContext,
     a11y: { headingLevel: 2, landmark: "region" },
   };
@@ -500,7 +554,7 @@ export function buildChapterPage(
   const supportingViews = supporting.map((p, i) => toProductView(p, editionLabel(chapter.volume, i + 2)));
 
   const featured: ChapterFeaturedSettings = {
-    eyebrow: "The signature of this chapter",
+    eyebrow: L.signatureEyebrow || "The signature of this chapter",
     chapterContext,
     product: featuredProduct,
     note: chapter.description ?? null, // the signature embodies the chapter
@@ -510,7 +564,7 @@ export function buildChapterPage(
     emptyStrategy: empty.featured,
   };
   const collection: ChapterCollectionSettings = {
-    heading: "The rest of the chapter",
+    heading: L.restHeading || "The rest of the chapter",
     chapterContext,
     products: supportingViews,
     groupBy: config.supporting?.groupBy ?? "none",
@@ -521,7 +575,7 @@ export function buildChapterPage(
   };
   const quote: ChapterQuoteSettings = { voice, emptyStrategy: empty.quote };
   const gallery: ChapterEditorialSettings = { contentId: chapter.galleryContentId ?? null, emptyStrategy: empty.gallery };
-  const rail: ChapterRailSettings = { heading: "Continue to the next chapter", chapterContext, chapters: others.map(toChapterCard), layout: "editorial", a11y: { headingLevel: 2, landmark: "region" }, emptyStrategy: empty["next-chapter"] };
+  const rail: ChapterRailSettings = { heading: L.nextHeading || "Continue to the next chapter", chapterContext, chapters: others.map(toChapterCard), layout: "editorial", a11y: { headingLevel: 2, landmark: "region" }, emptyStrategy: empty["next-chapter"] };
 
   // Overrides keyed by the template's section ids (merged over the template).
   // Empty strategy + content presence decide visibility per section.
@@ -552,7 +606,7 @@ export function buildChapterPage(
     template: "editorial-chapter",
     status: "published",
     visibility: !chapter.is_coming_soon,
-    palette: CHAPTER_THEME[chapter.slug] ?? "warm-ivory",
+    palette: content.customPalette?.surface ? "chapter-custom" : (CHAPTER_THEME[chapter.slug] ?? "warm-ivory"),
     editorialMood: chapter.identity?.editorialMood,
     navigation: {
       previous: prev ? `chapter-${prev.slug}` : undefined,

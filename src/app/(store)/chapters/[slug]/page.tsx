@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import type { CSSProperties } from "react";
 import { getCollectionBySlug, getCollections } from "@/services/collectionService";
-import { buildChapterPage, type ChapterInput, type ChapterSummary } from "@/lib/chapterPage";
+import { buildChapterPage, chapterContentVars, chapterAccentCss, type ChapterInput, type ChapterSummary, type ChapterContent } from "@/lib/chapterPage";
 import { isPagePublished } from "@/platform/pageResolver";
 import { PageView, buildPageMetadata } from "@/components/page";
 import { withRouteSeo } from "@/services/seoRedirectService";
@@ -28,10 +29,9 @@ export async function generateStaticParams() {
 async function loadChapterPage(slug: string) {
   const [collection, all] = await Promise.all([getCollectionBySlug(slug), getCollections()]);
   if (!collection) return null;
-  return buildChapterPage(
-    collection as unknown as ChapterInput,
-    all as unknown as ChapterSummary[],
-  );
+  const content = ((collection as { chapter_content?: ChapterContent | null }).chapter_content) ?? undefined;
+  const page = buildChapterPage(collection as unknown as ChapterInput, all as unknown as ChapterSummary[], {}, content);
+  return { page, content };
 }
 
 export async function generateMetadata({
@@ -40,8 +40,8 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const page = await loadChapterPage(slug);
-  return withRouteSeo(`/chapters/${slug}`, page ? buildPageMetadata(page) : {});
+  const result = await loadChapterPage(slug);
+  return withRouteSeo(`/chapters/${slug}`, result ? buildPageMetadata(result.page) : {});
 }
 
 export default async function ChapterRoute({
@@ -50,7 +50,17 @@ export default async function ChapterRoute({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const page = await loadChapterPage(slug);
-  if (!page || !isPagePublished(page)) notFound();
-  return <PageView page={page} />;
+  const result = await loadChapterPage(slug);
+  if (!result || !isPagePublished(result.page)) notFound();
+  const vars = chapterContentVars(result.content);
+  const cid = `chapter-${slug}`;
+  const accentCss = chapterAccentCss(result.content, cid);
+  return vars || accentCss ? (
+    <div style={vars as CSSProperties} data-cid={cid}>
+      {accentCss ? <style dangerouslySetInnerHTML={{ __html: accentCss }} /> : null}
+      <PageView page={result.page} />
+    </div>
+  ) : (
+    <PageView page={result.page} />
+  );
 }

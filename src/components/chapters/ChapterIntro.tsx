@@ -37,6 +37,13 @@ export function ChapterIntro({ settings }: SectionComponentProps) {
           ))}
         </p>
       ) : null}
+      {s.body && s.body.length > 0 ? (
+        <div className="chapter-intro__body">
+          {s.body.map((p, i) => (
+            <p key={i} className="chapter-intro__para">{p}</p>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
