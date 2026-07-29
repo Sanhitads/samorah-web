@@ -86,7 +86,7 @@ type Core = {
   airHourEyebrow: string; airFragranceEyebrow: string; airFeelsEyebrow: string; airExperienceEyebrow: string;
   airPlacementEyebrow: string; airPlacementHeading: string; airContinueEyebrow: string; airContinueHeading: string;
   // Candle PDP CMS extras (room/linen use air fields above; candles use these) — assembled to pdp_content.
-  cPalette: string; cCustomSurface: string; cCustomInk: string; // "" = chapter default, token, or "custom"
+  cPalette: string; cCustomSurface: string; cCustomInk: string; cCustomAccent: string; // "" = chapter default, token, or "custom"; accent recolours numbering
   cGradient: string; cGradFrom: string; cGradTo: string; cGradAngle: string; // "" = none, or "custom"
   cAccordion: { title: string; body: string }[]; // overrides the Details accordion
   cCustomSections: CustomSection[]; // admin-added extra sections (move anywhere)
@@ -209,7 +209,12 @@ function assembleCandleContent(core: Core) {
   })).filter((s) => s.body || s.lines.length || s.items.length);
   return {
     palette: core.cPalette && core.cPalette !== "custom" ? core.cPalette : undefined,
-    customPalette: core.cPalette === "custom" ? { surface: core.cCustomSurface, ink: core.cCustomInk } : undefined,
+    customPalette: (() => {
+      const pal: Record<string, string> = {};
+      if (core.cPalette === "custom") { pal.surface = core.cCustomSurface; pal.ink = core.cCustomInk; }
+      if (core.cCustomAccent) pal.accent = core.cCustomAccent;
+      return Object.keys(pal).length ? pal : undefined;
+    })(),
     customGradient: core.cGradient === "custom" ? { from: core.cGradFrom, to: core.cGradTo, angle: Number(core.cGradAngle) || 135 } : undefined,
     labels: hasLabels ? labels : undefined,
     accordion: accordion.length ? accordion : undefined,
@@ -304,7 +309,7 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
         };
       })(),
       ...((): Pick<Core,
-        "cPalette" | "cCustomSurface" | "cCustomInk" | "cGradient" | "cGradFrom" | "cGradTo" | "cGradAngle" | "cAccordion" | "cCustomSections" |
+        "cPalette" | "cCustomSurface" | "cCustomInk" | "cCustomAccent" | "cGradient" | "cGradFrom" | "cGradTo" | "cGradAngle" | "cAccordion" | "cCustomSections" |
         "cStoryEyebrow" | "cJourneyEyebrow" | "cJourneyHeading" | "cJourneyIntro" | "cMoodEyebrow" | "cMoodHeading" | "cCraftEyebrow" | "cCraftHeading" | "cArtistEyebrow" |
         "cLifestyleEyebrow" | "cLifestyleHeading" | "cTestimonialsEyebrow" | "cTestimonialsHeading" | "cMemoryLine" | "cContinueEyebrow" |
         "cStoryImage" | "cLifestyleImage" | "cArtworkImage" | "cTestimonials" |
@@ -312,9 +317,10 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
         const pc = (p.pdp_content ?? {}) as Record<string, unknown>;
         const clb = (pc.labels ?? {}) as Record<string, unknown>;
         return {
-          cPalette: pc.customPalette ? "custom" : sv(pc.palette),
+          cPalette: (pc.customPalette as { surface?: string })?.surface ? "custom" : sv(pc.palette),
           cCustomSurface: sv((pc.customPalette as { surface?: string })?.surface) || "#efe7db",
           cCustomInk: sv((pc.customPalette as { ink?: string })?.ink) || "#2a2018",
+          cCustomAccent: sv((pc.customPalette as { accent?: string })?.accent),
           cGradient: pc.customGradient ? "custom" : "",
           cGradFrom: sv((pc.customGradient as { from?: string })?.from) || "#caa46a",
           cGradTo: sv((pc.customGradient as { to?: string })?.to) || "#3a2415",
@@ -873,6 +879,7 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
                   <option value="custom">Custom…</option>
                 </select>
               </label>
+              <label className="cfg-field"><span>Numbering / accent colour <em className="om-field__hint">the NO. I.2 colour on the related cards</em></span><input type="color" value={core.cCustomAccent || "#c9a96e"} onChange={(e) => set({ cCustomAccent: e.target.value })} /></label>
             </div>
             {core.cPalette === "custom" ? (
               <div className="cfg-grid" data-anchor="story">

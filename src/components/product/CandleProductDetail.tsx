@@ -34,10 +34,11 @@ export function CandleProductDetail({
   bootstrapPlatform(); // register the section library so SectionRenderer resolves each type (also in preview)
 
   // A custom palette themes the editorial sections via inline CSS vars + an unregistered token (so no
-  // preset rule overrides them); a custom gradient repaints the hero media via one scoped style rule.
+  // preset rule overrides them); a custom gradient repaints the hero media via one scoped style rule;
+  // a custom accent recolours the edition numbering (--accent) — applied on <main> for the hero and
+  // via a scoped [data-cid] [data-theme] rule so it also beats each section's own theme accent.
   const cp = content?.customPalette;
-  const themeToken = cp ? "candle-custom" : palette;
-  const editorialVars: CSSProperties | undefined = cp
+  const editorialVars: CSSProperties | undefined = cp?.surface && cp?.ink
     ? ({
         "--surface": cp.surface,
         "--surface-alt": `color-mix(in srgb, ${cp.surface} 92%, ${cp.ink} 8%)`,
@@ -46,14 +47,19 @@ export function CandleProductDetail({
         "--ink-muted": `color-mix(in srgb, ${cp.ink} 55%, ${cp.surface})`,
       } as CSSProperties)
     : undefined;
+  const themeToken = editorialVars ? "candle-custom" : palette;
   const cg = content?.customGradient;
   const gradientCss = cg?.from && cg?.to ? `linear-gradient(${cg.angle || 135}deg, ${cg.from}, ${cg.to})` : null;
   const scopeId = `pdp-${p.slug}`;
+  const mainStyle = cp?.accent ? ({ "--accent": cp.accent } as CSSProperties) : undefined;
 
   return (
-    <main className="pdp" data-theme="warm-ivory" data-cid={scopeId}>
+    <main className="pdp" data-theme="warm-ivory" data-cid={scopeId} style={mainStyle}>
       {gradientCss ? (
         <style dangerouslySetInnerHTML={{ __html: `[data-cid="${scopeId}"] .pdp__layout .asset-image{background:${gradientCss} !important}` }} />
+      ) : null}
+      {cp?.accent ? (
+        <style dangerouslySetInnerHTML={{ __html: `[data-cid="${scopeId}"] [data-theme]{--accent:${cp.accent}}` }} />
       ) : null}
       {ld && !preview ? (
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld) }} />

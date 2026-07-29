@@ -180,7 +180,7 @@ export function buildProductArtist(pa: any): Artist | undefined {
  */
 export interface CandlePdpContent {
   palette?: string; // a preset theme token override (else the chapter default); customPalette wins over this
-  customPalette?: { surface: string; ink: string };
+  customPalette?: { surface?: string; ink?: string; accent?: string }; // accent recolours the edition numbering (--accent)
   customGradient?: { from: string; to: string; angle: number };
   labels?: {
     storyEyebrow?: string;
