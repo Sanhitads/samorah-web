@@ -30,7 +30,16 @@ async function loadChapterPage(slug: string) {
   const [collection, all] = await Promise.all([getCollectionBySlug(slug), getCollections()]);
   if (!collection) return null;
   const content = ((collection as { chapter_content?: ChapterContent | null }).chapter_content) ?? undefined;
-  const page = buildChapterPage(collection as unknown as ChapterInput, all as unknown as ChapterSummary[], {}, content);
+  // Per-product chapter overrides live in air_content (card image, from-price) / pdp_content (type).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const raw = collection as any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const products = (raw.products ?? []).map((p: any) => {
+    const ac = p.air_content ?? {};
+    const pc = p.pdp_content ?? {};
+    return { ...p, chapterImage: ac.chapterImage ?? null, chapterFromPrice: ac.chapterFromPrice != null ? Number(ac.chapterFromPrice) : null, collection_type: pc.collectionType ?? p.collection_type };
+  });
+  const page = buildChapterPage({ ...raw, products } as unknown as ChapterInput, all as unknown as ChapterSummary[], {}, content);
   return { page, content };
 }
 

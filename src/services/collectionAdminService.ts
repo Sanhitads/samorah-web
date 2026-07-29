@@ -31,7 +31,7 @@ export async function listCollectionsAdmin(): Promise<CollectionRow[]> {
   }));
 }
 
-export async function getCollectionForEdit(id: string): Promise<{ collection: any; products: { id: string; name: string; displayOrder: number; heroProduct: boolean; productType: string; chapterImage: string; interlude: string }[]; allProducts: { id: string; name: string }[] } | null> {
+export async function getCollectionForEdit(id: string): Promise<{ collection: any; products: { id: string; name: string; displayOrder: number; heroProduct: boolean; productType: string; chapterImage: string; interlude: string; chapterFromPrice: string }[]; allProducts: { id: string; name: string }[] } | null> {
   const db = loose();
   const { data: collection } = await db.from("collections").select("*").eq("id", id).maybeSingle();
   if (!collection) return null;
@@ -39,7 +39,7 @@ export async function getCollectionForEdit(id: string): Promise<{ collection: an
     db.from("products").select("id,name,display_order,product_type,air_content").eq("collection_id", id).order("display_order"),
     db.from("products").select("id,name").order("name"),
   ]);
-  const products = (inCol ?? []).map((p: any) => ({ id: p.id, name: p.name, displayOrder: Number(p.display_order ?? 0), heroProduct: p.id === collection.hero_product_id, productType: p.product_type ?? "candle", chapterImage: String((p.air_content ?? {}).chapterImage ?? ""), interlude: String((p.air_content ?? {}).interlude ?? "") }));
+  const products = (inCol ?? []).map((p: any) => ({ id: p.id, name: p.name, displayOrder: Number(p.display_order ?? 0), heroProduct: p.id === collection.hero_product_id, productType: p.product_type ?? "candle", chapterImage: String((p.air_content ?? {}).chapterImage ?? ""), interlude: String((p.air_content ?? {}).interlude ?? ""), chapterFromPrice: (p.air_content ?? {}).chapterFromPrice != null ? String((p.air_content).chapterFromPrice) : "" }));
   const allProducts = (all ?? []).map((p: any) => ({ id: p.id, name: p.name }));
   return { collection, products, allProducts };
 }
@@ -52,7 +52,7 @@ export async function getCandleChapterPreviewData(collectionId: string) {
     db
       .from("collections")
       .select(
-        "id, slug, name, volume, tagline, poetic_line, description, cover_image_url, is_coming_soon, hero_product_id, created_at, products:products!products_collection_id_fkey(id, slug, name, tagline, price, sale_price, is_hero, is_featured, created_at, product_type, status, pdp_content, product_images(url, alt_text, is_primary, sort_order))",
+        "id, slug, name, volume, tagline, poetic_line, description, cover_image_url, is_coming_soon, hero_product_id, created_at, products:products!products_collection_id_fkey(id, slug, name, tagline, price, sale_price, is_hero, is_featured, created_at, product_type, status, pdp_content, air_content, product_images(url, alt_text, is_primary, sort_order))",
       )
       .eq("id", collectionId)
       .maybeSingle(),
@@ -61,7 +61,12 @@ export async function getCandleChapterPreviewData(collectionId: string) {
   const AIR = ["room_spray", "linen_spray"];
   const products = (chapter?.products ?? [])
     .filter((p: any) => !AIR.includes(p.product_type) && p.status !== "archived")
-    .map((p: any) => ({ ...p, collection_type: (p.pdp_content ?? {}).collectionType ?? undefined }));
+    .map((p: any) => ({
+      ...p,
+      collection_type: (p.pdp_content ?? {}).collectionType ?? undefined,
+      chapterImage: (p.air_content ?? {}).chapterImage ?? null,
+      chapterFromPrice: (p.air_content ?? {}).chapterFromPrice != null ? Number((p.air_content).chapterFromPrice) : null,
+    }));
   return { chapter: chapter ? { ...chapter, products } : null, allChapters: all ?? [] };
 }
 
@@ -75,6 +80,13 @@ export async function setProductChapterImage(productId: string, url: string, act
  *  chapter page. */
 export async function setProductInterlude(productId: string, value: string, actorId?: string) {
   return mergeProductAir(productId, { interlude: value.trim() || undefined }, "product.interlude", actorId);
+}
+
+/** Set a product's chapter-card "From" price (air_content.chapterFromPrice) — e.g. the 100g price, so
+ *  the chapter card can differ from the product's base price. Blank clears it. */
+export async function setProductChapterFromPrice(productId: string, value: string, actorId?: string) {
+  const n = Number(value);
+  return mergeProductAir(productId, { chapterFromPrice: value.trim() && n > 0 ? n : undefined }, "product.chapter_from_price", actorId);
 }
 
 /** Merge a patch into a product's air_content (read-modify-write) — shared by the chapter editor's

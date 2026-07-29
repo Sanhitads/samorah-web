@@ -3,7 +3,7 @@ import { requireCapability } from "@/lib/auth/requireStaff";
 import {
   createCollection, updateCollection, setCollectionStatus, deleteCollection, getCollectionForEdit,
   setProductDisplayOrder, assignProductToCollection, setProductChapterImage, setProductInterlude,
-  getCandleChapterPreviewData,
+  setProductChapterFromPrice, getCandleChapterPreviewData,
   type CollectionInput,
 } from "@/services/collectionAdminService";
 import { getAirChapterProducts } from "@/services/productService";
@@ -32,6 +32,7 @@ export async function POST(request: Request) {
       case "chapter.data": return NextResponse.json({ ok: true, ...(await getCandleChapterPreviewData(body.id)) });
       case "product.chapterImage": return NextResponse.json(await setProductChapterImage(body.productId, body.url ?? "", a));
       case "product.interlude": return NextResponse.json(await setProductInterlude(body.productId, body.value ?? "", a));
+      case "product.chapterFromPrice": return NextResponse.json(await setProductChapterFromPrice(body.productId, body.value ?? "", a));
       default: return NextResponse.json({ error: "unknown action" }, { status: 400 });
     }
   } catch (e) {
