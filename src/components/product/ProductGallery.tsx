@@ -74,7 +74,7 @@ export function ProductGallery({ images, name, itemId }: { images: ProductGaller
               aria-label={`View image ${i + 1}`}
               onClick={() => setActive(i)}
             >
-              <AssetImage asset={g.src} alt={g.alt} role="detail" className="pdp__thumb-fill" />
+              <AssetImage asset={g.src} alt={g.alt} role="detail" sizes="96px" className="pdp__thumb-fill" />
             </button>
           ))}
         </div>
@@ -83,7 +83,7 @@ export function ProductGallery({ images, name, itemId }: { images: ProductGaller
       <div className="pdp__image" tabIndex={count > 1 ? 0 : -1} aria-roledescription="carousel">
         {imgs.map((g, i) => (
           <div key={i} className="pdp__image-layer" data-active={i === active} aria-hidden={i !== active}>
-            <AssetImage asset={g.src} alt={i === active ? g.alt : ""} role="detail" priority={i === 0} className="pdp__image-fill" />
+            <AssetImage asset={g.src} alt={i === active ? g.alt : ""} role="detail" priority={i === 0} sizes="(max-width: 900px) 100vw, 46vw" className="pdp__image-fill" />
           </div>
         ))}
         <button type="button" className="pdp__zoom" onClick={() => setOpen(true)} aria-label="View full screen">
@@ -113,7 +113,7 @@ export function ProductGallery({ images, name, itemId }: { images: ProductGaller
             </button>
           ) : null}
           <figure className="pdp__lightbox-img" onClick={(e) => e.stopPropagation()}>
-            <AssetImage asset={current.src} alt={current.alt} role="detail" className="pdp__lightbox-fill" />
+            <AssetImage asset={current.src} alt={current.alt} role="detail" sizes="100vw" className="pdp__lightbox-fill" />
           </figure>
           {count > 1 ? (
             <button

@@ -9,6 +9,7 @@
  */
 import type { Asset } from "./asset";
 import { isGradientRef, gradientClassOf } from "./assetResolver";
+import { isCloudinary, cldUrl, cldSrcSet } from "@/lib/cloudinaryUrl";
 
 export type AssetRenderKind =
   | "gradient"
@@ -39,6 +40,11 @@ function buildSrcSet(asset: Asset): string | undefined {
       .map((v) => `${v.url} ${v.width}w`)
       .join(", ");
     if (out) return out;
+  }
+  // A single Cloudinary upload → generate the responsive candidates on the fly (f_auto,q_auto,w_n),
+  // so a phone downloads a phone-sized modern-format image, not the full desktop original.
+  if (isCloudinary(asset.desktop) && !asset.mobile && !asset.tablet) {
+    return cldSrcSet(asset.desktop);
   }
   const out = [
     asset.mobile && `${asset.mobile} 640w`,
@@ -78,7 +84,10 @@ export function planAssetRender(
     return { ...base, kind: "video", src: asset.desktop, posterSrc: asset.poster };
   }
   if (opts?.as === "background") {
-    return { ...base, kind: "background", src: asset.desktop };
+    // Backgrounds have no srcSet — serve a format-optimised, generously capped single image.
+    return { ...base, kind: "background", src: isCloudinary(asset.desktop) ? cldUrl(asset.desktop, 2048) : asset.desktop };
   }
-  return { ...base, kind: "image", src: asset.desktop, srcSet: buildSrcSet(asset) };
+  // The `src` fallback (no-srcSet browsers) is format-optimised + capped; srcSet carries the widths.
+  const src = isCloudinary(asset.desktop) ? cldUrl(asset.desktop, 1600) : asset.desktop;
+  return { ...base, kind: "image", src, srcSet: buildSrcSet(asset) };
 }
