@@ -58,6 +58,13 @@ export interface FieldDef {
   blockFields?: FieldDef[];
   minBlocks?: number;
   maxBlocks?: number;
+  // ── heterogeneous blocks (point 17/18) ── each block carries a `_type` and uses the matching
+  //    variant's fields; the editor offers a "+ Add <label>" per variant and reordering across all.
+  blockVariants?: { key: string; label: string; fields: FieldDef[] }[];
+  // ── block "pull from" source (Homepage: Featured Atmosphere → a real product) ── when set on a
+  //    `blocks` field, each block gets a picker of the entity; choosing one fills the mapped block
+  //    fields from that entity's `data` (still fully editable afterwards). map = { blockField: dataKey }.
+  blockSource?: { entity: string; label?: string; map: Record<string, string> };
 }
 
 export interface SectionSchema {
@@ -149,7 +156,13 @@ function validateField(f: FieldDef, content: Record<string, unknown>, prefix: st
       const seen = new Set<string>();
       v.forEach((b: any) => { const val = String(b?.[uf.key] ?? "").trim(); if (val) { if (seen.has(val)) e.push(`${prefix}"${uf.label}" must be unique across ${f.blockLabel ?? "items"} ("${val}" repeats)`); seen.add(val); } });
     }
-    v.forEach((block: any, i) => { for (const bf of f.blockFields ?? []) e.push(...validateField(bf, block ?? {}, `${prefix}${f.blockLabel ?? "Item"} ${i + 1} · `)); });
+    if (f.blockVariants) {
+      // Heterogeneous blocks — validate each against its variant's fields (point 17/18).
+      const byKey = new Map(f.blockVariants.map((bv) => [bv.key, bv]));
+      v.forEach((block: any, i) => { const variant = byKey.get(block?._type); for (const bf of variant?.fields ?? []) e.push(...validateField(bf, block ?? {}, `${prefix}${variant?.label ?? "Block"} ${i + 1} · `)); });
+    } else {
+      v.forEach((block: any, i) => { for (const bf of f.blockFields ?? []) e.push(...validateField(bf, block ?? {}, `${prefix}${f.blockLabel ?? "Item"} ${i + 1} · `)); });
+    }
   }
   return e;
 }

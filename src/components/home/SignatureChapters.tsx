@@ -9,16 +9,16 @@ import type { HomeChapter } from "@/config/chapters";
  * a story to enter, not a product to choose. If there are no visible chapters,
  * the whole section hides gracefully (no broken/empty container).
  */
-export function SignatureChapters({ chapters }: { chapters: HomeChapter[] }) {
+export function SignatureChapters({ chapters, label, heading, sub }: { chapters: HomeChapter[]; label?: string; heading?: string; sub?: string }) {
   if (chapters.length === 0) return null;
 
   return (
     <section className="home-chapters">
       <Reveal className="home-chapters__intro">
-        <p className="home-chapters__label">Samorah Collections</p>
-        <h2 className="home-chapters__heading">The Signature Chapters</h2>
+        <p className="home-chapters__label">{label ?? "Samorah Collections"}</p>
+        <h2 className="home-chapters__heading">{heading ?? "The Signature Chapters"}</h2>
         <p className="home-chapters__sub">
-          A fragrance library composed through atmosphere, ritual and memory.
+          {sub ?? "A fragrance library composed through atmosphere, ritual and memory."}
         </p>
       </Reveal>
 

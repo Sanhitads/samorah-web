@@ -10,24 +10,29 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * highlights the matching section. Used by the product PDP editor and the air-chapter editor.
  */
 const SRC = "samorah-pdp-preview"; // shared message tag (also used by the preview routes)
-const DEVICES = [
-  { k: "desktop", l: "Desktop", w: 0 }, // 0 = native panel width (full size, no down-scaling)
-  { k: "tablet", l: "Tablet", w: 834 },
-  { k: "mobile", l: "Mobile", w: 390 },
-] as const;
 
 export function LivePreviewPanel({
   src = "/pdp-preview",
   draft,
   focusId,
   onRefresh,
+  desktopWidth = 0,
 }: {
   src?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   draft: any;
   focusId: string | null;
   onRefresh: () => void;
+  /** Width the "Desktop" tab renders at, then scales to fit the panel. 0 = native panel width (the
+   *  PDP default — crisp, no scaling). Set a real desktop width (e.g. 1280) when the panel is narrow
+   *  (the Homepage builder), so "Desktop" shows the true desktop layout instead of the mobile fallback. */
+  desktopWidth?: number;
 }) {
+  const DEVICES = [
+    { k: "desktop", l: "Desktop", w: desktopWidth }, // 0 = native panel width (no down-scaling)
+    { k: "tablet", l: "Tablet", w: 834 },
+    { k: "mobile", l: "Mobile", w: 390 },
+  ] as const;
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const readyRef = useRef(false);

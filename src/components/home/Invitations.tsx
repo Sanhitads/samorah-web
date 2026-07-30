@@ -3,7 +3,7 @@
 import { useRef } from "react";
 import Link from "next/link";
 import { motion, useInView, useReducedMotion } from "framer-motion";
-import { gradientClass, isGradientPlaceholder } from "@/lib/product";
+import { gradientClass, isGradientPlaceholder, isColorValue } from "@/lib/product";
 import type { HomeInvitation } from "@/config/invitations";
 
 /**
@@ -40,6 +40,7 @@ function InvitationPlate({
   const reduce = useReducedMotion();
   const ref = useRef<HTMLAnchorElement | null>(null);
   const inView = useInView(ref, { once: true, margin: "0px 0px -15% 0px" });
+  const color = isColorValue(invitation.image);
   const placeholder = isGradientPlaceholder(invitation.image);
 
   return (
@@ -57,14 +58,14 @@ function InvitationPlate({
       >
         <motion.div
           className={`home-living__image ${
-            placeholder
-              ? gradientClass(invitation.image) ?? ""
-              : "home-living__image--photo"
+            color ? "" : placeholder ? gradientClass(invitation.image) ?? "" : "home-living__image--photo"
           }`}
           style={
-            placeholder
-              ? undefined
-              : { backgroundImage: `url(${invitation.image})` }
+            color
+              ? { background: invitation.image }
+              : placeholder
+                ? undefined
+                : { backgroundImage: `url(${invitation.image})` }
           }
           aria-hidden="true"
           initial={{ opacity: 0, scale: reduce ? 1 : 1.06 }}

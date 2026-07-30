@@ -102,7 +102,28 @@ type Core = {
   cBurnTimes: Record<string, string>; // size label -> burn time
   cLifestyleMoments: string; // one moment per line (else derived)
   cCraft: { label: string; value: string; note: string }[]; // "Made by hand" tiles (else house set)
+  cSpecs: { label: string; value: string }[]; cSpecsHeading: string; // type-specific specifications (wax tablet / diffuser)
 };
+
+// Type-appropriate default spec rows — seeded when the admin opens the specs panel for a non-candle
+// candle-rendered type, so wax tablets / diffusers get the right fields instead of candle framing.
+const SPEC_DEFAULTS: Record<string, { label: string; value: string }[]> = {
+  wax_tablet: [
+    { label: "Longevity", value: "6–8 weeks of gentle scent" },
+    { label: "Where to place", value: "Drawers, wardrobes, a car, or a small room" },
+    { label: "How to use", value: "Unwrap and place — no flame, no heat. Snap to refresh the scent." },
+    { label: "Scent throw", value: "Soft, ambient" },
+  ],
+  reed_diffuser: [
+    { label: "Reeds", value: "8 natural fibre reeds" },
+    { label: "Flip", value: "Turn the reeds weekly for a steady throw" },
+    { label: "Coverage", value: "Up to 40 m²" },
+    { label: "Longevity", value: "10–12 weeks" },
+    { label: "Refill", value: "Reuse the vessel with a refill" },
+  ],
+  other: [{ label: "", value: "" }],
+};
+const SPEC_TYPES = ["wax_tablet", "reed_diffuser", "other"];
 
 const AIR_TYPES = ["room_spray", "linen_spray"];
 const AIR_PALETTES = ["morning-blue", "amber-hour", "sand", "deep-indigo", "monsoon"]; // section theme (page colour)
@@ -237,6 +258,8 @@ function assembleCandleContent(core: Core) {
     })(),
     lifestyleMoments: (() => { const m = linesToArr(core.cLifestyleMoments); return m.length ? m : undefined; })(),
     craft: (() => { const c = core.cCraft.map((r) => ({ label: r.label.trim(), value: r.value.trim(), note: r.note.trim() })).filter((r) => r.label || r.value); return c.length ? c : undefined; })(),
+    specs: (() => { const s = core.cSpecs.map((r) => ({ label: r.label.trim(), value: r.value.trim() })).filter((r) => r.label || r.value); return s.length ? s : undefined; })(),
+    specsHeading: core.cSpecsHeading.trim() || undefined,
   };
 }
 
@@ -244,8 +267,22 @@ function assembleCandleContent(core: Core) {
 const bv = (v: any) => Boolean(v);
 const sv = (v: unknown) => (v == null ? "" : String(v));
 
-export function ProductEditor({ productId, collections, categories, onClose, onSaved }: {
-  productId: string; collections: { id: string; name: string; volume: string | null; slug?: string }[]; categories: { id: string; name: string }[]; onClose: () => void; onSaved: () => void;
+type PickerProduct = { id: string; name: string; slug: string; imageUrl: string | null };
+type Timeline = {
+  createdAt: string | null; updatedAt: string | null; publishAt: string | null; status: string;
+  lastModifiedBy: string | null; lastModifiedAt: string | null;
+  lastPurchasedAt: string | null; unitsSold: number; ordersCount: number;
+  trail: { event: string; at: string; actorName: string | null; notes: string | null }[];
+};
+type Relationship = { relatedProductId: string; relationType: string; sortOrder: number; name: string; slug: string; imageUrl: string | null };
+const RELATION_TYPES = [
+  { v: "related", l: "Related" }, { v: "upsell", l: "Upsell" }, { v: "cross_sell", l: "Cross-sell" },
+  { v: "pairs_with", l: "Pairs well with" }, { v: "frequently_bought", l: "Frequently bought" },
+];
+const fmtDate = (v: string | null) => (v ? new Date(v).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—");
+
+export function ProductEditor({ productId, collections, categories, allProducts = [], onClose, onSaved }: {
+  productId: string; collections: { id: string; name: string; volume: string | null; slug?: string }[]; categories: { id: string; name: string }[]; allProducts?: PickerProduct[]; onClose: () => void; onSaved: () => void;
 }) {
   const [core, setCore] = useState<Core | null>(null);
   const [variants, setVariants] = useState<VariantRow[]>([]);
@@ -256,6 +293,9 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
   const [err, setErr] = useState("");
   const [msg, setMsg] = useState("");
   const [imgUrl, setImgUrl] = useState(""); const [imgAlt, setImgAlt] = useState("");
+  const [timeline, setTimeline] = useState<Timeline | null>(null);
+  const [rels, setRels] = useState<Relationship[]>([]);
+  const [relPick, setRelPick] = useState(""); const [relType, setRelType] = useState("related");
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const post = async (body: Record<string, unknown>): Promise<any> => {
@@ -318,7 +358,7 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
         "cStoryEyebrow" | "cJourneyEyebrow" | "cJourneyHeading" | "cJourneyIntro" | "cMoodEyebrow" | "cMoodHeading" | "cCraftEyebrow" | "cCraftHeading" | "cArtistEyebrow" |
         "cLifestyleEyebrow" | "cLifestyleHeading" | "cTestimonialsEyebrow" | "cTestimonialsHeading" | "cMemoryLine" | "cContinueEyebrow" |
         "cStoryImage" | "cLifestyleImage" | "cArtworkImage" | "cTestimonials" |
-        "cTestimonialInterval" | "cEdition" | "cCollectionType" | "cBurnTimes" | "cLifestyleMoments" | "cCraft"> => {
+        "cTestimonialInterval" | "cEdition" | "cCollectionType" | "cBurnTimes" | "cLifestyleMoments" | "cCraft" | "cSpecs" | "cSpecsHeading"> => {
         const pc = (p.pdp_content ?? {}) as Record<string, unknown>;
         const clb = (pc.labels ?? {}) as Record<string, unknown>;
         return {
@@ -346,6 +386,8 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
           cBurnTimes: (pc.burnTimes && typeof pc.burnTimes === "object") ? Object.fromEntries(Object.entries(pc.burnTimes as Record<string, unknown>).map(([k, v]) => [k, sv(v)])) : {},
           cLifestyleMoments: Array.isArray(pc.lifestyleMoments) ? (pc.lifestyleMoments as string[]).join("\n") : "",
           cCraft: Array.isArray(pc.craft) ? (pc.craft as { label?: string; value?: string; note?: string }[]).map((r) => ({ label: sv(r.label), value: sv(r.value), note: sv(r.note) })) : [],
+          cSpecs: Array.isArray(pc.specs) ? (pc.specs as { label?: string; value?: string }[]).map((r) => ({ label: sv(r.label), value: sv(r.value) })) : [],
+          cSpecsHeading: sv(pc.specsHeading),
         };
       })(),
     });
@@ -355,6 +397,42 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productId]);
+
+  // Timeline + relationships load alongside the product (independent of the Save busy flag).
+  const loadTimeline = async () => {
+    try {
+      const res = await fetch("/api/admin/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "timeline", id: productId }) });
+      const d = await res.json(); if (d?.ok) setTimeline(d.timeline as Timeline);
+    } catch { /* non-fatal */ }
+  };
+  const loadRels = async () => {
+    try {
+      const res = await fetch("/api/admin/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "relationships.get", id: productId }) });
+      const d = await res.json(); if (d?.ok) setRels((d.relationships as Relationship[]) ?? []);
+    } catch { /* non-fatal */ }
+  };
+  useEffect(() => {
+    void loadTimeline(); void loadRels();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productId]);
+
+  const addRel = () => {
+    if (!relPick || relPick === productId || rels.some((r) => r.relatedProductId === relPick)) return;
+    const p = allProducts.find((x) => x.id === relPick);
+    if (!p) return;
+    setRels((rs) => [...rs, { relatedProductId: p.id, relationType: relType, sortOrder: rs.length, name: p.name, slug: p.slug, imageUrl: p.imageUrl }]);
+    setRelPick("");
+  };
+  const setRelTypeAt = (i: number, t: string) => setRels((rs) => rs.map((r, j) => (j === i ? { ...r, relationType: t } : r)));
+  const removeRel = (i: number) => setRels((rs) => rs.filter((_, j) => j !== i));
+  const moveRel = (i: number, dir: -1 | 1) => setRels((rs) => {
+    const j = i + dir; if (j < 0 || j >= rs.length) return rs;
+    const out = [...rs]; [out[i], out[j]] = [out[j], out[i]]; return out.map((r, k) => ({ ...r, sortOrder: k }));
+  });
+  const saveRels = async () => {
+    const items = rels.map((r, i) => ({ relatedProductId: r.relatedProductId, relationType: r.relationType, sortOrder: i }));
+    if (await post({ action: "relationships.set", id: productId, items })) { setMsg("Relationships saved"); void loadRels(); setTimeout(() => setMsg(""), 1500); }
+  };
 
   const [previewOn, setPreviewOn] = useState(true);
   const [focusId, setFocusId] = useState<string | null>(null);
@@ -433,6 +511,13 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
 
   const set = (patch: Partial<Core>) => setCore((c) => (c ? { ...c, ...patch } : c));
   const numOrNull = (s: string) => (s.trim() === "" ? null : Number(s));
+
+  // Type-specific specifications (Batch C) — repeatable label/value rows + type-aware defaults.
+  const specUpdate = (i: number, patch: Partial<{ label: string; value: string }>) =>
+    setCore((c) => (c ? { ...c, cSpecs: c.cSpecs.map((s, j) => (j === i ? { ...s, ...patch } : s)) } : c));
+  const specAdd = () => setCore((c) => (c ? { ...c, cSpecs: [...c.cSpecs, { label: "", value: "" }] } : c));
+  const specRemove = (i: number) => setCore((c) => (c ? { ...c, cSpecs: c.cSpecs.filter((_, j) => j !== i) } : c));
+  const specLoadDefaults = () => setCore((c) => (c ? { ...c, cSpecs: (SPEC_DEFAULTS[c.productType] ?? SPEC_DEFAULTS.other).map((s) => ({ ...s })) } : c));
 
   // Details accordion — repeatable rows (functional updates so edits never use a stale core).
   const accUpdate = (i: number, patch: Partial<{ title: string; body: string }>) =>
@@ -558,7 +643,7 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
 
   // Variants
   const saveVariant = async (v: VariantRow) => {
-    if (await post({ action: "variant.upsert", variant: { id: v.id || undefined, productId, sku: v.sku, variantName: v.variantName, vesselType: v.vesselType, sizeLabel: v.sizeLabel, price: v.price, salePrice: v.salePrice, costPrice: v.costPrice, stock: v.stock, isActive: v.isActive, sortOrder: v.sortOrder, barcode: v.barcode, weightGrams: v.weightGrams, lowStockThreshold: v.lowStockThreshold } })) { await load(); onSaved(); }
+    if (await post({ action: "variant.upsert", variant: { id: v.id || undefined, productId, sku: v.sku, variantName: v.variantName, vesselType: v.vesselType, sizeLabel: v.sizeLabel, price: v.price, salePrice: v.salePrice, costPrice: v.costPrice, stock: v.stock, isActive: v.isActive, sortOrder: v.sortOrder, barcode: v.barcode, weightGrams: v.weightGrams, lowStockThreshold: v.lowStockThreshold, shippingClass: v.shippingClass, packageLengthCm: v.packageLengthCm, packageWidthCm: v.packageWidthCm, packageHeightCm: v.packageHeightCm, supplierSku: v.supplierSku } })) { await load(); onSaved(); }
   };
   const delVariant = async (v: VariantRow) => { if (v.id && await post({ action: "variant.delete", id: v.id, productId })) { await load(); onSaved(); } };
   const setV = (i: number, patch: Partial<VariantRow>) => setVariants((vs) => vs.map((v, j) => (j === i ? { ...v, ...patch } : v)));
@@ -615,7 +700,7 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
     await load();
   };
 
-  const addVariant = () => setVariants((vs) => [...vs, { id: "", sku: "", variantName: "", vesselType: null, sizeLabel: "", price: core?.price ?? 0, salePrice: null, costPrice: 0, stock: 0, isActive: true, sortOrder: vs.length, barcode: null, weightGrams: null, lowStockThreshold: null }]);
+  const addVariant = () => setVariants((vs) => [...vs, { id: "", sku: "", variantName: "", vesselType: null, sizeLabel: "", price: core?.price ?? 0, salePrice: null, costPrice: 0, stock: 0, isActive: true, sortOrder: vs.length, barcode: null, weightGrams: null, lowStockThreshold: null, shippingClass: null, packageLengthCm: null, packageWidthCm: null, packageHeightCm: null, supplierSku: null }]);
 
   if (!core) return (
     <div className="om-modal" role="dialog" aria-modal="true" onClick={onClose}><div className="om-modal__card om-modal__card--wide" onClick={(e) => e.stopPropagation()}><p className="admin__muted">Loading…</p></div></div>
@@ -660,6 +745,53 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
           <div className="pe-preview"><span className="pe-preview__title">{core.seoTitle || core.name}</span><span className="pe-preview__url">samorah.in/shop/{core.slug}</span><span className="pe-preview__desc">{core.seoDescription || core.tagline || "—"}</span></div>
         </details>
 
+        {(() => {
+          const title = (core.seoTitle || core.name || "Untitled").trim();
+          const desc = (core.seoDescription || core.tagline || "").trim();
+          const primaryImg = images.find((i) => i.isPrimary)?.url ?? images[0]?.url ?? "";
+          const ogImage = (core.seoOgImage || primaryImg).trim();
+          const titleLen = title.length, descLen = desc.length;
+          const tone = (n: number, lo: number, hi: number) => (n < lo ? "warn" : n > hi ? "over" : "ok");
+          return (
+            <details className="pe-sec" data-anchor="pdp-top">
+              <summary>Search &amp; social preview</summary>
+              <p className="om-field__hint" style={{ margin: "2px 0 12px" }}>Live preview of how this product appears on Google and when shared. Pulls from SEO title/description + OG image (falls back to the product name, tagline, and primary image).</p>
+              <div className="seo-prev">
+                {/* Google result */}
+                <div className="seo-prev__card">
+                  <span className="seo-prev__badge">Google</span>
+                  <div className="seo-serp">
+                    <div className="seo-serp__crumbs">samorah.in <span>›</span> shop <span>›</span> {core.slug || "…"}</div>
+                    <div className="seo-serp__title">{title}</div>
+                    <div className="seo-serp__desc">{desc || "No description — add a meta description so the snippet reads well."}</div>
+                  </div>
+                </div>
+                {/* Facebook / OpenGraph */}
+                <div className="seo-prev__card">
+                  <span className="seo-prev__badge">Facebook · OG</span>
+                  <div className="seo-og">
+                    {ogImage ? (/* eslint-disable-next-line @next/next/no-img-element */ <img src={ogImage} alt="" className="seo-og__img" />) : <div className="seo-og__img seo-og__img--empty">No OG / primary image</div>}
+                    <div className="seo-og__body"><span className="seo-og__domain">SAMORAH.IN</span><span className="seo-og__title">{title}</span><span className="seo-og__desc">{desc || "—"}</span></div>
+                  </div>
+                </div>
+                {/* Twitter / X summary_large_image */}
+                <div className="seo-prev__card">
+                  <span className="seo-prev__badge">X · Twitter</span>
+                  <div className="seo-tw">
+                    {ogImage ? (/* eslint-disable-next-line @next/next/no-img-element */ <img src={ogImage} alt="" className="seo-tw__img" />) : <div className="seo-tw__img seo-tw__img--empty">No image</div>}
+                    <div className="seo-tw__body"><span className="seo-tw__title">{title}</span><span className="seo-tw__desc">{desc || "—"}</span><span className="seo-tw__domain">samorah.in</span></div>
+                  </div>
+                </div>
+              </div>
+              <div className="seo-prev__meta">
+                <span data-tone={tone(titleLen, 30, 60)}>Title {titleLen} chars <em>(ideal 30–60)</em></span>
+                <span data-tone={tone(descLen, 70, 160)}>Description {descLen} chars <em>(ideal 70–160)</em></span>
+                <span data-tone={ogImage ? "ok" : "warn"}>{ogImage ? "Share image set" : "No share image"}</span>
+              </div>
+            </details>
+          );
+        })()}
+
         <details className="pe-sec">
           <summary>Collection &amp; chapter</summary>
           <div className="cfg-grid">
@@ -683,6 +815,98 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
             <label className="om-check"><input type="checkbox" checked={core.allowBackorder} onChange={(e) => set({ allowBackorder: e.target.checked })} /><span>Allow backorder</span></label>
           </div>
         </details>
+
+        <details className="pe-sec">
+          <summary>Timeline &amp; activity</summary>
+          {timeline ? (
+            <>
+              <div className="pe-tl">
+                <div className="pe-tl__cell"><span className="pe-tl__k">Created</span><span className="pe-tl__v">{fmtDate(timeline.createdAt)}</span></div>
+                <div className="pe-tl__cell"><span className="pe-tl__k">Last updated</span><span className="pe-tl__v">{fmtDate(timeline.updatedAt)}</span></div>
+                <div className="pe-tl__cell"><span className="pe-tl__k">Publish</span><span className="pe-tl__v">{timeline.publishAt ? fmtDate(timeline.publishAt) : timeline.status === "active" ? "Live now" : "—"}</span></div>
+                <div className="pe-tl__cell"><span className="pe-tl__k">Last modified by</span><span className="pe-tl__v">{timeline.lastModifiedBy || "—"}</span></div>
+                <div className="pe-tl__cell"><span className="pe-tl__k">Last purchased</span><span className="pe-tl__v">{fmtDate(timeline.lastPurchasedAt)}</span></div>
+                <div className="pe-tl__cell"><span className="pe-tl__k">Lifetime sales</span><span className="pe-tl__v">{timeline.unitsSold} units · {timeline.ordersCount} orders</span></div>
+              </div>
+              {timeline.trail.length ? (
+                <details className="pe-sec" style={{ marginTop: 12 }}>
+                  <summary>Recent activity ({timeline.trail.length})</summary>
+                  <ul className="rev-list">
+                    {timeline.trail.map((e, i) => (
+                      <li key={i} className="rev-item">
+                        <span className="rev-item__when">{fmtDate(e.at)}</span>
+                        <span className="rev-item__meta admin__muted">{e.event.replace(/^product\.|^variant\./, "").replace(/_/g, " ")}{e.actorName ? ` · ${e.actorName}` : ""}{e.notes ? ` — ${e.notes}` : ""}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              ) : <p className="admin__muted" style={{ marginTop: 8 }}>No recorded activity yet.</p>}
+            </>
+          ) : <p className="admin__muted">Loading activity…</p>}
+        </details>
+
+        <details className="pe-sec">
+          <summary>Storefront &amp; homepage placement</summary>
+          <p className="om-field__hint" style={{ margin: "2px 0 12px" }}>These flags drive badges and ordering on the Shop and Chapter pages. The editorial homepage layout is composed separately in the <a href="/admin/homepage" target="_blank" rel="noreferrer">Homepage builder</a>.</p>
+          <div className="pe-place">
+            <label className="pe-place__row"><input type="checkbox" checked={core.isHero} onChange={(e) => set({ isHero: e.target.checked })} /><span><b>Hero</b><em>Prioritised at the top of its chapter &amp; shop rails.</em></span></label>
+            <label className="pe-place__row"><input type="checkbox" checked={core.isFeatured} onChange={(e) => set({ isFeatured: e.target.checked })} /><span><b>Featured</b><em>Surfaces in “Featured” filters &amp; rails on Shop.</em></span></label>
+            <label className="pe-place__row"><input type="checkbox" checked={core.isBestseller} onChange={(e) => set({ isBestseller: e.target.checked })} /><span><b>Best seller</b><em>Shows a “Best seller” badge on cards.</em></span></label>
+            <label className="pe-place__row"><input type="checkbox" checked={core.isNewArrival} onChange={(e) => set({ isNewArrival: e.target.checked })} /><span><b>New arrival</b><em>Shows a “New” badge on cards.</em></span></label>
+            <label className="pe-place__row"><input type="checkbox" checked={core.visibleHomepage} onChange={(e) => set({ visibleHomepage: e.target.checked })} /><span><b>Eligible for homepage</b><em>Reserved — homepage sections don’t yet filter by this flag (roadmap).</em></span></label>
+          </div>
+        </details>
+
+        <details className="pe-sec">
+          <summary>Related products ({rels.length})</summary>
+          <p className="om-field__hint" style={{ margin: "2px 0 12px" }}>Curate the “You may also like” rail. Manual links take precedence over the automatic same-fragrance / same-chapter picks. One type per product.</p>
+          {rels.length ? (
+            <ul className="pe-rel">
+              {rels.map((r, i) => (
+                <li key={r.relatedProductId} className="pe-rel__row">
+                  {r.imageUrl ? (/* eslint-disable-next-line @next/next/no-img-element */ <img src={r.imageUrl} alt="" className="pe-rel__thumb" />) : <span className="pe-rel__thumb pe-rel__thumb--empty" aria-hidden="true">—</span>}
+                  <span className="pe-rel__name">{r.name}</span>
+                  <select value={r.relationType} onChange={(e) => setRelTypeAt(i, e.target.value)} aria-label={`Relationship type for ${r.name}`}>{RELATION_TYPES.map((t) => <option key={t.v} value={t.v}>{t.l}</option>)}</select>
+                  <span className="pe-rel__actions">
+                    <button type="button" className="pe-icon-btn" onClick={() => moveRel(i, -1)} disabled={i === 0} aria-label="Move up" title="Move up">↑</button>
+                    <button type="button" className="pe-icon-btn" onClick={() => moveRel(i, 1)} disabled={i === rels.length - 1} aria-label="Move down" title="Move down">↓</button>
+                    <button type="button" className="pe-icon-btn pe-icon-btn--danger" onClick={() => removeRel(i)} aria-label="Remove" title="Remove">✕</button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="admin__muted">No manual links — the storefront shows automatic recommendations.</p>}
+          <div className="pe-rel__add">
+            <select value={relPick} onChange={(e) => setRelPick(e.target.value)} aria-label="Add related product">
+              <option value="">— add a product —</option>
+              {allProducts.filter((p) => p.id !== productId && !rels.some((r) => r.relatedProductId === p.id)).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+            <select value={relType} onChange={(e) => setRelType(e.target.value)} aria-label="Relationship type">{RELATION_TYPES.map((t) => <option key={t.v} value={t.v}>{t.l}</option>)}</select>
+            <button type="button" className="ff-btn" onClick={addRel} disabled={!relPick}>Add</button>
+            <button type="button" className="ff-btn ff-btn--primary" onClick={saveRels} disabled={busy}>Save relationships</button>
+          </div>
+        </details>
+
+        {isCandle && SPEC_TYPES.includes(core.productType) ? (
+          <details className="pe-sec" open data-anchor="pdp-top">
+            <summary>Product specifications ({PRODUCT_TYPES.find((t) => t.v === core.productType)?.l ?? "custom"})</summary>
+            <p className="om-field__hint" style={{ margin: "2px 0 10px" }}>Type-appropriate details for a {core.productType === "reed_diffuser" ? "reed diffuser" : core.productType === "wax_tablet" ? "wax tablet" : "product that isn't a candle"} — burn-time / wick framing doesn't apply. Renders as a “Specifications” grid on the page.</p>
+            <div className="cfg-grid">
+              <label className="cfg-field"><span>Section heading</span><input value={core.cSpecsHeading} onChange={(e) => set({ cSpecsHeading: e.target.value })} placeholder="The details" /></label>
+            </div>
+            {core.cSpecs.map((s, i) => (
+              <div key={i} className="pe-journey__row" style={{ marginBottom: 6 }}>
+                <input value={s.label} onChange={(e) => specUpdate(i, { label: e.target.value })} placeholder="Longevity" style={{ flex: "0 0 34%" }} />
+                <input value={s.value} onChange={(e) => specUpdate(i, { value: e.target.value })} placeholder="6–8 weeks" />
+                <button type="button" className="pe-icon-btn pe-icon-btn--danger" onClick={() => specRemove(i)} aria-label="Remove spec" title="Remove">✕</button>
+              </div>
+            ))}
+            <div className="pe-rel__add">
+              <button type="button" className="ff-btn ff-btn--mini" onClick={specAdd}>+ row</button>
+              {core.cSpecs.length === 0 ? <button type="button" className="ff-btn ff-btn--mini" onClick={specLoadDefaults}>Load {PRODUCT_TYPES.find((t) => t.v === core.productType)?.l ?? "default"} defaults</button> : null}
+            </div>
+          </details>
+        ) : null}
 
         <details className="pe-sec">
           <summary>Editorial content</summary>
@@ -1122,7 +1346,31 @@ export function ProductEditor({ productId, collections, categories, onClose, onS
                 <label className="cfg-field cfg-field--sm"><span>Barcode / EAN</span><input value={v.barcode ?? ""} onChange={(e) => setV(i, { barcode: e.target.value })} /></label>
                 <label className="cfg-field cfg-field--sm"><span>Weight (g)</span><input type="number" value={v.weightGrams ?? ""} onChange={(e) => setV(i, { weightGrams: e.target.value === "" ? null : Number(e.target.value) })} /></label>
                 <label className="cfg-field cfg-field--sm"><span>Low-stock alert</span><input type="number" value={v.lowStockThreshold ?? ""} onChange={(e) => setV(i, { lowStockThreshold: e.target.value === "" ? null : Number(e.target.value) })} /></label>
+                {(() => {
+                  const p = Number(v.price) || 0, c = Number(v.costPrice) || 0;
+                  const margin = p > 0 && c > 0 ? Math.round(((p - c) / p) * 100) : null;
+                  return <label className="cfg-field cfg-field--sm"><span>Margin</span><input readOnly value={margin != null ? `${margin}% · ₹${(p - c).toLocaleString("en-IN")}` : "—"} title="Derived from price − cost" tabIndex={-1} /></label>;
+                })()}
               </div>
+              <details className="pe-sec pe-variant__logi">
+                <summary>Logistics &amp; supplier</summary>
+                <div className="pe-variant__grid">
+                  <label className="cfg-field cfg-field--sm"><span>Shipping class</span>
+                    <select value={v.shippingClass ?? ""} onChange={(e) => setV(i, { shippingClass: e.target.value || null })}>
+                      <option value="">—</option><option value="standard">Standard</option><option value="fragile">Fragile</option><option value="oversized">Oversized</option><option value="hazmat">Hazmat (flammable)</option>
+                    </select>
+                  </label>
+                  <label className="cfg-field cfg-field--sm"><span>Package L (cm)</span><input type="number" step="0.1" value={v.packageLengthCm ?? ""} onChange={(e) => setV(i, { packageLengthCm: e.target.value === "" ? null : Number(e.target.value) })} /></label>
+                  <label className="cfg-field cfg-field--sm"><span>Package W (cm)</span><input type="number" step="0.1" value={v.packageWidthCm ?? ""} onChange={(e) => setV(i, { packageWidthCm: e.target.value === "" ? null : Number(e.target.value) })} /></label>
+                  <label className="cfg-field cfg-field--sm"><span>Package H (cm)</span><input type="number" step="0.1" value={v.packageHeightCm ?? ""} onChange={(e) => setV(i, { packageHeightCm: e.target.value === "" ? null : Number(e.target.value) })} /></label>
+                  <label className="cfg-field cfg-field--sm"><span>Supplier SKU</span><input value={v.supplierSku ?? ""} onChange={(e) => setV(i, { supplierSku: e.target.value || null })} placeholder="vendor ref" /></label>
+                  {(() => {
+                    const l = Number(v.packageLengthCm) || 0, w = Number(v.packageWidthCm) || 0, h = Number(v.packageHeightCm) || 0;
+                    const vol = l > 0 && w > 0 && h > 0 ? (l * w * h / 5000).toFixed(2) : null; // courier volumetric (÷5000)
+                    return <label className="cfg-field cfg-field--sm"><span>Volumetric wt</span><input readOnly value={vol != null ? `${vol} kg` : "—"} title="L×W×H ÷ 5000 — courier volumetric weight" tabIndex={-1} /></label>;
+                  })()}
+                </div>
+              </details>
             </div>
           ))}
           <button type="button" className="ff-btn" onClick={addVariant}>+ variant</button>

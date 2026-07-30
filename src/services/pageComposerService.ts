@@ -64,17 +64,71 @@ export async function getPageSections(key: string, cfg: PageConfig, opts: { prev
   return cached();
 }
 
-export interface PageAdminView { draft: ComposedSection[]; status: PublishStatus; state: string; publishAt: string | null; unpublishAt: string | null; source: "db" | "config" }
+export type SectionPublishStatus = "published" | "changed" | "new";
+export interface PageAdminView { draft: ComposedSection[]; published: ComposedSection[]; publishStatusById: Record<string, SectionPublishStatus>; status: PublishStatus; state: string; publishAt: string | null; unpublishAt: string | null; source: "db" | "config" }
+
+// Per-section fingerprint for the "is this section published / changed / new?" badge (content only).
+const contentKey = (s: ComposedSection) => JSON.stringify({ type: s.type, enabled: s.enabled, settings: s.settings ?? {} });
 
 export async function getPageAdmin(key: string, cfg: PageConfig): Promise<PageAdminView> {
   const row = await readRow(key);
+  const draft = order((row?.draft ?? cfg.defaultSections()) as ComposedSection[]);
+  const published = order((Array.isArray(row?.published) ? row!.published : []) as ComposedSection[]);
+  const pubById = new Map(published.map((s) => [s.id, contentKey(s)]));
+  const publishStatusById: Record<string, SectionPublishStatus> = {};
+  for (const s of draft) {
+    const p = pubById.get(s.id);
+    publishStatusById[s.id] = p === undefined ? "new" : p === contentKey(s) ? "published" : "changed";
+  }
   return {
-    draft: order((row?.draft ?? cfg.defaultSections()) as ComposedSection[]),
+    draft, published, publishStatusById,
     status: (row?.status ?? "published") as PublishStatus,
     state: row ? publishState(row) : "default",
     publishAt: row?.publish_at ?? null, unpublishAt: row?.unpublish_at ?? null,
     source: row ? "db" : "config",
   };
+}
+
+const MGMT_KEYS = ["__state", "__from", "__until"]; // section-management keys kept when healing
+
+/**
+ * Pure merge for selective publish (point 13) — SELF-HEALING so a section can never vanish:
+ *  • selected            → publish the draft content;
+ *  • unselected + live    → keep its current live (published) content unchanged;
+ *  • unselected + missing → heal it back with its DEFAULT appearance (content stripped → config
+ *    fallback) while keeping its enabled + scheduling state, so it reappears without leaking unpublished
+ *    edits. Result follows the draft's order; nothing in the draft is ever dropped from `published`.
+ */
+export function mergePublishedSections(draft: ComposedSection[], published: ComposedSection[], selectedIds: string[]): ComposedSection[] {
+  const selected = new Set(selectedIds);
+  const liveById = new Map(published.map((s) => [s.id, s]));
+  return draft.map((d, i) => {
+    if (selected.has(d.id)) return { ...d, sortOrder: i };                       // publish selected content
+    const live = liveById.get(d.id);
+    if (live) return { ...live, sortOrder: i };                                  // keep current live content
+    const mgmt: Record<string, unknown> = {};                                    // self-heal: strip content, keep state
+    for (const k of MGMT_KEYS) if (d.settings?.[k] !== undefined) mgmt[k] = d.settings[k];
+    return { id: d.id, type: d.type, enabled: d.enabled, sortOrder: i, settings: mgmt };
+  });
+}
+
+export async function publishPageSections(key: string, cfg: PageConfig, sectionIds: string[], actorId?: string): Promise<{ ok: boolean; reason?: string }> {
+  const existing = await readRow(key);
+  const draft = sanitize(cfg, existing?.draft);
+  if (!draft || !draft.length) return { ok: false, reason: "nothing to publish" };
+  const selected = new Set(sectionIds ?? []);
+  if (!selected.size) return { ok: false, reason: "no sections selected" };
+  const published = (Array.isArray(existing?.published) ? existing!.published : []) as ComposedSection[];
+  const nextPublished = mergePublishedSections(draft, published, sectionIds);
+  if (!nextPublished.some((s) => s.enabled)) return { ok: false, reason: "at least one published section must be enabled" };
+  const db = createAdminClient() as any;
+  const { error } = await db.from("composed_pages").upsert({
+    page_key: key, draft, published: nextPublished, status: "published", updated_at: new Date().toISOString(),
+  }, { onConflict: "page_key" });
+  if (error) return { ok: false, reason: error.message };
+  await snapshotRevision("composed-page", key, nextPublished, actorId, `partial publish (${selected.size} section${selected.size === 1 ? "" : "s"})`);
+  await logEvent({ entityType: "settings", event: "page.published_sections", actorType: actorId ? "staff" : "system", actorId, notes: `${key}: ${[...selected].join(", ")}` });
+  return { ok: true };
 }
 
 export async function savePageDraft(key: string, cfg: PageConfig, data: unknown, actorId?: string): Promise<{ ok: boolean; reason?: string }> {

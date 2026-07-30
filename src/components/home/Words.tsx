@@ -23,11 +23,16 @@ export function Words({ voice }: { voice: EditorialVoice | null }) {
 
   if (!voice) return null;
 
+  // Alignment is CMS-driven (Homepage Builder → Words → Alignment). "" / unknown → the editorial default (center).
+  const align = (voice as { align?: string }).align;
+  const dataAlign = align === "left" || align === "right" ? align : "center";
+
   return (
     <section className="home-words">
       <motion.figure
         ref={ref}
         className="home-words__figure"
+        data-align={dataAlign}
         initial={{ opacity: 0, y: reduce ? 0 : 10 }}
         animate={
           inView ? { opacity: 1, y: 0 } : { opacity: 0, y: reduce ? 0 : 10 }

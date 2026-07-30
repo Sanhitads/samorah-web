@@ -3,7 +3,8 @@ import { requireCapability } from "@/lib/auth/requireStaff";
 import {
   createProduct, updateProduct, setProductStatus, setProductFeatured, getProductForEdit, duplicateProduct, deleteProduct,
   upsertVariant, deleteVariant, setFragranceNotes, addProductImage, updateProductImage, setPrimaryImage, deleteProductImage,
-  type CreateProductInput, type ProductCoreInput, type VariantInput, type ProductStatus,
+  getProductTimeline, getProductRelationships, setProductRelationships, bulkUpdateProducts,
+  type CreateProductInput, type ProductCoreInput, type VariantInput, type ProductStatus, type ProductBulkAction,
 } from "@/services/productAdminService";
 import { getAirSiblings, getCandleSiblings } from "@/services/productService";
 
@@ -52,6 +53,14 @@ export async function POST(request: Request) {
         return NextResponse.json(await setPrimaryImage(body.productId, body.id, a));
       case "image.delete":
         return NextResponse.json(await deleteProductImage(body.id, body.productId, a));
+      case "bulk":
+        return NextResponse.json(await bulkUpdateProducts(body.ids ?? [], body.bulkAction as ProductBulkAction, body.value, a));
+      case "timeline":
+        return NextResponse.json({ ok: true, timeline: await getProductTimeline(body.id) });
+      case "relationships.get":
+        return NextResponse.json({ ok: true, relationships: await getProductRelationships(body.id) });
+      case "relationships.set":
+        return NextResponse.json(await setProductRelationships(body.id, body.items ?? [], a));
       case "air.siblings":
         return NextResponse.json({ ok: true, siblings: await getAirSiblings(body.collectionId, body.excludeId ?? "") });
       case "candle.siblings":

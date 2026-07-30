@@ -15,11 +15,11 @@ import { getBrandStory } from "@/config/brandStory";
 import { getEditorialVoice } from "@/config/voices";
 import { getLettersInvitation } from "@/config/letters";
 import { getHomeInvitations } from "@/config/invitations";
+import { getVisibleChapters } from "@/config/chapters";
+import { getFeaturedExperiences, ATMOSPHERE_HEADING } from "@/config/experiences";
+import { getEditorialWorld } from "@/config/editorialWorld";
 
-const sourced = (type: SectionType, label: string, note: string): SectionDefinition => ({
-  schema: { type, label, note, fields: [], sourced: true },
-  defaults: () => ({}),
-});
+const IMPORTANCE_OPTIONS = ["Opening", "Ritual", "Detail", "Still Life", "Closing"].map((v) => ({ value: v, label: v }));
 
 export const SECTION_DEFS: Record<SectionType, SectionDefinition> = {
   hero: {
@@ -44,14 +44,20 @@ export const SECTION_DEFS: Record<SectionType, SectionDefinition> = {
   },
   "brand-story": {
     schema: {
-      type: "brand-story", label: "Brand Story", note: "The maker's quiet",
+      type: "brand-story", label: "Brand Story", note: "The maker's quiet — image + words + a link",
       fields: [
-        { key: "eyebrow", label: "Eyebrow", type: "text" },
-        { key: "heading", label: "Heading", type: "text", required: true },
-        { key: "body", label: "Body", type: "textarea" },
+        { key: "eyebrow", label: "Eyebrow", type: "text", maxLength: 60 },
+        { key: "heading", label: "Heading", type: "text", required: true, maxLength: 80 },
+        { key: "body", label: "Body", type: "textarea", maxLength: 400 },
+        { key: "quote", label: "Pull quote (optional — shown instead of body)", type: "textarea", maxLength: 200 },
+        { key: "image", label: "Image", type: "media", help: "Upload, pick from Library, or choose a gradient" },
+        { key: "imageAlt", label: "Image alt text", type: "text", maxLength: 160 },
+        { key: "orientation", label: "Image side", type: "select", options: [{ value: "image-left", label: "Image left" }, { value: "image-right", label: "Image right" }] },
+        { key: "ctaLabel", label: "Button label", type: "text", maxLength: 24 },
+        { key: "ctaHref", label: "Button URL", type: "url" },
       ],
     },
-    defaults: () => { const s = getBrandStory(); return { eyebrow: s.eyebrow, heading: s.heading, body: s.body }; },
+    defaults: () => { const s = getBrandStory(); return { eyebrow: s.eyebrow, heading: s.heading, body: s.body, quote: s.quote, image: s.image, imageAlt: s.imageAlt, orientation: s.orientation, ctaLabel: s.ctaLabel, ctaHref: s.ctaHref }; },
   },
   words: {
     schema: {
@@ -130,9 +136,131 @@ export const SECTION_DEFS: Record<SectionType, SectionDefinition> = {
     },
     defaults: (cid) => ({ items: getHomeInvitations(cid) }),
   },
-  chapters: sourced("chapters", "Signature Chapters", "Chapter rail — items from the chapters catalogue"),
-  atmosphere: sourced("atmosphere", "The Atmosphere", "Fragrance-worlds — items from experiences config"),
-  "editorial-world": sourced("editorial-world", "Editorial World", "Magazine spread — from editorial config"),
+  // ── Signature Chapters — intro + a card per Volume (each with its own gradient/"volume colour") ──
+  chapters: {
+    schema: {
+      type: "chapters", label: "Signature Chapters", note: "The chapter rail — edit the intro and each Volume card",
+      fields: [
+        { key: "label", label: "Eyebrow", type: "text", maxLength: 40 },
+        { key: "heading", label: "Heading", type: "text", required: true, maxLength: 60 },
+        { key: "sub", label: "Sub-line", type: "textarea", maxLength: 160 },
+        {
+          key: "items", label: "Chapter cards", type: "blocks", blockLabel: "Chapter", minBlocks: 1, maxBlocks: 8,
+          blockFields: [
+            { key: "volume", label: "Volume label", type: "text", maxLength: 24, placeholder: "Volume I" },
+            { key: "title", label: "Title", type: "text", required: true, maxLength: 40 },
+            { key: "tagline", label: "Poetic line", type: "text", maxLength: 80 },
+            { key: "image", label: "Cover (gradient / image)", type: "media", help: "Pick a gradient ‘volume colour’ or upload cover art" },
+            { key: "slug", label: "Chapter link (slug)", type: "text", placeholder: "dessert-chapter", help: "Links to /chapters/<slug>" },
+            { key: "ctaLabel", label: "Link label", type: "text", maxLength: 24, default: "Discover" },
+          ],
+        },
+      ],
+    },
+    defaults: () => {
+      return {
+        label: "Samorah Collections", heading: "The Signature Chapters",
+        sub: "A fragrance library composed through atmosphere, ritual and memory.",
+        items: getVisibleChapters().map((c) => ({ volume: c.volume, title: c.title, tagline: c.tagline, image: c.image, slug: c.slug, ctaLabel: c.ctaLabel })),
+      };
+    },
+  },
+  // ── Featured Atmosphere — one or more selectable fragrances, each with its own image + editorial ──
+  atmosphere: {
+    schema: {
+      type: "atmosphere", label: "Featured Atmosphere", note: "One or more fragrances — the first shows, the rest are selectable. Each has its own image.",
+      fields: [
+        { key: "heading", label: "Section eyebrow", type: "text", maxLength: 40 },
+        {
+          key: "items", label: "Featured fragrances", type: "blocks", blockLabel: "Fragrance", required: true, minBlocks: 1, maxBlocks: 5,
+          blockSource: { entity: "product", label: "Pull from a product", map: { title: "title", image: "image", chapter: "chapter", productType: "productType", ctaHref: "ctaHref", ctaLabel: "ctaLabel" } },
+          blockFields: [
+            { key: "title", label: "Name", type: "text", required: true, maxLength: 48 },
+            { key: "displayName", label: "Selector label (optional)", type: "text", maxLength: 32, help: "Short name in the picker; defaults to the name" },
+            { key: "productType", label: "Type label", type: "text", maxLength: 32, placeholder: "Scented Candle" },
+            { key: "chapter", label: "Chapter label", type: "text", maxLength: 40, placeholder: "The Dessert Chapter" },
+            { key: "image", label: "Image", type: "media", help: "Upload / pick / gradient — different per fragrance" },
+            { key: "imageAlt", label: "Image alt", type: "text", maxLength: 160 },
+            { key: "scene", label: "Scene", type: "text", maxLength: 80 },
+            { key: "memory", label: "Memory", type: "text", maxLength: 80 },
+            { key: "atmosphereIndex", label: "Atmosphere words (one per line)", type: "textarea", help: "Each line becomes an index row" },
+            { key: "signatureLine", label: "Signature line", type: "text", maxLength: 120 },
+            { key: "scentOpening", label: "Journey — First", type: "text", maxLength: 120 },
+            { key: "scentUnfolding", label: "Journey — Then", type: "text", maxLength: 120 },
+            { key: "scentLingering", label: "Journey — Finally", type: "text", maxLength: 120 },
+            { key: "ctaLabel", label: "Button label", type: "text", maxLength: 32 },
+            { key: "ctaHref", label: "Button URL", type: "url" },
+            { key: "colorScheme", label: "Text scheme", type: "select", options: [{ value: "on-dark", label: "On dark" }, { value: "on-light", label: "On light" }] },
+            { key: "backgroundTone", label: "Background tone", type: "select", options: [{ value: "ember", label: "Ember (warm brown)" }, { value: "forest", label: "Forest (deep green)" }, { value: "twilight", label: "Twilight (violet)" }, { value: "charcoal", label: "Charcoal (near-black)" }, { value: "warm-ivory", label: "Warm ivory (light)" }] },
+            { key: "lineColor", label: "Index line colour", type: "color", help: "The Atmosphere-Index leader lines — leave blank for the readable default" },
+            { key: "overlayStrength", label: "Overlay strength (0–1)", type: "number", min: 0, max: 1 },
+          ],
+        },
+      ],
+    },
+    defaults: (cid) => ({
+      heading: ATMOSPHERE_HEADING,
+      items: getFeaturedExperiences(cid).map((e) => ({
+        title: e.title, displayName: e.displayName, productType: e.productType, chapter: e.chapter, image: e.image, imageAlt: e.imageAlt,
+        scene: e.scene, memory: e.memory, atmosphereIndex: (e.atmosphereIndex ?? []).join("\n"), signatureLine: e.signatureLine,
+        scentOpening: e.scent.opening, scentUnfolding: e.scent.unfolding, scentLingering: e.scent.lingering,
+        ctaLabel: e.ctaLabel, ctaHref: e.ctaHref, colorScheme: e.colorScheme, backgroundTone: e.backgroundTone, overlayStrength: e.overlayStrength,
+      })),
+    }),
+  },
+  // ── Editorial World — the photo grid; each plate's hover name (title) is editable ──
+  "editorial-world": {
+    schema: {
+      type: "editorial-world", label: "Editorial World", note: "The magazine photo grid — each plate has its own image, hover name and link",
+      fields: [
+        {
+          key: "items", label: "Plates", type: "blocks", blockLabel: "Plate", minBlocks: 1, maxBlocks: 6,
+          description: "The magazine spread has 6 fixed positions (1 large opening · 4 centre moments · 1 closing), so “Add Plate” caps at 6. Remove one to add a different image.",
+          blockFields: [
+            { key: "title", label: "Hover name", type: "text", required: true, maxLength: 48, help: "Shown on hover — never ‘image1.jpg’" },
+            { key: "image", label: "Image", type: "media", help: "Upload / pick / gradient" },
+            { key: "imageAlt", label: "Image alt", type: "text", maxLength: 160 },
+            { key: "editorialImportance", label: "Role in the spread", type: "select", options: IMPORTANCE_OPTIONS, help: "Opening = large left · Closing = right · others fill the centre" },
+            { key: "destinationUrl", label: "Link URL (optional)", type: "url" },
+          ],
+        },
+      ],
+    },
+    defaults: (cid) => ({
+      items: getEditorialWorld(cid).map((s) => ({ title: s.title, image: s.image, imageAlt: s.imageAlt, editorialImportance: s.editorialImportance, destinationUrl: s.destinationUrl ?? (s.chapterSlug ? `/chapters/${s.chapterSlug}` : "") })),
+    }),
+  },
+  // ── Editorial content — flexible blocks (points 16/17/18): quote / paragraph (rich text) / heading /
+  //    image / button, all reorderable and repeatable ──
+  "content-blocks": {
+    schema: {
+      type: "content-blocks", label: "Editorial content", note: "Add Quote / Paragraph / Heading / Image / Button blocks in any order",
+      fields: [
+        { key: "eyebrow", label: "Section eyebrow (optional)", type: "text", maxLength: 60 },
+        {
+          key: "blocks", label: "Content blocks", type: "blocks", blockLabel: "Block", required: true, minBlocks: 1, maxBlocks: 30,
+          description: "Reorder with ↑ ↓. Paragraphs support bold, italic, links, lists, quotes and inline images.",
+          blockVariants: [
+            { key: "paragraph", label: "Paragraph", fields: [{ key: "html", label: "Text", type: "richtext", required: true }] },
+            { key: "heading", label: "Heading", fields: [{ key: "text", label: "Heading", type: "text", required: true, maxLength: 120 }, { key: "level", label: "Size", type: "select", options: [{ value: "h2", label: "Large (H2)" }, { value: "h3", label: "Medium (H3)" }] }] },
+            { key: "quote", label: "Quote", fields: [{ key: "quote", label: "Quote", type: "textarea", required: true, maxLength: 300 }, { key: "attribution", label: "Attribution", type: "text", maxLength: 80 }] },
+            { key: "image", label: "Image", fields: [{ key: "image", label: "Image", type: "media", required: true }, { key: "alt", label: "Alt text", type: "text", maxLength: 160 }, { key: "caption", label: "Caption", type: "text", maxLength: 160 }] },
+            { key: "cta", label: "Button", fields: [{ key: "label", label: "Button label", type: "text", required: true, maxLength: 32 }, { key: "href", label: "Button URL", type: "url", required: true }] },
+          ],
+        },
+        { key: "align", label: "Alignment", type: "align", options: ALIGN_OPTIONS },
+      ],
+    },
+    defaults: () => ({
+      eyebrow: "",
+      align: "left",
+      blocks: [
+        { _type: "heading", text: "A quiet note", level: "h2" },
+        { _type: "paragraph", html: "<p>Write freely here — <strong>bold</strong>, <em>italic</em>, links, lists and quotes are all supported.</p>" },
+        { _type: "quote", quote: "Fragrance designed to linger beyond the flame.", attribution: "Samorah" },
+      ],
+    }),
+  },
 };
 
 // Cross-field validation hook (point 5) — guard against shipping placeholder copy.

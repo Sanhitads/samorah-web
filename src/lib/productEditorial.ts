@@ -203,6 +203,10 @@ export interface CandlePdpContent {
   burnTimes?: Record<string, string>; // size label -> burn time, e.g. { "100g": "~25 hours" }
   lifestyleMoments?: string[]; // the tag row under Living With It (else derived from the text)
   craft?: CraftItem[]; // "Made by hand" tiles — Hand Poured / Wax / Wick / Vessel (else the house set)
+  // Batch C — product-type specifications (wax tablet / reed diffuser / other): a labelled grid the
+  // admin fills from type-appropriate defaults. Renders as a "Specifications" grid on the PDP.
+  specs?: { label: string; value: string }[];
+  specsEyebrow?: string; specsHeading?: string;
 }
 
 export interface CandleEditorialInput {
@@ -443,6 +447,17 @@ export function buildCandleEditorial({ view, artist, related, content }: CandleE
       { visibility: related.length > 0 },
     ),
   ];
+
+  // Batch C — product-type specifications grid (wax tablet / reed diffuser / other). Reuses the grid
+  // block (PlacementGrid) so there's no new styling and it can't break the page; lands after Craft.
+  const specItems = (content?.specs ?? []).filter((s) => s.label?.trim() || s.value?.trim()).map((s) => ({ label: s.label, note: s.value }));
+  if (specItems.length) {
+    const specSection = buildCustomSection(
+      { type: "grid", position: "after-craft", eyebrow: content?.specsEyebrow || "Specifications", heading: content?.specsHeading || "The details", items: specItems },
+      0, CANDLE_POS_ORDER, 5.5, "candle-specs",
+    );
+    if (specSection) overrides.push(specSection);
+  }
 
   return composeSections(CANDLE_PDP_TEMPLATE.sections, applyCandleCustomSections(overrides, content?.customSections));
 }

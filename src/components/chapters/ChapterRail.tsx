@@ -4,7 +4,7 @@ import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { gradientClass, isGradientPlaceholder } from "@/lib/product";
+import { gradientClass, isGradientPlaceholder, isColorValue } from "@/lib/product";
 import type { HomeChapter } from "@/config/chapters";
 import type { RailLayout } from "@/lib/presentation";
 
@@ -146,7 +146,9 @@ export function ChapterRail({
 function ChapterCard({ chapter }: { chapter: HomeChapter }) {
   const body = (
     <>
-      {isGradientPlaceholder(chapter.image) ? (
+      {isColorValue(chapter.image) ? (
+        <span className="home-chapter__image" style={{ background: chapter.image }} aria-hidden="true" />
+      ) : isGradientPlaceholder(chapter.image) ? (
         <span
           className={`home-chapter__image ${gradientClass(chapter.image) ?? ""}`}
           aria-hidden="true"

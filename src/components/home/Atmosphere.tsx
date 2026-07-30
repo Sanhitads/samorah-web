@@ -9,7 +9,8 @@ import {
   useReducedMotion,
   type Variants,
 } from "framer-motion";
-import { gradientClass, isGradientPlaceholder } from "@/lib/product";
+import type { CSSProperties } from "react";
+import { gradientClass, isGradientPlaceholder, isColorValue } from "@/lib/product";
 import {
   ATMOSPHERE_HEADING,
   type FeaturedExperience,
@@ -42,8 +43,10 @@ const LEADER_WIDTHS = [88, 56, 120, 72, 104, 48, 96, 64] as const;
 
 export function Atmosphere({
   experiences,
+  heading,
 }: {
   experiences: FeaturedExperience[];
+  heading?: string;
 }) {
   const reduce = useReducedMotion();
   const sectionRef = useRef<HTMLElement | null>(null);
@@ -100,6 +103,7 @@ export function Atmosphere({
       ref={sectionRef}
       className="home-atmosphere"
       data-scheme={exp.colorScheme ?? "on-dark"}
+      style={exp.lineColor ? ({ "--atmos-rule": exp.lineColor } as CSSProperties) : undefined}
     >
       {/* The air — photography + tonal overlay, breathing together on change. */}
       <div className="home-atmosphere__stage" aria-hidden="true">
@@ -116,7 +120,9 @@ export function Atmosphere({
                 Cloudinary URL it renders here as the full immersive background;
                 the tonal overlay below (colour + opacity) is CMS-driven, so
                 photography lands with no component change. */}
-            {placeholder ? (
+            {isColorValue(exp.image) ? (
+              <div className="home-atmosphere__image" style={{ background: exp.image }} />
+            ) : placeholder ? (
               <div
                 className={`home-atmosphere__image ${gradientClass(exp.image) ?? ""}`}
               />
@@ -144,7 +150,7 @@ export function Atmosphere({
           animate={inView ? { opacity: 1 } : { opacity: 0 }}
           transition={{ duration: reduce ? 0.4 : 0.8, ease: EASE_LUXURY }}
         >
-          {ATMOSPHERE_HEADING}
+          {heading ?? ATMOSPHERE_HEADING}
         </motion.p>
 
         <div className="home-atmosphere__row">

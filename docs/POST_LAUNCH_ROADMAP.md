@@ -342,3 +342,221 @@ dots 🟢🟡🔴, "N sold · ₹revenue", thumbnail fallback).
 Coupons, Content, Media, …) — Collections is now a first-class module there, matching the reviewer's
 "Chapters are first-class content" recommendation. The Volume → Chapter → Products hierarchy is fully
 manageable; the remaining hierarchy work is migrating the config-driven air products into it.
+
+## P9.2 — Products CMS (Batch A shipped — timeline, relationships, placement, SEO preview)
+
+**Shipped this round (all additive, non-breaking; verified with vitest + a Playwright E2E, 22/22):**
+
+- **Product Timeline & activity** (was P9.1 "Product timeline / version history", review 17/32;
+  P9 "Product audit history view") — a read-only panel in the product editor showing created / last
+  updated / publish state / **last modified by** (resolved from the audit stream) / **last purchased**
+  + lifetime units & orders (from paid order lines) + a **recent-activity list** of the product's audit
+  events with staff names. Pure surfacing of data already kept — no new columns.
+  (`getProductTimeline` in `productAdminService.ts`, action `timeline`.)
+- **Related products / manual merchandising** (was P9.1 review 10/14/33B/33G) — a curated relationships
+  editor writing to the existing `related_products` table (add/reorder/remove, five types: related /
+  upsell / cross-sell / pairs-with / frequently-bought). Critically, the **read path is now wired**:
+  `getRelatedProducts` layers curated overrides *ahead of* the same-fragrance/collection algorithm and
+  fills the rest — with **zero override rows the result is byte-for-byte the old behaviour** (pinned by
+  `src/services/getRelatedProducts.test.ts`, 5 cases).
+- **Storefront & homepage placement panel** — groups the merchandising flags (hero / featured /
+  best-seller / new-arrival) with honest "where this shows" copy + a link to the Homepage builder.
+- **Search & social preview** — live Google SERP + Facebook/OG + X/Twitter cards computed from the SEO
+  fields (falls back to name / tagline / primary image), with length-tone hints.
+
+**Deliberately carved out of Batch A (the "skips" — document-and-defer, not silently dropped):**
+
+| Carve-out | Why skipped now | What real completion needs | Complexity | Phase |
+|---|---|---|---|---|
+| **Genuine per-product homepage *slot* placement** (hero / carousel / featured grid / editor's pick / season / footer) | The editorial homepage is **section/config-driven** (`ComposedSections` → `@/config/*`); it does **not** query products by flag. A product→slot control would render nothing live — a mirage — so it was **not** built. The panel instead surfaces the flags that *do* drive Shop/Chapter badges + ordering, truthfully. | Either make the homepage product-bearing sections query by flag, or add a `homepage_placements` (product × slot × order) table the sections read + a builder UI. Touches the storefront render path — out of Batch A's "don't touch existing" scope. | M–L | Prod-1 |
+| **`visible_homepage` / `visible_search` / `visible_website` / `visible_chapter` enforcement** | These columns are stored + editable but have **no storefront consumer** today (verified by grep). Batch A labels `visible_homepage` "reserved" rather than implying it filters anything. | Wire each flag into the relevant query (`getProducts`, shop/chapter builders, homepage) with tests proving a hidden product disappears from exactly that surface. | S–M | Prod-1 |
+| **Curated related products showing on the *live* PDP without a rebuild** | PDPs are **SSG** (`● /shop/[slug]`, prerendered). A `related_products` change made in the admin appears only after a rebuild/revalidate — so the E2E asserts the read-path via unit tests, not the static page. | On `relationships.set`, `revalidatePath('/shop/[slug]')` (or tag-based revalidation) so a curated change is live within seconds. Small, but wants the revalidation-on-save pattern applied consistently. | S | Prod-1 |
+| **Air/spray PDP honouring manual related overrides** | The override read-path is wired into `getRelatedProducts` (candle PDP). Air PDPs use `getAirSiblings` (chapter siblings) and don't consult `related_products` yet. | Layer the same override read into the air sibling resolver, or unify both PDPs on one related-resolver. | S | Prod-1 |
+| **Type-specific merchandising rails (separate *upsell* vs *cross-sell* vs *pairs-with* placements)** | The editor stores all five relation types, but the storefront currently feeds them all into the single "You may also like" rail (type is stored, not yet placement-differentiated). | Give each rail its own query by `relation_type` + PDP slots ("Pairs well with", "Complete the ritual"). | M | Prod-2 |
+
+**Note:** everything shipped in Batch A reuses existing tables (`related_products`, `audit_events`,
+`order_items`, `products`) and the resilient-save pattern — **no migration required**.
+
+## P9.3 — Category CMS + product bulk operations (Batch B)
+
+**Shipped this round (additive, non-breaking; vitest + Playwright E2E, 19/19):**
+
+- **Category CMS** (was P9.1 "Categories CMS", review 22/34) — a full `/admin/categories` module
+  (list + create + edit + reorder ↑↓ + activate/deactivate + **guarded delete**) managing the catalog
+  taxonomy that seeds SKU prefix / HSN / GST defaults. Deletion is **blocked while any product
+  references the category** (the FK is `on delete restrict`) with a clear "reassign first" message, so
+  a live product can never be orphaned. New nav entry under **Catalog → Categories**.
+  (`categoryAdminService.ts`, `/api/admin/categories`, `CategoryManager.tsx`.)
+- **Product bulk operations** (was P9.1 "Bulk product actions", review 23/10) — multi-select in the
+  product list (per-row + select-all-on-page + "select all N filtered") with a bulk action bar: set
+  status, feature/unfeature, mark best-seller / new, **assign to (or remove from) a chapter**, and
+  **CSV export** of the selection. Each action is **one `update … in (ids)` query (no N+1) + one audit
+  event**; ids are de-duped and capped at 500. (`bulkUpdateProducts` in `productAdminService.ts`,
+  action `bulk`; pinned by `src/services/bulkUpdateProducts.test.ts`, 7 cases.)
+
+**Deliberately carved out of Batch B (the "skips"):**
+
+| Carve-out | Why skipped now | What real completion needs | Complexity | Phase |
+|---|---|---|---|---|
+| **Nested category hierarchy** (parent → child, e.g. Candles › Votive) | The `categories` table is **flat — no `parent_id`**. The user's point-10 "hierarchy" implies nesting; the CMS ships the flat taxonomy that actually exists rather than faking a tree. | Add a nullable `parent_id` FK (self-reference) + a tree UI + storefront breadcrumb wiring. Migration + render change. | M | Catalog-1 |
+| **Bulk CSV *import*** (create/update products from a spreadsheet) | Export ships (client-side, no server); import is a much larger slice — parsing, per-row validation, dry-run preview, partial-failure isolation, and idempotency — and can create/overwrite money-bearing catalogue rows. | A CSV parser + a staged import (validate → preview → commit) with per-row error reporting + audit. | L | Prod-2 |
+| **Bulk delete / bulk archive as a one-click** | Excluded as a **destructive default**. Status can be set to `archived` in bulk explicitly, but there is no silent bulk wipe. | If wanted: a guarded destructive bulk (typed confirmation + reason + per-record audit + undo), mirroring the orders bulk-cancel guardrails. | M | Prod-2 |
+| **Bulk edit of price / stock / tags** | Batch B covers status / featured / flags / chapter / export — the safe, common merchandising moves. Price & stock are money/inventory-sensitive and deserve their own validated flow. | A bulk price/stock editor with min/max guards + per-variant awareness + audit. | M | Prod-2 |
+
+**Note:** Batch B reuses the existing `categories` + `products` tables and the audit stream — **no
+migration required**. Categories remain admin-only taxonomy (SKU/HSN/GST defaults); they are not a
+storefront browse dimension today (the storefront browses by Collection/Chapter), so no storefront
+change was needed or made.
+
+## P9.4 — Variant logistics fields + product-type specifications (Batch C)
+
+**Shipped this round (additive; vitest + Playwright E2E, 13/13):**
+
+- **Extra variant fields** (was P9.1 review 9) — per-variant **shipping class**, **package L/W/H (cm)**,
+  and **supplier SKU**, plus two **derived, read-only** helpers in the editor: **margin** (price − cost,
+  from the existing `cost_price`/COGS) and **volumetric weight** (L×W×H ÷ 5000). Migration
+  `20260805120000_variant_logistics_fields.sql` — **resilient**: a variant save strips these columns
+  and retries if the migration isn't applied yet, so nothing hard-fails pre-`db push`.
+  (Also fixed a latent NOT-NULL edge: `upsertVariant` no longer sends a bare `null` for
+  `low_stock_threshold`, so creating a variant without touching that field takes the DB default.)
+- **Product-type specifications** (was P9.1 "Product Type → different editor", review point 9) — wax
+  tablet / reed diffuser / other now get a **type-appropriate specs panel** in the editor (label/value
+  rows, seeded with per-type defaults — longevity / placement / how-to for tablets; reeds / flip /
+  coverage / refill for diffusers) that renders as a real **"Specifications" grid on the PDP** (reuses
+  the existing PlacementGrid block, lands after Craft). Stored in `pdp_content.specs` — **no migration**.
+  Pinned by `src/lib/candleSpecs.test.ts` (4) + `src/services/variantLogistics.test.ts` (3).
+
+**Deliberately carved out of Batch C (the "skips"):**
+
+| Carve-out | Why skipped now | What real completion needs | Complexity | Phase |
+|---|---|---|---|---|
+| **Per-variant tax class** | GST is **product-level** (`products.gst_rate` / the category default). A variant-level tax override would be **inert** — nothing in checkout reads it — so it wasn't added as a fake field. | A variant `tax_class` column **plus** checkout/GST wiring that prefers it over the product rate, with invoice + reporting coverage. | M | Prod-2 |
+| **Inventory history / stock-movement ledger** | **No such table exists**; stock is a single scalar `variants.stock`. A real history needs a ledger written on *every* stock change (checkout decrement, fulfillment, manual edits, returns restock). | A `stock_movements` (variant × delta × reason × actor × ts) table + writes at each mutation point + a per-variant history view. Touches checkout/fulfillment. | L | Prod-2 |
+| **Per-variant warehouse link** | **No warehouse-location model** (already documented in P5 — stock is one scalar, no bin/rack/warehouse rows). | The Warehouse Location dependency in P5 (a `variant_locations` table) must land first. | M | WhOps-1 |
+| **Volumetric shipping wiring** | Package dims are stored + shown (with a derived volumetric estimate), but the shipment request builds parcels from the **Packaging Engine**, not per-variant dims — so dims aren't auto-fed into courier rating yet. | Make `packOrder` / `buildShipmentRequest` prefer per-variant dims when present (fall back to the packaging catalogue). Additive but touches the shipment path. | M | Ship-2 |
+| **Auto-neutralising candle framing for non-candle types** | wax tablet / diffuser still render through the candle PDP, which keeps candle-specific bits (burn-time hero stat, wax/wick craft tiles, care accordion). The admin can override those via the existing candle CMS, and the new specs grid adds the correct details — but the candle framing isn't auto-hidden by type. | Make `buildCandleEditorial` type-aware (hide/relabel burn-time + craft + accordion by `product_type`), or a dedicated tablet/diffuser PDP template. | M | Prod-2 |
+
+**⚠ Migration to apply:** `supabase/migrations/20260805120000_variant_logistics_fields.sql` — run
+`npx supabase db push`. Until then the logistics fields are editable but not persisted (the resilient
+strip keeps saves working); the specs feature needs no migration.
+
+## P10 — Homepage CMS (every section editable + preview)
+
+**Context:** the homepage already had a full Page Builder (composer engine + schema-driven forms +
+draft/publish/schedule/revisions/autosave/edit-lock + a device-switching draft preview), and 6 of 9
+sections were DB-editable. This round finished the job.
+
+**Shipped this round (additive; vitest + Playwright E2E, 17/17; no migration):**
+
+- **The 3 remaining `sourced` sections are now fully editable blocks:**
+  - **Signature Chapters** — editable eyebrow / heading / sub-line + a card per Volume (volume label,
+    title, poetic line, **gradient "volume colour"**, chapter link). "Select the volume colour" ✔.
+  - **Featured Atmosphere** — a **repeatable block per fragrance**, each with **its own image** +
+    name / type / chapter / scene / memory / atmosphere words / signature line / fragrance journey /
+    CTA / tone. First shows; the rest become the selector. "Which one to select · 3 different images ·
+    tomorrow different" ✔ (add/edit/remove blocks).
+  - **Editorial World** — a block per photo-grid plate with **its own image, editable hover name
+    (title), alt, role-in-spread and link**. "Photo-grid hover name editable" ✔.
+- **Brand Story** gained image + image-alt + orientation + pull-quote + CTA fields (matches the design).
+- **SchemaForm upgrades (benefit every builder — homepage/about/journal/email):** a real image
+  **Upload** button + thumbnail on `media` fields ("each image upload should exist" ✔), a **colour
+  picker**, and a **gradient-preset picker** (the 22 `grad-*` tokens). "Select gradient/volume colour" ✔.
+- Un-edited homepage renders **byte-for-byte as before** — each list section falls back to its config
+  catalogue when no items are saved (pinned by `src/lib/homepageSections.test.ts`).
+
+**Deliberately carved out (the "skips"):**
+
+| Carve-out | Why now | What full completion needs | Complexity | Phase |
+|---|---|---|---|---|
+| ~~Live-as-you-type preview~~ | **SHIPPED** — the homepage builder now has a **side-by-side live preview** (`LivePreviewPanel` → `/homepage-preview` renders `ComposedSections` from the postMessage'd draft), updating as you type without saving, with Desktop/Tablet/Mobile widths. Same family as the PDP/chapter editors. | — | done | — |
+| **Chapters auto-synced from `/admin/collections`** | The homepage chapter cards are **independent content** (so you can set each Volume's colour + poetic line here). They don't auto-mirror the real collections. | A "sync from collections" toggle that populates cards from live chapters, with per-card overrides. | S–M | HP-2 |
+| ~~Featured-Atmosphere product picker~~ | **SHIPPED** — each Featured-Atmosphere block now has a **"Pull from a product"** picker: choosing a real product fills the block's fields (name / image / chapter / type / link) from it, and every field stays editable — or leave it blank and type your own. Generalised via `FieldDef.blockSource` + `EntityOption.data`, so any block can offer a "pull from" source. | — | done | — |
+| **Free-form photo-grid geometry** | Plates are placed by `editorialImportance` (Opening = large left · Closing = right · others centre) — the art-directed layout is fixed by the design system; admins choose each plate's role, not pixel geometry. | A layout-variant selector if free composition is ever wanted (design decision, not just code). | M | HP-3 |
+
+**Note:** all of this reuses the existing `composed_pages` engine + section registry — **no migration**,
+and the same builder now makes About and Journal richer for free (shared SchemaForm + section defs).
+
+## P10.1 — Homepage Builder editing + section management (Phases 1–2)
+
+**Shipped — Phase 1 (editing experience; Playwright 12/12):** bidirectional **editor ↔ preview
+navigation** (click a section either side → the other scrolls + flashes), **per-section save status**
+(✓ Saved / ● Unsaved / Saving…), a **dirty-state warning** (beforeunload + in-app nav guard, only when
+unsaved), **accordion + Expand/Collapse All**, and **scroll/position memory** (sessionStorage).
+
+**Shipped — Phase 2 (section management; Playwright 18/18 + a drag test):** **duplicate section**
+(deep-copies all settings), a **visibility status** dropdown — Visible / Hidden / **Scheduled** (per-
+section window, evaluated at request time on the force-dynamic homepage) / **Archived** — with a
+guarded Remove; **section templates** (a pre-filled "Add section" picker); a **reusable section
+library** ("Holiday Hero", "Launch Banner"…) stored in the generic `settings` table (no migration) and
+insertable into any composed page; and **drag-and-drop reordering** (framer-motion `Reorder` + a drag
+handle, ↑/↓ kept for keyboard). Section state lives in reserved `settings.__state/__from/__until` keys,
+so the composer contract and storefront rendering are untouched (a legacy section with no `__state`
+renders exactly as before).
+
+**Deliberately deferred (the "coming soon" templates need NEW storefront components — shown disabled in
+the picker, never faked):**
+
+| Template | Why deferred | What it needs | Complexity |
+|---|---|---|---|
+| **Split Hero** | The `Hero` component is single-column | A two-column hero component (image + copy) + schema + registry entry | S–M |
+| **Video** | No video section exists | A `Video` section (background/embedded, poster, mute/loop) + schema + storefront component | M |
+| **Instagram** | No social integration | An Instagram feed section + a Graph-API/feed integration + caching | M–L |
+| **Journal** | No homepage journal block | A `JournalTeaser` section pulling latest entries from the journal service + component | S–M |
+
+Each is a *self-contained* addition to the section registry (schema + component + `ComposedSections`
+mapper), which is exactly the extensibility the Homepage Builder is designed for — no builder rewrite.
+
+## P10.2 — Homepage Builder publishing workflow (Phase 3)
+
+**Shipped (Playwright 15/15 + 9 unit tests; no migration):**
+
+- **Section validation (11)** — each section's schema errors surface **inline** (a "⚠ N" badge + the
+  list when open) and in a publish-bar summary; publishing an incomplete section is blocked (the
+  server validation now also runs per-section on selective publish). *I deliberately did not add new
+  required fields* — surfacing the existing schema requirements only, so the current homepage still
+  publishes.
+- **Publishing states (12)** — a derived **Published / Draft / Hidden / Scheduled / Expired / Archived**
+  badge per section, from `__state` + the schedule window + whether the section's content matches what's
+  live (server `publishStatusById`) and has no pending edits.
+- **Publish selected sections (13)** — tick sections → **Publish selected**. `publishPageSections`
+  merges the chosen sections' draft content into the live `published` array while keeping unselected
+  sections' live content (pure `mergePublishedSections`, unit-tested). Whole-page Publish is unchanged.
+- **Per-section schedule (14)** — the Phase-2 window is relabelled **Publish on / Unpublish on** and now
+  reads **Expired** past its end; the storefront gate (`sectionScheduleOk`) is request-time accurate.
+- **Version history (15)** — each revision now has **Preview** (streams that version into the live
+  preview with an exit banner) and **Compare** (a diff: which sections a restore would add / remove /
+  change) alongside the existing **Restore**.
+
+All additive: the storefront still reads `published` exactly as before; selective publish only updates
+`published` per section; section state lives in reserved `settings.__*` keys — no schema or DB change.
+
+## P10.3 — Homepage Builder content editing (Phase 4)
+
+**Shipped (Playwright 16/16 + 11 unit tests; no migration):**
+
+- **Rich text editor (16)** — `richtext` fields now render a no-dependency WYSIWYG editor
+  (`RichTextField`): a contentEditable area + toolbar for **Bold / Italic / H2 / H3 / Quote /
+  Paragraph / bullet + numbered lists / Link / inline image upload**. Output is constrained HTML,
+  sanitised on every change by an **isomorphic allowlist sanitizer** (`src/lib/cms/richText.ts`):
+  only `a,b,strong,i,em,u,ul,ol,li,blockquote,h2,h3,h4,p,br,img` survive; `<script>/<style>/<iframe>`
+  and their content are dropped, event-handler attrs and `javascript:/data:/vbscript:` URLs stripped,
+  disallowed tags unwrapped keeping their text. Rendered on the storefront via `<RichText>` (server
+  component, sanitised again before `dangerouslySetInnerHTML`). Threat model: content is authored only
+  by staff with `catalog.manage`. *Fixed a controlled-contentEditable defect along the way* — the
+  editor no longer reassigns `innerHTML` on its own sanitised echoes (tracked via a `lastEmitted`
+  ref), which previously collapsed the caret and dropped characters during rapid typing.
+- **Reorder + repeatable heterogeneous blocks (17, 18)** — a new **`blockVariants`** field DSL lets one
+  `blocks` field hold mixed block types, each with its own fields and its own **"+ Add <Quote /
+  Paragraph / Heading / Image / Button>"** button; blocks reorder with ↑ ↓ and delete with ×.
+  `validateContent` validates each block against its own variant's fields (keyed by `block._type`).
+- **New "Editorial content" section (`content-blocks`)** — the first section built on `blockVariants`:
+  compose Heading / Paragraph (rich text) / Quote / Image / Button blocks in any order. Registered in
+  the section registry + offered as an **"Editorial content" starter template** (seeded with a
+  heading + rich-text paragraph + quote) and as a blank type. Storefront component `ContentBlocks`.
+- **Homepage search (19)** — a **Find section / content** box in the builder toolbar dims non-matching
+  rows and highlights matches (with a live match count); matches on section label/type **and** on the
+  section's content (its serialised settings), so large pages are navigable.
+
+All additive: `richtext` was a pre-existing unused field type; `blockVariants` is optional and
+backward-compatible; `content-blocks` is a brand-new section type — existing sections, the storefront,
+and the DB schema are untouched, no migration.

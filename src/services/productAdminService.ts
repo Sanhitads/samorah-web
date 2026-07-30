@@ -83,6 +83,8 @@ export interface VariantRow {
   id: string; sku: string; variantName: string | null; vesselType: VesselType | null;
   sizeLabel: string | null; price: number; salePrice: number | null; costPrice: number; stock: number; isActive: boolean; sortOrder: number;
   barcode: string | null; weightGrams: number | null; lowStockThreshold: number | null;
+  // Batch C — operational logistics / procurement fields (20260805120000).
+  shippingClass: string | null; packageLengthCm: number | null; packageWidthCm: number | null; packageHeightCm: number | null; supplierSku: string | null;
 }
 
 export interface NoteRow { id: string; layer: string; note: string; sortOrder: number; }
@@ -102,6 +104,9 @@ export async function getProductForEdit(id: string): Promise<{ product: any; var
     price: Number(v.price), salePrice: v.sale_price != null ? Number(v.sale_price) : null, costPrice: Number(v.cost_price ?? 0), stock: Number(v.stock ?? 0),
     isActive: Boolean(v.is_active), sortOrder: Number(v.sort_order ?? 0),
     barcode: v.barcode ?? null, weightGrams: v.weight_grams != null ? Number(v.weight_grams) : null, lowStockThreshold: v.low_stock_threshold != null ? Number(v.low_stock_threshold) : null,
+    shippingClass: v.shipping_class ?? null,
+    packageLengthCm: v.package_length_cm != null ? Number(v.package_length_cm) : null, packageWidthCm: v.package_width_cm != null ? Number(v.package_width_cm) : null, packageHeightCm: v.package_height_cm != null ? Number(v.package_height_cm) : null,
+    supplierSku: v.supplier_sku ?? null,
   }));
   const notes: NoteRow[] = (ns ?? []).map((n: any) => ({ id: n.id, layer: n.layer, note: n.note, sortOrder: Number(n.sort_order ?? 0) }));
   const images: ImageRow[] = (imgs ?? []).map((im: any) => ({ id: im.id, url: im.url, altText: im.alt_text ?? null, isPrimary: Boolean(im.is_primary), sortOrder: Number(im.sort_order ?? 0) }));
@@ -332,20 +337,31 @@ export interface VariantInput {
   id?: string; productId: string; sku: string; variantName?: string; vesselType?: VesselType | null;
   sizeLabel?: string; price: number; salePrice?: number | null; costPrice?: number; stock?: number; isActive?: boolean; sortOrder?: number;
   barcode?: string | null; weightGrams?: number | null; lowStockThreshold?: number | null;
+  shippingClass?: string | null; packageLengthCm?: number | null; packageWidthCm?: number | null; packageHeightCm?: number | null; supplierSku?: string | null;
 }
+// Added by 20260805120000 — stripped on a schema error so a variant save works before the migration.
+const VARIANT_LOGISTICS_COLUMNS = ["shipping_class", "package_length_cm", "package_width_cm", "package_height_cm", "supplier_sku"];
 export async function upsertVariant(input: VariantInput, actorId?: string) {
   if (!input.sku?.trim()) return { ok: false, reason: "SKU required" };
   const db = loose();
-  const row = {
+  const row: Record<string, unknown> = {
     product_id: input.productId, sku: input.sku.trim().toUpperCase(), variant_name: input.variantName || null,
     vessel_type: input.vesselType || null, size_label: input.sizeLabel || null, price: input.price,
     sale_price: input.salePrice ?? null, cost_price: input.costPrice ?? 0, stock: input.stock ?? 0, is_active: input.isActive ?? true,
     sort_order: input.sortOrder ?? 0, barcode: input.barcode || null, weight_grams: input.weightGrams ?? null,
-    low_stock_threshold: input.lowStockThreshold ?? null, updated_at: new Date().toISOString(),
+    shipping_class: input.shippingClass || null, package_length_cm: input.packageLengthCm ?? null,
+    package_width_cm: input.packageWidthCm ?? null, package_height_cm: input.packageHeightCm ?? null, supplier_sku: input.supplierSku || null,
+    updated_at: new Date().toISOString(),
   };
-  const { error } = input.id
-    ? await db.from("variants").update(row).eq("id", input.id)
-    : await db.from("variants").insert(row);
+  // low_stock_threshold is NOT NULL (default 5) — only send it when set, so an unset value takes the
+  // DB default on insert (a bare null would violate the constraint) and is left unchanged on update.
+  if (input.lowStockThreshold != null) row.low_stock_threshold = input.lowStockThreshold;
+  const run = (r: Record<string, unknown>) => (input.id ? db.from("variants").update(r).eq("id", input.id) : db.from("variants").insert(r));
+  let { error } = await run(row);
+  if (error && /could not find|does not exist|schema cache|PGRST204/i.test(error.message)) {
+    const safe = { ...row }; for (const c of VARIANT_LOGISTICS_COLUMNS) delete safe[c];
+    ({ error } = await run(safe));
+  }
   if (error) return { ok: false, reason: /duplicate|unique/i.test(error.message) ? "SKU already exists" : error.message };
   await logEvent({ entityType: "product", entityId: input.productId, event: input.id ? "variant.updated" : "variant.created", actorType: actorId ? "staff" : "system", actorId, notes: input.sku });
   return { ok: true };
@@ -355,5 +371,136 @@ export async function deleteVariant(id: string, productId: string, actorId?: str
   const { error } = await db.from("variants").delete().eq("id", id);
   if (error) return { ok: false, reason: error.message };
   await logEvent({ entityType: "product", entityId: productId, event: "variant.deleted", actorType: actorId ? "staff" : "system", actorId });
+  return { ok: true };
+}
+
+// ── Product timeline / activity (Batch A · point 1) ────────────────────────────────────────────────
+// Provenance shown INSIDE the editor. Everything is DERIVED from data the app already keeps: the
+// products row (created/updated/publish), the audit stream (who touched it + when), and paid order
+// lines (last purchased + units). No new columns — read-only surfacing.
+export interface ProductTimeline {
+  createdAt: string | null; updatedAt: string | null; publishAt: string | null; status: string;
+  lastModifiedBy: string | null; lastModifiedAt: string | null;
+  lastPurchasedAt: string | null; unitsSold: number; ordersCount: number;
+  trail: { event: string; at: string; actorName: string | null; notes: string | null }[];
+}
+export async function getProductTimeline(id: string): Promise<ProductTimeline> {
+  const db = loose();
+  const empty: ProductTimeline = { createdAt: null, updatedAt: null, publishAt: null, status: "", lastModifiedBy: null, lastModifiedAt: null, lastPurchasedAt: null, unitsSold: 0, ordersCount: 0, trail: [] };
+  try {
+    const { data: p } = await db.from("products").select("created_at,updated_at,publish_at,status").eq("id", id).maybeSingle();
+    if (!p) return empty;
+    // Audit stream for this product (newest first) — resolve staff names so it reads in plain language.
+    const { data: ev } = await db.from("audit_events").select("event,created_at,actor_id,actor_type,notes").eq("entity_type", "product").eq("entity_id", id).order("created_at", { ascending: false }).limit(25);
+    const events = (ev ?? []) as { event: string; created_at: string; actor_id: string | null; actor_type: string; notes: string | null }[];
+    const actorIds = [...new Set(events.map((e) => e.actor_id).filter(Boolean))] as string[];
+    const names = new Map<string, string>();
+    if (actorIds.length) {
+      const { data: us } = await db.from("users").select("id,full_name").in("id", actorIds);
+      for (const u of us ?? []) names.set(u.id, u.full_name ?? "");
+    }
+    const trail = events.map((e) => ({ event: e.event, at: e.created_at, actorName: e.actor_id ? names.get(e.actor_id) ?? null : null, notes: e.notes || null }));
+    const lastStaff = events.find((e) => e.actor_type === "staff" && e.actor_id);
+    // Last purchased + lifetime units from paid order lines.
+    let lastPurchasedAt: string | null = null, unitsSold = 0; const orderIds = new Set<string>();
+    try {
+      const { data: lines } = await db.from("order_items").select("quantity,order_id,orders!inner(payment_status,created_at)").eq("product_id", id).in("orders.payment_status", ["paid", "partially_refunded", "refunded"]);
+      for (const l of lines ?? []) {
+        unitsSold += Number(l.quantity ?? 0);
+        if (l.order_id) orderIds.add(l.order_id);
+        const at = Array.isArray(l.orders) ? l.orders[0]?.created_at : (l.orders as any)?.created_at;
+        if (at && (!lastPurchasedAt || at > lastPurchasedAt)) lastPurchasedAt = at;
+      }
+    } catch { /* order_items optional */ }
+    return {
+      createdAt: p.created_at ?? null, updatedAt: p.updated_at ?? null, publishAt: p.publish_at ?? null, status: p.status ?? "",
+      lastModifiedBy: lastStaff ? (names.get(lastStaff.actor_id as string) || "Staff") : null, lastModifiedAt: lastStaff?.created_at ?? p.updated_at ?? null,
+      lastPurchasedAt, unitsSold, ordersCount: orderIds.size, trail,
+    };
+  } catch {
+    return empty;
+  }
+}
+
+// ── Product relationships (Batch A · point 5) — curated `related_products` overrides ───────────────
+// The storefront's getRelatedProducts falls back to the fragrance-family/collection algorithm; these
+// manual rows take precedence there (additive — no override rows ⇒ identical behaviour to before).
+// One relation_type per (product, target) — the table's unique(product_id, related_product_id).
+export const RELATION_TYPES = [
+  { v: "related", l: "Related" },
+  { v: "upsell", l: "Upsell" },
+  { v: "cross_sell", l: "Cross-sell" },
+  { v: "pairs_with", l: "Pairs well with" },
+  { v: "frequently_bought", l: "Frequently bought together" },
+] as const;
+const RELATION_TYPE_SET = new Set(RELATION_TYPES.map((r) => r.v));
+
+export interface RelationshipRow { relatedProductId: string; relationType: string; sortOrder: number; name: string; slug: string; imageUrl: string | null; }
+export async function getProductRelationships(id: string): Promise<RelationshipRow[]> {
+  const db = loose();
+  try {
+    const { data: rows } = await db.from("related_products").select("related_product_id,relation_type,sort_order").eq("product_id", id).order("sort_order");
+    const rels = (rows ?? []) as { related_product_id: string; relation_type: string; sort_order: number }[];
+    if (!rels.length) return [];
+    const ids = rels.map((r) => r.related_product_id);
+    const { data: prods } = await db.from("products").select("id,name,slug,product_images(url,is_primary,sort_order)").in("id", ids);
+    const byId = new Map<string, any>((prods ?? []).map((p: any) => [p.id, p]));
+    return rels.map((r) => {
+      const p = byId.get(r.related_product_id);
+      const imgs = (p?.product_images ?? []) as any[];
+      const primary = imgs.find((i) => i.is_primary) ?? [...imgs].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))[0];
+      return { relatedProductId: r.related_product_id, relationType: r.relation_type ?? "related", sortOrder: Number(r.sort_order ?? 0), name: p?.name ?? "(deleted product)", slug: p?.slug ?? "", imageUrl: primary?.url ?? null };
+    });
+  } catch {
+    return [];
+  }
+}
+// ── Bulk operations (Batch B · point 12) — safe, non-destructive multi-select actions ─────────────
+// One `update … in (ids)` per call (no N+1), one audit event. Deliberately excludes delete/archive as
+// a destructive default — status can be set to "archived" explicitly, but there is no silent bulk wipe.
+export type ProductBulkAction = "status" | "featured" | "collection" | "bestseller" | "newArrival" | "hero";
+const BULK_STATUSES: ProductStatus[] = ["active", "draft", "archived", "out_of_stock"];
+export async function bulkUpdateProducts(ids: string[], action: ProductBulkAction, value: unknown, actorId?: string): Promise<{ ok: boolean; done: number; total: number; reason?: string }> {
+  const clean = [...new Set((ids ?? []).filter((x): x is string => typeof x === "string" && !!x))].slice(0, 500);
+  if (!clean.length) return { ok: false, done: 0, total: 0, reason: "No products selected." };
+  const db = loose();
+  const row: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  let note = "";
+  switch (action) {
+    case "status": {
+      const s = String(value);
+      if (!BULK_STATUSES.includes(s as ProductStatus)) return { ok: false, done: 0, total: clean.length, reason: "Invalid status." };
+      row.status = s; note = `status → ${s}`; break;
+    }
+    case "featured": row.is_featured = Boolean(value); note = `featured → ${Boolean(value)}`; break;
+    case "collection": row.collection_id = value ? String(value) : null; note = value ? "assigned to chapter" : "removed from chapter"; break;
+    case "bestseller": row.is_bestseller = Boolean(value); note = `best seller → ${Boolean(value)}`; break;
+    case "newArrival": row.is_new_arrival = Boolean(value); note = `new arrival → ${Boolean(value)}`; break;
+    case "hero": row.is_hero = Boolean(value); note = `hero → ${Boolean(value)}`; break;
+    default: return { ok: false, done: 0, total: clean.length, reason: "Unknown bulk action." };
+  }
+  let { error } = await db.from("products").update(row).in("id", clean);
+  // CMS-flag columns may predate their migration — retry without them rather than fail the batch.
+  if (error && /could not find|does not exist|schema cache|PGRST204/i.test(error.message) && (action === "bestseller" || action === "newArrival")) {
+    return { ok: false, done: 0, total: clean.length, reason: "That flag isn't available yet (pending migration)." };
+  }
+  if (error) return { ok: false, done: 0, total: clean.length, reason: error.message };
+  await logEvent({ entityType: "product", event: `product.bulk_${action}`, actorType: actorId ? "staff" : "system", actorId, notes: `${clean.length} products · ${note}` });
+  return { ok: true, done: clean.length, total: clean.length };
+}
+
+export async function setProductRelationships(id: string, items: { relatedProductId: string; relationType: string; sortOrder: number }[], actorId?: string) {
+  const db = loose();
+  // Replace-all: this editor is the sole writer of related_products, so a clean rewrite keeps the set
+  // exactly as curated. Skip self-links and dedupe targets (the unique constraint allows one per pair).
+  const seen = new Set<string>();
+  const rows = items
+    .filter((it) => it.relatedProductId && it.relatedProductId !== id)
+    .filter((it) => (seen.has(it.relatedProductId) ? false : (seen.add(it.relatedProductId), true)))
+    .map((it, i) => ({ product_id: id, related_product_id: it.relatedProductId, relation_type: RELATION_TYPE_SET.has(it.relationType as any) ? it.relationType : "related", sort_order: it.sortOrder ?? i }));
+  const { error: delErr } = await db.from("related_products").delete().eq("product_id", id);
+  if (delErr) return { ok: false, reason: delErr.message };
+  if (rows.length) { const { error } = await db.from("related_products").insert(rows); if (error) return { ok: false, reason: error.message }; }
+  await logEvent({ entityType: "product", entityId: id, event: "product.relationships_set", actorType: actorId ? "staff" : "system", actorId, notes: `${rows.length} links` });
   return { ok: true };
 }

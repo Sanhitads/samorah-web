@@ -88,6 +88,9 @@ export interface FeaturedExperience {
   /** Typography colour: "on-dark" → warm-ivory ink, "on-light" → charcoal ink.
    *  Default "on-dark". */
   colorScheme?: "on-dark" | "on-light";
+  /** Optional override colour for the Atmosphere-Index leader lines (CMS-editable). When unset the
+   *  scheme-aware default is used (readable on both dark and light fields). */
+  lineColor?: string;
 
   // — CMS control (marketing reorders experiences without touching code) —
   /** CMS "Homepage Featured" — only these appear on the homepage. */

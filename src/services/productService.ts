@@ -189,12 +189,30 @@ export async function getRelatedProducts(
   limit = 4,
 ) {
   const db = createPublicClient();
-  let query = db.from("products").select(CARD_FIELDS).neq("id", product.id).limit(limit);
 
-  if (product.fragrance_family) query = query.eq("fragrance_family", product.fragrance_family);
-  else if (product.collection_id) query = query.eq("collection_id", product.collection_id);
+  // 1) Curated overrides (admin → related_products), in their saved order. Additive: with no override
+  //    rows this branch contributes nothing and the result is identical to the family/collection query.
+  const picks: Awaited<ReturnType<typeof runAlgo>> = [];
+  try {
+    const { data: rel } = await db.from("related_products").select("related_product_id,sort_order").eq("product_id", product.id).order("sort_order");
+    const ids = (rel ?? []).map((r) => (r as { related_product_id: string }).related_product_id);
+    if (ids.length) {
+      const { data: cards } = await db.from("products").select(CARD_FIELDS).in("id", ids);
+      const byId = new Map((cards ?? []).map((c) => [(c as { id: string }).id, c]));
+      for (const id of ids) { const c = byId.get(id); if (c) picks.push(c); } // preserve curated order
+    }
+  } catch { /* related_products optional — fall through to the algorithm */ }
+  if (picks.length >= limit) return picks.slice(0, limit);
 
-  const { data, error } = await query;
-  if (error) throw error;
-  return data ?? [];
+  // 2) Fill the remaining slots with the same-family / same-collection algorithm, excluding the picks.
+  async function runAlgo() {
+    let query = db.from("products").select(CARD_FIELDS).neq("id", product.id).limit(limit + picks.length);
+    if (product.fragrance_family) query = query.eq("fragrance_family", product.fragrance_family);
+    else if (product.collection_id) query = query.eq("collection_id", product.collection_id);
+    const { data, error } = await query;
+    if (error) throw error;
+    return data ?? [];
+  }
+  const rest = (await runAlgo()).filter((d) => !picks.some((p) => (p as { id: string }).id === (d as { id: string }).id));
+  return [...picks, ...rest].slice(0, limit);
 }

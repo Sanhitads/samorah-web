@@ -3739,16 +3739,28 @@ h1, h2, h3, h4 {
   letter-spacing: 0.25em;
   text-transform: uppercase;
 }
+/* A quiet, static scroll hairline with a single soft highlight that drifts down — a calm hint,
+   never a blink. The track stays constant; only a small gradient segment glides along it. */
 .home-hero__scroll-line {
+  position: relative;
   width: 1px;
   height: 48px;
-  background: rgba(250, 247, 242, 0.4);
-  transform-origin: top;
-  animation: heroScroll 2.4s var(--ease-luxury) infinite;
+  background: rgba(250, 247, 242, 0.28);
+  overflow: hidden;
 }
-@keyframes heroScroll {
-  0%, 100% { transform: scaleY(1); opacity: 0.5; }
-  50% { transform: scaleY(0.4); opacity: 0.9; }
+.home-hero__scroll-line::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 40%;
+  background: linear-gradient(to bottom, rgba(250, 247, 242, 0), rgba(250, 247, 242, 0.9), rgba(250, 247, 242, 0));
+  animation: heroScrollDrift 2.8s var(--ease-luxury) infinite;
+}
+@keyframes heroScrollDrift {
+  0% { transform: translateY(-120%); }
+  100% { transform: translateY(300%); }
 }
 
 @media (max-width: 1024px) {
@@ -3760,7 +3772,7 @@ h1, h2, h3, h4 {
   .home-hero__sub { max-width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .home-hero__scroll-line { animation: none; }
+  .home-hero__scroll-line::after { animation: none; opacity: 0.5; }
 }
 
 /* ─── Homepage · Signature Chapters (Phase 7 · Section 2) ───
@@ -4126,12 +4138,14 @@ h1, h2, h3, h4 {
   --atmos-soft: rgba(250, 247, 242, 0.72);
   --atmos-faint: rgba(250, 247, 242, 0.46);
   --atmos-line: rgba(250, 247, 242, 0.16);
+  --atmos-rule: rgba(201, 169, 110, 0.55); /* the Atmosphere-Index leader line — visible gold on dark */
 }
 .home-atmosphere[data-scheme="on-light"] {
   --atmos-ink: var(--deep-charcoal);
   --atmos-soft: rgba(42, 42, 42, 0.74);
   --atmos-faint: rgba(42, 42, 42, 0.5);
   --atmos-line: rgba(42, 42, 42, 0.14);
+  --atmos-rule: rgba(120, 88, 44, 0.6); /* darker so the leader line stays readable on a light field */
 }
 
 /* The air — stacked layers so changes crossfade in place */
@@ -4281,8 +4295,7 @@ h1, h2, h3, h4 {
 .atmos-index__rule {
   flex: 0 0 auto;
   height: 1px;
-  background: var(--gold);
-  opacity: 0.26;
+  background: var(--atmos-rule);
 }
 
 /* The crescendo — one unforgettable sentence, after the Index */
@@ -4539,6 +4552,13 @@ h1, h2, h3, h4 {
   padding-inline: clamp(24px, 6vw, 80px);
   text-align: center;
 }
+/* CMS alignment (Homepage Builder). The gold rule + author follow the chosen alignment. */
+.home-words__figure[data-align="left"] { text-align: left; }
+.home-words__figure[data-align="left"] .home-words__rule { margin-left: 0; }
+.home-words__figure[data-align="left"] .home-words__author { text-align: left; }
+.home-words__figure[data-align="right"] { text-align: right; }
+.home-words__figure[data-align="right"] .home-words__rule { margin-right: 0; margin-left: auto; }
+.home-words__figure[data-align="right"] .home-words__author { text-align: right; }
 /* the single permitted ornament — a subtle gold hairline */
 .home-words__rule {
   display: block;
@@ -4705,6 +4725,9 @@ h1, h2, h3, h4 {
     align-self: auto;
     margin: 0;
   }
+  /* the frame's base height:100% would collapse against an auto-height plate, hiding the image —
+     reset it so each plate's aspect-ratio (below) drives the height on the stacked mobile layout. */
+  .home-editorial__frame { height: auto; }
   .home-editorial__plate[data-slot="hero"] .home-editorial__frame,
   .home-editorial__plate[data-slot="closing"] .home-editorial__frame,
   .home-editorial__plate[data-slot="portrait"] .home-editorial__frame { aspect-ratio: 4 / 5; }
@@ -4952,6 +4975,43 @@ video.asset-image {
 .home-testi__by { margin-top: 1rem; font-family: var(--font-sans, "DM Sans", sans-serif); font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--smoke, #6b6259); }
 .home-testi__role { text-transform: none; letter-spacing: 0; }
 .home-testi__cta { margin-top: clamp(2rem, 5vw, 3.5rem); }
+/* The testimonials section sits on a LIGHT ground, where the default ghost button (white text +
+   white border) is invisible. Give its button dark ink + a dark hairline so it reads. */
+.home-testi__cta .btn-ghost { color: var(--ink, #1f1a16); border-color: rgba(31, 26, 22, 0.4); }
+.home-testi__cta .btn-ghost:hover { background: rgba(31, 26, 22, 0.06); border-color: rgba(31, 26, 22, 0.7); }
+
+/* Editorial content section (Phase 4) — flexible blocks: heading / paragraph (rich text) / quote / image / button */
+.home-content { background: var(--warm-ivory); padding-block: clamp(56px, 9vh, 104px); }
+.home-content__inner { max-width: 760px; margin: 0 auto; padding-inline: clamp(20px, 6vw, 40px); }
+.home-content[data-align="center"] .home-content__inner { text-align: center; }
+.home-content[data-align="right"] .home-content__inner { text-align: right; }
+.home-content__eyebrow { font-family: var(--font-sans); font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold, #C9A96E); margin: 0 0 18px; }
+.home-content__h2 { font-family: var(--font-serif); font-weight: 300; font-size: clamp(26px, 3.4vw, 40px); line-height: 1.2; margin: 24px 0 12px; color: var(--charcoal); }
+.home-content__h3 { font-family: var(--font-serif); font-weight: 300; font-size: clamp(20px, 2.4vw, 28px); margin: 20px 0 10px; color: var(--charcoal); }
+.home-content__para { font-family: var(--font-sans); font-size: clamp(15px, 1.4vw, 17px); line-height: 1.7; color: var(--charcoal); }
+.home-content__para p { margin: 0 0 12px; }
+.home-content__para a { color: var(--gold, #a8863f); text-decoration: underline; }
+.home-content__para ul, .home-content__para ol { margin: 0 0 12px 22px; }
+.home-content__para blockquote { border-left: 2px solid var(--gold, #C9A96E); padding-left: 16px; margin: 12px 0; font-style: italic; }
+.home-content__para img { max-width: 100%; height: auto; border-radius: 6px; margin: 12px 0; }
+.home-content__quote { margin: 28px 0; font-family: var(--font-serif); font-style: italic; font-size: clamp(20px, 2.6vw, 30px); line-height: 1.4; color: var(--charcoal); border: 0; padding: 0; }
+.home-content__quote p { margin: 0; }
+.home-content__quote cite { display: block; margin-top: 10px; font-family: var(--font-sans); font-style: normal; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); }
+.home-content__figure { margin: 24px 0; }
+.home-content__img { width: 100%; aspect-ratio: 16 / 10; border-radius: 8px; background-size: cover; background-position: center; display: block; }
+.home-content__img--photo { aspect-ratio: auto; }
+.home-content__figure figcaption { margin-top: 8px; font-family: var(--font-sans); font-size: 12px; color: var(--muted); }
+.home-content__cta { margin: 24px 0; }
+.home-content[data-align="center"] .home-content__quote cite { text-align: center; }
+
+/* Homepage Builder live-preview anchors — each section is a scroll target; a brief gold flash confirms
+   the editor↔preview link. Storefront never uses these (anchors are preview-only), so no effect there. */
+.cs-anchor { scroll-margin-top: 8px; }
+.cs-anchor--flash { animation: cs-anchor-flash 1.6s ease; }
+@keyframes cs-anchor-flash {
+  0% { box-shadow: inset 0 0 0 3px rgba(201, 169, 110, 0.9); }
+  100% { box-shadow: inset 0 0 0 3px rgba(201, 169, 110, 0); }
+}
 
 /* ── Premium authentication ─────────────────────────────────────────────── */
 .auth-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 40px 20px;

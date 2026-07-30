@@ -31,6 +31,7 @@ export function ProductsManager({ products, categories, collections }: {
   const [sort, setSort] = useState("updated");
   const [page, setPage] = useState(0);
   const [confirmDel, setConfirmDel] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const post = async (body: Record<string, unknown>): Promise<any> => {
@@ -83,6 +84,27 @@ export function ProductsManager({ products, categories, collections }: {
   const safePage = Math.min(page, totalPages - 1);
   const pageRows = rows.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
 
+  // ── Bulk selection (Batch B · point 12) ──────────────────────────────────────────────────────────
+  const toggleOne = (id: string) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const pageIds = pageRows.map((p) => p.id);
+  const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selected.has(id));
+  const togglePage = () => setSelected((s) => { const n = new Set(s); if (allPageSelected) pageIds.forEach((id) => n.delete(id)); else pageIds.forEach((id) => n.add(id)); return n; });
+  const selectAllFiltered = () => setSelected(new Set(rows.map((r) => r.id)));
+  const clearSel = () => setSelected(new Set());
+  const bulk = async (bulkAction: string, value: unknown) => {
+    const ids = [...selected]; if (!ids.length) return;
+    const d = await post({ action: "bulk", ids, bulkAction, value });
+    if (d?.ok) { clearSel(); refresh(); }
+  };
+  const exportCsv = () => {
+    const chosen = selected.size ? rows.filter((r) => selected.has(r.id)) : rows;
+    const cols: (keyof ProductRow)[] = ["name", "baseSku", "slug", "collectionName", "fragranceFamily", "price", "salePrice", "totalStock", "salesCount", "salesRevenue", "status"];
+    const esc = (v: unknown) => { const s = v == null ? "" : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+    const csv = [cols.join(","), ...chosen.map((r) => cols.map((c) => esc(r[c])).join(","))].join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a"); a.href = url; a.download = `products-${chosen.length}.csv`; a.click(); URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="cfg">
       <div className="oms-strip">
@@ -109,12 +131,35 @@ export function ProductsManager({ products, categories, collections }: {
         {err && !creating && !editId ? <span className="ff-err">{err}</span> : null}
       </form>
 
+      {selected.size > 0 ? (
+        <div className="pl-bulk" role="region" aria-label="Bulk actions">
+          <span className="pl-bulk__count">{selected.size} selected</span>
+          {selected.size < rows.length ? <button type="button" className="ff-btn ff-btn--mini" onClick={selectAllFiltered}>Select all {rows.length}</button> : null}
+          <span className="pl-bulk__sep" />
+          <select className="cfg-toggle" defaultValue="" disabled={busy} onChange={(e) => { if (e.target.value) { bulk("status", e.target.value); e.target.value = ""; } }} aria-label="Set status">
+            <option value="">Set status…</option>{STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <select className="cfg-toggle" defaultValue="" disabled={busy} onChange={(e) => { const v = e.target.value; if (v) { bulk("collection", v === "__none__" ? "" : v); e.target.value = ""; } }} aria-label="Assign chapter">
+            <option value="">Assign chapter…</option><option value="__none__">— remove from chapter —</option>
+            {collections.map((c) => <option key={c.id} value={c.id}>{c.volume ? `${c.volume} — ${c.name}` : c.name}</option>)}
+          </select>
+          <button type="button" className="ff-btn ff-btn--mini" disabled={busy} onClick={() => bulk("featured", true)}>★ Feature</button>
+          <button type="button" className="ff-btn ff-btn--mini" disabled={busy} onClick={() => bulk("featured", false)}>☆ Unfeature</button>
+          <button type="button" className="ff-btn ff-btn--mini" disabled={busy} onClick={() => bulk("bestseller", true)}>Best seller</button>
+          <button type="button" className="ff-btn ff-btn--mini" disabled={busy} onClick={() => bulk("newArrival", true)}>New</button>
+          <span className="pl-bulk__sep" />
+          <button type="button" className="ff-btn ff-btn--mini" disabled={busy} onClick={exportCsv}>⤓ Export CSV</button>
+          <button type="button" className="ff-btn ff-btn--mini" onClick={clearSel}>Clear</button>
+        </div>
+      ) : null}
+
       <div className="admin__table-wrap">
         <table className="admin__table admin__table--board">
-          <thead><tr><th></th><th>Product</th><th>Collection</th><th>Price</th><th>Stock</th><th>Sales</th><th>Flags</th><th>Status</th><th>Updated</th><th>Actions</th></tr></thead>
+          <thead><tr><th><input type="checkbox" checked={allPageSelected} onChange={togglePage} aria-label="Select all on page" /></th><th></th><th>Product</th><th>Collection</th><th>Price</th><th>Stock</th><th>Sales</th><th>Flags</th><th>Status</th><th>Updated</th><th>Actions</th></tr></thead>
           <tbody>
             {pageRows.map((p) => (
-              <tr key={p.id}>
+              <tr key={p.id} data-selected={selected.has(p.id) ? "1" : undefined}>
+                <td><input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleOne(p.id)} aria-label={`Select ${p.name}`} /></td>
                 <td>{p.imageUrl ? (/* eslint-disable-next-line @next/next/no-img-element */ <img className="pl-thumb" src={p.imageUrl} alt="" />) : <span className="pl-thumb pl-thumb--empty" />}</td>
                 <td>{p.name}<div className="admin__muted admin__mono">{p.baseSku}{p.fragranceFamily ? ` · ${p.fragranceFamily}` : ""}</div></td>
                 <td className="admin__muted">{p.collectionName ?? "—"}</td>
@@ -150,7 +195,7 @@ export function ProductsManager({ products, categories, collections }: {
                 </td>
               </tr>
             ))}
-            {rows.length === 0 ? <tr><td colSpan={10} className="admin__empty">No products{anyFilter ? " match these filters" : " yet"}.</td></tr> : null}
+            {rows.length === 0 ? <tr><td colSpan={11} className="admin__empty">No products{anyFilter ? " match these filters" : " yet"}.</td></tr> : null}
           </tbody>
         </table>
       </div>
@@ -169,7 +214,7 @@ export function ProductsManager({ products, categories, collections }: {
       </div>
 
       {creating ? <CreateModal categories={categories} busy={busy} err={err} onClose={() => setCreating(false)} onCreate={async (c) => { const d = await post({ action: "create", product: c }); if (d?.ok) { setCreating(false); refresh(); } }} /> : null}
-      {editId ? <ProductEditor productId={editId} collections={collections} categories={categories} onClose={() => setEditId(null)} onSaved={refresh} /> : null}
+      {editId ? <ProductEditor productId={editId} collections={collections} categories={categories} allProducts={products.map((p) => ({ id: p.id, name: p.name, slug: p.slug, imageUrl: p.imageUrl }))} onClose={() => setEditId(null)} onSaved={refresh} /> : null}
     </div>
   );
 }

@@ -16,10 +16,14 @@ export interface ComposablePage {
   key: string; label: string; cfg: PageConfig;
   meta: Record<string, { label: string; note: string }>;
   previewPath: string; previewCookie: string;
+  /** When set, the builder shows a side-by-side LIVE preview (postMessage, no save) at this iframe
+   *  route — visual-CMS parity with the PDP/chapter editors. The route renders ComposedSections from
+   *  the streamed draft, so it fits any composed page whose storefront uses ComposedSections. */
+  livePreviewSrc?: string;
 }
 
 export const COMPOSABLE_PAGES: Record<string, ComposablePage> = {
-  homepage: { key: "homepage", label: "Homepage", cfg: HOMEPAGE_CFG, meta: HOMEPAGE_META, previewPath: "/", previewCookie: "hp_preview" },
+  homepage: { key: "homepage", label: "Homepage", cfg: HOMEPAGE_CFG, meta: HOMEPAGE_META, previewPath: "/", previewCookie: "hp_preview", livePreviewSrc: "/homepage-preview" },
   about: { key: "about", label: "About", cfg: ABOUT_CFG, meta: ABOUT_META, previewPath: "/about", previewCookie: "ab_preview" },
   journal: { key: "journal", label: "Journal", cfg: JOURNAL_CFG, meta: JOURNAL_META, previewPath: "/journal", previewCookie: "jn_preview" },
 };

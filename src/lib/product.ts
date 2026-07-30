@@ -130,6 +130,12 @@ export function gradientClass(url: string): string | null {
   return isGradientPlaceholder(url) ? url.slice(GRADIENT_PREFIX.length) : null;
 }
 
+/** A media/cover value that is a solid colour (from the builder's colour picker), e.g. "#2a1a12".
+ *  A third option next to a gradient token and a photo URL — rendered as a plain background colour. */
+export function isColorValue(url: string | null | undefined): boolean {
+  return typeof url === "string" && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(url.trim());
+}
+
 // ── Badge ─────────────────────────────────────────────────────────────────────
 
 export type ProductBadge =

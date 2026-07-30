@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
-import { gradientClass, isGradientPlaceholder } from "@/lib/product";
+import { gradientClass, isGradientPlaceholder, isColorValue } from "@/lib/product";
 import type { BrandStory as BrandStoryData } from "@/config/brandStory";
 
 /**
@@ -46,7 +46,14 @@ export function BrandStory({ story }: { story: BrandStoryData }) {
       <div className="home-story__inner">
         {/* The image settles first */}
         <motion.div className="home-story__media" {...reveal(0)}>
-          {placeholder ? (
+          {isColorValue(story.image) ? (
+            <div
+              className="home-story__image"
+              style={{ background: story.image }}
+              role="img"
+              aria-label={story.imageAlt}
+            />
+          ) : placeholder ? (
             <div
               className={`home-story__image ${gradientClass(story.image) ?? ""}`}
               aria-hidden="true"

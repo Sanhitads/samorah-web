@@ -3,7 +3,7 @@
 import { useRef } from "react";
 import Link from "next/link";
 import { motion, useInView, useReducedMotion } from "framer-motion";
-import { gradientClass, isGradientPlaceholder } from "@/lib/product";
+import { gradientClass, isGradientPlaceholder, isColorValue } from "@/lib/product";
 import type { EditorialStory } from "@/config/editorialWorld";
 
 /**
@@ -46,6 +46,7 @@ function Plate({
   inView: boolean;
   reduce: boolean;
 }) {
+  const color = isColorValue(story.image);
   const placeholder = isGradientPlaceholder(story.image);
   const href = destinationOf(story);
 
@@ -67,12 +68,10 @@ function Plate({
       >
         <div
           className={`home-editorial__image ${
-            placeholder
-              ? gradientClass(story.image) ?? ""
-              : "home-editorial__image--photo"
+            color ? "" : placeholder ? gradientClass(story.image) ?? "" : "home-editorial__image--photo"
           }`}
           style={
-            placeholder ? undefined : { backgroundImage: `url(${story.image})` }
+            color ? { background: story.image } : placeholder ? undefined : { backgroundImage: `url(${story.image})` }
           }
           aria-hidden="true"
         />

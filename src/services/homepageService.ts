@@ -16,19 +16,20 @@ export const PAGE_KEY = "homepage";
 /** The sections that compose the DEFAULT homepage (the current hand-built order). */
 export const DEFAULT_ORDER = ["hero", "chapters", "brand-story", "atmosphere", "invitations", "words", "editorial-world", "letters"] as const;
 /** All section types the homepage can render (default set + optional add-ons). */
-export const SECTION_TYPES = [...DEFAULT_ORDER, "testimonials"] as const;
+export const SECTION_TYPES = [...DEFAULT_ORDER, "testimonials", "content-blocks"] as const;
 export type SectionType = (typeof SECTION_TYPES)[number];
 
 export const SECTION_META: Record<SectionType, { label: string; note: string }> = {
   hero: { label: "Hero", note: "Campaign-driven opening" },
   chapters: { label: "Signature Chapters", note: "Editorial chapter rail" },
   "brand-story": { label: "Brand Story", note: "The maker's quiet" },
-  atmosphere: { label: "The Atmosphere", note: "Inhabit one fragrance-world" },
+  atmosphere: { label: "Featured Atmosphere", note: "Selectable fragrances — each with its own image; pull from a product or write your own" },
   invitations: { label: "Living with Fragrance", note: "Two ways of living" },
   words: { label: "Words", note: "One literary sentence" },
   "editorial-world": { label: "Editorial World", note: "The final magazine spread" },
   letters: { label: "The Letters", note: "Quiet editorial close" },
   testimonials: { label: "Testimonials", note: "Reader voices — repeatable blocks" },
+  "content-blocks": { label: "Editorial content", note: "Compose from Quote / Paragraph / Heading / Image / Button blocks — reorder freely" },
 };
 
 export interface HomeSection extends ComposedSection { type: SectionType }
