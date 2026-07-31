@@ -21,6 +21,9 @@ import { getEditorialWorld } from "@/config/editorialWorld";
 
 const IMPORTANCE_OPTIONS = ["Opening", "Ritual", "Detail", "Still Life", "Closing"].map((v) => ({ value: v, label: v }));
 
+// Featured-content picker (point 28): copy these entity data keys → the section's display fields on pick.
+const FEATURED_FILL = { title: "title", image: "image", imageAlt: "imageAlt", href: "href", blurb: "blurb" };
+
 export const SECTION_DEFS: Record<SectionType, SectionDefinition> = {
   hero: {
     schema: {
@@ -282,6 +285,33 @@ export const SECTION_DEFS: Record<SectionType, SectionDefinition> = {
         { _type: "quote", quote: "Fragrance designed to linger beyond the flame.", attribution: "Samorah" },
       ],
     }),
+  },
+  // ── Featured spotlight (point 28) — pick any product / chapter / atmosphere / testimonial / artist /
+  //    journal piece from a dropdown; the picker fills the display fields, which then render + stay editable ──
+  "featured-content": {
+    schema: {
+      type: "featured-content", label: "Featured spotlight", note: "Feature any product, chapter, atmosphere, testimonial, artist or journal piece",
+      fields: [
+        { key: "eyebrow", label: "Eyebrow", type: "text", maxLength: 40 },
+        { key: "entityType", label: "Feature a…", type: "select", options: [
+          { value: "product", label: "Product" }, { value: "chapter", label: "Chapter" }, { value: "atmosphere", label: "Atmosphere" },
+          { value: "testimonial", label: "Testimonial" }, { value: "artist", label: "Artist" }, { value: "journal", label: "Journal piece" },
+        ] },
+        { key: "product", label: "Choose a product", type: "reference", refEntity: "product", refFill: FEATURED_FILL, showIf: { field: "entityType", equals: "product" } },
+        { key: "chapter", label: "Choose a chapter", type: "reference", refEntity: "collection", refFill: FEATURED_FILL, showIf: { field: "entityType", equals: "chapter" } },
+        { key: "atmosphere", label: "Choose an atmosphere", type: "reference", refEntity: "atmosphere", refFill: FEATURED_FILL, showIf: { field: "entityType", equals: "atmosphere" } },
+        { key: "testimonial", label: "Choose a testimonial", type: "reference", refEntity: "testimonial", refFill: FEATURED_FILL, showIf: { field: "entityType", equals: "testimonial" } },
+        { key: "artist", label: "Choose an artist", type: "reference", refEntity: "artist", refFill: FEATURED_FILL, showIf: { field: "entityType", equals: "artist" } },
+        { key: "journal", label: "Choose a journal piece", type: "reference", refEntity: "journal", refFill: FEATURED_FILL, showIf: { field: "entityType", equals: "journal" } },
+        { key: "title", label: "Title", type: "text", required: true, maxLength: 120 },
+        { key: "blurb", label: "Blurb", type: "textarea", maxLength: 300 },
+        { key: "image", label: "Image", type: "media", help: "Filled from the picked item — or choose your own" },
+        { key: "imageAlt", label: "Image alt text", type: "text", maxLength: 160, altFor: "image" },
+        { key: "href", label: "Link URL", type: "url" },
+        { key: "ctaLabel", label: "Button label", type: "text", maxLength: 24 },
+      ],
+    },
+    defaults: () => ({ eyebrow: "Featured", entityType: "product", title: "", blurb: "", image: "", imageAlt: "", href: "", ctaLabel: "Discover" }),
   },
 };
 

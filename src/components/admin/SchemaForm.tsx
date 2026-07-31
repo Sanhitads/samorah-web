@@ -144,18 +144,24 @@ function FieldControl({ f, value, content, media, entities, onChange, onSibling 
     );
   }
 
-  // Reference (point 5) — stores { entity, id }, not a slug.
+  // Reference (point 5) — stores { entity, id }, not a slug. Phase 7 #28: picking an item also copies
+  // its display data into sibling fields (refFill), so a section can feature any entity from a dropdown.
   if (f.type === "reference") {
     const ref = (value && typeof value === "object" ? value : {}) as { entity?: string; id?: string };
     const opts = entities[f.refEntity ?? ""] ?? [];
+    const pick = (id: string) => {
+      if (!id) { onChange(undefined); return; }
+      onChange({ entity: f.refEntity, id });
+      if (f.refFill && onSibling) { const data = (opts.find((o) => o.id === id)?.data ?? {}) as Record<string, unknown>; for (const [dataKey, fieldKey] of Object.entries(f.refFill)) if (data[dataKey] !== undefined) onSibling(fieldKey, data[dataKey]); }
+    };
     return (
       <label className="cfg-field" title={f.tooltip}>
         <span>{f.label}{f.required ? " *" : ""} <span className="admin__muted">({f.refEntity})</span></span>
-        <select value={ref.id ?? ""} onChange={(e) => onChange(e.target.value ? { entity: f.refEntity, id: e.target.value } : undefined)}>
-          <option value="">— none —</option>
+        <select value={ref.id ?? ""} onChange={(e) => pick(e.target.value)}>
+          <option value="">{opts.length ? "— choose —" : "— none available —"}</option>
           {opts.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
         </select>
-        {helpText ? <small className="admin__muted">{helpText}</small> : null}
+        {f.refFill ? <small className="admin__muted">Picking fills the fields below — then edit freely.</small> : helpText ? <small className="admin__muted">{helpText}</small> : null}
       </label>
     );
   }

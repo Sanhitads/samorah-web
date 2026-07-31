@@ -50,7 +50,11 @@ export interface FieldDef {
   altFor?: string;
 
   // ── references (point 5) ── value is { entity, id } (stores the ID, not a slug)
-  refEntity?: "page" | "chapter" | "collection" | "product" | "blog" | "media" | "author";
+  refEntity?: "page" | "chapter" | "collection" | "product" | "blog" | "media" | "author" | "atmosphere" | "testimonial" | "artist" | "journal";
+  // ── featured-content pickers (Phase 7 · point 28) ── on a `reference` field, when an item is picked
+  //    its `data[<dataKey>]` is copied into the sibling field `<fieldKey>` (denormalised display fields,
+  //    then editable). Map = { dataKey: fieldKey }. Lets a section feature any entity from a dropdown.
+  refFill?: Record<string, string>;
 
   // ── localisation (point 10) ── when true, the value is stored locale-keyed
   //    ({ en: "…", hi: "…" }) and read via resolveLocalized(); cheap seam today.

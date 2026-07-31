@@ -5015,6 +5015,22 @@ video.asset-image {
 .home-content__img--photo { aspect-ratio: auto; }
 .home-content__figure figcaption { margin-top: 8px; font-family: var(--font-sans); font-size: 12px; color: var(--muted); }
 
+/* Phase 7 · point 28 — Featured spotlight section */
+.feat { padding: 80px 24px; }
+.feat__inner { max-width: var(--container-wide, 1200px); margin-inline: auto; }
+.feat__card { display: grid; grid-template-columns: 1.1fr 1fr; gap: 48px; align-items: center; }
+.feat[data-kind="testimonial"] .feat__inner, .feat__quote { max-width: 760px; margin-inline: auto; text-align: center; }
+.feat__media { overflow: hidden; border-radius: 10px; }
+.feat__img { width: 100%; aspect-ratio: 4 / 3; background-size: cover; background-position: center; display: block; }
+.feat__img--photo { aspect-ratio: 4 / 3; object-fit: cover; }
+.feat__eyebrow { font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--gold, #caa46a); margin-bottom: 16px; }
+.feat__title { font-family: var(--font-serif); font-size: clamp(28px, 3vw, 40px); font-weight: 300; line-height: 1.15; margin-bottom: 16px; }
+.feat__blurb { font-family: var(--font-sans); font-size: 15px; line-height: 1.8; color: var(--muted, #6b6259); margin-bottom: 28px; max-width: 46ch; }
+.feat__quote-text { font-family: var(--font-serif); font-size: clamp(22px, 2.6vw, 32px); font-weight: 300; font-style: italic; line-height: 1.4; margin-bottom: 18px; }
+.feat__cite { font-family: var(--font-sans); font-size: 12px; letter-spacing: 0.1em; color: var(--muted, #6b6259); }
+.feat__cta { margin-top: 24px; }
+@media (max-width: 860px) { .feat__card { grid-template-columns: 1fr; gap: 28px; } }
+
 /* Phase 5 · point 23 — video embeds (file <video> or lazy YouTube/Vimeo iframe) */
 .video-embed { width: 100%; border-radius: 8px; overflow: hidden; background: #000; }
 .video-embed video { width: 100%; display: block; }

@@ -26,6 +26,7 @@ export const SECTION_TEMPLATES: SectionTemplateDef[] = [
   { id: "atmosphere", label: "Featured Atmosphere", description: "Selectable fragrance worlds, each with its own image.", type: "atmosphere" },
   { id: "invitations", label: "Living with Fragrance", description: "Two connected editorial plates.", type: "invitations" },
   { id: "editorial-content", label: "Editorial content", description: "Compose from Quote / Paragraph / Heading / Image / Button blocks — with a rich-text editor.", type: "content-blocks" },
+  { id: "featured-spotlight", label: "Featured spotlight", description: "Feature a product, chapter, atmosphere, testimonial, artist or journal piece — picked from a dropdown.", type: "featured-content" },
   // Coming soon — these need new storefront components / integrations before they can render.
   { id: "split-hero", label: "Split Hero", description: "Two-column hero (image + copy). Needs a new component.", type: "", comingSoon: true },
   { id: "video", label: "Video", description: "Background or embedded video. Needs a new component.", type: "", comingSoon: true },

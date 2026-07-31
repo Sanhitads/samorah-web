@@ -16,7 +16,7 @@ export const PAGE_KEY = "homepage";
 /** The sections that compose the DEFAULT homepage (the current hand-built order). */
 export const DEFAULT_ORDER = ["hero", "chapters", "brand-story", "atmosphere", "invitations", "words", "editorial-world", "letters"] as const;
 /** All section types the homepage can render (default set + optional add-ons). */
-export const SECTION_TYPES = [...DEFAULT_ORDER, "testimonials", "content-blocks"] as const;
+export const SECTION_TYPES = [...DEFAULT_ORDER, "testimonials", "content-blocks", "featured-content"] as const;
 export type SectionType = (typeof SECTION_TYPES)[number];
 
 export const SECTION_META: Record<SectionType, { label: string; note: string }> = {
@@ -30,6 +30,7 @@ export const SECTION_META: Record<SectionType, { label: string; note: string }> 
   letters: { label: "The Letters", note: "Quiet editorial close" },
   testimonials: { label: "Testimonials", note: "Reader voices — repeatable blocks" },
   "content-blocks": { label: "Editorial content", note: "Compose from Quote / Paragraph / Heading / Image / Button blocks — reorder freely" },
+  "featured-content": { label: "Featured spotlight", note: "Feature any product / chapter / atmosphere / testimonial / artist / journal piece — picked from a dropdown" },
 };
 
 export interface HomeSection extends ComposedSection { type: SectionType }

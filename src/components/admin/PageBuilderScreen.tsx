@@ -5,6 +5,11 @@ import { getPageAdmin } from "@/services/pageComposerService";
 import { COMPOSABLE_PAGES, resolveAdminSections, pageSchemas } from "@/config/composablePages";
 import { listMedia } from "@/services/media/mediaService";
 import { listProductsAdmin } from "@/services/productAdminService";
+import { listCollectionsAdmin } from "@/services/collectionAdminService";
+import { getFeaturedExperiences } from "@/config/experiences";
+import { getTestimonials } from "@/config/testimonials";
+import { ARTISTS } from "@/config/artist";
+import { getJournalHighlights } from "@/config/journalHighlights";
 import { listSectionTemplates } from "@/services/sectionLibraryService";
 import { listSeoOverrides } from "@/services/seoRedirectService";
 import { getHomepagePerformance } from "@/services/analytics/performanceService";
@@ -59,14 +64,22 @@ export async function PageBuilderScreen({ pageKey }: { pageKey: string }) {
 
   // Product options (with data) so a Featured-Atmosphere block can "Pull from a product" — the picker
   // fills its fields from a real product, then stays fully editable (or leave blank + type your own).
+  // Featured-content pickers (Phase 7 · point 28) — every featurable entity, each normalised to a common
+  // display shape ({title,image,imageAlt,href,blurb}) so the reference picker can denormalise on select.
   let entities: EntityOptions = {};
   if (canManage) {
-    const products = await listProductsAdmin();
+    const [products, collections] = await Promise.all([listProductsAdmin(), listCollectionsAdmin()]);
     entities = {
       product: products.map((p) => ({
         id: p.id, label: p.name,
-        data: { title: p.name, image: p.imageUrl ?? "", chapter: p.collectionName ?? "", productType: p.scentGroup ?? p.fragranceFamily ?? "", ctaHref: `/shop/${p.slug}`, ctaLabel: `Discover ${p.name}` },
+        // Keeps the atmosphere blockSource keys (chapter/productType/ctaHref/ctaLabel) + featured-content keys.
+        data: { title: p.name, image: p.imageUrl ?? "", chapter: p.collectionName ?? "", productType: p.scentGroup ?? p.fragranceFamily ?? "", ctaHref: `/shop/${p.slug}`, ctaLabel: `Discover ${p.name}`, imageAlt: p.name, href: `/shop/${p.slug}`, blurb: p.collectionName ?? "" },
       })),
+      collection: collections.map((c) => ({ id: c.id, label: c.name, data: { title: c.name, image: c.coverImageUrl ?? "", imageAlt: c.name, href: `/chapters/${c.slug}`, blurb: c.tagline ?? c.volume ?? "" } })),
+      atmosphere: getFeaturedExperiences().map((e) => ({ id: e.id, label: e.displayName || e.title, data: { title: e.displayName || e.title, image: e.image ?? "", imageAlt: e.imageAlt ?? e.title, href: e.ctaHref ?? "", blurb: e.productType ?? "" } })),
+      testimonial: getTestimonials(null, 20).map((t) => ({ id: t.id, label: (t.attribution || t.quote).slice(0, 48), data: { title: t.attribution || "A reader", blurb: t.quote, image: "", imageAlt: "", href: "" } })),
+      artist: ARTISTS.map((a) => ({ id: a.id, label: a.name, data: { title: a.name, image: a.portrait ?? "", imageAlt: a.name, href: "", blurb: a.role ?? "" } })),
+      journal: getJournalHighlights().map((j) => ({ id: j.id, label: j.title, data: { title: j.title, image: j.image ?? "", imageAlt: j.title, href: j.href ?? "", blurb: j.excerpt ?? "" } })),
     };
   }
 
