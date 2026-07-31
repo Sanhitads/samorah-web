@@ -1060,9 +1060,12 @@ a.adm-badge[data-b="incident"]:hover { background: rgba(168,68,58,0.22); }
 /* Side-by-side live builder (Homepage) — editor left, live preview sticky right. */
 .pb-live { display: grid; grid-template-columns: minmax(0, 480px) minmax(0, 1fr); gap: 16px; align-items: start; }
 .pb-live__editor { min-width: 0; }
-.pb-live__preview { position: sticky; top: 12px; height: calc(100vh - 96px); display: flex; border: 1px solid var(--ad-hair); border-radius: 10px; overflow: hidden; background: #e6e3dd; }
+/* Sticky live preview — fills (almost) the whole viewport height once you scroll into the builder,
+   with a small 16px top/bottom breathing margin. `svh` handles mobile browser chrome; `vh` is the
+   fallback for browsers without it. */
+.pb-live__preview { position: sticky; top: 16px; height: calc(100vh - 32px); height: calc(100svh - 32px); display: flex; border: 1px solid var(--ad-hair); border-radius: 10px; overflow: hidden; background: #e6e3dd; }
 .pb-live__preview .pe-live__panel { flex: 1; min-width: 0; }
-@media (max-width: 1000px) { .pb-live { grid-template-columns: 1fr; } .pb-live__preview { position: static; height: 70vh; } }
+@media (max-width: 1000px) { .pb-live { grid-template-columns: 1fr; } .pb-live__preview { position: sticky; top: 8px; height: 88vh; height: 88svh; } }
 
 .hp-preview { margin-top: 16px; border: 1px solid var(--ad-hair); border-radius: 6px; overflow: hidden; }
 .hp-preview__bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--ad-hair); background: rgba(31,26,22,0.03); }

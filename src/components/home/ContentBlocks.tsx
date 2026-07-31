@@ -61,7 +61,7 @@ export function ContentBlocks({ eyebrow, blocks, align }: { eyebrow?: string; bl
               );
             }
             case "cta":
-              return s(b.label) ? <div key={i} className="home-content__cta"><Link href={s(b.href) || "#"} className="btn btn-ghost">{s(b.label)}</Link></div> : null;
+              return s(b.label) ? <div key={i} className="home-content__cta"><Link href={s(b.href) || "#"} className="btn btn-outline">{s(b.label)}</Link></div> : null;
             default:
               return null;
           }
