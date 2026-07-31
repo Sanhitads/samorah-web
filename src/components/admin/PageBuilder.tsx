@@ -13,6 +13,7 @@ import { AddSectionModal } from "./AddSectionModal";
 import { PageSeoPanel, type PageSeo } from "./PageSeoPanel";
 import { PerformancePanel } from "./PerformancePanel";
 import { SectionAnalyticsPanel } from "./SectionAnalyticsPanel";
+import { AccessibilityPanel } from "./AccessibilityPanel";
 import type { HomepagePerformance } from "@/services/analytics/performanceService";
 import type { SectionStat } from "@/services/analytics/sectionAnalyticsService";
 import { enabledForState, effectiveSectionState, type SectionState } from "@/lib/cms/sectionState";
@@ -307,6 +308,7 @@ export function PageBuilder({ pageKey, label, view, sectionMeta, schemas, media,
       {seo ? <PageSeoPanel path={previewPath} label={label} initial={seo} origin={seoOrigin ?? ""} media={media} /> : null}
       {analytics ? <SectionAnalyticsPanel stats={analytics} sections={sections.map((s) => ({ id: s.id, type: s.type, label: labelOf(s.type) }))} /> : null}
       {perf ? <PerformancePanel perf={perf} typeLabels={Object.fromEntries(sectionMeta.map((m) => [m.type, m.label]))} /> : null}
+      <AccessibilityPanel sections={sections} schemas={schemas} labelOf={labelOf} onFocus={setFocusId} />
       {(() => {
         const renderRow = (s: ComposedSection, i: number, draggable: boolean) => {
           const st = statusOf(s);

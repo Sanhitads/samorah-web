@@ -42,23 +42,46 @@ export async function deleteRedirect(id: string, actorId?: string): Promise<{ ok
 }
 
 // ── SEO overrides ──────────────────────────────────────────────────────────
-export interface SeoOverrideRow { path: string; title: string; description: string; ogImage: string; robots: string; canonical: string; sitemapPriority: string; changeFreq: string }
+export interface SeoOverrideRow { path: string; title: string; description: string; ogImage: string; robots: string; canonical: string; sitemapPriority: string; changeFreq: string; structuredData: string }
+
+const jsonToText = (v: unknown): string => { if (v == null) return ""; try { return typeof v === "string" ? v : JSON.stringify(v, null, 2); } catch { return ""; } };
+// structured_data is added by a later migration — reads/writes tolerate its absence.
+const SEO_SCHEMA_MISS = /structured_data|could not find|schema cache|PGRST204|column .* does not exist/i;
 
 export async function listSeoOverrides(): Promise<SeoOverrideRow[]> {
   const db = createAdminClient() as any;
   const { data } = await db.from("seo_overrides").select("*").order("path");
-  return (data ?? []).map((r: any) => ({ path: r.path, title: r.title ?? "", description: r.description ?? "", ogImage: r.og_image ?? "", robots: r.robots ?? "", canonical: r.canonical ?? "", sitemapPriority: r.sitemap_priority != null ? String(r.sitemap_priority) : "", changeFreq: r.change_freq ?? "" }));
+  return (data ?? []).map((r: any) => ({ path: r.path, title: r.title ?? "", description: r.description ?? "", ogImage: r.og_image ?? "", robots: r.robots ?? "", canonical: r.canonical ?? "", sitemapPriority: r.sitemap_priority != null ? String(r.sitemap_priority) : "", changeFreq: r.change_freq ?? "", structuredData: jsonToText(r.structured_data) }));
 }
 
-export async function upsertSeoOverride(input: { path: string; title?: string; description?: string; ogImage?: string; robots?: string; canonical?: string; sitemapPriority?: string; changeFreq?: string }, actorId?: string): Promise<{ ok: boolean; reason?: string }> {
+export async function upsertSeoOverride(input: { path: string; title?: string; description?: string; ogImage?: string; robots?: string; canonical?: string; sitemapPriority?: string; changeFreq?: string; structuredData?: string }, actorId?: string): Promise<{ ok: boolean; reason?: string }> {
   const path = cleanPath(input.path);
   if (!path) return { ok: false, reason: "path required" };
+  // Validate custom JSON-LD up front so we never store invalid JSON.
+  let structured: unknown = undefined;
+  if (input.structuredData !== undefined) {
+    const t = input.structuredData.trim();
+    if (!t) structured = null;
+    else { try { structured = JSON.parse(t); } catch { return { ok: false, reason: "Structured data must be valid JSON." }; } }
+  }
   const db = createAdminClient() as any;
   const prio = input.sitemapPriority && !Number.isNaN(Number(input.sitemapPriority)) ? Number(input.sitemapPriority) : null;
-  const { error } = await db.from("seo_overrides").upsert({ path, title: input.title || null, description: input.description || null, og_image: input.ogImage || null, robots: input.robots || null, canonical: input.canonical || null, sitemap_priority: prio, change_freq: input.changeFreq || null, updated_at: new Date().toISOString() }, { onConflict: "path" });
-  if (error) return { ok: false, reason: error.message };
+  const row: Record<string, unknown> = { path, title: input.title || null, description: input.description || null, og_image: input.ogImage || null, robots: input.robots || null, canonical: input.canonical || null, sitemap_priority: prio, change_freq: input.changeFreq || null, updated_at: new Date().toISOString() };
+  if (structured !== undefined) row.structured_data = structured;
+  let up = await db.from("seo_overrides").upsert(row, { onConflict: "path" });
+  if (up.error && SEO_SCHEMA_MISS.test(up.error.message)) { delete row.structured_data; up = await db.from("seo_overrides").upsert(row, { onConflict: "path" }); }
+  if (up.error) return { ok: false, reason: up.error.message };
   await logEvent({ entityType: "settings", event: "seo.saved", actorType: actorId ? "staff" : "system", actorId, notes: path });
   return { ok: true };
+}
+
+/** The custom JSON-LD object stored for a route (for `<script type="application/ld+json">`), or null. */
+export async function getRouteStructuredData(path: string): Promise<unknown | null> {
+  try {
+    const db = createAdminClient() as any;
+    const { data } = await db.from("seo_overrides").select("structured_data").eq("path", cleanPath(path)).maybeSingle();
+    return data?.structured_data ?? null;
+  } catch { return null; }
 }
 
 export async function deleteSeoOverride(path: string, actorId?: string): Promise<{ ok: boolean; reason?: string }> {

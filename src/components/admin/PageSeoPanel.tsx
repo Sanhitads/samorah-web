@@ -9,7 +9,14 @@ import type { MediaOption } from "./SchemaForm";
  * It layers over the global SEO defaults and is read by the page's `generateMetadata` via
  * `withRouteSeo(path)`. Saving posts to the existing `/api/admin/seo` endpoint (catalog.manage).
  */
-export type PageSeo = { title: string; description: string; ogImage: string; canonical: string; robots: string };
+export type PageSeo = { title: string; description: string; ogImage: string; canonical: string; robots: string; structuredData: string };
+
+const ORG_TEMPLATE = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "WebPage",
+  name: "Samorah — Handmade Scented Candles",
+  description: "Slow-crafted luxury scented candles inspired by ritual, silence and timeless warmth.",
+}, null, 2);
 
 export function PageSeoPanel({ path, label, initial, origin, media = [] }: {
   path: string; label: string; initial: PageSeo; origin: string; media?: MediaOption[];
@@ -28,6 +35,8 @@ export function PageSeoPanel({ path, label, initial, origin, media = [] }: {
   const save = async () => {
     setBusy(true); setMsg(null);
     try {
+      // Validate custom JSON-LD client-side too, for a friendly message before the round-trip.
+      if (seo.structuredData.trim()) { try { JSON.parse(seo.structuredData); } catch { setBusy(false); setMsg({ tone: "err", text: "Structured data must be valid JSON." }); return; } }
       const res = await fetch("/api/admin/seo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "seo.save", seo: { path, ...seo } }) });
       const d = await res.json(); setBusy(false);
       if (!res.ok || d.ok === false) { setMsg({ tone: "err", text: d.error ?? d.reason ?? "Failed to save" }); return; }
@@ -64,6 +73,9 @@ export function PageSeoPanel({ path, label, initial, origin, media = [] }: {
                 <option value="noindex,nofollow">noindex, nofollow</option>
                 <option value="index,nofollow">index, nofollow</option>
               </select></label>
+            <label className="cfg-field"><span>Structured data (JSON-LD) <span className="admin__muted">— optional, advanced</span></span>
+              <textarea rows={4} className="hp-seo__jsonld" value={seo.structuredData} onChange={(e) => set("structuredData", e.target.value)} placeholder='{ "@context": "https://schema.org", "@type": "WebPage", … }' spellCheck={false} />
+              <span className="cfg-hint">Rendered as a &lt;script type=&quot;application/ld+json&quot;&gt; on this page, on top of the automatic Organization + WebSite schema. <button type="button" className="ff-btn ff-btn--mini" onClick={() => set("structuredData", ORG_TEMPLATE)}>Insert WebPage template</button></span></label>
             <div className="cfg-actions">
               <button type="button" className="ff-btn ff-btn--primary" disabled={busy} onClick={save}>{busy ? "Saving…" : "Save SEO"}</button>
               {msg ? <span className={`cfg-msg cfg-msg--${msg.tone}`}>{msg.text}</span> : null}

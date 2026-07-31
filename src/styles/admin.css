@@ -1119,6 +1119,18 @@ a.adm-badge[data-b="incident"]:hover { background: rgba(168,68,58,0.22); }
 .hp-analytics__scroll { overflow-x: auto; }
 .hp-analytics__table { width: 100%; min-width: 460px; }
 .hp-analytics__table td.admin__mono { text-align: right; }
+/* Phase 7 · point 32 — accessibility checker */
+.hp-a11y__body { padding: 0 14px 16px; }
+.hp-a11y__list { list-style: none; margin: 6px 0 10px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.hp-a11y__item { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-left: 3px solid var(--ad-hair, rgba(31,26,22,0.2)); background: rgba(31,26,22,0.02); border-radius: 0 6px 6px 0; }
+.hp-a11y__item.is-error { border-left-color: #a8443a; }
+.hp-a11y__item.is-warn { border-left-color: #c9a24a; }
+.hp-a11y__jump { display: flex; gap: 10px; align-items: center; background: none; border: none; padding: 0; cursor: pointer; font: inherit; text-align: left; }
+.hp-a11y__tag { font-size: 12px; font-weight: 500; }
+.hp-a11y__tag.is-error { color: #a8443a; }
+.hp-a11y__tag.is-warn { color: #9a6a1e; }
+.hp-a11y__where { font-size: 11px; color: var(--smoke, #6b6259); }
+.hp-a11y__msg { font-size: 12px; }
 /* Phase 5 · point 22 — alt-text validation */
 .sf-warn { color: #9a6a1e; font-size: 11px; }
 .sf-decorative { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--smoke, #6b6259); cursor: pointer; }

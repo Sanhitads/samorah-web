@@ -4,7 +4,8 @@ import { requireStaff } from "@/lib/auth/requireStaff";
 import { ComposedSections } from "@/components/page/ComposedSections";
 import { PreviewBanner } from "@/components/page/PreviewBanner";
 import { SectionTracker } from "@/components/analytics/SectionTracker";
-import { withRouteSeo } from "@/services/seoRedirectService";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { withRouteSeo, getRouteStructuredData } from "@/services/seoRedirectService";
 
 /**
  * Homepage — consumer #1 of the Composable Page framework. Composition + content are
@@ -22,10 +23,11 @@ export function generateMetadata(): Promise<Metadata> {
 export default async function HomePage({ searchParams }: { searchParams: Promise<{ preview?: string }> }) {
   const sp = await searchParams;
   const preview = sp.preview === "1" ? (await requireStaff("editor")).ok : false;
-  const sections = await getHomepageSections({ preview });
+  const [sections, structuredData] = await Promise.all([getHomepageSections({ preview }), getRouteStructuredData("/")]);
 
   return (
     <main>
+      {structuredData ? <JsonLd data={structuredData} /> : null}
       {preview ? <PreviewBanner label="homepage" livePath="/" /> : null}
       <ComposedSections sections={sections} track={!preview} />
       {preview ? null : <SectionTracker pageKey="homepage" />}

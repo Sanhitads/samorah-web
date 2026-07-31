@@ -49,7 +49,7 @@ export async function PageBuilderScreen({ pageKey }: { pageKey: string }) {
   // Page SEO (Phase 5 · point 24) — the DB override for this page's live path, edited in-builder.
   const seoRow = canManage ? (await listSeoOverrides()).find((r) => r.path === page.previewPath) : undefined;
   const seo = canManage
-    ? { title: seoRow?.title ?? "", description: seoRow?.description ?? "", ogImage: seoRow?.ogImage ?? "", canonical: seoRow?.canonical ?? "", robots: seoRow?.robots ?? "" }
+    ? { title: seoRow?.title ?? "", description: seoRow?.description ?? "", ogImage: seoRow?.ogImage ?? "", canonical: seoRow?.canonical ?? "", robots: seoRow?.robots ?? "", structuredData: seoRow?.structuredData ?? "" }
     : undefined;
 
   // Analytics (Phase 6): performance meter (deterministic, from media weights) + per-section metrics.
