@@ -3720,6 +3720,19 @@ h1, h2, h3, h4 {
 }
 .home-hero__cta-row { display: flex; }
 
+/* Phase 5 · point 24 — optional hero treatment controls (absent → the original look) */
+.home-hero__video { width: 100%; height: 100%; object-fit: cover; }
+.home-hero[data-align="center"] .home-hero__inner { text-align: center; }
+.home-hero[data-align="center"] .home-hero__content { max-width: 720px; margin-inline: auto; }
+.home-hero[data-align="center"] .home-hero__sub { margin-inline: auto; }
+.home-hero[data-align="center"] .home-hero__cta-row { justify-content: center; }
+.home-hero[data-align="right"] .home-hero__inner { text-align: right; }
+.home-hero[data-align="right"] .home-hero__content { margin-left: auto; }
+.home-hero[data-align="right"] .home-hero__sub { margin-left: auto; }
+.home-hero[data-align="right"] .home-hero__cta-row { justify-content: flex-end; }
+.home-hero__cta[data-style="solid"] { background: var(--ivory); color: var(--deep-charcoal); border-color: var(--ivory); }
+.home-hero__cta[data-style="underline"] { border-color: transparent; padding-inline: 0; text-decoration: underline; text-underline-offset: 6px; }
+
 /* Quiet scroll cue */
 .home-hero__scroll {
   position: absolute;
@@ -5001,6 +5014,12 @@ video.asset-image {
 .home-content__img { width: 100%; aspect-ratio: 16 / 10; border-radius: 8px; background-size: cover; background-position: center; display: block; }
 .home-content__img--photo { aspect-ratio: auto; }
 .home-content__figure figcaption { margin-top: 8px; font-family: var(--font-sans); font-size: 12px; color: var(--muted); }
+
+/* Phase 5 · point 23 — video embeds (file <video> or lazy YouTube/Vimeo iframe) */
+.video-embed { width: 100%; border-radius: 8px; overflow: hidden; background: #000; }
+.video-embed video { width: 100%; display: block; }
+.video-embed--frame { position: relative; aspect-ratio: 16 / 9; }
+.video-embed--frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 .home-content__cta { margin: 24px 0; }
 .home-content[data-align="center"] .home-content__quote cite { text-align: center; }
 

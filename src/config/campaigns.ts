@@ -27,6 +27,18 @@ export interface HeroCampaign {
   ctaHref: string;
   /** Colour mood / editorial atmosphere (future: tints scrim/accents). */
   theme: string;
+  /**
+   * Optional hero treatment controls (Phase 5 · point 24). All optional — when a
+   * field is absent the Hero renders its original fixed look, so existing campaigns
+   * and saved sections are unaffected.
+   */
+  videoUrl?: string;            // MP4 / Cloudinary video — plays muted behind the hero, overrides the image
+  align?: string;               // content alignment: left (default) / center / right
+  overlayStyle?: string;        // scrim (default) / dark / gradient / none
+  overlayOpacity?: number;      // 0–100 — how strong the overlay is
+  buttonStyle?: string;         // ghost (default) / solid / underline
+  animate?: boolean;            // entrance animation (default true)
+  showScroll?: boolean;         // scroll indicator (default true)
   /** Chapter(s) this campaign features. A campaign may highlight one, several,
    *  or seasonal chapters — emphasis is expressed later through editorial
    *  photography (the active chapter receives current imagery), never through

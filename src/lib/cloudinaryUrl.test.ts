@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isCloudinary, cldUrl, cldSrcSet, cldBlur, CLD_WIDTHS } from "./cloudinaryUrl";
+import { isCloudinary, cldUrl, cldSrcSet, cldBlur, cldCrop, focalGravity, CLD_WIDTHS } from "./cloudinaryUrl";
 
 const RAW = "https://res.cloudinary.com/samorah/image/upload/v1710000000/products/kashmiri-chai.jpg";
 
@@ -41,5 +41,27 @@ describe("cloudinaryUrl", () => {
     expect(cldBlur(RAW)).toBe("https://res.cloudinary.com/samorah/image/upload/e_blur:2000,q_30,w_24,c_limit,f_auto/v1710000000/products/kashmiri-chai.jpg");
     expect(cldBlur("https://example.com/x.jpg")).toBeUndefined();
     expect(cldBlur("gradient:grad-chai")).toBeUndefined();
+  });
+
+  it("maps a focal point to a compass gravity (Phase 5 #21)", () => {
+    expect(focalGravity(null, null)).toBe("auto");
+    expect(focalGravity(0.5, 0.5)).toBe("center");
+    expect(focalGravity(0.1, 0.1)).toBe("north_west");
+    expect(focalGravity(0.9, 0.9)).toBe("south_east");
+    expect(focalGravity(0.5, 0.1)).toBe("north");
+    expect(focalGravity(0.9, 0.5)).toBe("east");
+  });
+
+  it("bakes a focal-aware crop into the URL (c_fill,g_*,ar_*)", () => {
+    expect(cldCrop(RAW, { ar: "16:9", focalX: 0.5, focalY: 0.2 }))
+      .toBe("https://res.cloudinary.com/samorah/image/upload/c_fill,g_north,ar_16:9,f_auto,q_auto/v1710000000/products/kashmiri-chai.jpg");
+    // no focal → smart g_auto; width included when given
+    expect(cldCrop(RAW, { ar: "1:1", width: 800 }))
+      .toBe("https://res.cloudinary.com/samorah/image/upload/c_fill,g_auto,ar_1:1,w_800,f_auto,q_auto/v1710000000/products/kashmiri-chai.jpg");
+    // invalid ar is dropped; non-Cloudinary + already-transformed pass through
+    expect(cldCrop(RAW, { ar: "bogus" })).toBe("https://res.cloudinary.com/samorah/image/upload/c_fill,g_auto,f_auto,q_auto/v1710000000/products/kashmiri-chai.jpg");
+    expect(cldCrop("https://example.com/x.jpg", { ar: "1:1" })).toBe("https://example.com/x.jpg");
+    const already = "https://res.cloudinary.com/samorah/image/upload/c_fill,ar_1:1/v1/products/x.jpg";
+    expect(cldCrop(already, { ar: "16:9" })).toBe(already);
   });
 });

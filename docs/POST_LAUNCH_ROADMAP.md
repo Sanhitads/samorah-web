@@ -560,3 +560,38 @@ All additive: the storefront still reads `published` exactly as before; selectiv
 All additive: `richtext` was a pre-existing unused field type; `blockVariants` is optional and
 backward-compatible; `content-blocks` is a brand-new section type — existing sections, the storefront,
 and the DB schema are untouched, no migration.
+
+## P10.4 — Media Management (Phase 5)
+
+Analysis first established that most of the plumbing already existed (a `media` table with
+folders/tags/focal/blur, `mediaService`, the `/admin/media` library, Cloudinary signed uploads, the
+`seo_overrides` SEO engine + `withRouteSeo`), so this phase was **targeted wiring**, not greenfield.
+
+**Shipped (unit + Playwright tested; one small additive migration):**
+
+- **Hero treatment controls (24)** — the Hero gained optional **background video, content alignment,
+  overlay style (scrim/dark/gradient/none) + strength, button style, entrance-animation toggle, and
+  scroll-indicator toggle**. All optional → existing heroes render identically.
+- **Homepage SEO (24)** — a **"Page SEO & social preview"** panel inside the builder (works for
+  homepage/about/journal via each page's live path) edits the DB SEO override (title/description/OG
+  image/canonical/robots) with a live **Google SERP + OG card** preview, saving via `/api/admin/seo`.
+- **Alt-text validation (22)** — a media field's alt (via the new `altFor` link) **warns when a real
+  image has no alt** and offers a **"Decorative" toggle** (sidecar `<img>__decorative`) to suppress it.
+- **Media Library picker (20/25)** — a **"Browse Media"** modal on every media field: browse grid,
+  search, folder + tag filters, **recently used**, reuse, upload/replace, and a new GET
+  `/api/admin/media` list endpoint (items + folders + tags). Inline **Alt / Credit / Copyright** editing
+  persists to the asset (new `media.credit`/`copyright` columns — migration `20260806120000`, service
+  degrades gracefully pre-migration).
+- **Image editing — crop + focal (21)** — the picker has a click-to-set **focal point** and
+  **aspect-ratio** presets; the selection is baked into a Cloudinary delivery URL
+  (`cldCrop` → `c_fill,g_<focal>,ar_<ratio>,f_auto,q_auto`), so any plain `<img>`/background shows the
+  cropped, focal-aware image with **no per-component change**. Focal also saved to the asset.
+- **Video support (23)** — the media upload route + Cloudinary provider now accept **MP4/WebM** (video
+  `kind`, no image-only transforms); a `parseVideo` helper + `<VideoEmbed>` render **MP4 / YouTube /
+  Vimeo** (YouTube via privacy `youtube-nocookie`, lazy 16:9 iframe); a new **video block** in the
+  Editorial-content section; and hero **background video**.
+- **Editorial blocks (26)** — Bold / Italic / Links / Lists / Quotes were already delivered by the
+  Phase 4 rich-text editor (`RichTextField` + sanitiser); verified, no new work.
+
+Additive throughout: the one migration only **adds** two nullable `media` columns; every storefront
+change is opt-in (absent settings → the original look).

@@ -20,6 +20,7 @@ type Draft = { chapter: any; allChapters: any[] } | null;
 export default function CandleChapterPreviewRoute() {
   const [draft, setDraft] = useState<Draft>(null);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const receivedRef = useRef(false); // true once the first draft arrives → stops the ready-retry
 
   useEffect(() => {
     const origin = window.location.origin;
@@ -33,16 +34,25 @@ export default function CandleChapterPreviewRoute() {
     };
     const onMessage = (e: MessageEvent) => {
       if (e.origin !== origin || e.data?.source !== SRC) return;
-      if (e.data.kind === "draft") setDraft(e.data.product);
+      if (e.data.kind === "draft") { receivedRef.current = true; setDraft(e.data.product); }
       if (e.data.kind === "focus") focusSection(e.data.id);
     };
     const onClick = (ev: MouseEvent) => { if ((ev.target as HTMLElement)?.closest?.("a")) ev.preventDefault(); };
     window.addEventListener("message", onMessage);
     document.addEventListener("click", onClick, true);
-    window.parent?.postMessage({ source: SRC, kind: "ready" }, origin);
+    // Retry "ready" until the editor answers with a draft (a one-shot "ready" can be missed if the
+    // parent listener isn't attached yet — React StrictMode mount/remount in dev — leaving it stuck).
+    const announce = () => window.parent?.postMessage({ source: SRC, kind: "ready" }, origin);
+    announce();
+    let tries = 0;
+    const readyTimer = setInterval(() => {
+      if (receivedRef.current || tries++ > 25) { clearInterval(readyTimer); return; }
+      announce();
+    }, 200);
     return () => {
       window.removeEventListener("message", onMessage);
       document.removeEventListener("click", onClick, true);
+      clearInterval(readyTimer);
       if (flashTimer.current) clearTimeout(flashTimer.current);
     };
   }, []);

@@ -60,7 +60,7 @@ export function MediaManager({ items, folders, canManage, uploadsOn, folder, q }
 
   const saveEdit = async () => {
     if (!edit) return;
-    const d = await postJson({ action: "update", id: edit.id, patch: { alt: edit.alt, title: edit.title, role: edit.role, folder: edit.folder, tags: edit.tags } });
+    const d = await postJson({ action: "update", id: edit.id, patch: { alt: edit.alt, title: edit.title, role: edit.role, folder: edit.folder, tags: edit.tags, credit: edit.credit, copyright: edit.copyright } });
     if (d?.ok) { setEdit(null); refresh(); }
   };
 
@@ -137,6 +137,10 @@ export function MediaManager({ items, folders, canManage, uploadsOn, folder, q }
               <label className="cfg-field"><span>Folder</span><input value={edit.folder} onChange={(e) => setEdit({ ...edit, folder: e.target.value })} /></label>
             </div>
             <label className="cfg-field"><span>Tags (comma-separated)</span><input value={edit.tags.join(", ")} onChange={(e) => setEdit({ ...edit, tags: e.target.value.split(",").map((t) => t.trim()) })} /></label>
+            <div className="cfg-grid">
+              <label className="cfg-field"><span>Credit</span><input value={edit.credit} onChange={(e) => setEdit({ ...edit, credit: e.target.value })} placeholder="Photographer / source" /></label>
+              <label className="cfg-field"><span>Copyright</span><input value={edit.copyright} onChange={(e) => setEdit({ ...edit, copyright: e.target.value })} placeholder="© 2026 …" /></label>
+            </div>
             {err ? <p className="ff-err">{err}</p> : null}
             <div className="om-modal__actions"><button type="button" className="ff-btn" disabled={busy} onClick={() => setEdit(null)}>Cancel</button><button type="button" className="ff-btn ff-btn--primary" disabled={busy} onClick={saveEdit}>{busy ? "Saving…" : "Save"}</button></div>
           </div>

@@ -10,6 +10,7 @@ import type { MediaOption, EntityOptions } from "./SchemaForm";
 import { LivePreviewPanel } from "./LivePreviewPanel";
 import { PageBuilderSectionRow } from "./PageBuilderSectionRow";
 import { AddSectionModal } from "./AddSectionModal";
+import { PageSeoPanel, type PageSeo } from "./PageSeoPanel";
 import { enabledForState, effectiveSectionState, type SectionState } from "@/lib/cms/sectionState";
 
 export type SectionTemplate = { id: string; label: string; description: string; type: string; settings: Record<string, unknown>; comingSoon: boolean };
@@ -32,8 +33,8 @@ const sectionKey = (s: ComposedSection) => JSON.stringify({ type: s.type, enable
 const fingerprints = (list: ComposedSection[]) => Object.fromEntries(list.map((s) => [s.id, sectionKey(s)]));
 const PREVIEW_SRC = "samorah-pdp-preview"; // shared postMessage tag (LivePreviewPanel + preview routes)
 
-export function PageBuilder({ pageKey, label, view, sectionMeta, schemas, media, entities = {}, templates = [], library: libraryProp = [], previewPath, previewCookie, livePreviewSrc }: {
-  pageKey: string; label: string; view: PageAdminView; sectionMeta: Meta[]; schemas: Record<string, SectionSchema>; media: MediaOption[]; entities?: EntityOptions; templates?: SectionTemplate[]; library?: LibraryEntry[]; previewPath: string; previewCookie: string; livePreviewSrc?: string;
+export function PageBuilder({ pageKey, label, view, sectionMeta, schemas, media, entities = {}, templates = [], library: libraryProp = [], previewPath, previewCookie, livePreviewSrc, seo, seoOrigin }: {
+  pageKey: string; label: string; view: PageAdminView; sectionMeta: Meta[]; schemas: Record<string, SectionSchema>; media: MediaOption[]; entities?: EntityOptions; templates?: SectionTemplate[]; library?: LibraryEntry[]; previewPath: string; previewCookie: string; livePreviewSrc?: string; seo?: PageSeo; seoOrigin?: string;
 }) {
   const router = useRouter();
   const apiBase = `/api/admin/pages/${pageKey}`;
@@ -299,6 +300,7 @@ export function PageBuilder({ pageKey, label, view, sectionMeta, schemas, media,
           <button type="button" className="ff-btn ff-btn--primary" onClick={() => setShowAdd(true)}>+ Add section{library.length ? ` · ${library.length} saved` : ""}</button>
         </span>
       </div>
+      {seo ? <PageSeoPanel path={previewPath} label={label} initial={seo} origin={seoOrigin ?? ""} media={media} /> : null}
       {(() => {
         const renderRow = (s: ComposedSection, i: number, draggable: boolean) => {
           const st = statusOf(s);

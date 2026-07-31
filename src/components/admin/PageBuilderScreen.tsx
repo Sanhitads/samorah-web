@@ -6,6 +6,8 @@ import { COMPOSABLE_PAGES, resolveAdminSections, pageSchemas } from "@/config/co
 import { listMedia } from "@/services/media/mediaService";
 import { listProductsAdmin } from "@/services/productAdminService";
 import { listSectionTemplates } from "@/services/sectionLibraryService";
+import { listSeoOverrides } from "@/services/seoRedirectService";
+import { canonicalOrigin } from "@/config/site";
 import { SECTION_TEMPLATES } from "@/config/sectionTemplates";
 import { getPageType } from "@/lib/cms/pageRegistry";
 import { resolveContent } from "@/lib/cms/sectionSchema";
@@ -42,6 +44,12 @@ export async function PageBuilderScreen({ pageKey }: { pageKey: string }) {
   });
   const library = canManage ? await listSectionTemplates() : [];
 
+  // Page SEO (Phase 5 · point 24) — the DB override for this page's live path, edited in-builder.
+  const seoRow = canManage ? (await listSeoOverrides()).find((r) => r.path === page.previewPath) : undefined;
+  const seo = canManage
+    ? { title: seoRow?.title ?? "", description: seoRow?.description ?? "", ogImage: seoRow?.ogImage ?? "", canonical: seoRow?.canonical ?? "", robots: seoRow?.robots ?? "" }
+    : undefined;
+
   // Product options (with data) so a Featured-Atmosphere block can "Pull from a product" — the picker
   // fills its fields from a real product, then stays fully editable (or leave blank + type your own).
   let entities: EntityOptions = {};
@@ -63,7 +71,7 @@ export async function PageBuilderScreen({ pageKey }: { pageKey: string }) {
         <p className="admin__count">{view.draft.length} sections · {view.state}{canManage ? "" : " · read-only (needs catalog.manage)"}</p>
       </header>
       {canManage ? (
-        <PageBuilder pageKey={pageKey} label={page.label} view={{ ...view, draft: resolved }} sectionMeta={sectionMeta} schemas={schemas} media={media} entities={entities} templates={templates} library={library} previewPath={page.previewPath} previewCookie={page.previewCookie} livePreviewSrc={page.livePreviewSrc} />
+        <PageBuilder pageKey={pageKey} label={page.label} view={{ ...view, draft: resolved }} sectionMeta={sectionMeta} schemas={schemas} media={media} entities={entities} templates={templates} library={library} previewPath={page.previewPath} previewCookie={page.previewCookie} livePreviewSrc={page.livePreviewSrc} seo={seo} seoOrigin={canonicalOrigin()} />
       ) : (
         <p className="admin__empty">Editing this page needs the catalog.manage capability.</p>
       )}

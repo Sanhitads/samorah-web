@@ -19,6 +19,7 @@ export interface MediaRow {
   width: number | null; height: number | null; bytes: number | null; format: string | null;
   alt: string; title: string; role: string; folder: string; tags: string[];
   focalX: number | null; focalY: number | null; dominantColor: string | null; aspectRatio: string | null;
+  credit: string; copyright: string;
   status: string; version: number; createdAt: string;
 }
 
@@ -28,17 +29,24 @@ function mapRow(r: any): MediaRow {
     width: r.width ?? null, height: r.height ?? null, bytes: r.bytes ?? null, format: r.format ?? null,
     alt: r.alt ?? "", title: r.title ?? "", role: r.role ?? "support", folder: r.folder ?? "general", tags: Array.isArray(r.tags) ? r.tags : [],
     focalX: r.focal_x ?? null, focalY: r.focal_y ?? null, dominantColor: r.dominant_color ?? null, aspectRatio: r.aspect_ratio ?? null,
+    credit: r.credit ?? r.photographer ?? "", copyright: r.copyright ?? "",
     status: r.status, version: r.version ?? 1, createdAt: r.created_at,
   };
 }
 
+// Columns added by a later migration — a pre-migration DB errors if we send them, so uploads/updates
+// retry without them (mirrors the blur_data_url pattern). Keeps the app working before `db push`.
+const SCHEMA_MISS = /credit|copyright|could not find|schema cache|PGRST204|column .* does not exist/i;
+
 export function mediaConfigured(): boolean { return cloudinaryConfigured(); }
 
-/** List assets, optionally filtered by folder / free-text (title/alt/tags). */
-export async function listMedia(opts: { folder?: string; search?: string; limit?: number } = {}): Promise<MediaRow[]> {
+/** List assets, optionally filtered by folder / free-text (title/alt) / tag / kind. */
+export async function listMedia(opts: { folder?: string; search?: string; tag?: string; kind?: string; limit?: number } = {}): Promise<MediaRow[]> {
   const db = createAdminClient() as any;
   let q = db.from("media").select("*").order("created_at", { ascending: false }).limit(opts.limit ?? 200);
   if (opts.folder && opts.folder !== "all") q = q.eq("folder", opts.folder);
+  if (opts.kind && opts.kind !== "all") q = q.eq("kind", opts.kind);
+  if (opts.tag) q = q.contains("tags", [opts.tag]);
   if (opts.search) {
     const s = opts.search.trim().replace(/[%,]/g, "");
     q = q.or(`title.ilike.%${s}%,alt.ilike.%${s}%`);
@@ -54,20 +62,30 @@ export async function listFolders(): Promise<string[]> {
   return [...new Set((data ?? []).map((r: any) => r.folder as string))].sort() as string[];
 }
 
+/** Distinct tags across all assets (for the picker's tag filter). */
+export async function listTags(): Promise<string[]> {
+  const db = createAdminClient() as any;
+  const { data } = await db.from("media").select("tags");
+  const all = (data ?? []).flatMap((r: any) => (Array.isArray(r.tags) ? r.tags : []));
+  return [...new Set(all as string[])].filter(Boolean).sort();
+}
+
 /** The narrowest master we'd want on a large-screen luxury PDP; below this we upload but warn. */
 export const MIN_RECOMMENDED_WIDTH = 1400;
 
 /** Upload bytes via the storage provider (capped web-master + LQIP + colour), then register the row. */
-export async function uploadMedia(bytes: Buffer, meta: { filename?: string; folder?: string; alt?: string; title?: string }, actorId?: string): Promise<{ ok: boolean; id?: string; url?: string; reason?: string; warning?: string; width?: number; height?: number }> {
+export async function uploadMedia(bytes: Buffer, meta: { filename?: string; folder?: string; alt?: string; title?: string; kind?: string }, actorId?: string): Promise<{ ok: boolean; id?: string; url?: string; reason?: string; warning?: string; width?: number; height?: number }> {
   if (!cloudinaryConfigured()) return { ok: false, reason: "Storage not configured — paste a URL instead." };
+  const kind = meta.kind === "video" ? "video" : "image";
   try {
-    const up = await cloudinaryProvider.upload(bytes, { filename: meta.filename, folder: meta.folder });
+    const up = await cloudinaryProvider.upload(bytes, { filename: meta.filename, folder: meta.folder, kind });
     const reg = await registerMedia({
-      provider: "cloudinary", publicId: up.publicId, url: up.url, width: up.width, height: up.height, bytes: up.bytes, format: up.format,
+      provider: "cloudinary", publicId: up.publicId, url: up.url, kind, width: up.width, height: up.height, bytes: up.bytes, format: up.format,
       dominantColor: up.dominantColor, aspectRatio: up.aspectRatio, blurDataUrl: up.blurDataUrl,
       alt: meta.alt, title: meta.title ?? meta.filename, folder: meta.folder,
     }, actorId);
-    const warning = up.width && up.width < MIN_RECOMMENDED_WIDTH
+    // Only images have a min-width recommendation.
+    const warning = kind === "image" && up.width && up.width < MIN_RECOMMENDED_WIDTH
       ? `Uploaded, but this image is only ${up.width}px wide — under the recommended ${MIN_RECOMMENDED_WIDTH}px. It may look soft on large screens.`
       : undefined;
     return { ...reg, url: reg.ok ? up.url : undefined, warning, width: up.width, height: up.height };
@@ -80,7 +98,7 @@ export interface RegisterInput {
   provider?: string; publicId?: string | null; url: string; kind?: string;
   width?: number; height?: number; bytes?: number; format?: string;
   alt?: string; title?: string; role?: string; folder?: string; tags?: string[];
-  dominantColor?: string; aspectRatio?: string; blurDataUrl?: string;
+  dominantColor?: string; aspectRatio?: string; blurDataUrl?: string; credit?: string; copyright?: string;
 }
 
 /** Insert a media row (post-upload, or register-by-URL for an existing asset). */
@@ -95,10 +113,13 @@ export async function registerMedia(input: RegisterInput, actorId?: string): Pro
     folder: (input.folder || "general").trim(), tags: input.tags ?? [], updated_at: new Date().toISOString(),
   };
   if (input.blurDataUrl) row.blur_data_url = input.blurDataUrl;
-  // The blur column is added by a later migration — retry without it so a pre-migration upload still works.
+  if (input.credit) row.credit = input.credit;
+  if (input.copyright) row.copyright = input.copyright;
+  // blur/credit/copyright columns are added by later migrations — retry without them so a
+  // pre-migration upload still works.
   let ins = await db.from("media").insert(row).select("id").maybeSingle();
-  if (ins.error && /blur_data_url|could not find|schema cache|PGRST204/i.test(ins.error.message)) {
-    delete row.blur_data_url;
+  if (ins.error && SCHEMA_MISS.test(ins.error.message)) {
+    delete row.blur_data_url; delete row.credit; delete row.copyright;
     ins = await db.from("media").insert(row).select("id").maybeSingle();
   }
   const { data, error } = ins;
@@ -107,7 +128,7 @@ export async function registerMedia(input: RegisterInput, actorId?: string): Pro
   return { ok: true, id: data?.id };
 }
 
-export async function updateMedia(id: string, patch: { alt?: string; title?: string; role?: string; folder?: string; tags?: string[]; focalX?: number | null; focalY?: number | null }, actorId?: string): Promise<{ ok: boolean; reason?: string }> {
+export async function updateMedia(id: string, patch: { alt?: string; title?: string; role?: string; folder?: string; tags?: string[]; focalX?: number | null; focalY?: number | null; credit?: string; copyright?: string }, actorId?: string): Promise<{ ok: boolean; reason?: string }> {
   const db = createAdminClient() as any;
   const row: any = { updated_at: new Date().toISOString() };
   if (patch.alt !== undefined) row.alt = patch.alt || null;
@@ -117,8 +138,14 @@ export async function updateMedia(id: string, patch: { alt?: string; title?: str
   if (patch.tags !== undefined) row.tags = [...new Set(patch.tags.map((t) => t.trim()).filter(Boolean))].slice(0, 20);
   if (patch.focalX !== undefined) row.focal_x = patch.focalX;
   if (patch.focalY !== undefined) row.focal_y = patch.focalY;
-  const { error } = await db.from("media").update(row).eq("id", id);
-  if (error) return { ok: false, reason: error.message };
+  if (patch.credit !== undefined) row.credit = patch.credit || null;
+  if (patch.copyright !== undefined) row.copyright = patch.copyright || null;
+  let upd = await db.from("media").update(row).eq("id", id);
+  if (upd.error && SCHEMA_MISS.test(upd.error.message)) {
+    delete row.credit; delete row.copyright;
+    upd = await db.from("media").update(row).eq("id", id);
+  }
+  if (upd.error) return { ok: false, reason: upd.error.message };
   await logEvent({ entityType: "settings", event: "media.updated", entityId: id, actorType: actorId ? "staff" : "system", actorId });
   return { ok: true };
 }
@@ -164,10 +191,10 @@ export async function deleteMedia(id: string, actorId?: string): Promise<{ ok: b
   const usage = await getMediaUsage(id);
   if (usage.usedBy.length) return { ok: false, reason: `In use by ${usage.usedBy.length} item(s)`, usage };
   const db = createAdminClient() as any;
-  const { data: row } = await db.from("media").select("provider,public_id").eq("id", id).maybeSingle();
+  const { data: row } = await db.from("media").select("provider,public_id,kind").eq("id", id).maybeSingle();
   const { error } = await db.from("media").delete().eq("id", id);
   if (error) return { ok: false, reason: error.message };
-  if (row?.provider === "cloudinary" && row.public_id) { try { await cloudinaryProvider.destroy(row.public_id); } catch { /* best-effort */ } }
+  if (row?.provider === "cloudinary" && row.public_id) { try { await cloudinaryProvider.destroy(row.public_id, row.kind); } catch { /* best-effort */ } }
   await logEvent({ entityType: "settings", event: "media.deleted", entityId: id, actorType: actorId ? "staff" : "system", actorId });
   return { ok: true };
 }

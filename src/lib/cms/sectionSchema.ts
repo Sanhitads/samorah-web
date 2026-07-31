@@ -44,6 +44,11 @@ export interface FieldDef {
   // ── conditional visibility (point 2) ──
   showIf?: { field: string; equals?: unknown; truthy?: boolean };
 
+  // ── alt-text validation (Phase 5 · point 22) ── set on a TEXT field to mark it as the alt text
+  //    for the sibling media field named here. The editor warns when that image is set but this alt
+  //    is blank, and offers a "Decorative" toggle (stored in `<altFor>__decorative`) to suppress it.
+  altFor?: string;
+
   // ── references (point 5) ── value is { entity, id } (stores the ID, not a slug)
   refEntity?: "page" | "chapter" | "collection" | "product" | "blog" | "media" | "author";
 

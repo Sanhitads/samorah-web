@@ -50,16 +50,16 @@ async function fetchBlur(secureUrl: string): Promise<string | undefined> {
 export const cloudinaryProvider: MediaProvider = {
   name: "cloudinary",
 
-  async upload(bytes: Buffer, opts: { filename?: string; folder?: string }): Promise<UploadResult> {
+  async upload(bytes: Buffer, opts: { filename?: string; folder?: string; kind?: string }): Promise<UploadResult> {
     if (!cloudinaryConfigured()) throw new Error("Cloudinary is not configured (CLOUDINARY_* env).");
+    const isVideo = opts.kind === "video";
     const folder = opts.folder ? `${BASE_FOLDER}/${opts.folder}` : BASE_FOLDER;
     const timestamp = String(Math.floor(readClock() / 1000));
-    // Store a capped, metadata-free "web master": re-encode to ≤3000px at q_90 (drops EXIF/GPS on the
-    // way), so a 20–40MB DSLR original never sits in Cloudinary. Delivery derivatives come off this.
-    const transformation = "c_limit,w_3000,q_90";
-    // Sign every param we send (Cloudinary requires the signature to cover them). `colors` returns the
-    // palette so we can store the dominant colour.
-    const signed: Record<string, string> = { colors: "true", folder, timestamp, transformation };
+    // Images: store a capped, metadata-free "web master" (≤3000px, q_90, EXIF/GPS dropped) + palette.
+    // Video: those transforms/params are image-only, so we upload as-is (Cloudinary re-encodes on
+    // delivery) and sign just folder+timestamp. `/auto/upload` auto-detects the resource type.
+    const signed: Record<string, string> = { folder, timestamp };
+    if (!isVideo) { signed.colors = "true"; signed.transformation = "c_limit,w_3000,q_90"; }
     const signature = sign(signed);
 
     const form = new FormData();
@@ -71,13 +71,13 @@ export const cloudinaryProvider: MediaProvider = {
     const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD}/auto/upload`, { method: "POST", body: form });
     if (!res.ok) throw new Error(`Cloudinary upload failed (${res.status}): ${await res.text()}`);
     const d = await res.json();
-    const dominantColor: string | undefined = Array.isArray(d.colors) && d.colors[0]?.[0] ? String(d.colors[0][0]) : undefined;
+    const dominantColor: string | undefined = !isVideo && Array.isArray(d.colors) && d.colors[0]?.[0] ? String(d.colors[0][0]) : undefined;
     const aspectRatio = d.width && d.height ? aspectOf(d.width, d.height) : undefined;
-    const blurDataUrl = await fetchBlur(d.secure_url as string);
+    const blurDataUrl = isVideo ? undefined : await fetchBlur(d.secure_url as string);
     return { publicId: d.public_id, url: d.secure_url, width: d.width, height: d.height, bytes: d.bytes, format: d.format, dominantColor, aspectRatio, blurDataUrl };
   },
 
-  async destroy(publicId: string): Promise<void> {
+  async destroy(publicId: string, kind?: string): Promise<void> {
     if (!cloudinaryConfigured()) return;
     const timestamp = String(Math.floor(readClock() / 1000));
     const signature = sign({ public_id: publicId, timestamp });
@@ -86,7 +86,8 @@ export const cloudinaryProvider: MediaProvider = {
     form.append("api_key", KEY);
     form.append("timestamp", timestamp);
     form.append("signature", signature);
-    await fetch(`https://api.cloudinary.com/v1_1/${CLOUD}/image/destroy`, { method: "POST", body: form });
+    const resourceType = kind === "video" ? "video" : "image";
+    await fetch(`https://api.cloudinary.com/v1_1/${CLOUD}/${resourceType}/destroy`, { method: "POST", body: form });
   },
 };
 

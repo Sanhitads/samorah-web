@@ -18,6 +18,6 @@ export interface UploadResult {
 
 export interface MediaProvider {
   readonly name: string;
-  upload(bytes: Buffer, opts: { filename?: string; folder?: string }): Promise<UploadResult>;
-  destroy(publicId: string): Promise<void>;
+  upload(bytes: Buffer, opts: { filename?: string; folder?: string; kind?: string }): Promise<UploadResult>;
+  destroy(publicId: string, kind?: string): Promise<void>;
 }

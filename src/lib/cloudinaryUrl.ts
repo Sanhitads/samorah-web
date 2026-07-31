@@ -32,6 +32,31 @@ export function cldSrcSet(url: string, widths: number[] = CLD_WIDTHS): string | 
   return widths.map((w) => `${cldUrl(url, w)} ${w}w`).join(", ");
 }
 
+/** Map a 0–1 focal point to a Cloudinary compass gravity (`g_north_west` … `g_center` … `g_south_east`).
+ *  Coarse but well-supported and predictable — the chosen zone stays in frame when the image is cropped. */
+export function focalGravity(fx?: number | null, fy?: number | null): string {
+  if (fx == null || fy == null) return "auto"; // no focal set → Cloudinary smart crop
+  const h = fx < 0.34 ? "west" : fx > 0.66 ? "east" : "";
+  const v = fy < 0.34 ? "north" : fy > 0.66 ? "south" : "";
+  return [v, h].filter(Boolean).join("_") || "center";
+}
+
+/** Bake a focal-aware crop into a Cloudinary URL (Phase 5 · point 21 — Crop / Focal / Aspect). Produces
+ *  `c_fill,ar_<ar>,g_<gravity>[,w_n],f_auto,q_auto` so a plain <img>/background shows the cropped image
+ *  with the focal region kept in frame — no per-component change needed. `ar` like "16:9"/"4:5"/"1:1";
+ *  omit to keep the original ratio. Non-Cloudinary or already-transformed URLs pass through unchanged. */
+export function cldCrop(url: string, opts: { ar?: string; focalX?: number | null; focalY?: number | null; width?: number } = {}): string {
+  if (!isCloudinary(url)) return url;
+  const i = url.indexOf(UPLOAD);
+  const post = url.slice(i + UPLOAD.length);
+  if (!/^v\d+\//.test(post)) return url; // already transformed — never double-crop
+  const parts = ["c_fill", `g_${focalGravity(opts.focalX, opts.focalY)}`];
+  if (opts.ar && /^\d+:\d+$/.test(opts.ar)) parts.push(`ar_${opts.ar}`);
+  if (opts.width) parts.push(`w_${opts.width}`);
+  parts.push("f_auto", "q_auto");
+  return `${url.slice(0, i)}${UPLOAD}${parts.join(",")}/${post}`;
+}
+
 /** A tiny blurred LQIP URL for a Cloudinary image (~a few hundred bytes) — used as the blur-up
  *  background so imagery fades in instead of popping. Non-Cloudinary URLs return undefined. */
 export function cldBlur(url: string): string | undefined {

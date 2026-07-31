@@ -5,8 +5,12 @@ import type { FieldDef } from "@/lib/cms/sectionSchema";
 import { isFieldVisible } from "@/lib/cms/sectionSchema";
 import { gradientClass, isColorValue } from "@/lib/product";
 import { RichTextField } from "./RichTextField";
+import { MediaPicker } from "./MediaPicker";
 
 export interface MediaOption { id: string; url: string; title: string }
+
+/** A hosted-video URL (MP4/WebM/etc.) — rendered as a <video> thumbnail rather than an <img>. */
+const isVideoUrl = (v: string) => /^https?:\/\//.test(v) && /\.(mp4|webm|mov|ogg)(\?|$)/i.test(v);
 export type EntityOption = { id: string; label: string; data?: Record<string, unknown> };
 export type EntityOptions = Record<string, EntityOption[]>;
 
@@ -35,7 +39,7 @@ export function SchemaForm({ fields, values, media, entities = {}, onChange }: {
   if (!fields.length) return <p className="admin__muted" style={{ padding: "4px 0" }}>Content for this section comes from its catalogue — no inline fields yet.</p>;
   return (
     <div className="cfg-grid">
-      {fields.map((f) => <FieldControl key={f.key} f={f} value={values[f.key]} content={values} media={media} entities={entities} onChange={(v) => onChange(f.key, v)} />)}
+      {fields.map((f) => <FieldControl key={f.key} f={f} value={values[f.key]} content={values} media={media} entities={entities} onChange={(v) => onChange(f.key, v)} onSibling={onChange} />)}
     </div>
   );
 }
@@ -55,10 +59,11 @@ function move<T>(arr: T[], i: number, dir: number): T[] {
   const n = [...arr]; [n[i], n[j]] = [n[j], n[i]]; return n;
 }
 
-function FieldControl({ f, value, content, media, entities, onChange }: { f: FieldDef; value: unknown; content: Record<string, unknown>; media: MediaOption[]; entities: EntityOptions; onChange: (v: unknown) => void }) {
+function FieldControl({ f, value, content, media, entities, onChange, onSibling }: { f: FieldDef; value: unknown; content: Record<string, unknown>; media: MediaOption[]; entities: EntityOptions; onChange: (v: unknown) => void; onSibling?: (key: string, value: unknown) => void }) {
   // Hooks must run every render (before any early return) — used by the media uploader below.
   const [uploading, setUploading] = useState(false);
   const [upErr, setUpErr] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(false);
   const upload = async (file: File) => {
     setUploading(true); setUpErr("");
     try {
@@ -76,6 +81,11 @@ function FieldControl({ f, value, content, media, entities, onChange }: { f: Fie
   const err = inlineError(f, value);
   const counter = f.maxLength && typeof value === "string" ? `${value.length}/${f.maxLength}` : null;
   const helpText = f.description || f.help || (f.recommendedSize ? `Recommended: ${f.recommendedSize}` : "");
+  // Alt-text validation (Phase 5 · point 22): a text field bound to a sibling image via `altFor`.
+  const altImg = f.altFor ? content[f.altFor] : undefined;
+  const altImgReal = typeof altImg === "string" && /^https?:\/\//.test(altImg);
+  const decorative = f.altFor ? !!content[`${f.altFor}__decorative`] : false;
+  const altMissing = !!f.altFor && altImgReal && !str.trim() && !decorative;
 
   // Nested repeatable blocks (points 1, 3).
   if (f.type === "blocks") {
@@ -116,7 +126,7 @@ function FieldControl({ f, value, content, media, entities, onChange }: { f: Fie
             ) : null}
             <div className="cfg-grid">
               {(f.blockVariants ? (f.blockVariants.find((bv) => bv.key === b._type)?.fields ?? []) : (f.blockFields ?? [])).map((bf) => (
-                <FieldControl key={bf.key} f={bf} value={b[bf.key]} content={b} media={media} entities={entities} onChange={(v) => setBlock(i, bf.key, v)} />
+                <FieldControl key={bf.key} f={bf} value={b[bf.key]} content={b} media={media} entities={entities} onChange={(v) => setBlock(i, bf.key, v)} onSibling={(k, v) => setBlock(i, k, v)} />
               ))}
             </div>
           </div>
@@ -181,7 +191,9 @@ function FieldControl({ f, value, content, media, entities, onChange }: { f: Fie
       ) : f.type === "media" ? (
         <span className="sf-media">
           <span className="sf-media__row">
-            {/^https?:\/\//.test(str) ? (
+            {isVideoUrl(str) ? (
+              <video className="sf-media__thumb" src={str} muted playsInline aria-hidden="true" />
+            ) : /^https?:\/\//.test(str) ? (
               /* eslint-disable-next-line @next/next/no-img-element */ <img src={str} alt="" className="sf-media__thumb" />
             ) : str.startsWith("gradient:") ? (
               <span className={`sf-media__thumb ${gradientClass(str) ?? ""}`} aria-hidden="true" />
@@ -191,11 +203,21 @@ function FieldControl({ f, value, content, media, entities, onChange }: { f: Fie
               <span className="sf-media__thumb sf-media__thumb--empty" aria-hidden="true">—</span>
             )}
             <input id={id} type="text" value={str} onChange={(e) => onChange(e.target.value)} placeholder={f.placeholder ?? "Media URL / gradient / #colour"} />
+            <button type="button" className="ff-btn ff-btn--mini" onClick={() => setPickerOpen(true)}>Browse</button>
             <label className={`ff-btn ff-btn--mini${uploading ? " is-disabled" : ""}`} style={{ cursor: uploading ? "default" : "pointer" }}>
               {uploading ? "Uploading…" : "⬆ Upload"}
-              <input type="file" accept="image/*" hidden disabled={uploading} onChange={(e) => { const fl = e.target.files?.[0]; if (fl) upload(fl); e.target.value = ""; }} />
+              <input type="file" accept={f.allowedMime?.length ? f.allowedMime.join(",") : "image/*"} hidden disabled={uploading} onChange={(e) => { const fl = e.target.files?.[0]; if (fl) upload(fl); e.target.value = ""; }} />
             </label>
           </span>
+          {pickerOpen ? (
+            <MediaPicker
+              open={pickerOpen}
+              kind={f.allowedMime?.some((m) => m.startsWith("video/")) ? "video" : "image"}
+              allowCrop={!f.allowedMime?.some((m) => m.startsWith("video/"))}
+              onSelect={(url) => onChange(url)}
+              onClose={() => setPickerOpen(false)}
+            />
+          ) : null}
           <span className="sf-media__row">
             <select value="" onChange={(e) => { if (e.target.value) onChange(`gradient:${e.target.value}`); }} title="Use a gradient placeholder">
               <option value="">Gradient…</option>
@@ -215,6 +237,10 @@ function FieldControl({ f, value, content, media, entities, onChange }: { f: Fie
         <input id={id} type={f.type === "url" ? "text" : "text"} value={str} maxLength={f.maxLength} onChange={(e) => onChange(e.target.value)} placeholder={f.placeholder} />
       )}
       {err ? <small className="sf-err">{err}</small> : helpText ? <small className="admin__muted">{helpText}</small> : null}
+      {f.altFor ? (
+        <label className="sf-decorative"><input type="checkbox" checked={decorative} onChange={(e) => onSibling?.(`${f.altFor}__decorative`, e.target.checked)} /> Decorative image (no alt needed)</label>
+      ) : null}
+      {altMissing ? <small className="sf-warn">⚠ Describe this image for screen readers, or mark it decorative</small> : null}
     </label>
   );
 }

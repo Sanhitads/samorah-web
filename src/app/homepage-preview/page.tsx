@@ -17,6 +17,7 @@ const SRC = "samorah-pdp-preview"; // shared message tag (see LivePreviewPanel +
 export default function HomepagePreviewRoute() {
   const [sections, setSections] = useState<ComposedSection[] | null>(null);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const receivedRef = useRef(false); // becomes true once the first draft arrives → stops the ready-retry
 
   useEffect(() => {
     const origin = window.location.origin;
@@ -30,7 +31,7 @@ export default function HomepagePreviewRoute() {
     };
     const onMessage = (e: MessageEvent) => {
       if (e.origin !== origin || e.data?.source !== SRC) return;
-      if (e.data.kind === "draft") setSections(Array.isArray(e.data.product) ? (e.data.product as ComposedSection[]) : []);
+      if (e.data.kind === "draft") { receivedRef.current = true; setSections(Array.isArray(e.data.product) ? (e.data.product as ComposedSection[]) : []); }
       if (e.data.kind === "focus") focusSection(e.data.id);
     };
     // A click inside a section tells the editor to open + scroll to it (preview → editor). Links are
@@ -44,10 +45,21 @@ export default function HomepagePreviewRoute() {
     };
     window.addEventListener("message", onMessage);
     document.addEventListener("click", onClick, true);
-    window.parent?.postMessage({ source: SRC, kind: "ready" }, origin);
+    // Robust handshake: keep announcing "ready" until the parent answers with a draft. A one-shot
+    // "ready" can be missed if the parent's message listener isn't attached at that instant — e.g.
+    // React StrictMode's mount→unmount→remount in dev tears the parent listener down briefly — which
+    // would leave the preview stuck on "loading" forever. Retrying makes the handshake deterministic.
+    const announce = () => window.parent?.postMessage({ source: SRC, kind: "ready" }, origin);
+    announce();
+    let tries = 0;
+    const readyTimer = setInterval(() => {
+      if (receivedRef.current || tries++ > 25) { clearInterval(readyTimer); return; }
+      announce();
+    }, 200);
     return () => {
       window.removeEventListener("message", onMessage);
       document.removeEventListener("click", onClick, true);
+      clearInterval(readyTimer);
       if (flashTimer.current) clearTimeout(flashTimer.current);
     };
   }, []);

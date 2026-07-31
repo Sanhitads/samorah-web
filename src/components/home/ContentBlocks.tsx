@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { RichText } from "@/components/ui/RichText";
+import { VideoEmbed } from "@/components/ui/VideoEmbed";
 import { gradientClass, isGradientPlaceholder, isColorValue } from "@/lib/product";
 
 /**
@@ -45,6 +46,16 @@ export function ContentBlocks({ eyebrow, blocks, align }: { eyebrow?: string; bl
               return (
                 <figure key={i} className="home-content__figure">
                   <ImageBlock src={src} alt={s(b.alt)} />
+                  {b.caption ? <figcaption>{s(b.caption)}</figcaption> : null}
+                </figure>
+              );
+            }
+            case "video": {
+              const url = s(b.url);
+              if (!url) return null;
+              return (
+                <figure key={i} className="home-content__figure">
+                  <VideoEmbed url={url} className="home-content__video" />
                   {b.caption ? <figcaption>{s(b.caption)}</figcaption> : null}
                 </figure>
               );

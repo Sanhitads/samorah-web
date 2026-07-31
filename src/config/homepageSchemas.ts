@@ -34,12 +34,29 @@ export const SECTION_DEFS: Record<SectionType, SectionDefinition> = {
         { key: "ctaLabel", label: "Button label", type: "text", maxLength: 24, required: true, showIf: { field: "ctaEnabled", truthy: true } },
         { key: "ctaHref", label: "Button URL", type: "url", required: true, showIf: { field: "ctaEnabled", truthy: true } },
         { key: "heroImage", label: "Background image", type: "media", help: "Media URL or gradient:name placeholder" },
+        { key: "videoUrl", label: "Background video (optional)", type: "media", help: "MP4 / Cloudinary video URL — plays muted behind the hero and overrides the image", allowedMime: ["video/mp4", "video/webm"] },
         { key: "theme", label: "Theme", type: "select", options: [{ value: "dark", label: "Dark" }, { value: "light", label: "Light" }] },
+        // Phase 5 · point 24 — hero treatment controls (all additive; omitted → the original look).
+        { key: "align", label: "Content alignment", type: "align", options: ALIGN_OPTIONS },
+        { key: "overlayStyle", label: "Image overlay", type: "select", help: "Darkens the image so text stays legible", options: [
+          { value: "scrim", label: "Editorial scrim (default)" },
+          { value: "dark", label: "Even darken" },
+          { value: "gradient", label: "Bottom-up gradient" },
+          { value: "none", label: "None" },
+        ] },
+        { key: "overlayOpacity", label: "Overlay strength (%)", type: "number", min: 0, max: 100, help: "0 = no darkening, 100 = strongest" },
+        { key: "buttonStyle", label: "Button style", type: "select", options: [
+          { value: "ghost", label: "Ghost / outline (default)" },
+          { value: "solid", label: "Solid" },
+          { value: "underline", label: "Underline" },
+        ] },
+        { key: "animate", label: "Entrance animation", type: "boolean", default: true },
+        { key: "showScroll", label: "Show scroll indicator", type: "boolean", default: true },
       ],
     },
     defaults: () => {
       const c = getActiveCampaign();
-      return { eyebrow: c.eyebrow, heading: c.heading, subheading: c.subheading, ctaEnabled: true, ctaLabel: c.ctaLabel, ctaHref: c.ctaHref, heroImage: c.heroImage, theme: c.theme };
+      return { eyebrow: c.eyebrow, heading: c.heading, subheading: c.subheading, ctaEnabled: true, ctaLabel: c.ctaLabel, ctaHref: c.ctaHref, heroImage: c.heroImage, videoUrl: "", theme: c.theme, align: "left", overlayStyle: "scrim", buttonStyle: "ghost", animate: true, showScroll: true };
     },
   },
   "brand-story": {
@@ -51,7 +68,7 @@ export const SECTION_DEFS: Record<SectionType, SectionDefinition> = {
         { key: "body", label: "Body", type: "textarea", maxLength: 400 },
         { key: "quote", label: "Pull quote (optional — shown instead of body)", type: "textarea", maxLength: 200 },
         { key: "image", label: "Image", type: "media", help: "Upload, pick from Library, or choose a gradient" },
-        { key: "imageAlt", label: "Image alt text", type: "text", maxLength: 160 },
+        { key: "imageAlt", label: "Image alt text", type: "text", maxLength: 160, altFor: "image" },
         { key: "orientation", label: "Image side", type: "select", options: [{ value: "image-left", label: "Image left" }, { value: "image-right", label: "Image right" }] },
         { key: "ctaLabel", label: "Button label", type: "text", maxLength: 24 },
         { key: "ctaHref", label: "Button URL", type: "url" },
@@ -244,7 +261,8 @@ export const SECTION_DEFS: Record<SectionType, SectionDefinition> = {
             { key: "paragraph", label: "Paragraph", fields: [{ key: "html", label: "Text", type: "richtext", required: true }] },
             { key: "heading", label: "Heading", fields: [{ key: "text", label: "Heading", type: "text", required: true, maxLength: 120 }, { key: "level", label: "Size", type: "select", options: [{ value: "h2", label: "Large (H2)" }, { value: "h3", label: "Medium (H3)" }] }] },
             { key: "quote", label: "Quote", fields: [{ key: "quote", label: "Quote", type: "textarea", required: true, maxLength: 300 }, { key: "attribution", label: "Attribution", type: "text", maxLength: 80 }] },
-            { key: "image", label: "Image", fields: [{ key: "image", label: "Image", type: "media", required: true }, { key: "alt", label: "Alt text", type: "text", maxLength: 160 }, { key: "caption", label: "Caption", type: "text", maxLength: 160 }] },
+            { key: "image", label: "Image", fields: [{ key: "image", label: "Image", type: "media", required: true }, { key: "alt", label: "Alt text", type: "text", maxLength: 160, altFor: "image" }, { key: "caption", label: "Caption", type: "text", maxLength: 160 }] },
+            { key: "video", label: "Video", fields: [{ key: "url", label: "Video URL (MP4 / YouTube / Vimeo)", type: "text", required: true, placeholder: "https://youtu.be/… or an .mp4 URL" }, { key: "caption", label: "Caption", type: "text", maxLength: 160 }] },
             { key: "cta", label: "Button", fields: [{ key: "label", label: "Button label", type: "text", required: true, maxLength: 32 }, { key: "href", label: "Button URL", type: "url", required: true }] },
           ],
         },
