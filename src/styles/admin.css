@@ -1108,6 +1108,17 @@ a.adm-badge[data-b="incident"]:hover { background: rgba(168,68,58,0.22); }
 .hp-seo__previews { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 18px; padding-top: 4px; border-top: 1px solid var(--ad-hair, rgba(31,26,22,0.08)); }
 .hp-seo__previews > div { min-width: 0; }
 .hp-seo__previews .seo-og { max-width: 360px; }
+/* Phase 6 · points 26/27 — performance meter + section analytics panels */
+.hp-perf__body, .hp-analytics__body { padding: 0 14px 16px; }
+.hp-perf__stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 6px 0 10px; }
+.hp-perf__stat { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border: 1px solid var(--ad-hair, rgba(31,26,22,0.1)); border-radius: 8px; }
+.hp-perf__stat.is-warn { border-color: #c9a24a; background: rgba(201,162,74,0.06); }
+.hp-perf__stat.is-err { border-color: #a8443a; background: rgba(168,68,58,0.06); }
+.hp-perf__num { font-size: 17px; font-weight: 500; line-height: 1.2; }
+.hp-perf__lbl { font-size: 11px; color: var(--smoke, #6b6259); }
+.hp-analytics__scroll { overflow-x: auto; }
+.hp-analytics__table { width: 100%; min-width: 460px; }
+.hp-analytics__table td.admin__mono { text-align: right; }
 /* Phase 5 · point 22 — alt-text validation */
 .sf-warn { color: #9a6a1e; font-size: 11px; }
 .sf-decorative { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--smoke, #6b6259); cursor: pointer; }

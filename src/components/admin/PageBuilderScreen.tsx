@@ -7,6 +7,8 @@ import { listMedia } from "@/services/media/mediaService";
 import { listProductsAdmin } from "@/services/productAdminService";
 import { listSectionTemplates } from "@/services/sectionLibraryService";
 import { listSeoOverrides } from "@/services/seoRedirectService";
+import { getHomepagePerformance } from "@/services/analytics/performanceService";
+import { getSectionAnalytics } from "@/services/analytics/sectionAnalyticsService";
 import { canonicalOrigin } from "@/config/site";
 import { SECTION_TEMPLATES } from "@/config/sectionTemplates";
 import { getPageType } from "@/lib/cms/pageRegistry";
@@ -50,6 +52,11 @@ export async function PageBuilderScreen({ pageKey }: { pageKey: string }) {
     ? { title: seoRow?.title ?? "", description: seoRow?.description ?? "", ogImage: seoRow?.ogImage ?? "", canonical: seoRow?.canonical ?? "", robots: seoRow?.robots ?? "" }
     : undefined;
 
+  // Analytics (Phase 6): performance meter (deterministic, from media weights) + per-section metrics.
+  const [perf, analytics] = canManage
+    ? await Promise.all([getHomepagePerformance(resolved), getSectionAnalytics(pageKey, 30)])
+    : [undefined, undefined];
+
   // Product options (with data) so a Featured-Atmosphere block can "Pull from a product" — the picker
   // fills its fields from a real product, then stays fully editable (or leave blank + type your own).
   let entities: EntityOptions = {};
@@ -71,7 +78,7 @@ export async function PageBuilderScreen({ pageKey }: { pageKey: string }) {
         <p className="admin__count">{view.draft.length} sections · {view.state}{canManage ? "" : " · read-only (needs catalog.manage)"}</p>
       </header>
       {canManage ? (
-        <PageBuilder pageKey={pageKey} label={page.label} view={{ ...view, draft: resolved }} sectionMeta={sectionMeta} schemas={schemas} media={media} entities={entities} templates={templates} library={library} previewPath={page.previewPath} previewCookie={page.previewCookie} livePreviewSrc={page.livePreviewSrc} seo={seo} seoOrigin={canonicalOrigin()} />
+        <PageBuilder pageKey={pageKey} label={page.label} view={{ ...view, draft: resolved }} sectionMeta={sectionMeta} schemas={schemas} media={media} entities={entities} templates={templates} library={library} previewPath={page.previewPath} previewCookie={page.previewCookie} livePreviewSrc={page.livePreviewSrc} seo={seo} seoOrigin={canonicalOrigin()} perf={perf} analytics={analytics} />
       ) : (
         <p className="admin__empty">Editing this page needs the catalog.manage capability.</p>
       )}

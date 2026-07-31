@@ -595,3 +595,30 @@ folders/tags/focal/blur, `mediaService`, the `/admin/media` library, Cloudinary 
 
 Additive throughout: the one migration only **adds** two nullable `media` columns; every storefront
 change is opt-in (absent settings → the original look).
+
+## P10.5 — Homepage Analytics (Phase 6)
+
+Built on the existing consent layer (`consentGranted()` / `samorah_consent`) and the GA4 stack, but
+**first-party** so the numbers exist without waiting on the GA4 Data API. Unit + Playwright tested.
+
+**Section analytics (26)** — a builder panel showing **Views / CTR / Scroll % / Clicks / Conversions**
+per homepage section over the last 30 days:
+- A new `section_events` table (RLS policy-less; `service_role` only) + a stable `section_analytics(page_key, days)`
+  SQL rollup (migrations `20260807120000` + grants `…130000`/`…140000`, all applied).
+- Storefront tracking: `ComposedSections` renders each live section in a `display:contents` wrapper
+  (`data-sa-id` — **zero layout change**); `<SectionTracker>` observes them and records a de-duped
+  **view** (≥50% visible), max **scroll** depth, and **clicks**, batched via `sendBeacon` to the public
+  `POST /api/analytics/section` ingest (rate-limited, errors swallowed). **All consent-gated**, only an
+  ephemeral per-tab session id — no PII.
+- **Conversions** = last-touch attribution: a section CTA click stamps `sa_last_section`, which
+  `useCartStore.addItem` reads on add-to-cart to credit that section.
+- `getSectionAnalytics` aggregates + derives CTR; the panel lines the metrics up with the section list.
+
+**Performance meter (27)** — a builder panel estimating **homepage image weight, largest image,
+heaviest section, and estimated load time** (~4 Mbps mobile). Deterministic: `getHomepagePerformance`
+walks the draft's image URLs, sizes them against the `media` table (matching a cropped delivery URL back
+to its raw base), and flags external/unknown-size images. No tracking, computed server-side per load.
+
+Real-world scenario the panels answer: *"Featured Atmosphere gets 1,240 views but 2% CTR and only 30%
+scroll — visitors aren't reaching it; move it up. The Hero image is 2.1 MB — re-upload a lighter master
+to cut ~1s off load."* Additive: storefront DOM is byte-for-byte unchanged; three additive migrations.

@@ -3,6 +3,7 @@ import { getHomepageSections } from "@/services/homepageService";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { ComposedSections } from "@/components/page/ComposedSections";
 import { PreviewBanner } from "@/components/page/PreviewBanner";
+import { SectionTracker } from "@/components/analytics/SectionTracker";
 import { withRouteSeo } from "@/services/seoRedirectService";
 
 /**
@@ -26,7 +27,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   return (
     <main>
       {preview ? <PreviewBanner label="homepage" livePath="/" /> : null}
-      <ComposedSections sections={sections} />
+      <ComposedSections sections={sections} track={!preview} />
+      {preview ? null : <SectionTracker pageKey="homepage" />}
     </main>
   );
 }

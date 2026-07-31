@@ -26,7 +26,7 @@ const sstr = (v: unknown) => (typeof v === "string" && v.trim() ? (v as string) 
  * settings over their config baseline; list-based sections render catalogue data.
  * A new page type reuses these sections for free — no new rendering code.
  */
-export function ComposedSections({ sections, anchors = false }: { sections: ComposedSection[]; anchors?: boolean }) {
+export function ComposedSections({ sections, anchors = false, track = false }: { sections: ComposedSection[]; anchors?: boolean; track?: boolean }) {
   const campaign = getActiveCampaign();
   const voice = getEditorialVoice(campaign.id);
   const merged = <T,>(base: T, s: ComposedSection): T => ({ ...base, ...((s.settings ?? {}) as Partial<T>) });
@@ -55,6 +55,10 @@ export function ComposedSections({ sections, anchors = false }: { sections: Comp
       {sections.filter((s) => s.enabled && sectionScheduleOk(s.settings) && REGISTRY[s.type]).map((s) =>
         anchors ? (
           <div key={s.id} id={s.id} data-preview-section={s.id} className="cs-anchor">{REGISTRY[s.type](s)}</div>
+        ) : track ? (
+          // Analytics hook (point 26): `display:contents` → the wrapper generates NO box, so layout is
+          // byte-for-byte unchanged; the tracker observes its real child element and reads these attrs.
+          <div key={s.id} data-sa-id={s.id} data-sa-type={s.type} style={{ display: "contents" }}>{REGISTRY[s.type](s)}</div>
         ) : (
           <Fragment key={s.id}>{REGISTRY[s.type](s)}</Fragment>
         ),

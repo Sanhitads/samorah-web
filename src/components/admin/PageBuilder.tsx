@@ -11,6 +11,10 @@ import { LivePreviewPanel } from "./LivePreviewPanel";
 import { PageBuilderSectionRow } from "./PageBuilderSectionRow";
 import { AddSectionModal } from "./AddSectionModal";
 import { PageSeoPanel, type PageSeo } from "./PageSeoPanel";
+import { PerformancePanel } from "./PerformancePanel";
+import { SectionAnalyticsPanel } from "./SectionAnalyticsPanel";
+import type { HomepagePerformance } from "@/services/analytics/performanceService";
+import type { SectionStat } from "@/services/analytics/sectionAnalyticsService";
 import { enabledForState, effectiveSectionState, type SectionState } from "@/lib/cms/sectionState";
 
 export type SectionTemplate = { id: string; label: string; description: string; type: string; settings: Record<string, unknown>; comingSoon: boolean };
@@ -33,8 +37,8 @@ const sectionKey = (s: ComposedSection) => JSON.stringify({ type: s.type, enable
 const fingerprints = (list: ComposedSection[]) => Object.fromEntries(list.map((s) => [s.id, sectionKey(s)]));
 const PREVIEW_SRC = "samorah-pdp-preview"; // shared postMessage tag (LivePreviewPanel + preview routes)
 
-export function PageBuilder({ pageKey, label, view, sectionMeta, schemas, media, entities = {}, templates = [], library: libraryProp = [], previewPath, previewCookie, livePreviewSrc, seo, seoOrigin }: {
-  pageKey: string; label: string; view: PageAdminView; sectionMeta: Meta[]; schemas: Record<string, SectionSchema>; media: MediaOption[]; entities?: EntityOptions; templates?: SectionTemplate[]; library?: LibraryEntry[]; previewPath: string; previewCookie: string; livePreviewSrc?: string; seo?: PageSeo; seoOrigin?: string;
+export function PageBuilder({ pageKey, label, view, sectionMeta, schemas, media, entities = {}, templates = [], library: libraryProp = [], previewPath, previewCookie, livePreviewSrc, seo, seoOrigin, perf, analytics }: {
+  pageKey: string; label: string; view: PageAdminView; sectionMeta: Meta[]; schemas: Record<string, SectionSchema>; media: MediaOption[]; entities?: EntityOptions; templates?: SectionTemplate[]; library?: LibraryEntry[]; previewPath: string; previewCookie: string; livePreviewSrc?: string; seo?: PageSeo; seoOrigin?: string; perf?: HomepagePerformance; analytics?: Record<string, SectionStat>;
 }) {
   const router = useRouter();
   const apiBase = `/api/admin/pages/${pageKey}`;
@@ -301,6 +305,8 @@ export function PageBuilder({ pageKey, label, view, sectionMeta, schemas, media,
         </span>
       </div>
       {seo ? <PageSeoPanel path={previewPath} label={label} initial={seo} origin={seoOrigin ?? ""} media={media} /> : null}
+      {analytics ? <SectionAnalyticsPanel stats={analytics} sections={sections.map((s) => ({ id: s.id, type: s.type, label: labelOf(s.type) }))} /> : null}
+      {perf ? <PerformancePanel perf={perf} typeLabels={Object.fromEntries(sectionMeta.map((m) => [m.type, m.label]))} /> : null}
       {(() => {
         const renderRow = (s: ComposedSection, i: number, draggable: boolean) => {
           const st = statusOf(s);

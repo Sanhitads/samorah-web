@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { BUNDLE_DISCOUNT, BUNDLE_SIZE, bundleUnitPrice } from "@/lib/bundle";
 import { trackAddToCart, trackRemoveFromCart } from "@/lib/analytics/events";
+import { trackSectionConversion } from "@/lib/analytics/sectionTracking";
 import type { AnalyticsItem } from "@/lib/analytics/types";
 
 /** Map a cart line/product to the GA4 ecommerce item shape (no PII). */
@@ -111,6 +112,7 @@ export const useCartStore = create<CartState>()(
           // Re-adding a line clears its tombstone (revive).
           const { [key]: _drop, ...tombstones } = state.tombstones;
           trackAddToCart(toAnalyticsItem({ ...product, vessel, size, qty: 1 }));
+          trackSectionConversion(); // last-touch: credit the homepage section that drove this add-to-cart
           return { items, tombstones };
         }),
 
