@@ -34,6 +34,10 @@ export const SECTION_DEFS: Record<SectionType, SectionDefinition> = {
         { key: "ctaLabel", label: "Button label", type: "text", maxLength: 24, required: true, showIf: { field: "ctaEnabled", truthy: true } },
         { key: "ctaHref", label: "Button URL", type: "url", required: true, showIf: { field: "ctaEnabled", truthy: true } },
         { key: "heroImage", label: "Background image", type: "media", help: "Media URL or gradient:name placeholder" },
+        { key: "imageFit", label: "Image fit", type: "select", help: "Fill crops to cover the hero (use the focal point to choose what stays); Fit shows the whole image (letterboxed for wide/tall images)", options: [
+          { value: "cover", label: "Fill the space (crop — use focal point)" },
+          { value: "contain", label: "Show the whole image (no cropping)" },
+        ] },
         { key: "videoUrl", label: "Background video (optional)", type: "media", help: "MP4 / Cloudinary video URL — plays muted behind the hero and overrides the image", allowedMime: ["video/mp4", "video/webm"] },
         { key: "theme", label: "Theme", type: "select", options: [{ value: "dark", label: "Dark" }, { value: "light", label: "Light" }] },
         // Phase 5 · point 24 — hero treatment controls (all additive; omitted → the original look).
@@ -56,7 +60,7 @@ export const SECTION_DEFS: Record<SectionType, SectionDefinition> = {
     },
     defaults: () => {
       const c = getActiveCampaign();
-      return { eyebrow: c.eyebrow, heading: c.heading, subheading: c.subheading, ctaEnabled: true, ctaLabel: c.ctaLabel, ctaHref: c.ctaHref, heroImage: c.heroImage, videoUrl: "", theme: c.theme, align: "left", overlayStyle: "scrim", buttonStyle: "ghost", animate: true, showScroll: true };
+      return { eyebrow: c.eyebrow, heading: c.heading, subheading: c.subheading, ctaEnabled: true, ctaLabel: c.ctaLabel, ctaHref: c.ctaHref, heroImage: c.heroImage, imageFit: "cover", videoUrl: "", theme: c.theme, align: "left", overlayStyle: "scrim", buttonStyle: "ghost", animate: true, showScroll: true };
     },
   },
   "brand-story": {

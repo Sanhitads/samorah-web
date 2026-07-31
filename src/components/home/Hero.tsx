@@ -70,7 +70,12 @@ export function Hero({ campaign }: { campaign: HeroCampaign }) {
       ) : (
         <div
           className="home-hero__bg home-hero__bg--photo"
-          style={{ backgroundImage: `url(${campaign.heroImage})`, backgroundPosition: campaign.heroImage__focal || undefined }}
+          style={{
+            backgroundImage: `url(${campaign.heroImage})`,
+            backgroundPosition: campaign.heroImage__focal || undefined,
+            // "contain" shows the whole image (no crop); it must not tile, so disable repeat.
+            ...(campaign.imageFit === "contain" ? { backgroundSize: "contain", backgroundRepeat: "no-repeat" } : null),
+          }}
           aria-hidden="true"
         />
       )}
