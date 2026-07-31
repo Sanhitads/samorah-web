@@ -33,6 +33,7 @@ export interface HeroCampaign {
    * and saved sections are unaffected.
    */
   videoUrl?: string;            // MP4 / Cloudinary video — plays muted behind the hero, overrides the image
+  heroImage__focal?: string;    // CSS background-position ("50% 30%") from the media picker's focal point
   align?: string;               // content alignment: left (default) / center / right
   overlayStyle?: string;        // scrim (default) / dark / gradient / none
   overlayOpacity?: number;      // 0–100 — how strong the overlay is

@@ -70,7 +70,7 @@ export function Hero({ campaign }: { campaign: HeroCampaign }) {
       ) : (
         <div
           className="home-hero__bg home-hero__bg--photo"
-          style={{ backgroundImage: `url(${campaign.heroImage})` }}
+          style={{ backgroundImage: `url(${campaign.heroImage})`, backgroundPosition: campaign.heroImage__focal || undefined }}
           aria-hidden="true"
         />
       )}

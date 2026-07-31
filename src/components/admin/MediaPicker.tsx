@@ -24,7 +24,9 @@ function pushRecent(url: string) {
 
 export function MediaPicker({ open, kind = "image", allowCrop = true, onSelect, onClose }: {
   open: boolean; kind?: "image" | "video" | "all"; allowCrop?: boolean;
-  onSelect: (url: string) => void; onClose: () => void;
+  /** `focal` is a CSS position string ("50% 30%") when the editor set one — applied by full-bleed
+   *  surfaces (hero background / content image) as background/object-position. */
+  onSelect: (url: string, focal?: string) => void; onClose: () => void;
 }) {
   const [items, setItems] = useState<MediaRow[]>([]);
   const [folders, setFolders] = useState<string[]>([]);
@@ -71,9 +73,12 @@ export function MediaPicker({ open, kind = "image", allowCrop = true, onSelect, 
 
   if (!open) return null;
 
-  const cropped = (base: string) => (allowCrop && isCloudinary(base) ? cldCrop(base, { ar: ar || undefined, focalX: focal?.x, focalY: focal?.y }) : base);
-  const choose = (url: string) => { pushRecent(url); onSelect(url); onClose(); };
-  const confirmSel = () => { if (sel) choose(cropped(sel.url)); };
+  const focalPos = focal ? `${(focal.x * 100).toFixed(1)}% ${(focal.y * 100).toFixed(1)}%` : undefined;
+  const cropped = (base: string) => (allowCrop && ar && isCloudinary(base) ? cldCrop(base, { ar, focalX: focal?.x, focalY: focal?.y }) : base);
+  const choose = (url: string, fpos?: string) => { pushRecent(url); onSelect(url, fpos); onClose(); };
+  // Confirm: bake an aspect crop only when an aspect was chosen; always pass the focal as a CSS position
+  // so full-bleed surfaces (hero bg / content image) can frame to it even without a fixed-ratio crop.
+  const confirmSel = () => { if (sel) choose(cropped(sel.url), focalPos); };
 
   const onUpload = async (file: File) => {
     setUploading(true); setErr("");
@@ -105,7 +110,7 @@ export function MediaPicker({ open, kind = "image", allowCrop = true, onSelect, 
     const r = e.currentTarget.getBoundingClientRect();
     setFocal({ x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)) });
   };
-  const objPos = focal ? `${(focal.x * 100).toFixed(1)}% ${(focal.y * 100).toFixed(1)}%` : "center";
+  const objPos = focalPos ?? "center";
 
   return (
     <div className="om-modal mp" role="dialog" aria-modal="true" onClick={onClose}>

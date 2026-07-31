@@ -11,11 +11,11 @@ import { gradientClass, isGradientPlaceholder, isColorValue } from "@/lib/produc
 type Block = { _type?: string;[k: string]: unknown };
 const s = (v: unknown) => (v == null ? "" : String(v));
 
-function ImageBlock({ src, alt }: { src: string; alt: string }) {
+function ImageBlock({ src, alt, focal }: { src: string; alt: string; focal?: string }) {
   if (isColorValue(src)) return <div className="home-content__img" style={{ background: src }} role="img" aria-label={alt} />;
   if (isGradientPlaceholder(src)) return <div className={`home-content__img ${gradientClass(src) ?? ""}`} role="img" aria-label={alt} />;
   // eslint-disable-next-line @next/next/no-img-element
-  return <img className="home-content__img home-content__img--photo" src={src} alt={alt} loading="lazy" />;
+  return <img className="home-content__img home-content__img--photo" src={src} alt={alt} loading="lazy" style={focal ? { objectPosition: focal } : undefined} />;
 }
 
 export function ContentBlocks({ eyebrow, blocks, align }: { eyebrow?: string; blocks: Block[]; align?: string }) {
@@ -45,7 +45,7 @@ export function ContentBlocks({ eyebrow, blocks, align }: { eyebrow?: string; bl
               if (!src) return null;
               return (
                 <figure key={i} className="home-content__figure">
-                  <ImageBlock src={src} alt={s(b.alt)} />
+                  <ImageBlock src={src} alt={s(b.alt)} focal={s(b.image__focal) || undefined} />
                   {b.caption ? <figcaption>{s(b.caption)}</figcaption> : null}
                 </figure>
               );

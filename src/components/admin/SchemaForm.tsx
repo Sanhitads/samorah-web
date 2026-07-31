@@ -214,7 +214,7 @@ function FieldControl({ f, value, content, media, entities, onChange, onSibling 
               open={pickerOpen}
               kind={f.allowedMime?.some((m) => m.startsWith("video/")) ? "video" : "image"}
               allowCrop={!f.allowedMime?.some((m) => m.startsWith("video/"))}
-              onSelect={(url) => onChange(url)}
+              onSelect={(url, focal) => { onChange(url); onSibling?.(`${f.key}__focal`, focal ?? ""); }}
               onClose={() => setPickerOpen(false)}
             />
           ) : null}
