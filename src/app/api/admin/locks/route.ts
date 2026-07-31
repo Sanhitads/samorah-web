@@ -14,5 +14,6 @@ export async function POST(request: Request) {
   if (!body.resource) return NextResponse.json({ error: "resource required" }, { status: 400 });
 
   if (body.action === "release") { await releaseLock(body.resource, staff.userId ?? undefined); return NextResponse.json({ ok: true }); }
-  return NextResponse.json(await acquireLock(body.resource, staff.userId ?? undefined));
+  // "steal" = the Take-over-editing action: forcibly reassign the lock to the caller (point 34).
+  return NextResponse.json(await acquireLock(body.resource, staff.userId ?? undefined, { steal: body.action === "steal" }));
 }

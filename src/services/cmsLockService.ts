@@ -14,13 +14,14 @@ async function actorName(db: any, actorId?: string): Promise<string> {
   try { const { data } = await db.from("users").select("full_name,email").eq("id", actorId).maybeSingle(); return data?.full_name || data?.email || "a colleague"; } catch { return "a colleague"; }
 }
 
-/** Acquire/refresh a lock. If a fresh lock is held by someone else, returns their name. */
-export async function acquireLock(resource: string, actorId?: string): Promise<{ ok: boolean; heldBy?: string }> {
+/** Acquire/refresh a lock. If a fresh lock is held by someone else, returns their name — unless `steal`
+ *  is set (the "Take over editing" action), which forcibly reassigns the lock to the caller. */
+export async function acquireLock(resource: string, actorId?: string, opts: { steal?: boolean } = {}): Promise<{ ok: boolean; heldBy?: string }> {
   const db = createAdminClient() as any;
   try {
     const { data: row } = await db.from("cms_locks").select("*").eq("resource_key", resource).maybeSingle();
     const fresh = row && Date.now() - Date.parse(row.locked_at) < FRESH_MS;
-    if (fresh && row.actor_id && row.actor_id !== actorId) return { ok: false, heldBy: row.actor_name || "a colleague" };
+    if (fresh && row.actor_id && row.actor_id !== actorId && !opts.steal) return { ok: false, heldBy: row.actor_name || "a colleague" };
     await db.from("cms_locks").upsert({ resource_key: resource, actor_id: actorId ?? null, actor_name: await actorName(db, actorId), locked_at: new Date().toISOString() }, { onConflict: "resource_key" });
     return { ok: true };
   } catch { return { ok: true }; } // never block editing on a lock-system failure

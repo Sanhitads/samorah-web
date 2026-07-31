@@ -15,7 +15,9 @@ import { PerformancePanel } from "./PerformancePanel";
 import { SectionAnalyticsPanel } from "./SectionAnalyticsPanel";
 import { AccessibilityPanel } from "./AccessibilityPanel";
 import { PresetsPanel } from "./PresetsPanel";
+import { AuditTimelinePanel } from "./AuditTimelinePanel";
 import type { PagePreset } from "@/services/pagePresetsService";
+import type { PageAuditEntry } from "@/services/pageAuditService";
 import type { HomepagePerformance } from "@/services/analytics/performanceService";
 import type { SectionStat } from "@/services/analytics/sectionAnalyticsService";
 import { enabledForState, effectiveSectionState, type SectionState } from "@/lib/cms/sectionState";
@@ -41,8 +43,8 @@ const sectionKey = (s: ComposedSection) => JSON.stringify({ type: s.type, enable
 const fingerprints = (list: ComposedSection[]) => Object.fromEntries(list.map((s) => [s.id, sectionKey(s)]));
 const PREVIEW_SRC = "samorah-pdp-preview"; // shared postMessage tag (LivePreviewPanel + preview routes)
 
-export function PageBuilder({ pageKey, label, view, sectionMeta, schemas, media, entities = {}, templates = [], library: libraryProp = [], previewPath, previewCookie, livePreviewSrc, seo, seoOrigin, perf, analytics, presets: presetsProp = [] }: {
-  pageKey: string; label: string; view: PageAdminView; sectionMeta: Meta[]; schemas: Record<string, SectionSchema>; media: MediaOption[]; entities?: EntityOptions; templates?: SectionTemplate[]; library?: LibraryEntry[]; previewPath: string; previewCookie: string; livePreviewSrc?: string; seo?: PageSeo; seoOrigin?: string; perf?: HomepagePerformance; analytics?: Record<string, SectionStat>; presets?: PagePreset[];
+export function PageBuilder({ pageKey, label, view, sectionMeta, schemas, media, entities = {}, templates = [], library: libraryProp = [], previewPath, previewCookie, livePreviewSrc, seo, seoOrigin, perf, analytics, presets: presetsProp = [], audit: auditProp = [] }: {
+  pageKey: string; label: string; view: PageAdminView; sectionMeta: Meta[]; schemas: Record<string, SectionSchema>; media: MediaOption[]; entities?: EntityOptions; templates?: SectionTemplate[]; library?: LibraryEntry[]; previewPath: string; previewCookie: string; livePreviewSrc?: string; seo?: PageSeo; seoOrigin?: string; perf?: HomepagePerformance; analytics?: Record<string, SectionStat>; presets?: PagePreset[]; audit?: PageAuditEntry[];
 }) {
   const router = useRouter();
   const apiBase = `/api/admin/pages/${pageKey}`;
@@ -113,6 +115,15 @@ export function PageBuilder({ pageKey, label, view, sectionMeta, schemas, media,
 
   // Content lock (heartbeat) + autosave — both on a 30s tick (review points 8, 9).
   const resource = `page:${pageKey}`;
+  const readOnly = !!lockedBy;                 // another editor holds the lock (point 34)
+  const lockedByRef = useRef(lockedBy); lockedByRef.current = lockedBy;
+  // "Take over editing" (point 34): forcibly reassign the lock to me, then edit.
+  const takeOver = async () => {
+    try {
+      const r = await (await fetch("/api/admin/locks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "steal", resource }) })).json();
+      if (r.ok) { setLockedBy(null); setMsg({ tone: "ok", text: "You're now editing — the other editor will go read-only." }); }
+    } catch { /* ignore */ }
+  };
   useEffect(() => {
     let alive = true;
     const lock = async () => {
@@ -122,6 +133,7 @@ export function PageBuilder({ pageKey, label, view, sectionMeta, schemas, media,
       } catch { /* ignore */ }
     };
     const autosave = async () => {
+      if (lockedByRef.current) return;         // never autosave over another editor's work while read-only
       const cur = snapshot();
       if (cur === lastSaved.current) return; // nothing changed since last save
       try {
@@ -223,6 +235,10 @@ export function PageBuilder({ pageKey, label, view, sectionMeta, schemas, media,
   const applyPreset = (secs: ComposedSection[]) => { setSections(secs); setOpenSet(new Set()); setMsg({ tone: "ok", text: "Preset loaded into the draft — review, then Save or Publish." }); };
   const activatePreset = async (secs: ComposedSection[]) => { setSections(secs); const d = await post({ action: "publish", sections: secs.map((s, i) => ({ ...s, sortOrder: i })) }); if (d?.ok) setMsg({ tone: "ok", text: "Preset activated — published live." }); };
 
+  // Audit timeline (point 35).
+  const [audit, setAudit] = useState<PageAuditEntry[]>(auditProp);
+  const refreshAudit = async () => { const d = await post({ action: "audit.timeline" }); if (Array.isArray(d?.audit)) setAudit(d.audit); };
+
   // Selective publish (point 13) — publish only the ticked sections.
   const toggleSelect = (id: string) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const clearSelect = () => setSelected(new Set());
@@ -306,7 +322,7 @@ export function PageBuilder({ pageKey, label, view, sectionMeta, schemas, media,
   const searchRef = useRef<HTMLInputElement>(null);
   const kb = useRef<{ save: () => void; undo: () => void; redo: () => void; focusSearch: () => void; esc: () => void } | null>(null);
   kb.current = {
-    save,
+    save: () => { if (!readOnly) save(); },
     undo: history.undo,
     redo: history.redo,
     focusSearch: () => searchRef.current?.focus(),
@@ -330,8 +346,13 @@ export function PageBuilder({ pageKey, label, view, sectionMeta, schemas, media,
 
   return (
     <div className={`cfg${livePreviewSrc ? " pb-live" : ""}`}>
-      <div className="pb-live__editor">
-      {lockedBy ? <div className="nav-warn" style={{ borderColor: "#8a3d2f", background: "rgba(138,61,47,0.08)", color: "#8a3d2f" }}>⚠ Currently edited by {lockedBy}. Your changes may overwrite theirs — coordinate before publishing.</div> : null}
+      <div className={`pb-live__editor${readOnly ? " is-readonly" : ""}`}>
+      {readOnly ? (
+        <div className="pb-lockbar">
+          <span>🔒 <b>Currently edited by {lockedBy}</b> — you're in read-only mode so you don't overwrite their work.</span>
+          <button type="button" className="ff-btn ff-btn--mini ff-btn--primary" onClick={takeOver}>Take over editing</button>
+        </div>
+      ) : null}
       {autosavedAt ? <p className="admin__muted" style={{ margin: "0 0 8px", fontSize: 12 }}>Autosaved at {autosavedAt}</p> : null}
       <div className="hp-toolbar">
         <span className="hp-toolbar__left">
@@ -351,6 +372,7 @@ export function PageBuilder({ pageKey, label, view, sectionMeta, schemas, media,
       {perf ? <PerformancePanel perf={perf} typeLabels={Object.fromEntries(sectionMeta.map((m) => [m.type, m.label]))} /> : null}
       <AccessibilityPanel sections={sections} schemas={schemas} labelOf={labelOf} onFocus={setFocusId} />
       <PresetsPanel presets={presets} currentSections={sections} busy={busy} onSave={savePreset} onDelete={deletePreset} onApply={applyPreset} onActivate={activatePreset} />
+      <AuditTimelinePanel audit={audit} onRefresh={refreshAudit} labelOf={labelOf} />
       {(() => {
         const renderRow = (s: ComposedSection, i: number, draggable: boolean) => {
           const st = statusOf(s);

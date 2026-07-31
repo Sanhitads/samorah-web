@@ -648,3 +648,27 @@ to cut ~1s off load."* Additive: storefront DOM is byte-for-byte unchanged; thre
 Real-world scenario: *"Save the current homepage as 'Diwali Homepage', swap the Hero + a Featured
 spotlight for the festival, and Activate on the day — one click, live. The checker flags the new Hero
 image has no alt and the CTA lost its link before it ships."* Additive throughout; one additive migration.
+
+## P10.7 — Professional editor features (Phase 8)
+
+- **Undo / Redo (33)** — a `useHistoryState` hook (bounded past/future stack; consecutive edits to the
+  same field coalesce into one step) backs the builder's section state. **Ctrl/Cmd+Z** undo,
+  **Ctrl/Cmd+Shift+Z** (or **Ctrl+Y**) redo, plus toolbar ↶/↷ buttons.
+- **Keyboard shortcuts** — **Ctrl/Cmd+S** save · undo/redo · **Ctrl/Cmd+/** focus the find box · **Esc**
+  closes the top-most modal. One global keydown handler via a stable ref (always sees current state).
+- **Multi-user safety (34)** — the existing advisory lock is now enforced: when another editor holds the
+  lock the builder shows **"Currently edited by …"** and goes **read-only** (controls
+  `pointer-events:none`, autosave suspended); a **"Take over editing"** button steals the lock
+  (`acquireLock({steal})`) and flips the other editor to read-only on their next heartbeat.
+- **Audit timeline (35)** — every change records **who / what / when / previous → new**. A pure
+  `diffSections` util computes field-level diffs; `savePageDraft` logs a `page.edited` audit event with
+  the diff (publish/reset/restore are tagged too, keyed by `metadata.pageKey` since `audit_events.entity_id`
+  is a uuid). A builder panel lists the timeline with actor names, each edit expandable to its field diffs.
+- **Preview modes (36)** — Desktop / Tablet / Mobile already existed; added **Dark** (same-origin style
+  injection: invert the page, re-invert media — an approximation until a real dark theme) and **Print**
+  (`iframe.print()`).
+
+Real-world scenario: *"Two editors open the homepage at once — the second sees 'edited by Priya' and a
+read-only page, takes over when Priya's done, undoes an accidental section delete with Ctrl+Z, checks the
+audit timeline to see exactly which fields Priya changed, previews it in Dark, and Ctrl+S to save."*
+No migration — built on the existing locks/audit tables.

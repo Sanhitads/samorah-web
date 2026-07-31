@@ -9,6 +9,7 @@
 import { unstable_cache } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logEvent } from "@/services/auditService";
+import { recordPageEdit } from "@/services/pageAuditService";
 import { isLive, publishState, type PublishStatus } from "@/lib/cms/publishable";
 import { snapshotRevision, listRevisions as listCmsRevisions, getRevisionSnapshot, type Revision } from "@/services/cms/revisions";
 
@@ -127,7 +128,7 @@ export async function publishPageSections(key: string, cfg: PageConfig, sectionI
   }, { onConflict: "page_key" });
   if (error) return { ok: false, reason: error.message };
   await snapshotRevision("composed-page", key, nextPublished, actorId, `partial publish (${selected.size} section${selected.size === 1 ? "" : "s"})`);
-  await logEvent({ entityType: "settings", event: "page.published_sections", actorType: actorId ? "staff" : "system", actorId, notes: `${key}: ${[...selected].join(", ")}` });
+  await logEvent({ entityType: "settings", event: "page.published_sections", actorType: actorId ? "staff" : "system", actorId, notes: `Published ${selected.size} selected section${selected.size === 1 ? "" : "s"}`, metadata: { pageKey: key } });
   return { ok: true };
 }
 
@@ -138,7 +139,8 @@ export async function savePageDraft(key: string, cfg: PageConfig, data: unknown,
   const existing = await readRow(key);
   const { error } = await db.from("composed_pages").upsert({ page_key: key, draft: clean, published: existing?.published ?? null, status: "draft", updated_at: new Date().toISOString() }, { onConflict: "page_key" });
   if (error) return { ok: false, reason: error.message };
-  await logEvent({ entityType: "settings", event: "page.draft_saved", actorType: actorId ? "staff" : "system", actorId, notes: key });
+  // Audit timeline (Phase 8 · point 35): record the field-level diff vs the previous draft (who/what/when/prev/new).
+  await recordPageEdit(key, Array.isArray(existing?.draft) ? (existing.draft as never[]) : [], clean as never[], actorId);
   return { ok: true };
 }
 
@@ -155,7 +157,7 @@ export async function publishPage(key: string, cfg: PageConfig, opts: { publishA
   }, { onConflict: "page_key" });
   if (error) return { ok: false, reason: error.message };
   await snapshotRevision("composed-page", key, draft, actorId, scheduled ? "scheduled publish" : undefined);
-  await logEvent({ entityType: "settings", event: scheduled ? "page.scheduled" : "page.published", actorType: actorId ? "staff" : "system", actorId, notes: key });
+  await logEvent({ entityType: "settings", event: scheduled ? "page.scheduled" : "page.published", actorType: actorId ? "staff" : "system", actorId, notes: scheduled ? "Scheduled publish" : "Published live", metadata: { pageKey: key } });
   return { ok: true };
 }
 
@@ -163,7 +165,7 @@ export async function resetPage(key: string, actorId?: string): Promise<{ ok: bo
   const db = createAdminClient() as any;
   const { error } = await db.from("composed_pages").delete().eq("page_key", key);
   if (error) return { ok: false, reason: error.message };
-  await logEvent({ entityType: "settings", event: "page.reset", actorType: actorId ? "staff" : "system", actorId, notes: key });
+  await logEvent({ entityType: "settings", event: "page.reset", actorType: actorId ? "staff" : "system", actorId, notes: "Reset to default", metadata: { pageKey: key } });
   return { ok: true };
 }
 
@@ -173,6 +175,6 @@ export async function restorePageRevision(key: string, cfg: PageConfig, revision
   const snap = await getRevisionSnapshot(revisionId);
   if (!Array.isArray(snap)) return { ok: false, reason: "revision not found" };
   const res = await savePageDraft(key, cfg, snap, actorId);
-  if (res.ok) await logEvent({ entityType: "settings", event: "page.restored", actorType: actorId ? "staff" : "system", actorId, notes: `${key} ← ${revisionId}` });
+  if (res.ok) await logEvent({ entityType: "settings", event: "page.restored", actorType: actorId ? "staff" : "system", actorId, notes: `Restored a previous version`, metadata: { pageKey: key } });
   return res;
 }

@@ -1060,6 +1060,9 @@ a.adm-badge[data-b="incident"]:hover { background: rgba(168,68,58,0.22); }
 /* Side-by-side live builder (Homepage) — editor left, live preview sticky right. */
 .pb-live { display: grid; grid-template-columns: minmax(0, 480px) minmax(0, 1fr); gap: 16px; align-items: start; }
 .pb-live__editor { min-width: 0; }
+/* Phase 8 · point 34 — multi-user read-only + take-over */
+.pb-lockbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 14px; margin-bottom: 12px; border: 1px solid #c9a24a; background: rgba(201,162,74,0.12); border-radius: 8px; font-size: 13px; }
+.pb-live__editor.is-readonly > *:not(.pb-lockbar) { pointer-events: none; opacity: 0.5; user-select: none; }
 /* Sticky live preview — fills (almost) the whole viewport height once you scroll into the builder,
    with a small 16px top/bottom breathing margin. `svh` handles mobile browser chrome; `vh` is the
    fallback for browsers without it. */
@@ -1143,6 +1146,25 @@ a.adm-badge[data-b="incident"]:hover { background: rgba(168,68,58,0.22); }
 .hp-presets__meta { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .hp-presets__pname { font-weight: 500; }
 .hp-presets__season { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; padding: 2px 7px; border-radius: 999px; background: var(--gold, #caa46a); color: #1f1a16; }
+/* Phase 8 · point 35 — audit timeline */
+.hp-audit__body { padding: 0 14px 16px; }
+.hp-audit__head { display: flex; justify-content: space-between; align-items: center; margin: 6px 0 8px; }
+.hp-audit__list { list-style: none; margin: 0; padding: 0; }
+.hp-audit__item { border-bottom: 1px solid var(--ad-hair, rgba(31,26,22,0.07)); }
+.hp-audit__row { width: 100%; display: grid; grid-template-columns: auto auto minmax(0,1fr) auto auto; gap: 10px; align-items: center; padding: 8px 4px; background: none; border: none; cursor: pointer; font: inherit; text-align: left; }
+.hp-audit__row:disabled { cursor: default; }
+.hp-audit__badge { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 7px; border-radius: 999px; background: rgba(31,26,22,0.08); white-space: nowrap; }
+.hp-audit__badge.is-pub { background: var(--gold, #caa46a); color: #1f1a16; }
+.hp-audit__who { font-weight: 500; font-size: 13px; }
+.hp-audit__what { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hp-audit__when { font-size: 11px; white-space: nowrap; }
+.hp-audit__diff { padding: 2px 8px 10px; display: flex; flex-direction: column; gap: 8px; }
+.hp-audit__section { font-weight: 500; font-size: 12px; display: block; margin-bottom: 3px; }
+.hp-audit__field { display: grid; grid-template-columns: 110px minmax(0,1fr) auto minmax(0,1fr); gap: 8px; align-items: baseline; padding: 1px 0; font-size: 12px; }
+.hp-audit__fname { color: var(--smoke,#6b6259); font-size: 11px; }
+.hp-audit__prev { color: #a8443a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hp-audit__next { color: #2e7d32; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hp-audit__arrow { color: var(--smoke,#6b6259); }
 /* Phase 5 · point 22 — alt-text validation */
 .sf-warn { color: #9a6a1e; font-size: 11px; }
 .sf-decorative { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--smoke, #6b6259); cursor: pointer; }

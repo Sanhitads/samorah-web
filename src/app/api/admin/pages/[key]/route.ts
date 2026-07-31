@@ -7,6 +7,7 @@ import { getRevisionSnapshot } from "@/services/cms/revisions";
 import { validateComposedPage } from "@/lib/cms/composedPageValidation";
 import { listSectionTemplates, saveSectionTemplate, deleteSectionTemplate } from "@/services/sectionLibraryService";
 import { savePagePreset, deletePagePreset } from "@/services/pagePresetsService";
+import { getPageAudit } from "@/services/pageAuditService";
 
 /** POST /api/admin/pages/[key] — generic Composable Page builder for any page type. catalog.manage. */
 export const runtime = "nodejs";
@@ -90,6 +91,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ key
     // preset, or delete one. "Apply" (load into draft) is client-side; "Activate" reuses the publish action.
     case "preset.save": return NextResponse.json(await savePagePreset({ pageKey: key, name: body.name, season: body.season, sections: body.sections ?? [] }, actor));
     case "preset.delete": return NextResponse.json(await deletePagePreset(body.id, key, actor));
+    // Audit timeline (point 35) — every change with who/what/when/prev/new.
+    case "audit.timeline": return NextResponse.json({ ok: true, audit: await getPageAudit(key, 50) });
     default: return NextResponse.json({ error: "unknown action" }, { status: 400 });
   }
 }
