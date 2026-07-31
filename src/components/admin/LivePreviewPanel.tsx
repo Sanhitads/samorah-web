@@ -38,6 +38,7 @@ export function LivePreviewPanel({
   const readyRef = useRef(false);
   const [device, setDevice] = useState<(typeof DEVICES)[number]["k"]>("desktop");
   const [stage, setStage] = useState({ w: 0, h: 0 });
+  const [dark, setDark] = useState(false); // dark-preview toggle (point 36)
 
   // Latest draft/focus, so the async "ready" handshake always posts current values (not a stale closure).
   const draftRef = useRef(draft);
@@ -94,9 +95,24 @@ export function LivePreviewPanel({
 
   const refresh = () => {
     readyRef.current = false;
+    setDark(false);
     onRefresh(); // reload saved DB state into the editor → draft memo updates → re-posted on ready
     if (iframeRef.current) iframeRef.current.src = `${src}?r=${Date.now()}`; // force reload → fresh ready handshake
   };
+
+  // Dark preview (point 36) — the iframe is same-origin, so we inject a dark treatment directly: invert
+  // the page then re-invert media so photos stay true. An approximation until a real dark theme lands.
+  const DARK_CSS = "html{filter:invert(0.92) hue-rotate(180deg);background:#0e0e0e!important}img,video,canvas,svg,[style*='background-image'],[style*='url(']{filter:invert(1) hue-rotate(180deg)}";
+  const toggleDark = () => {
+    const doc = iframeRef.current?.contentDocument;
+    if (!doc) return;
+    const existing = doc.getElementById("sa-dark-preview");
+    if (existing) { existing.remove(); setDark(false); return; }
+    const style = doc.createElement("style"); style.id = "sa-dark-preview"; style.textContent = DARK_CSS;
+    doc.head.appendChild(style); setDark(true);
+  };
+  // Print (point 36) — print just the previewed page via the same-origin iframe.
+  const printPreview = () => { try { iframeRef.current?.contentWindow?.focus(); iframeRef.current?.contentWindow?.print(); } catch { /* ignore */ } };
 
   return (
     <div className="pe-live__panel">
@@ -112,6 +128,8 @@ export function LivePreviewPanel({
               {d.l}
             </button>
           ))}
+          <button type="button" className={`pe-live__dev${dark ? " is-active" : ""}`} title="Preview in dark mode (approximation)" onClick={toggleDark}>🌙 Dark</button>
+          <button type="button" className="pe-live__dev" title="Print the preview" onClick={printPreview}>🖨 Print</button>
         </div>
         <span className="pe-live__hint">Live draft · not saved</span>
         <button type="button" className="ff-btn ff-btn--mini" onClick={refresh}>Refresh from live</button>

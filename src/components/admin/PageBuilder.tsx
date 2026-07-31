@@ -19,6 +19,7 @@ import type { PagePreset } from "@/services/pagePresetsService";
 import type { HomepagePerformance } from "@/services/analytics/performanceService";
 import type { SectionStat } from "@/services/analytics/sectionAnalyticsService";
 import { enabledForState, effectiveSectionState, type SectionState } from "@/lib/cms/sectionState";
+import { useHistoryState } from "@/hooks/useHistoryState";
 
 export type SectionTemplate = { id: string; label: string; description: string; type: string; settings: Record<string, unknown>; comingSoon: boolean };
 export type LibraryEntry = { id: string; name: string; type: string; settings: Record<string, unknown>; createdAt: string };
@@ -48,7 +49,7 @@ export function PageBuilder({ pageKey, label, view, sectionMeta, schemas, media,
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: string; text: string } | null>(null);
-  const [sections, setSections] = useState<ComposedSection[]>(view.draft);
+  const [sections, setSections, history] = useHistoryState<ComposedSection[]>(view.draft, { limit: 120 });
   const [pubAt, setPubAt] = useState(toLocal(view.publishAt));
   const [unpubAt, setUnpubAt] = useState(toLocal(view.unpublishAt));
   const [openSet, setOpenSet] = useState<Set<string>>(new Set());       // expanded section ids (accordion)
@@ -78,7 +79,8 @@ export function PageBuilder({ pageKey, label, view, sectionMeta, schemas, media,
     if (!q) return true;
     return `${labelOf(s.type)} ${s.type}`.toLowerCase().includes(q) || JSON.stringify(s.settings ?? {}).toLowerCase().includes(q);
   };
-  const setField = (i: number, key: string, value: unknown) => setSections((s) => s.map((x, j) => (j === i ? { ...x, settings: { ...x.settings, [key]: value } } : x)));
+  // Field edits coalesce into one undo step per (section,key) run of ~1.2s — typing is one undo, not per-key.
+  const setField = (i: number, key: string, value: unknown) => setSections((s) => s.map((x, j) => (j === i ? { ...x, settings: { ...x.settings, [key]: value } } : x)), `field:${i}:${key}`);
 
   // Per-section save status (point 2) — compare each section's current fingerprint to its last-saved one.
   const savedById = useRef<Record<string, string>>(fingerprints(view.draft));
@@ -298,6 +300,34 @@ export function PageBuilder({ pageKey, label, view, sectionMeta, schemas, media,
     if (d?.ok && Array.isArray(d.library)) setLibrary(d.library as LibraryEntry[]);
   };
 
+  // Keyboard shortcuts (Phase 8) — Ctrl/Cmd+S save · Ctrl/Cmd+Z undo · Ctrl/Cmd+Shift+Z (or Ctrl+Y) redo
+  // · Ctrl/Cmd+/ focus search · Esc close the top-most modal. A ref keeps the handler stable while always
+  // seeing the latest state/functions.
+  const searchRef = useRef<HTMLInputElement>(null);
+  const kb = useRef<{ save: () => void; undo: () => void; redo: () => void; focusSearch: () => void; esc: () => void } | null>(null);
+  kb.current = {
+    save,
+    undo: history.undo,
+    redo: history.redo,
+    focusSearch: () => searchRef.current?.focus(),
+    esc: () => { if (showAdd) setShowAdd(false); else if (revs) setRevs(null); else if (compareRev) setCompareRev(null); else if (saveLibFor !== null) setSaveLibFor(null); else if (previewRev) setPreviewRev(null); else if (confirmDel) setConfirmDel(null); },
+  };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const mod = e.ctrlKey || e.metaKey;
+      const t = e.target as HTMLElement | null;
+      const typing = t?.tagName === "INPUT" || t?.tagName === "TEXTAREA" || !!t?.isContentEditable;
+      const k = e.key.toLowerCase();
+      if (mod && k === "s") { e.preventDefault(); kb.current?.save(); }
+      else if (mod && k === "z" && !e.shiftKey) { if (!typing) { e.preventDefault(); kb.current?.undo(); } }
+      else if (mod && (k === "y" || (k === "z" && e.shiftKey))) { if (!typing) { e.preventDefault(); kb.current?.redo(); } }
+      else if (mod && e.key === "/") { e.preventDefault(); kb.current?.focusSearch(); }
+      else if (e.key === "Escape") { kb.current?.esc(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   return (
     <div className={`cfg${livePreviewSrc ? " pb-live" : ""}`}>
       <div className="pb-live__editor">
@@ -305,10 +335,12 @@ export function PageBuilder({ pageKey, label, view, sectionMeta, schemas, media,
       {autosavedAt ? <p className="admin__muted" style={{ margin: "0 0 8px", fontSize: 12 }}>Autosaved at {autosavedAt}</p> : null}
       <div className="hp-toolbar">
         <span className="hp-toolbar__left">
-          <input className="hp-search" type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Find a section or content…" aria-label="Find a section or content" />
+          <input ref={searchRef} className="hp-search" type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Find a section or content… (Ctrl+/)" aria-label="Find a section or content" />
           {search.trim() ? <span className="admin__muted">{sections.filter(sectionMatches).length} match{sections.filter(sectionMatches).length === 1 ? "" : "es"}</span> : <span className="admin__muted">{sections.length} sections · drag ⠿ to reorder</span>}
         </span>
         <span className="ff-actions">
+          <button type="button" className="ff-btn ff-btn--mini" disabled={!history.canUndo} title="Undo (Ctrl+Z)" onClick={history.undo}>↶ Undo</button>
+          <button type="button" className="ff-btn ff-btn--mini" disabled={!history.canRedo} title="Redo (Ctrl+Shift+Z)" onClick={history.redo}>↷ Redo</button>
           <button type="button" className="ff-btn ff-btn--mini" onClick={expandAll}>Expand all</button>
           <button type="button" className="ff-btn ff-btn--mini" onClick={collapseAll}>Collapse all</button>
           <button type="button" className="ff-btn ff-btn--primary" onClick={() => setShowAdd(true)}>+ Add section{library.length ? ` · ${library.length} saved` : ""}</button>
