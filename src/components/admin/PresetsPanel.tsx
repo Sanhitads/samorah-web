@@ -26,7 +26,9 @@ export function PresetsPanel({ presets, currentSections, busy, onSave, onDelete,
   const [season, setSeason] = useState("Default");
   const [confirmActivate, setConfirmActivate] = useState<string | null>(null);
 
-  const doSave = async () => { if (!name.trim()) return; await onSave(name.trim(), season); setName(""); };
+  // A name is auto-derived from the season when none is typed, so Save is never stuck disabled.
+  const derivedName = name.trim() || (season && season !== "Default" ? `${season} Homepage` : "Homepage preset");
+  const doSave = async () => { await onSave(derivedName, season); setName(""); };
 
   return (
     <div className="hp-seo hp-presets">
@@ -37,11 +39,11 @@ export function PresetsPanel({ presets, currentSections, busy, onSave, onDelete,
       {open ? (
         <div className="hp-presets__body">
           <div className="hp-presets__save">
-            <input className="hp-presets__name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Preset name (e.g. Christmas Homepage)" maxLength={80} />
+            <input className="hp-presets__name" value={name} onChange={(e) => setName(e.target.value)} placeholder={`Preset name (default: “${derivedName}”)`} maxLength={80} />
             <select value={season} onChange={(e) => setSeason(e.target.value)} title="Season">
               {SEASONS.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
-            <button type="button" className="ff-btn ff-btn--primary ff-btn--mini" disabled={busy || !name.trim()} onClick={doSave}>Save current as preset</button>
+            <button type="button" className="ff-btn ff-btn--primary ff-btn--mini" disabled={busy} onClick={doSave}>Save current as preset</button>
           </div>
 
           {presets.length ? (

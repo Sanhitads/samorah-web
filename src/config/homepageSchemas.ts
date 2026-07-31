@@ -311,7 +311,7 @@ export const SECTION_DEFS: Record<SectionType, SectionDefinition> = {
         { key: "ctaLabel", label: "Button label", type: "text", maxLength: 24 },
       ],
     },
-    defaults: () => ({ eyebrow: "Featured", entityType: "product", title: "", blurb: "", image: "", imageAlt: "", href: "", ctaLabel: "Discover" }),
+    defaults: () => ({ eyebrow: "Featured", entityType: "product", title: "A featured piece", blurb: "Use “Feature a…” above to pick a product, chapter, atmosphere, testimonial, artist or journal piece — its title, image, link and blurb fill in here, then edit freely.", image: "", imageAlt: "", href: "", ctaLabel: "Discover" }),
   },
 };
 

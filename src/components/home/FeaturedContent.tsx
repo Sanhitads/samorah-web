@@ -29,7 +29,7 @@ export function FeaturedContent({ eyebrow, title, blurb, image, imageAlt, href, 
             {eyebrow ? <p className="feat__eyebrow">{eyebrow}</p> : null}
             <p className="feat__quote-text">“{blurb}”</p>
             {title ? <cite className="feat__cite">— {title}</cite> : null}
-            {href && ctaLabel ? <div className="feat__cta"><Link href={href} className="btn btn-ghost">{ctaLabel}</Link></div> : null}
+            {ctaLabel ? <div className="feat__cta"><Link href={href || "#"} className="btn btn-ghost">{ctaLabel}</Link></div> : null}
           </blockquote>
         ) : (
           <div className="feat__card">
@@ -38,7 +38,7 @@ export function FeaturedContent({ eyebrow, title, blurb, image, imageAlt, href, 
               {eyebrow ? <p className="feat__eyebrow">{eyebrow}</p> : null}
               {title ? <h2 className="feat__title">{title}</h2> : null}
               {blurb ? <p className="feat__blurb">{blurb}</p> : null}
-              {href && ctaLabel ? <Link href={href} className="btn btn-ghost feat__link">{ctaLabel}</Link> : null}
+              {ctaLabel ? <Link href={href || "#"} className="btn btn-ghost feat__link">{ctaLabel}</Link> : null}
             </div>
           </div>
         )}
