@@ -14,6 +14,8 @@ import { PageSeoPanel, type PageSeo } from "./PageSeoPanel";
 import { PerformancePanel } from "./PerformancePanel";
 import { SectionAnalyticsPanel } from "./SectionAnalyticsPanel";
 import { AccessibilityPanel } from "./AccessibilityPanel";
+import { PresetsPanel } from "./PresetsPanel";
+import type { PagePreset } from "@/services/pagePresetsService";
 import type { HomepagePerformance } from "@/services/analytics/performanceService";
 import type { SectionStat } from "@/services/analytics/sectionAnalyticsService";
 import { enabledForState, effectiveSectionState, type SectionState } from "@/lib/cms/sectionState";
@@ -38,8 +40,8 @@ const sectionKey = (s: ComposedSection) => JSON.stringify({ type: s.type, enable
 const fingerprints = (list: ComposedSection[]) => Object.fromEntries(list.map((s) => [s.id, sectionKey(s)]));
 const PREVIEW_SRC = "samorah-pdp-preview"; // shared postMessage tag (LivePreviewPanel + preview routes)
 
-export function PageBuilder({ pageKey, label, view, sectionMeta, schemas, media, entities = {}, templates = [], library: libraryProp = [], previewPath, previewCookie, livePreviewSrc, seo, seoOrigin, perf, analytics }: {
-  pageKey: string; label: string; view: PageAdminView; sectionMeta: Meta[]; schemas: Record<string, SectionSchema>; media: MediaOption[]; entities?: EntityOptions; templates?: SectionTemplate[]; library?: LibraryEntry[]; previewPath: string; previewCookie: string; livePreviewSrc?: string; seo?: PageSeo; seoOrigin?: string; perf?: HomepagePerformance; analytics?: Record<string, SectionStat>;
+export function PageBuilder({ pageKey, label, view, sectionMeta, schemas, media, entities = {}, templates = [], library: libraryProp = [], previewPath, previewCookie, livePreviewSrc, seo, seoOrigin, perf, analytics, presets: presetsProp = [] }: {
+  pageKey: string; label: string; view: PageAdminView; sectionMeta: Meta[]; schemas: Record<string, SectionSchema>; media: MediaOption[]; entities?: EntityOptions; templates?: SectionTemplate[]; library?: LibraryEntry[]; previewPath: string; previewCookie: string; livePreviewSrc?: string; seo?: PageSeo; seoOrigin?: string; perf?: HomepagePerformance; analytics?: Record<string, SectionStat>; presets?: PagePreset[];
 }) {
   const router = useRouter();
   const apiBase = `/api/admin/pages/${pageKey}`;
@@ -212,6 +214,13 @@ export function PageBuilder({ pageKey, label, view, sectionMeta, schemas, media,
   const restore = async (id: string) => { const d = await post({ action: "restore", id }); if (d?.ok) { setRevs(null); setMsg({ tone: "ok", text: "Restored into draft — review, then publish." }); } };
   const restoreLive = async (id: string) => { const d = await post({ action: "restore.publish", id }); if (d?.ok) { setRevs(null); setPreviewRev(null); setMsg({ tone: "ok", text: "Restored and published live." }); } };
 
+  // Presets + seasonal homepages (points 29/30).
+  const [presets, setPresets] = useState<PagePreset[]>(presetsProp);
+  const savePreset = async (name: string, season: string) => { const d = await post({ action: "preset.save", name, season, sections: withOrder() }); if (d?.presets) setPresets(d.presets); if (d?.ok) setMsg({ tone: "ok", text: `Saved preset "${name}".` }); };
+  const deletePreset = async (id: string) => { const d = await post({ action: "preset.delete", id }); if (d?.presets) setPresets(d.presets); };
+  const applyPreset = (secs: ComposedSection[]) => { setSections(secs); setOpenSet(new Set()); setMsg({ tone: "ok", text: "Preset loaded into the draft — review, then Save or Publish." }); };
+  const activatePreset = async (secs: ComposedSection[]) => { setSections(secs); const d = await post({ action: "publish", sections: secs.map((s, i) => ({ ...s, sortOrder: i })) }); if (d?.ok) setMsg({ tone: "ok", text: "Preset activated — published live." }); };
+
   // Selective publish (point 13) — publish only the ticked sections.
   const toggleSelect = (id: string) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const clearSelect = () => setSelected(new Set());
@@ -309,6 +318,7 @@ export function PageBuilder({ pageKey, label, view, sectionMeta, schemas, media,
       {analytics ? <SectionAnalyticsPanel stats={analytics} sections={sections.map((s) => ({ id: s.id, type: s.type, label: labelOf(s.type) }))} /> : null}
       {perf ? <PerformancePanel perf={perf} typeLabels={Object.fromEntries(sectionMeta.map((m) => [m.type, m.label]))} /> : null}
       <AccessibilityPanel sections={sections} schemas={schemas} labelOf={labelOf} onFocus={setFocusId} />
+      <PresetsPanel presets={presets} currentSections={sections} busy={busy} onSave={savePreset} onDelete={deletePreset} onApply={applyPreset} onActivate={activatePreset} />
       {(() => {
         const renderRow = (s: ComposedSection, i: number, draggable: boolean) => {
           const st = statusOf(s);

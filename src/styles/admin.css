@@ -1131,6 +1131,15 @@ a.adm-badge[data-b="incident"]:hover { background: rgba(168,68,58,0.22); }
 .hp-a11y__tag.is-warn { color: #9a6a1e; }
 .hp-a11y__where { font-size: 11px; color: var(--smoke, #6b6259); }
 .hp-a11y__msg { font-size: 12px; }
+/* Phase 7 · points 29/30 — presets & seasonal homepages */
+.hp-presets__body { padding: 0 14px 16px; }
+.hp-presets__save { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 6px 0 12px; }
+.hp-presets__name { flex: 1; min-width: 200px; }
+.hp-presets__list { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.hp-presets__item { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 10px; border: 1px solid var(--ad-hair, rgba(31,26,22,0.1)); border-radius: 7px; }
+.hp-presets__meta { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.hp-presets__pname { font-weight: 500; }
+.hp-presets__season { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; padding: 2px 7px; border-radius: 999px; background: var(--gold, #caa46a); color: #1f1a16; }
 /* Phase 5 · point 22 — alt-text validation */
 .sf-warn { color: #9a6a1e; font-size: 11px; }
 .sf-decorative { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--smoke, #6b6259); cursor: pointer; }

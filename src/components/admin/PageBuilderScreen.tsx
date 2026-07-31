@@ -11,6 +11,7 @@ import { getTestimonials } from "@/config/testimonials";
 import { ARTISTS } from "@/config/artist";
 import { getJournalHighlights } from "@/config/journalHighlights";
 import { listSectionTemplates } from "@/services/sectionLibraryService";
+import { listPagePresets } from "@/services/pagePresetsService";
 import { listSeoOverrides } from "@/services/seoRedirectService";
 import { getHomepagePerformance } from "@/services/analytics/performanceService";
 import { getSectionAnalytics } from "@/services/analytics/sectionAnalyticsService";
@@ -50,6 +51,7 @@ export async function PageBuilderScreen({ pageKey }: { pageKey: string }) {
     return { id: t.id, label: t.label, description: t.description, type: t.type, settings, comingSoon: !!t.comingSoon };
   });
   const library = canManage ? await listSectionTemplates() : [];
+  const presets = canManage ? await listPagePresets(pageKey) : [];
 
   // Page SEO (Phase 5 · point 24) — the DB override for this page's live path, edited in-builder.
   const seoRow = canManage ? (await listSeoOverrides()).find((r) => r.path === page.previewPath) : undefined;
@@ -91,7 +93,7 @@ export async function PageBuilderScreen({ pageKey }: { pageKey: string }) {
         <p className="admin__count">{view.draft.length} sections · {view.state}{canManage ? "" : " · read-only (needs catalog.manage)"}</p>
       </header>
       {canManage ? (
-        <PageBuilder pageKey={pageKey} label={page.label} view={{ ...view, draft: resolved }} sectionMeta={sectionMeta} schemas={schemas} media={media} entities={entities} templates={templates} library={library} previewPath={page.previewPath} previewCookie={page.previewCookie} livePreviewSrc={page.livePreviewSrc} seo={seo} seoOrigin={canonicalOrigin()} perf={perf} analytics={analytics} />
+        <PageBuilder pageKey={pageKey} label={page.label} view={{ ...view, draft: resolved }} sectionMeta={sectionMeta} schemas={schemas} media={media} entities={entities} templates={templates} library={library} previewPath={page.previewPath} previewCookie={page.previewCookie} livePreviewSrc={page.livePreviewSrc} seo={seo} seoOrigin={canonicalOrigin()} perf={perf} analytics={analytics} presets={presets} />
       ) : (
         <p className="admin__empty">Editing this page needs the catalog.manage capability.</p>
       )}

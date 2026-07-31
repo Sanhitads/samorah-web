@@ -6,6 +6,7 @@ import { savePageDraft, publishPage, publishPageSections, resetPage, listPageRev
 import { getRevisionSnapshot } from "@/services/cms/revisions";
 import { validateComposedPage } from "@/lib/cms/composedPageValidation";
 import { listSectionTemplates, saveSectionTemplate, deleteSectionTemplate } from "@/services/sectionLibraryService";
+import { savePagePreset, deletePagePreset } from "@/services/pagePresetsService";
 
 /** POST /api/admin/pages/[key] — generic Composable Page builder for any page type. catalog.manage. */
 export const runtime = "nodejs";
@@ -85,6 +86,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ key
       const res = await deleteSectionTemplate(body.id, actor);
       return NextResponse.json({ ...res, library: await listSectionTemplates() });
     }
+    // Page presets + seasonal homepages (points 29/30). Save the current composition as a named/seasonal
+    // preset, or delete one. "Apply" (load into draft) is client-side; "Activate" reuses the publish action.
+    case "preset.save": return NextResponse.json(await savePagePreset({ pageKey: key, name: body.name, season: body.season, sections: body.sections ?? [] }, actor));
+    case "preset.delete": return NextResponse.json(await deletePagePreset(body.id, key, actor));
     default: return NextResponse.json({ error: "unknown action" }, { status: 400 });
   }
 }

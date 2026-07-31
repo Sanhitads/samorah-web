@@ -622,3 +622,29 @@ to its raw base), and flags external/unknown-size images. No tracking, computed 
 Real-world scenario the panels answer: *"Featured Atmosphere gets 1,240 views but 2% CTR and only 30%
 scroll — visitors aren't reaching it; move it up. The Hero image is 2.1 MB — re-upload a lighter master
 to cut ~1s off load."* Additive: storefront DOM is byte-for-byte unchanged; three additive migrations.
+
+## P10.6 — Samorah-specific homepage features (Phase 7)
+
+- **Featured content pickers (28)** — a new **"Featured spotlight"** section: feature any **Product /
+  Chapter / Atmosphere / Testimonial / Artist / Journal piece** from a dropdown instead of hardcoding.
+  The `reference` field gained **`refFill`** — picking an item denormalises its display data
+  (title/image/alt/href/blurb) into the section's editable fields, so the storefront needs no async
+  resolver. Every featurable entity is loaded normalised to one shape (products + collections from DB;
+  atmosphere/testimonials/artists from config; a new `journalHighlights` config until a Journal CMS lands).
+- **Seasonal homepage (29) + presets (30)** — save the whole composition as a named/seasonal **preset**
+  (Default / Autumn / Summer / Christmas / Diwali / Launch), then **Apply** it into the draft (clone) or
+  **Activate** it (publish live) with one click — the seasonal switch. Stored in the generic `settings`
+  KV row `page_presets` (no migration, mirroring the Section Library); two new API actions
+  (`preset.save`/`preset.delete`), with Apply client-side and Activate reusing the publish action.
+- **Homepage SEO — structured data (31)** — automatic global **Organization + WebSite** JSON-LD on every
+  store page, plus an editable **per-page custom JSON-LD** in the SEO panel (`seo_overrides.structured_data`,
+  migration `20260808120000`) rendered on the homepage. (Title/description/OG/canonical/robots shipped in
+  Phase 5.)
+- **Accessibility checker (32)** — a builder panel auditing the live draft for **missing alt text,
+  heading-hierarchy problems, low contrast, broken buttons, and empty links**, computed client-side from
+  section state (updates as you edit); click an issue to jump to its section. WCAG contrast math extracted
+  to a shared `lib/a11y/contrast` util.
+
+Real-world scenario: *"Save the current homepage as 'Diwali Homepage', swap the Hero + a Featured
+spotlight for the festival, and Activate on the day — one click, live. The checker flags the new Hero
+image has no alt and the CTA lost its link before it ships."* Additive throughout; one additive migration.
