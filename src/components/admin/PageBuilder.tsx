@@ -117,12 +117,19 @@ export function PageBuilder({ pageKey, label, view, sectionMeta, schemas, media,
   const resource = `page:${pageKey}`;
   const readOnly = !!lockedBy;                 // another editor holds the lock (point 34)
   const lockedByRef = useRef(lockedBy); lockedByRef.current = lockedBy;
-  // "Take over editing" (point 34): forcibly reassign the lock to me, then edit.
+  // "Take over editing" (point 34): forcibly reassign the lock to me, then edit. Reports clearly when it
+  // can't (an expired session returns 401/403 — silently doing nothing looked like the button was broken).
+  const [takingOver, setTakingOver] = useState(false);
   const takeOver = async () => {
+    setTakingOver(true);
     try {
-      const r = await (await fetch("/api/admin/locks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "steal", resource }) })).json();
-      if (r.ok) { setLockedBy(null); setMsg({ tone: "ok", text: "You're now editing — the other editor will go read-only." }); }
-    } catch { /* ignore */ }
+      const res = await fetch("/api/admin/locks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "steal", resource }) });
+      if (res.status === 401 || res.status === 403) { setMsg({ tone: "err", text: "Couldn't take over — your session has expired. Refresh the page and sign in again." }); return; }
+      const r = await res.json().catch(() => ({}));
+      if (r.ok) { setLockedBy(null); setMsg({ tone: "ok", text: "You're now editing — the other editor goes read-only on their next check." }); }
+      else { setMsg({ tone: "err", text: r.error ?? "Couldn't take over editing." }); }
+    } catch { setMsg({ tone: "err", text: "Couldn't take over editing — network error. Try again." }); }
+    finally { setTakingOver(false); }
   };
   useEffect(() => {
     let alive = true;
@@ -350,14 +357,14 @@ export function PageBuilder({ pageKey, label, view, sectionMeta, schemas, media,
       {readOnly ? (
         <div className="pb-lockbar">
           <span>🔒 <b>Currently edited by {lockedBy}</b> — you're in read-only mode so you don't overwrite their work.</span>
-          <button type="button" className="ff-btn ff-btn--mini ff-btn--primary" onClick={takeOver}>Take over editing</button>
+          <button type="button" className="ff-btn ff-btn--mini ff-btn--primary" disabled={takingOver} onClick={takeOver}>{takingOver ? "Taking over…" : "Take over editing"}</button>
         </div>
       ) : null}
       {autosavedAt ? <p className="admin__muted" style={{ margin: "0 0 8px", fontSize: 12 }}>Autosaved at {autosavedAt}</p> : null}
       <div className="hp-toolbar">
         <span className="hp-toolbar__left">
           <input ref={searchRef} className="hp-search" type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Find a section or content… (Ctrl+/)" aria-label="Find a section or content" />
-          {search.trim() ? <span className="admin__muted">{sections.filter(sectionMatches).length} match{sections.filter(sectionMatches).length === 1 ? "" : "es"}</span> : <span className="admin__muted">{sections.length} sections · drag ⠿ to reorder</span>}
+          {search.trim() ? <span className="admin__muted">{sections.filter(sectionMatches).length} match{sections.filter(sectionMatches).length === 1 ? "" : "es"}</span> : <span className="admin__muted">{sections.length} sections</span>}
         </span>
         <span className="ff-actions">
           <button type="button" className="ff-btn ff-btn--mini" disabled={!history.canUndo} title="Undo (Ctrl+Z)" onClick={history.undo}>↶ Undo</button>
