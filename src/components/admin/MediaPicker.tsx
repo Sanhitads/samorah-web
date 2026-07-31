@@ -43,8 +43,9 @@ export function MediaPicker({ open, kind = "image", allowCrop = true, onSelect, 
   const [savingMeta, setSavingMeta] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (): Promise<MediaRow[]> => {
     setLoading(true); setErr("");
+    let out: MediaRow[] = [];
     try {
       const p = new URLSearchParams();
       if (folder !== "all") p.set("folder", folder);
@@ -54,9 +55,10 @@ export function MediaPicker({ open, kind = "image", allowCrop = true, onSelect, 
       const res = await fetch(`/api/admin/media?${p}`);
       const d = await res.json();
       if (!res.ok || d.ok === false) { setErr(d.error ?? "Failed to load"); setItems([]); }
-      else { setItems(d.items ?? []); setFolders(d.folders ?? []); setTags(d.tags ?? []); }
+      else { out = d.items ?? []; setItems(out); setFolders(d.folders ?? []); setTags(d.tags ?? []); }
     } catch { setErr("Network error"); }
     setLoading(false);
+    return out;
   }, [folder, tag, q, kind]);
 
   useEffect(() => { if (open) { setRecent(readRecent()); } }, [open]);
@@ -80,7 +82,13 @@ export function MediaPicker({ open, kind = "image", allowCrop = true, onSelect, 
       const res = await fetch("/api/admin/media", { method: "POST", body: fd });
       const d = await res.json(); setUploading(false);
       if (!res.ok || d.ok === false) { setErr(d.error ?? d.reason ?? "Upload failed"); return; }
-      if (d.url) { await load(); choose(d.url); }
+      if (d.url) {
+        // Select the freshly-uploaded asset (open its crop/detail panel) rather than closing — the
+        // editor can then set a focal point / crop / alt before confirming.
+        const list = await load();
+        const found = list.find((m) => (d.id && m.id === d.id) || m.url === d.url);
+        setSel(found ?? ({ id: d.id ?? d.url, kind: kind === "video" ? "video" : "image", provider: "cloudinary", publicId: null, url: d.url, width: d.width ?? null, height: d.height ?? null, bytes: null, format: null, alt: "", title: file.name, role: "support", folder: folder === "all" ? "general" : folder, tags: [], focalX: null, focalY: null, dominantColor: null, aspectRatio: null, credit: "", copyright: "", status: "published", version: 1, createdAt: "" } as MediaRow));
+      }
     } catch { setUploading(false); setErr("Upload failed"); }
   };
 

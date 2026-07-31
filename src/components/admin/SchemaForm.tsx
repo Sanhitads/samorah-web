@@ -218,19 +218,22 @@ function FieldControl({ f, value, content, media, entities, onChange, onSibling 
               onClose={() => setPickerOpen(false)}
             />
           ) : null}
-          <span className="sf-media__row">
-            <select value="" onChange={(e) => { if (e.target.value) onChange(`gradient:${e.target.value}`); }} title="Use a gradient placeholder">
-              <option value="">Gradient…</option>
-              {GRADIENT_PRESETS.map((g) => <option key={g} value={g}>{g}</option>)}
-            </select>
-            <input type="color" value={isColorValue(str) ? str : "#caa46a"} onChange={(e) => onChange(e.target.value)} title="Pick a solid colour" aria-label={`${f.label} colour`} />
-            {media.length ? (
-              <select value="" onChange={(e) => { if (e.target.value) onChange(e.target.value); }} title="Pick from Media Library">
-                <option value="">Library…</option>
-                {media.map((m) => <option key={m.id} value={m.url}>{m.title || m.url.split("/").pop()}</option>)}
+          {/* Gradient / solid-colour placeholders + image library — not shown for video-only fields. */}
+          {f.allowedMime?.some((m) => m.startsWith("video/")) ? null : (
+            <span className="sf-media__row">
+              <select value="" onChange={(e) => { if (e.target.value) onChange(`gradient:${e.target.value}`); }} title="Use a gradient placeholder">
+                <option value="">Gradient…</option>
+                {GRADIENT_PRESETS.map((g) => <option key={g} value={g}>{g}</option>)}
               </select>
-            ) : null}
-          </span>
+              <input type="color" value={isColorValue(str) ? str : "#caa46a"} onChange={(e) => onChange(e.target.value)} title="Pick a solid colour" aria-label={`${f.label} colour`} />
+              {media.length ? (
+                <select value="" onChange={(e) => { if (e.target.value) onChange(e.target.value); }} title="Pick from Media Library">
+                  <option value="">Library…</option>
+                  {media.map((m) => <option key={m.id} value={m.url}>{m.title || m.url.split("/").pop()}</option>)}
+                </select>
+              ) : null}
+            </span>
+          )}
           {upErr ? <small className="sf-err">{upErr}</small> : null}
         </span>
       ) : (

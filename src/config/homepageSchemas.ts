@@ -262,7 +262,7 @@ export const SECTION_DEFS: Record<SectionType, SectionDefinition> = {
             { key: "heading", label: "Heading", fields: [{ key: "text", label: "Heading", type: "text", required: true, maxLength: 120 }, { key: "level", label: "Size", type: "select", options: [{ value: "h2", label: "Large (H2)" }, { value: "h3", label: "Medium (H3)" }] }] },
             { key: "quote", label: "Quote", fields: [{ key: "quote", label: "Quote", type: "textarea", required: true, maxLength: 300 }, { key: "attribution", label: "Attribution", type: "text", maxLength: 80 }] },
             { key: "image", label: "Image", fields: [{ key: "image", label: "Image", type: "media", required: true }, { key: "alt", label: "Alt text", type: "text", maxLength: 160, altFor: "image" }, { key: "caption", label: "Caption", type: "text", maxLength: 160 }] },
-            { key: "video", label: "Video", fields: [{ key: "url", label: "Video URL (MP4 / YouTube / Vimeo)", type: "text", required: true, placeholder: "https://youtu.be/… or an .mp4 URL" }, { key: "caption", label: "Caption", type: "text", maxLength: 160 }] },
+            { key: "video", label: "Video", fields: [{ key: "url", label: "Video (upload MP4 / paste YouTube / Vimeo)", type: "media", allowedMime: ["video/mp4", "video/webm"], required: true, placeholder: "Upload an MP4, or paste a YouTube / Vimeo URL" }, { key: "caption", label: "Caption", type: "text", maxLength: 160 }] },
             { key: "cta", label: "Button", fields: [{ key: "label", label: "Button label", type: "text", required: true, maxLength: 32 }, { key: "href", label: "Button URL", type: "url", required: true }] },
           ],
         },
