@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { hasCapability } from "@/lib/auth/capabilities";
-import { listCoupons } from "@/services/couponAdminService";
+import { listCoupons, listTargetOptions } from "@/services/couponAdminService";
 import { CouponsManager } from "@/components/admin/CouponsManager";
 
 /**
@@ -19,6 +19,7 @@ export default async function CouponsPage() {
   const canManage = hasCapability(staff.role, "catalog.manage");
 
   const coupons = await listCoupons();
+  const targetOptions = canManage ? await listTargetOptions() : { categories: [], collections: [], products: [], productTypes: [] };
 
   return (
     <main className="admin">
@@ -29,7 +30,7 @@ export default async function CouponsPage() {
       </header>
 
       {canManage ? (
-        <CouponsManager coupons={coupons} />
+        <CouponsManager coupons={coupons} targetOptions={targetOptions} />
       ) : (
         <div className="admin__table-wrap">
           <table className="admin__table admin__table--board">

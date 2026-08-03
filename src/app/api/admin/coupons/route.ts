@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireCapability } from "@/lib/auth/requireStaff";
-import { createCoupon, updateCoupon, toggleCoupon, deleteCoupon, type CouponInput } from "@/services/couponAdminService";
+import { createCoupon, updateCoupon, toggleCoupon, deleteCoupon, restoreRedemption, type CouponInput } from "@/services/couponAdminService";
 
 /** POST /api/admin/coupons { action, ... } — coupon CRUD. Merchandising → catalog.manage. */
 export const runtime = "nodejs";
@@ -29,6 +29,9 @@ export async function POST(request: Request) {
       case "delete":
         if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
         return NextResponse.json(await deleteCoupon(body.id, a));
+      case "restore-redemption":
+        if (!body.orderId) return NextResponse.json({ error: "orderId required" }, { status: 400 });
+        return NextResponse.json(await restoreRedemption(body.orderId, String(body.reason ?? ""), a));
       default:
         return NextResponse.json({ error: "unknown action" }, { status: 400 });
     }

@@ -385,6 +385,14 @@
 .cfg-field input, .cfg-field select { padding: 8px 10px; font-family: var(--font-sans); font-size: 13px; border: 1px solid var(--ad-hair); border-radius: 3px; background: #fff; }
 .cfg-checks { display: flex; flex-direction: column; gap: 8px; }
 .cfg-days { display: flex; flex-wrap: wrap; gap: 6px; }
+/* Coupon applies-to / exclusions editor (points 2/3). */
+.cfg-targets { margin-top: 14px; border-top: 1px solid var(--ad-hair); padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.cfg-targets__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.cfg-targets__head > span:first-child { font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--smoke, #6b6259); }
+.cfg-targets__row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 4px; border: 1px solid var(--ad-hair); background: #fff; }
+.cfg-targets__row[data-mode="exclude"] { background: #fbf3f2; border-color: #e6c9c4; }
+.cfg-targets__row select, .cfg-targets__row input { padding: 6px 8px; font-family: var(--font-sans); font-size: 13px; border: 1px solid var(--ad-hair); border-radius: 3px; background: #fff; }
+.cfg-targets__row select:last-of-type, .cfg-targets__row input { flex: 1 1 160px; }
 .cfg-day { padding: 6px 12px; border: 1px solid var(--ad-hair); border-radius: 999px; background: #fff; cursor: pointer; font-family: var(--font-sans); font-size: 12px; text-transform: capitalize; }
 .cfg-day[data-on="1"] { background: #1f1a16; color: #faf7f2; border-color: #1f1a16; }
 .cfg-actions { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
