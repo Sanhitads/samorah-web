@@ -682,8 +682,10 @@ surfaces; the second was spec-marked "future"), plus one micro-enhancement — r
   has **Desktop / Mobile focal tabs**; each stores its own focal (`<key>__focal` / `<key>__focalMobile`)
   and the hero background reframes per breakpoint via CSS custom properties + a `max-width:768px` media
   query (backward-compatible — no mobile focal → falls back to the desktop focal → centre). Crop / Focal
-  Point / Aspect Ratio (desktop) were already done. *Remaining micro-enhancement:* a different **aspect
-  ratio** per device (art-directed `<picture>`/`srcSet`), vs. the current per-device *framing*. Low priority.
+  Point / Aspect Ratio (desktop) were already done. The micro-enhancement — a different **aspect ratio**
+  per device (art-directed `<picture>`/`srcSet` + a separate mobile crop URL) — is now also **CLOSED**:
+  the picker bakes a mobile Cloudinary crop (`<key>__mobile`) and Hero / ContentBlocks / FeaturedContent
+  render `<picture>` (or a mobile background div for the hero). Fully backward-compatible.
 - **True dark homepage theme — Phase 8 · #36** (the spec marked Dark + Print "future"). The **Dark**
   preview is a CSS invert/hue-rotate **approximation** (media re-inverted) — a preview aid, not a
   shippable dark storefront, because the homepage sections have no dark `data-theme` tokens. **Print** is
@@ -697,3 +699,27 @@ tags + folders + recently-used + replace + credits/copyright, alt validation, vi
 hero bg video, hero treatment controls, homepage SEO + structured data, section analytics, performance
 meter, featured pickers, seasonal presets, accessibility checker, undo/redo, keyboard shortcuts,
 multi-user read-only + take-over, audit timeline, Desktop/Tablet/Mobile preview) is **fully implemented**.
+
+### Deferred hardening items (from the Homepage Builder security sweep)
+
+The high/medium-risk findings were fixed inline (sanitizer entity/control-char decoding, analytics ingest
+64 KB body cap, `safeHref` protocol allowlist on all CMS-authored CTA links, `listMedia` search
+metacharacter escaping). These lower-risk items are deferred — none is exploitable by the current trusted
+`catalog.manage` operator set; they matter only under multi-writer or hostile-operator threat models:
+
+- **Section-analytics metric poisoning (MEDIUM).** The ingest endpoint is public (storefront posts events)
+  and rate-limited, but a scripted client could still inflate a section's view/click counts within the
+  rate limit. Acceptable for first-party dashboards today; revisit if analytics ever drive automated
+  decisions. Mitigation options: per-session dedupe server-side, or an HMAC-signed event envelope.
+- **Settings-KV lost-update race (LOW).** `pagePresetsService` (and the generic `settings` KV row) does a
+  read-modify-write with no optimistic concurrency, so two admins saving presets simultaneously can clobber
+  each other's change. Rare with one operator. Fix: a version column + conditional update, or JSONB merge.
+- **`cms_locks` acquire race (LOW).** Lock acquisition isn't a single atomic upsert-with-condition, so a
+  precise-timing double-acquire is theoretically possible. The 90 s lease + heartbeat + take-over UI make
+  the practical impact negligible. Fix: move the freshness check into a conditional SQL upsert.
+- **Revision restore not resource-scoped + skips validation (LOW).** `revisions.restore` trusts the stored
+  snapshot and doesn't re-validate against the current schema or assert the target resource. Low risk (only
+  staff-authored snapshots), but a schema drift could restore a now-invalid shape. Fix: re-run
+  `validateContent` on restore and assert `resource` matches.
+- **`cmsLockService` `Date.parse` NaN guard (LOW).** A malformed timestamp yields `NaN`, which compares
+  falsey and is treated as stale. Harmless (fails safe toward "expired") but worth an explicit guard.

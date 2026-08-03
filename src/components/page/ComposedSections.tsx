@@ -46,7 +46,7 @@ export function ComposedSections({ sections, anchors = false, track = false }: {
     letters: (s) => <TheLetters invitation={merged(getLettersInvitation(campaign.id), s) as LettersInvitation} />,
     testimonials: (s) => <Testimonials content={(s.settings ?? {}) as TestimonialsContent} />,
     "content-blocks": (s) => <ContentBlocks eyebrow={sstr(s.settings.eyebrow)} blocks={Array.isArray(s.settings.blocks) ? (s.settings.blocks as Record<string, unknown>[]) : []} align={sstr(s.settings.align)} />,
-    "featured-content": (s) => <FeaturedContent eyebrow={sstr(s.settings.eyebrow)} title={sstr(s.settings.title)} blurb={sstr(s.settings.blurb)} image={sstr(s.settings.image)} imageAlt={sstr(s.settings.imageAlt)} href={sstr(s.settings.href)} ctaLabel={sstr(s.settings.ctaLabel)} entityType={sstr(s.settings.entityType)} />,
+    "featured-content": (s) => <FeaturedContent eyebrow={sstr(s.settings.eyebrow)} title={sstr(s.settings.title)} blurb={sstr(s.settings.blurb)} image={sstr(s.settings.image)} imageMobile={sstr(s.settings.image__mobile)} imageAlt={sstr(s.settings.imageAlt)} href={sstr(s.settings.href)} ctaLabel={sstr(s.settings.ctaLabel)} entityType={sstr(s.settings.entityType)} />,
   };
 
   // `anchors` (preview only): wrap each section in a scroll-target so the builder's live preview can

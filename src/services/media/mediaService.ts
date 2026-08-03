@@ -48,8 +48,10 @@ export async function listMedia(opts: { folder?: string; search?: string; tag?: 
   if (opts.kind && opts.kind !== "all") q = q.eq("kind", opts.kind);
   if (opts.tag) q = q.contains("tags", [opts.tag]);
   if (opts.search) {
-    const s = opts.search.trim().replace(/[%,]/g, "");
-    q = q.or(`title.ilike.%${s}%,alt.ilike.%${s}%`);
+    // Strip PostgREST filter metacharacters so a search term can't break out of the .or() grammar:
+    // `%`/`_` are ilike wildcards; `,` separates or-clauses; `()` group them; `*` is the ilike wildcard glyph.
+    const s = opts.search.trim().replace(/[%,()*_]/g, "");
+    if (s) q = q.or(`title.ilike.%${s}%,alt.ilike.%${s}%`);
   }
   const { data } = await q;
   return (data ?? []).map(mapRow);

@@ -3672,9 +3672,14 @@ h1, h2, h3, h4 {
   background-size: cover;
   background-position: var(--focal-d, center);
 }
+/* Art-directed mobile crop (#21) — a separately-cropped mobile background, shown only on phones and only
+   when one is set (`--has-mobile`), so heroes without a mobile crop are unchanged. */
+.home-hero__bg--mobile { display: none; background-size: cover; background-position: center; }
 /* Per-breakpoint focal (#21) — reframe the hero background on phones when a mobile focal is set. */
 @media (max-width: 768px) {
   .home-hero__bg--photo { background-position: var(--focal-m, var(--focal-d, center)); }
+  .home-hero__bg--has-mobile { display: none; }
+  .home-hero__bg--mobile { display: block; }
 }
 .home-hero__scrim {
   position: absolute;

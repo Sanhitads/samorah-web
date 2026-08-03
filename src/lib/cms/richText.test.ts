@@ -32,6 +32,22 @@ describe("sanitizeHtml (Phase 4 · point 16 — allowlist)", () => {
     expect(sanitizeHtml('<a href="https://x.com" title="t">x</a>')).toContain('href="https://x.com"');
     expect(sanitizeHtml('<img src="https://res.cloudinary.com/x.jpg" alt="a">')).toContain('src="https://res.cloudinary.com/x.jpg"');
   });
+  it("blocks entity/control-char encoded dangerous schemes (hardening)", () => {
+    // Numeric char-ref for the leading letter: browsers decode it, so the sanitizer must too.
+    expect(sanitizeHtml('<a href="&#106;avascript:alert(1)">x</a>')).toBe("<a>x</a>");
+    expect(sanitizeHtml('<a href="&#x6a;avascript:alert(1)">x</a>')).toBe("<a>x</a>");
+    // Control char (tab) inserted inside the scheme — ignored by browsers, must be ignored here.
+    expect(sanitizeHtml('<a href="java\tscript:alert(1)">x</a>')).toBe("<a>x</a>");
+    expect(sanitizeHtml('<a href="java&#9;script:alert(1)">x</a>')).toBe("<a>x</a>");
+    // Named entity for the colon.
+    expect(sanitizeHtml('<a href="javascript&colon;alert(1)">x</a>')).toBe("<a>x</a>");
+    // Leading whitespace / newline before the scheme.
+    expect(sanitizeHtml('<a href="  javascript:alert(1)">x</a>')).toBe("<a>x</a>");
+    // data: and vbscript: too.
+    expect(sanitizeHtml('<img src="da&#116;a:text/html,evil" alt="a">')).toBe('<img alt="a">');
+    // A legitimate link that merely CONTAINS the substring "javascript" in the path must survive.
+    expect(sanitizeHtml('<a href="/learn/javascript-guide">x</a>')).toContain('href="/learn/javascript-guide"');
+  });
   it("richTextToPlain flattens to text (for search/empties)", () => {
     expect(richTextToPlain("<p>Hello <strong>world</strong></p>")).toBe("Hello world");
     expect(richTextToPlain("<script>x</script>")).toBe("");

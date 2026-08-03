@@ -13,8 +13,14 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   const rl = rateLimit(request, { bucket: "section-events", limit: 120, windowMs: 60_000 });
   if (!rl.ok) return NextResponse.json({ ok: false }, { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } });
+  // Reject oversized payloads before parsing (defence-in-depth: the service also caps at 50 events, but
+  // a huge body would be fully buffered + JSON-parsed first). A legit batch is a few KB; 64KB is ample.
+  const declared = Number(request.headers.get("content-length") ?? 0);
+  if (declared > 64 * 1024) return NextResponse.json({ ok: false }, { status: 413 });
   try {
-    const body = (await request.json()) as { events?: unknown };
+    const raw = await request.text();
+    if (raw.length > 64 * 1024) return NextResponse.json({ ok: false }, { status: 413 });
+    const body = JSON.parse(raw) as { events?: unknown };
     const events = (Array.isArray(body.events) ? body.events : []) as SectionEventInput[];
     if (!events.length) return NextResponse.json({ ok: true, inserted: 0 });
     const res = await recordSectionEvents(events);

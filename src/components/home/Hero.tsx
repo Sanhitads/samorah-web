@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { gradientClass, isGradientPlaceholder } from "@/lib/product";
+import { safeHref } from "@/lib/safeHref";
 import type { HeroCampaign } from "@/config/campaigns";
 
 /**
@@ -68,19 +69,25 @@ export function Hero({ campaign }: { campaign: HeroCampaign }) {
       ) : placeholder ? (
         <div className={`home-hero__bg ${gradientClass(campaign.heroImage) ?? ""}`} aria-hidden="true" />
       ) : (
-        <div
-          className="home-hero__bg home-hero__bg--photo"
-          style={{
-            backgroundImage: `url(${campaign.heroImage})`,
-            // Per-breakpoint focal (#21): CSS vars so a media query can reframe on phones (inline
-            // background-position couldn't be overridden by a media query). Absent → center (unchanged).
-            "--focal-d": campaign.heroImage__focal || "center",
-            "--focal-m": campaign.heroImage__focalMobile || campaign.heroImage__focal || "center",
-            // "contain" shows the whole image (no crop); it must not tile, so disable repeat.
-            ...(campaign.imageFit === "contain" ? { backgroundSize: "contain", backgroundRepeat: "no-repeat" } : null),
-          } as CSSProperties}
-          aria-hidden="true"
-        />
+        <>
+          <div
+            className={`home-hero__bg home-hero__bg--photo${campaign.heroImage__mobile ? " home-hero__bg--has-mobile" : ""}`}
+            style={{
+              backgroundImage: `url(${campaign.heroImage})`,
+              // Per-breakpoint focal (#21): CSS vars so a media query can reframe on phones (inline
+              // background-position couldn't be overridden by a media query). Absent → center (unchanged).
+              "--focal-d": campaign.heroImage__focal || "center",
+              "--focal-m": campaign.heroImage__focalMobile || campaign.heroImage__focal || "center",
+              // "contain" shows the whole image (no crop); it must not tile, so disable repeat.
+              ...(campaign.imageFit === "contain" ? { backgroundSize: "contain", backgroundRepeat: "no-repeat" } : null),
+            } as CSSProperties}
+            aria-hidden="true"
+          />
+          {/* Art-directed mobile crop (#21) — a separately-shaped image shown only on phones. */}
+          {campaign.heroImage__mobile ? (
+            <div className="home-hero__bg home-hero__bg--mobile" style={{ backgroundImage: `url(${campaign.heroImage__mobile})` }} aria-hidden="true" />
+          ) : null}
+        </>
       )}
       {overlayStyle !== "none" ? (
         <div className="home-hero__scrim" data-style={overlayStyle} style={overlayStyleCss(overlayStyle, op)} aria-hidden="true" />
@@ -99,7 +106,7 @@ export function Hero({ campaign }: { campaign: HeroCampaign }) {
           </motion.p>
           {campaign.ctaLabel && campaign.ctaHref ? (
             <motion.div className="home-hero__cta-row" {...reveal(0.34)}>
-              <Link href={campaign.ctaHref} className="btn btn-ghost home-hero__cta" data-style={buttonStyle}>
+              <Link href={safeHref(campaign.ctaHref)} className="btn btn-ghost home-hero__cta" data-style={buttonStyle}>
                 {campaign.ctaLabel}
               </Link>
             </motion.div>

@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
+import { safeHref } from "@/lib/safeHref";
 import { RichText } from "@/components/ui/RichText";
 import { VideoEmbed } from "@/components/ui/VideoEmbed";
 import { gradientClass, isGradientPlaceholder, isColorValue } from "@/lib/product";
@@ -12,13 +13,17 @@ import { gradientClass, isGradientPlaceholder, isColorValue } from "@/lib/produc
 type Block = { _type?: string;[k: string]: unknown };
 const s = (v: unknown) => (v == null ? "" : String(v));
 
-function ImageBlock({ src, alt, focal, focalMobile }: { src: string; alt: string; focal?: string; focalMobile?: string }) {
+function ImageBlock({ src, alt, focal, focalMobile, mobileSrc }: { src: string; alt: string; focal?: string; focalMobile?: string; mobileSrc?: string }) {
   if (isColorValue(src)) return <div className="home-content__img" style={{ background: src }} role="img" aria-label={alt} />;
   if (isGradientPlaceholder(src)) return <div className={`home-content__img ${gradientClass(src) ?? ""}`} role="img" aria-label={alt} />;
   // Per-breakpoint focal (#21) via CSS vars so a media query can reframe on phones; absent → center.
   const style = (focal || focalMobile) ? ({ "--focal-d": focal || "center", "--focal-m": focalMobile || focal || "center" } as CSSProperties) : undefined;
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img className="home-content__img home-content__img--photo" src={src} alt={alt} loading="lazy" style={style} />;
+  /* eslint-disable @next/next/no-img-element */
+  const img = <img className="home-content__img home-content__img--photo" src={src} alt={alt} loading="lazy" style={style} />;
+  /* eslint-enable @next/next/no-img-element */
+  // Art-directed mobile crop (#21) — a separately-shaped image on phones.
+  if (mobileSrc) return <picture><source media="(max-width: 768px)" srcSet={mobileSrc} />{img}</picture>;
+  return img;
 }
 
 export function ContentBlocks({ eyebrow, blocks, align }: { eyebrow?: string; blocks: Block[]; align?: string }) {
@@ -48,7 +53,7 @@ export function ContentBlocks({ eyebrow, blocks, align }: { eyebrow?: string; bl
               if (!src) return null;
               return (
                 <figure key={i} className="home-content__figure">
-                  <ImageBlock src={src} alt={s(b.alt)} focal={s(b.image__focal) || undefined} focalMobile={s(b.image__focalMobile) || undefined} />
+                  <ImageBlock src={src} alt={s(b.alt)} focal={s(b.image__focal) || undefined} focalMobile={s(b.image__focalMobile) || undefined} mobileSrc={s(b.image__mobile) || undefined} />
                   {b.caption ? <figcaption>{s(b.caption)}</figcaption> : null}
                 </figure>
               );
@@ -64,7 +69,7 @@ export function ContentBlocks({ eyebrow, blocks, align }: { eyebrow?: string; bl
               );
             }
             case "cta":
-              return s(b.label) ? <div key={i} className="home-content__cta"><Link href={s(b.href) || "#"} className="btn btn-outline">{s(b.label)}</Link></div> : null;
+              return s(b.label) ? <div key={i} className="home-content__cta"><Link href={safeHref(s(b.href))} className="btn btn-outline">{s(b.label)}</Link></div> : null;
             default:
               return null;
           }
