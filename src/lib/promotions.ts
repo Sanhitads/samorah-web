@@ -17,6 +17,14 @@ export interface PromoLine {
   unitPrice: number; // rupees (source); converted to paise here
   qty: number;
   compositionId?: string;
+  // Coupon-targeting identifiers (Phase 1) — optional; used by targeting/exclusion matching only.
+  productId?: string;
+  categoryId?: string;
+  collectionId?: string;
+  productType?: string;
+  variantId?: string;
+  onSale?: boolean;
+  isGiftCard?: boolean;
 }
 
 export type PromotionKind = "composition" | "percentage" | "fixed" | "free_shipping";

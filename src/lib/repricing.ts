@@ -7,7 +7,7 @@
  */
 import { getProductBySlug } from "@/services/productService";
 import { getHourBySlug, airProductType } from "@/config/theHours";
-import { effectivePrice } from "@/lib/pricing";
+import { effectivePrice, isOnSale } from "@/lib/pricing";
 import { computeOrderTotals, type CommerceLine, type OrderTotals } from "@/lib/commerce";
 import { loadCouponRegistry } from "@/services/couponService";
 import { BUNDLE_SIZE } from "@/lib/bundle";
@@ -76,6 +76,10 @@ export async function repriceCart(items: ClientCartLine[], state?: string, coupo
         qty,
         taxClass: airProductType(air.group.kind),
         compositionId: item.compositionId,
+        // Air products are config-driven (no DB category/collection ids); target them by product_type.
+        productType: airProductType(air.group.kind),
+        onSale: false, // Air config has no sale-price concept
+        isGiftCard: false,
       });
       details[item.key] = {
         sku: `AIR-${item.slug.toUpperCase()}`,
@@ -96,7 +100,10 @@ export async function repriceCart(items: ClientCartLine[], state?: string, coupo
           slug?: string;
           status?: string;
           price?: number | null;
-          collection?: { name?: string | null; volume?: string | null } | null;
+          category_id?: string | null;
+          collection_id?: string | null;
+          product_type?: string | null;
+          collection?: { id?: string | null; name?: string | null; volume?: string | null } | null;
           product_images?: { url: string; is_primary: boolean }[] | null;
           variants?: { id?: string; sku?: string | null; vessel_type: string | null; size_label: string | null; price: number; sale_price: number | null; is_active: boolean }[];
         }
@@ -121,6 +128,14 @@ export async function repriceCart(items: ClientCartLine[], state?: string, coupo
       qty,
       taxClass: "candle",
       compositionId: item.compositionId,
+      // Coupon-targeting identifiers (Phase 1) — server-authoritative, from the re-fetched product.
+      productId: product.id,
+      categoryId: product.category_id ?? undefined,
+      collectionId: product.collection_id ?? product.collection?.id ?? undefined,
+      productType: product.product_type ?? undefined,
+      variantId: variant?.id,
+      onSale: isOnSale(priceable),
+      isGiftCard: product.product_type === "gift_card",
     });
     details[item.key] = {
       sku: variant?.sku ?? `${item.slug}-${norm(item.vessel)}-${item.size}`.toUpperCase(),

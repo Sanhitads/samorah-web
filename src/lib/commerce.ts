@@ -34,6 +34,17 @@ export interface CommerceLine {
   qty: number;
   taxClass: string; // key into TAX_CLASSES
   compositionId?: string;
+  // Coupon-targeting identifiers (Phase 1) — OPTIONAL and inert until the promotion engine matches
+  // against them. Populated on the AUTHORITATIVE server path (repriceCart); the client preview may fill
+  // only what it knows (productType). A line is part of a bundle iff `compositionId` is set; a gift-card
+  // line iff `isGiftCard`; a sale-priced line iff `onSale`. No fake product/category flags.
+  productId?: string;
+  categoryId?: string;
+  collectionId?: string; // "chapter" = collection
+  productType?: string; // canonical string, e.g. candle | room_spray | linen_spray | gift_card
+  variantId?: string;
+  onSale?: boolean; // line is currently sale-priced (for sale-item exclusions)
+  isGiftCard?: boolean; // gift-card product line (excluded from ordinary coupons by default)
 }
 
 /** All money fields in PAISE (integer). */
@@ -105,6 +116,13 @@ export function computeOrderTotals(lines: CommerceLine[], opts: ComputeOpts = {}
     unitPrice: l.unitPrice,
     qty: l.qty,
     compositionId: l.compositionId,
+    productId: l.productId,
+    categoryId: l.categoryId,
+    collectionId: l.collectionId,
+    productType: l.productType,
+    variantId: l.variantId,
+    onSale: l.onSale,
+    isGiftCard: l.isGiftCard,
   }));
   const promo = computePromotions(promoLines, opts.couponCode, opts.couponRegistry); // byLine in paise
 
@@ -199,6 +217,9 @@ export function toCommerceLines(
       : t.includes("room") || t.includes("spray")
         ? "room_spray"
         : "candle";
-    return { key: i.key, name: i.name, unitPrice: i.price, qty: i.qty, taxClass, compositionId: i.compositionId };
+    // Client preview carries only what the cart item knows (productType). The authoritative server path
+    // (repriceCart) fills the catalogue ids/onSale; here we surface productType + the gift-card flag so a
+    // gift-card line is recognisable even in the preview.
+    return { key: i.key, name: i.name, unitPrice: i.price, qty: i.qty, taxClass, compositionId: i.compositionId, productType: i.productType, isGiftCard: (i.productType ?? "").toLowerCase() === "gift_card" };
   });
 }
