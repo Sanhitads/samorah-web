@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireCapability } from "@/lib/auth/requireStaff";
-import { createCoupon, updateCoupon, toggleCoupon, deleteCoupon, restoreRedemption, savePromoBanner, type CouponInput, type PromoBanner } from "@/services/couponAdminService";
+import { createCoupon, updateCoupon, toggleCoupon, deleteCoupon, setCouponStatus, duplicateCoupon, restoreRedemption, savePromoBanner, type CouponInput, type PromoBanner } from "@/services/couponAdminService";
 
 /** POST /api/admin/coupons { action, ... } — coupon CRUD. Merchandising → catalog.manage. */
 export const runtime = "nodejs";
@@ -29,6 +29,15 @@ export async function POST(request: Request) {
       case "delete":
         if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
         return NextResponse.json(await deleteCoupon(body.id, a));
+      case "archive":
+        if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
+        return NextResponse.json(await setCouponStatus(body.id, "archived", a));
+      case "restore": // archived → draft (review before relaunch)
+        if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
+        return NextResponse.json(await setCouponStatus(body.id, "draft", a));
+      case "duplicate":
+        if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
+        return NextResponse.json(await duplicateCoupon(body.id, String(body.code ?? ""), a));
       case "restore-redemption":
         if (!body.orderId) return NextResponse.json({ error: "orderId required" }, { status: 400 });
         return NextResponse.json(await restoreRedemption(body.orderId, String(body.reason ?? ""), a));

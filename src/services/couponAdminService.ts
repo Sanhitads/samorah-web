@@ -302,11 +302,63 @@ export async function toggleCoupon(id: string, isActive: boolean, actorId?: stri
   return { ok: true };
 }
 
+/** Lifecycle transition (Phase 2 · points 12/19). Pause = temporary stop; Archive = retire; Restore an
+ *  archived coupon → DRAFT (forces review before relaunch, never auto-Active). (Activation-readiness
+ *  validation is layered on in the validation step.) */
+export async function setCouponStatus(id: string, next: "draft" | "active" | "paused" | "archived", actorId?: string) {
+  const db = loose();
+  const { error } = await db.from("coupons").update({ status: next, updated_at: new Date().toISOString() }).eq("id", id);
+  if (error) return { ok: false, reason: error.message };
+  const event = next === "active" ? "coupon.activated" : next === "paused" ? "coupon.paused"
+    : next === "archived" ? "coupon.archived" : "coupon.restored";
+  await logEvent({ entityType: "settings", event, entityId: id, actorType: actorId ? "staff" : "system", actorId });
+  return { ok: true };
+}
+
+/** Destructive delete is allowed ONLY for a genuinely-unused DRAFT: no redemptions, no order references
+ *  (by id OR the code snapshot), and never previously activated (per audit). used_count=0 alone is NOT
+ *  proof. Anything historically meaningful must be ARCHIVED instead (point 19). */
 export async function deleteCoupon(id: string, actorId?: string) {
   const db = loose();
-  // Orders FK coupon_id ON DELETE SET NULL, so deleting is safe (order snapshot keeps coupon_code).
+  const { data: c } = await db.from("coupons").select("status, code").eq("id", id).maybeSingle();
+  if (!c) return { ok: false, reason: "coupon not found" };
+  const archiveInstead = "This coupon has history — archive it instead of deleting.";
+  if (c.status !== "draft") return { ok: false, reason: "Only draft coupons can be deleted. Archive this one instead." };
+  const some = async (t: string, col: string, val: string, extra?: (q: any) => any) => {
+    let q = db.from(t).select("id").eq(col, val).limit(1);
+    if (extra) q = extra(q);
+    return ((await q).data ?? []).length > 0;
+  };
+  if (await some("coupon_redemptions", "coupon_id", id)) return { ok: false, reason: archiveInstead };
+  if (await some("orders", "coupon_id", id)) return { ok: false, reason: archiveInstead };
+  if (await some("orders", "coupon_code", c.code)) return { ok: false, reason: archiveInstead };
+  if (await some("audit_events", "entity_id", id, (q) => q.eq("event", "coupon.activated"))) return { ok: false, reason: archiveInstead };
   const { error } = await db.from("coupons").delete().eq("id", id);
   if (error) return { ok: false, reason: error.message };
-  await logEvent({ entityType: "settings", event: "coupon.deleted", actorType: actorId ? "staff" : "system", actorId });
+  await logEvent({ entityType: "settings", event: "coupon.deleted", entityId: id, actorType: actorId ? "staff" : "system", actorId, notes: c.code });
   return { ok: true };
+}
+
+/** Duplicate (point 18) — copy the CONFIG (targets/eligibility/limits/descriptions/dates) into a brand-new
+ *  coupon identity with a new unique code, forced to DRAFT. Copies NO operational/history state
+ *  (used_count/ledger/audit/orders/reservations/creation metadata). Dates are preserved (Draft prevents
+ *  accidental execution) — the admin is prompted to review them before activating. */
+const DUP_FIELDS = ["public_description", "internal_notes", "description", "type", "value", "max_discount", "min_order",
+  "min_qualifying_quantity", "max_uses", "max_uses_per_user", "eligibility", "first_order_only", "auto_apply",
+  "combinable", "priority", "exclude_sale", "starts_at", "expires_at"] as const;
+export async function duplicateCoupon(sourceId: string, newCode: string, actorId?: string) {
+  const clean = normalizeCouponCode(newCode);
+  if (!clean) return { ok: false, reason: "a new code is required" };
+  const db = loose();
+  const { data: src } = await db.from("coupons").select("*").eq("id", sourceId).maybeSingle();
+  if (!src) return { ok: false, reason: "source coupon not found" };
+  const dup: Record<string, unknown> = { code: clean, status: "draft" }; // new identity, Draft; used_count defaults 0
+  for (const f of DUP_FIELDS) dup[f] = src[f];
+  const { data: created, error } = await db.from("coupons").insert(dup).select("id").single();
+  if (error) return { ok: false, reason: /duplicate|unique/i.test(error.message) ? "code already exists" : error.message };
+  const { data: targets } = await db.from("coupon_targets").select("mode, target_type, category_id, collection_id, product_id, variant_id, product_type").eq("coupon_id", sourceId);
+  const rows = (targets ?? []).map((t: any) => ({ ...t, coupon_id: created.id }));
+  if (rows.length) await db.from("coupon_targets").insert(rows);
+  await logEvent({ entityType: "settings", event: "coupon.duplicated", entityId: created.id, actorType: actorId ? "staff" : "system", actorId, notes: `${src.code} → ${clean}`, metadata: { sourceId, newId: created.id, sourceCode: src.code, newCode: clean } });
+  return { ok: true, id: created.id };
 }
