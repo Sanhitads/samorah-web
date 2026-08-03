@@ -149,6 +149,36 @@ export async function listTargetOptions(): Promise<TargetOptions> {
   };
 }
 
+export interface RedemptionRow {
+  id: string;
+  orderId: string | null;
+  orderNumber: string | null;
+  couponCode: string;
+  identity: string;
+  state: "reserved" | "consumed" | "released" | "restored";
+  discount: number; // rupees
+  reason: string | null;
+  reservedAt: string | null;
+  consumedAt: string | null;
+  releasedAt: string | null;
+}
+
+/** Recent coupon redemptions (order → coupon → lifecycle state) for the admin monitor. */
+export async function listRedemptions(limit = 60): Promise<RedemptionRow[]> {
+  const db = loose();
+  const { data } = await db
+    .from("coupon_redemptions")
+    .select("id, order_id, coupon_code, identity, state, discount_paise, reason, reserved_at, consumed_at, released_at, orders(order_number)")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  return (data ?? []).map((r: any) => ({
+    id: r.id, orderId: r.order_id, orderNumber: r.orders?.order_number ?? null,
+    couponCode: r.coupon_code, identity: r.identity, state: r.state,
+    discount: Math.round(Number(r.discount_paise ?? 0)) / 100, reason: r.reason,
+    reservedAt: r.reserved_at, consumedAt: r.consumed_at, releasedAt: r.released_at,
+  }));
+}
+
 export async function listCoupons(): Promise<AdminCoupon[]> {
   const db = loose();
   const { data } = await db.from("coupons").select("*").order("created_at", { ascending: false });
