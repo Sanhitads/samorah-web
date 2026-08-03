@@ -10,6 +10,7 @@
  */
 import { getOrderByNumber } from "@/services/orderService";
 import { issueRefund, type IssueRefundResult } from "@/services/refundService";
+import { releaseCoupon } from "@/services/couponRedemptionService";
 import { logEvent } from "@/services/auditService";
 import { callRpc } from "@/lib/supabase/rpc";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -81,6 +82,12 @@ export async function cancelOrder(input: CancelOrderInput): Promise<CancelOrderR
 
   if (!cancel.ok) return { ok: false, reason: cancel.reason ?? "cancel_failed", previousStatus: cancel.previous_status };
   if (cancel.already_cancelled) return { ok: true, alreadyCancelled: true, previousStatus: cancel.previous_status };
+
+  // Coupon lifecycle (point 10): a NORMAL cancellation frees the coupon slot (customer didn't benefit).
+  // A FRAUD/abuse cancellation RETAINS it — an abuser must not get the code back. Idempotent + safe.
+  if (type !== "fraud") {
+    await releaseCoupon(o.id, `order cancelled (${type})`, { type: input.actorId ? "staff" : "system", id: input.actorId });
+  }
 
   await logEvent({
     orderId: o.id,

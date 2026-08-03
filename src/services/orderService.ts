@@ -17,7 +17,7 @@ import { COMMERCE } from "@/config/commerce";
 import { validateRazorpayPayment } from "@/lib/razorpayApi";
 import { signOrderToken } from "@/lib/orderToken";
 import { logEvent } from "@/services/auditService";
-import { incrementCouponUsage } from "@/services/couponService";
+import { consumeCoupon } from "@/services/couponRedemptionService";
 import { trackServerPurchase } from "@/lib/analytics/server";
 import type { RepriceResult } from "@/lib/repricing";
 import { notifyOps } from "@/lib/notifications/opsEngine";
@@ -206,6 +206,19 @@ export async function createPendingOrder(payload: Record<string, unknown>): Prom
   return { orderId: data.order_id, orderNumber: data.order_number };
 }
 
+/** Void a just-created PENDING order (only if still pending) and release its stock holds. Used when the
+ *  coupon can't be reserved after pricing — we abort before the client pays, so nothing lingers held. */
+export async function voidPendingOrder(orderId: string): Promise<void> {
+  try {
+    const db = createAdminClient();
+    await db.from("orders").update({ status: "cancelled", payment_status: "failed", updated_at: new Date().toISOString() })
+      .eq("id", orderId).eq("payment_status", "pending");
+    await db.from("stock_reservations").delete().eq("order_id", orderId);
+  } catch (e) {
+    console.error("voidPendingOrder failed", e);
+  }
+}
+
 export interface FinalizeResult {
   found: boolean;
   created: boolean;
@@ -345,14 +358,9 @@ export async function persistOrder(input: {
       }
     }
     await enqueueFulfillment(data.order_id);
-    // Count the coupon redemption once (first finalizer only) so usage limits hold.
-    try {
-      const db = createAdminClient();
-      const { data: o } = await db.from("orders").select("coupon_code").eq("id", data.order_id).maybeSingle();
-      await incrementCouponUsage((o as { coupon_code?: string | null } | null)?.coupon_code);
-    } catch (e) {
-      console.error("coupon usage increment failed", e);
-    }
+    // Coupon: mark the reservation (held since checkout) CONSUMED. Race-safe + idempotent + counted at
+    // reserve time — so retries/webhooks never double-count and the limit can't be overrun (points 9/10).
+    await consumeCoupon(data.order_id);
     await logEvent({
       orderId: data.order_id,
       entityType: "order",

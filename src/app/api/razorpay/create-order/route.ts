@@ -3,7 +3,9 @@ import { NextResponse } from "next/server";
 import crypto from "node:crypto";
 import { RAZORPAY, COMMERCE } from "@/config/commerce";
 import { repriceCart, type ClientCartLine } from "@/lib/repricing";
-import { buildPendingPayload, createPendingOrder, reserveStock, type OrderAddress } from "@/services/orderService";
+import { buildPendingPayload, createPendingOrder, reserveStock, voidPendingOrder, type OrderAddress } from "@/services/orderService";
+import { reserveCoupon, redemptionIdentity } from "@/services/couponRedemptionService";
+import { createClient } from "@/lib/supabase/server";
 import type { OrderTotals } from "@/lib/commerce";
 
 /** Deterministic SHA-256 fingerprint of the priced cart (server-side only) —
@@ -82,6 +84,31 @@ export async function POST(request: Request) {
   if (!priced.valid || !priced.totals) {
     return NextResponse.json({ error: priced.reason ?? "Your bag could not be validated." }, { status: 422 });
   }
+
+  // Coupon benefit + reconfirm baseline: re-price WITHOUT the coupon so we know (a) the exact customer
+  // benefit to record on redemption, and (b) the correct total to show if the coupon can't be honoured
+  // (never silently charge the higher amount). Only when a code was supplied.
+  let benefitPaise = 0;
+  let couponApplied = false;
+  let pricedNoCoupon: Awaited<ReturnType<typeof repriceCart>> | null = null;
+  if (body.couponCode) {
+    try {
+      pricedNoCoupon = await repriceCart(body.items ?? [], address.state, undefined);
+      if (pricedNoCoupon.valid && pricedNoCoupon.totals) {
+        benefitPaise = pricedNoCoupon.totals.payable - priced.totals.payable;
+        couponApplied = benefitPaise > 0; // a ₹0-benefit coupon is never reserved (point 8)
+      }
+    } catch (e) {
+      console.error("no-coupon reprice failed", e);
+    }
+  }
+  // Optional authenticated identity for the per-customer usage limit (else the normalized guest email).
+  let userId: string | null = null;
+  try {
+    const supa = await createClient();
+    const { data: { user } } = await supa.auth.getUser();
+    userId = user?.id ?? null;
+  } catch { /* guest checkout — identity falls back to email */ }
 
   const amount = priced.totals.payable; // paise, server-authoritative
   if (amount <= 0) {
@@ -163,11 +190,33 @@ export async function POST(request: Request) {
   if (!payload) {
     return NextResponse.json({ error: "Your bag could not be validated." }, { status: 422 });
   }
+  let pending: { orderId: string; orderNumber: string };
   try {
-    await createPendingOrder(payload);
+    pending = await createPendingOrder(payload);
   } catch (e) {
     console.error("create pending order failed", e);
     return NextResponse.json({ error: "Could not start payment. Please try again.", ...devDetail(e) }, { status: 500 });
+  }
+
+  // 3) Reserve the coupon slot BEFORE the client pays (atomic; enforces global + per-customer limits).
+  //    If it can't be reserved, we must NOT let the client pay the discounted amount — void this attempt
+  //    and return the correct (no-coupon) total for the customer to review + reconfirm (never overcharge).
+  if (couponApplied && body.couponCode) {
+    const rr = await reserveCoupon({
+      orderId: pending.orderId, code: body.couponCode,
+      identity: redemptionIdentity(userId, email), userId, email, benefitPaise,
+    });
+    if (!rr.reserved) {
+      await voidPendingOrder(pending.orderId);
+      const t2 = pricedNoCoupon?.totals;
+      const reason = rr.reason === "per_user" ? "You’ve already used this code." :
+        rr.reason === "exhausted" ? "This code has reached its usage limit." :
+        "This code can no longer be applied.";
+      return NextResponse.json({
+        repriced: true, coupon: body.couponCode, reason,
+        summary: t2 ? { subtotal: t2.subtotal, discount: t2.discount, shipping: t2.shipping, gst: t2.gst, total: t2.total, payable: t2.payable } : undefined,
+      }, { status: 409 });
+    }
   }
 
   return NextResponse.json({

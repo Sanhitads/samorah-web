@@ -113,15 +113,7 @@ export async function validateCoupon(code: string, subtotalPaise: number): Promi
   return { ok: true, coupon: { code: c.code, type: c.type, value: c.value, minSubtotal: c.minSubtotal, maxDiscount: c.maxDiscount } };
 }
 
-/** Increment a coupon's usage on order finalize (best-effort; never blocks the order). */
-export async function incrementCouponUsage(code: string | null | undefined): Promise<void> {
-  if (!code) return;
-  try {
-    const db = loose();
-    const { data } = await db.from("coupons").select("id,used_count").eq("code", code.toUpperCase()).maybeSingle();
-    if (!data) return;
-    await db.from("coupons").update({ used_count: Number(data.used_count ?? 0) + 1, updated_at: new Date().toISOString() }).eq("id", data.id);
-  } catch (e) {
-    console.error("incrementCouponUsage failed", e);
-  }
-}
+// NOTE: coupon usage is no longer a best-effort read-then-write counter. Redemption is atomic + race-safe
+// via the reserve/consume/release lifecycle (couponRedemptionService + the SQL RPCs): a slot is HELD at
+// checkout (reserve), CONSUMED on payment, and RELEASED on cancellation/failure — with used_count mutated
+// atomically alongside the coupon_redemptions ledger. See src/services/couponRedemptionService.ts.
