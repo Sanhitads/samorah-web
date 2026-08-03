@@ -258,6 +258,31 @@ function invalid(input: CouponInput): string | null {
   return errs.length ? errs[0] : null;
 }
 
+// ── Structured audit diffs (point 20) — before/after per field, reusing the existing audit_events infra ──
+const AUDIT_FIELDS: { col: string; label: string }[] = [
+  { col: "type", label: "type" }, { col: "value", label: "value" }, { col: "max_discount", label: "maxDiscount" },
+  { col: "min_order", label: "minOrder" }, { col: "min_qualifying_quantity", label: "minQualifyingQuantity" },
+  { col: "max_uses", label: "maxUses" }, { col: "max_uses_per_user", label: "maxUsesPerUser" },
+  { col: "eligibility", label: "eligibility" }, { col: "starts_at", label: "startsAt" }, { col: "expires_at", label: "expiresAt" },
+  { col: "combinable", label: "combinable" }, { col: "priority", label: "priority" }, { col: "auto_apply", label: "autoApply" },
+  { col: "exclude_sale", label: "excludeSale" }, { col: "public_description", label: "publicDescription" }, { col: "internal_notes", label: "internalNotes" },
+];
+type Change = { before: unknown; after: unknown };
+const targetKey = (t: any) => `${t.mode}:${t.target_type ?? t.type}:${t.category_id ?? t.collection_id ?? t.product_id ?? t.variant_id ?? t.product_type ?? t.id ?? t.value ?? ""}`;
+
+/** Diff the coupon config (row columns + targets) old→new into { field: {before, after} }. */
+function diffCoupon(oldRow: Record<string, any>, newRow: Record<string, any>, oldTargets: any[], newTargets: AdminCouponTarget[] | undefined): Record<string, Change> {
+  const changes: Record<string, Change> = {};
+  for (const { col, label } of AUDIT_FIELDS) {
+    const b = oldRow[col] ?? null, a = newRow[col] ?? null;
+    if (String(b) !== String(a)) changes[label] = { before: b, after: a };
+  }
+  const oldKeys = (oldTargets ?? []).map(targetKey).sort();
+  const newKeys = (newTargets ?? []).map(targetKey).sort();
+  if (JSON.stringify(oldKeys) !== JSON.stringify(newKeys)) changes.targets = { before: oldKeys, after: newKeys };
+  return changes;
+}
+
 export async function createCoupon(input: CouponInput, actorId?: string) {
   const bad = invalid(input);
   if (bad) return { ok: false, reason: bad };
@@ -265,7 +290,7 @@ export async function createCoupon(input: CouponInput, actorId?: string) {
   const { data, error } = await db.from("coupons").insert(row(input)).select("id").single();
   if (error) return { ok: false, reason: /duplicate|unique/i.test(error.message) ? "code already exists" : error.message };
   await saveTargets(data.id, input.targets);
-  await logEvent({ entityType: "settings", event: "coupon.created", actorType: actorId ? "staff" : "system", actorId, notes: normalizeCouponCode(input.code) });
+  await logEvent({ entityType: "settings", event: "coupon.created", entityId: data.id, actorType: actorId ? "staff" : "system", actorId, notes: normalizeCouponCode(input.code) });
   return { ok: true };
 }
 
@@ -273,12 +298,41 @@ export async function updateCoupon(id: string, input: CouponInput, actorId?: str
   const bad = invalid(input);
   if (bad) return { ok: false, reason: bad };
   const db = loose();
-  const { error } = await db.from("coupons").update(row(input)).eq("id", id);
+  const { data: oldRow } = await db.from("coupons").select("*").eq("id", id).maybeSingle();
+  const { data: oldTargets } = await db.from("coupon_targets").select("*").eq("coupon_id", id);
+  const newRow = row(input);
+  const { error } = await db.from("coupons").update(newRow).eq("id", id);
   // A colliding code hits the DB unique constraint — surface it friendly (was a raw error before).
   if (error) return { ok: false, reason: /duplicate|unique/i.test(error.message) ? "code already exists" : error.message };
   await saveTargets(id, input.targets);
-  await logEvent({ entityType: "settings", event: "coupon.updated", actorType: actorId ? "staff" : "system", actorId, notes: normalizeCouponCode(input.code) });
+  // Structured before/after diff → audit metadata (the UI renders sentences from this).
+  const changes = diffCoupon(oldRow ?? {}, newRow, oldTargets ?? [], input.targets);
+  await logEvent({ entityType: "settings", event: "coupon.updated", entityId: id, actorType: actorId ? "staff" : "system", actorId, notes: normalizeCouponCode(input.code), metadata: Object.keys(changes).length ? { changes } : undefined });
   return { ok: true };
+}
+
+export interface CouponAuditEntry {
+  id: string;
+  event: string;
+  actorType: string | null;
+  actorId: string | null;
+  createdAt: string;
+  notes: string | null;
+  changes?: Record<string, Change>;
+}
+
+/** Per-coupon audit timeline (point 20) — reads audit_events by entity_id = coupon.id. Newest first.
+ *  Structured `changes` drive human-readable rendering in the UI. */
+export async function listCouponAudit(couponId: string): Promise<CouponAuditEntry[]> {
+  const db = loose();
+  const { data } = await db.from("audit_events")
+    .select("id, event, actor_type, actor_id, created_at, notes, metadata")
+    .eq("entity_id", couponId).like("event", "coupon.%")
+    .order("created_at", { ascending: false }).limit(100);
+  return (data ?? []).map((r: any) => ({
+    id: r.id, event: r.event, actorType: r.actor_type ?? null, actorId: r.actor_id ?? null,
+    createdAt: r.created_at, notes: r.notes ?? null, changes: r.metadata?.changes,
+  }));
 }
 
 /** Admin manual restore of a released redemption (point 10) — reason MANDATORY + audited. */
