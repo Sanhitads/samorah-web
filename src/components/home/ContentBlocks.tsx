@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import { RichText } from "@/components/ui/RichText";
 import { VideoEmbed } from "@/components/ui/VideoEmbed";
@@ -11,11 +12,13 @@ import { gradientClass, isGradientPlaceholder, isColorValue } from "@/lib/produc
 type Block = { _type?: string;[k: string]: unknown };
 const s = (v: unknown) => (v == null ? "" : String(v));
 
-function ImageBlock({ src, alt, focal }: { src: string; alt: string; focal?: string }) {
+function ImageBlock({ src, alt, focal, focalMobile }: { src: string; alt: string; focal?: string; focalMobile?: string }) {
   if (isColorValue(src)) return <div className="home-content__img" style={{ background: src }} role="img" aria-label={alt} />;
   if (isGradientPlaceholder(src)) return <div className={`home-content__img ${gradientClass(src) ?? ""}`} role="img" aria-label={alt} />;
+  // Per-breakpoint focal (#21) via CSS vars so a media query can reframe on phones; absent → center.
+  const style = (focal || focalMobile) ? ({ "--focal-d": focal || "center", "--focal-m": focalMobile || focal || "center" } as CSSProperties) : undefined;
   // eslint-disable-next-line @next/next/no-img-element
-  return <img className="home-content__img home-content__img--photo" src={src} alt={alt} loading="lazy" style={focal ? { objectPosition: focal } : undefined} />;
+  return <img className="home-content__img home-content__img--photo" src={src} alt={alt} loading="lazy" style={style} />;
 }
 
 export function ContentBlocks({ eyebrow, blocks, align }: { eyebrow?: string; blocks: Block[]; align?: string }) {
@@ -45,7 +48,7 @@ export function ContentBlocks({ eyebrow, blocks, align }: { eyebrow?: string; bl
               if (!src) return null;
               return (
                 <figure key={i} className="home-content__figure">
-                  <ImageBlock src={src} alt={s(b.alt)} focal={s(b.image__focal) || undefined} />
+                  <ImageBlock src={src} alt={s(b.alt)} focal={s(b.image__focal) || undefined} focalMobile={s(b.image__focalMobile) || undefined} />
                   {b.caption ? <figcaption>{s(b.caption)}</figcaption> : null}
                 </figure>
               );

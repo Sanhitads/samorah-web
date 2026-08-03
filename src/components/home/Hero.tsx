@@ -72,10 +72,13 @@ export function Hero({ campaign }: { campaign: HeroCampaign }) {
           className="home-hero__bg home-hero__bg--photo"
           style={{
             backgroundImage: `url(${campaign.heroImage})`,
-            backgroundPosition: campaign.heroImage__focal || undefined,
+            // Per-breakpoint focal (#21): CSS vars so a media query can reframe on phones (inline
+            // background-position couldn't be overridden by a media query). Absent → center (unchanged).
+            "--focal-d": campaign.heroImage__focal || "center",
+            "--focal-m": campaign.heroImage__focalMobile || campaign.heroImage__focal || "center",
             // "contain" shows the whole image (no crop); it must not tile, so disable repeat.
             ...(campaign.imageFit === "contain" ? { backgroundSize: "contain", backgroundRepeat: "no-repeat" } : null),
-          }}
+          } as CSSProperties}
           aria-hidden="true"
         />
       )}

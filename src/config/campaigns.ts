@@ -34,6 +34,7 @@ export interface HeroCampaign {
    */
   videoUrl?: string;            // MP4 / Cloudinary video — plays muted behind the hero, overrides the image
   heroImage__focal?: string;    // CSS background-position ("50% 30%") from the media picker's focal point
+  heroImage__focalMobile?: string; // per-breakpoint focal for phones (#21) — applied via a media query
   imageFit?: string;            // "cover" (default, fill+crop) or "contain" (show the whole image)
   align?: string;               // content alignment: left (default) / center / right
   overlayStyle?: string;        // scrim (default) / dark / gradient / none

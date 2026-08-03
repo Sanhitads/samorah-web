@@ -3670,7 +3670,11 @@ h1, h2, h3, h4 {
 }
 .home-hero__bg--photo {
   background-size: cover;
-  background-position: center;
+  background-position: var(--focal-d, center);
+}
+/* Per-breakpoint focal (#21) — reframe the hero background on phones when a mobile focal is set. */
+@media (max-width: 768px) {
+  .home-hero__bg--photo { background-position: var(--focal-m, var(--focal-d, center)); }
 }
 .home-hero__scrim {
   position: absolute;
@@ -5012,7 +5016,8 @@ video.asset-image {
 .home-content__quote cite { display: block; margin-top: 10px; font-family: var(--font-sans); font-style: normal; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); }
 .home-content__figure { margin: 24px 0; }
 .home-content__img { width: 100%; aspect-ratio: 16 / 10; border-radius: 8px; background-size: cover; background-position: center; display: block; }
-.home-content__img--photo { aspect-ratio: auto; }
+.home-content__img--photo { aspect-ratio: auto; object-fit: cover; object-position: var(--focal-d, center); }
+@media (max-width: 768px) { .home-content__img--photo { object-position: var(--focal-m, var(--focal-d, center)); } }
 .home-content__figure figcaption { margin-top: 8px; font-family: var(--font-sans); font-size: 12px; color: var(--muted); }
 
 /* Phase 7 · point 28 — Featured spotlight section */

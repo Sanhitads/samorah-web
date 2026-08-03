@@ -675,14 +675,15 @@ No migration — built on the existing locks/audit tables.
 
 ## P10.8 — Homepage Builder: deferred / partial sub-points (Phases 4–8)
 
-Every phase point is implemented and E2E-tested **except** the following, where a lighter working version
-shipped and the full version is deferred. Recorded here so nothing is lost:
+Every phase point is implemented and E2E-tested. Two items remain intentionally deferred (large new
+surfaces; the second was spec-marked "future"), plus one micro-enhancement — recorded so nothing is lost:
 
-- **Responsive art-direction crop — Phase 5 · #21 ("Mobile Crop / Desktop Crop").** The media picker
-  ships one focal + aspect crop baked into the Cloudinary URL, applied at every breakpoint (Crop / Focal
-  Point / Aspect Ratio are done). A **different crop per breakpoint** (mobile vs desktop framing from one
-  field) is **not** built. Needs: a second stored crop/focal per placement + `<picture>`/art-directed
-  `srcSet` in the section renderers. *Medium complexity.*
+- **Per-breakpoint focal — Phase 5 · #21 ("Mobile Crop / Desktop Crop") — CLOSED.** The media picker now
+  has **Desktop / Mobile focal tabs**; each stores its own focal (`<key>__focal` / `<key>__focalMobile`)
+  and the hero background reframes per breakpoint via CSS custom properties + a `max-width:768px` media
+  query (backward-compatible — no mobile focal → falls back to the desktop focal → centre). Crop / Focal
+  Point / Aspect Ratio (desktop) were already done. *Remaining micro-enhancement:* a different **aspect
+  ratio** per device (art-directed `<picture>`/`srcSet`), vs. the current per-device *framing*. Low priority.
 - **True dark homepage theme — Phase 8 · #36** (the spec marked Dark + Print "future"). The **Dark**
   preview is a CSS invert/hue-rotate **approximation** (media re-inverted) — a preview aid, not a
   shippable dark storefront, because the homepage sections have no dark `data-theme` tokens. **Print** is

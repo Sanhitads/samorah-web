@@ -26,7 +26,7 @@ export function MediaPicker({ open, kind = "image", allowCrop = true, onSelect, 
   open: boolean; kind?: "image" | "video" | "all"; allowCrop?: boolean;
   /** `focal` is a CSS position string ("50% 30%") when the editor set one — applied by full-bleed
    *  surfaces (hero background / content image) as background/object-position. */
-  onSelect: (url: string, focal?: string) => void; onClose: () => void;
+  onSelect: (url: string, focal?: string, focalMobile?: string) => void; onClose: () => void;
 }) {
   const [items, setItems] = useState<MediaRow[]>([]);
   const [folders, setFolders] = useState<string[]>([]);
@@ -41,6 +41,8 @@ export function MediaPicker({ open, kind = "image", allowCrop = true, onSelect, 
   const [sel, setSel] = useState<MediaRow | null>(null);
   const [ar, setAr] = useState("");
   const [focal, setFocal] = useState<{ x: number; y: number } | null>(null);
+  const [focalMobile, setFocalMobile] = useState<{ x: number; y: number } | null>(null); // per-breakpoint focal (#21)
+  const [dev, setDev] = useState<"desktop" | "mobile">("desktop");
   const [meta, setMeta] = useState({ alt: "", credit: "", copyright: "", tags: "" });
   const [savingMeta, setSavingMeta] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -68,17 +70,21 @@ export function MediaPicker({ open, kind = "image", allowCrop = true, onSelect, 
   useEffect(() => { // reset the crop editor whenever a new asset is chosen
     if (!sel) return;
     setAr(""); setFocal(sel.focalX != null && sel.focalY != null ? { x: sel.focalX, y: sel.focalY } : null);
+    setFocalMobile(null); setDev("desktop");
     setMeta({ alt: sel.alt, credit: sel.credit, copyright: sel.copyright, tags: sel.tags.join(", ") });
   }, [sel]);
 
   if (!open) return null;
 
-  const focalPos = focal ? `${(focal.x * 100).toFixed(1)}% ${(focal.y * 100).toFixed(1)}%` : undefined;
+  const posOf = (f: { x: number; y: number } | null) => (f ? `${(f.x * 100).toFixed(1)}% ${(f.y * 100).toFixed(1)}%` : undefined);
+  const focalPos = posOf(focal);
+  const focalMobilePos = posOf(focalMobile);
+  const active = dev === "mobile" ? focalMobile : focal; // the focal being edited on the current device tab
   const cropped = (base: string) => (allowCrop && ar && isCloudinary(base) ? cldCrop(base, { ar, focalX: focal?.x, focalY: focal?.y }) : base);
-  const choose = (url: string, fpos?: string) => { pushRecent(url); onSelect(url, fpos); onClose(); };
-  // Confirm: bake an aspect crop only when an aspect was chosen; always pass the focal as a CSS position
-  // so full-bleed surfaces (hero bg / content image) can frame to it even without a fixed-ratio crop.
-  const confirmSel = () => { if (sel) choose(cropped(sel.url), focalPos); };
+  const choose = (url: string, fpos?: string, fmpos?: string) => { pushRecent(url); onSelect(url, fpos, fmpos); onClose(); };
+  // Confirm: bake an aspect crop only when an aspect was chosen; pass BOTH the desktop and mobile focal as
+  // CSS positions so full-bleed surfaces (hero bg / content image) frame per breakpoint (#21).
+  const confirmSel = () => { if (sel) choose(cropped(sel.url), focalPos, focalMobilePos); };
 
   const onUpload = async (file: File) => {
     setUploading(true); setErr("");
@@ -108,9 +114,10 @@ export function MediaPicker({ open, kind = "image", allowCrop = true, onSelect, 
 
   const setFocalFromClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
-    setFocal({ x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)) });
+    const pt = { x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)) };
+    if (dev === "mobile") setFocalMobile(pt); else setFocal(pt);
   };
-  const objPos = focalPos ?? "center";
+  const objPos = posOf(active) ?? "center";
 
   return (
     <div className="om-modal mp" role="dialog" aria-modal="true" onClick={onClose}>
@@ -167,15 +174,22 @@ export function MediaPicker({ open, kind = "image", allowCrop = true, onSelect, 
               {allowCrop && sel.kind !== "video" ? (
                 <>
                   <p className="mp__section">Crop &amp; focal point</p>
-                  <div className="mp__crop" style={{ aspectRatio: ar ? ar.replace(":", "/") : (sel.aspectRatio || "3/2") }} onClick={setFocalFromClick} title="Click to set the focal point">
+                  <div className="mp__devtabs">
+                    <button type="button" className={`ff-btn ff-btn--mini${dev === "desktop" ? " is-active" : ""}`} onClick={() => setDev("desktop")}>🖥 Desktop</button>
+                    <button type="button" className={`ff-btn ff-btn--mini${dev === "mobile" ? " is-active" : ""}`} onClick={() => setDev("mobile")}>📱 Mobile{focalMobile ? " ✓" : ""}</button>
+                  </div>
+                  <div className="mp__crop" style={{ aspectRatio: dev === "mobile" ? "4 / 5" : (ar ? ar.replace(":", "/") : (sel.aspectRatio || "3/2")) }} onClick={setFocalFromClick} title={`Click to set the ${dev} focal point`}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={sel.url} alt="" style={{ objectPosition: objPos }} />
-                    {focal ? <span className="mp__focal" style={{ left: `${focal.x * 100}%`, top: `${focal.y * 100}%` }} /> : null}
+                    {active ? <span className="mp__focal" style={{ left: `${active.x * 100}%`, top: `${active.y * 100}%` }} /> : null}
                   </div>
-                  <div className="mp__ars">
-                    {AR_PRESETS.map((a) => <button key={a.k} type="button" className={`ff-btn ff-btn--mini${ar === a.k ? " is-active" : ""}`} onClick={() => setAr(a.k)}>{a.label}</button>)}
-                  </div>
-                  {!isCloudinary(sel.url) ? <small className="admin__muted">Crop bakes into Cloudinary URLs; this external image is used as-is (focal saved to the asset).</small> : null}
+                  {dev === "desktop" ? (
+                    <div className="mp__ars">
+                      {AR_PRESETS.map((a) => <button key={a.k} type="button" className={`ff-btn ff-btn--mini${ar === a.k ? " is-active" : ""}`} onClick={() => setAr(a.k)}>{a.label}</button>)}
+                    </div>
+                  ) : null}
+                  <small className="admin__muted">Click to set where the image frames — {dev === "mobile" ? "on phones (portrait)." : "on desktop."} Set a Mobile focal to reframe on small screens{focalMobile ? "." : " (optional)."}</small>
+                  {!isCloudinary(sel.url) ? <small className="admin__muted">Aspect crop bakes into Cloudinary URLs; this external image is used as-is (focal still applies).</small> : null}
                 </>
               ) : (
                 <div className="mp__crop mp__crop--video">
