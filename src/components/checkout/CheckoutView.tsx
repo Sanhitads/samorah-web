@@ -98,11 +98,32 @@ export function CheckoutView() {
   const couponCode = useCheckoutStore((s) => s.couponCode);
   const setCouponCode = useCheckoutStore((s) => s.setCouponCode);
 
-  // Place of supply = the delivery (shipping) state (GST §12/13).
-  const totals = useMemo(
+  // Place of supply = the delivery (shipping) state (GST §12/13). Client compute is the instant fallback,
+  // but it CANNOT resolve DB coupons (no registry, no catalogue relationships) — so a valid coupon would
+  // look "not recognised". The server preview below runs the SAME engine as create-order and is
+  // authoritative for display when present.
+  const clientTotals = useMemo(
     () => calculateOrderTotals(items, ship.state, { couponCode: couponCode || undefined }),
     [items, ship.state, couponCode],
   );
+  const [serverTotals, setServerTotals] = useState<ReturnType<typeof calculateOrderTotals> | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+  useEffect(() => {
+    if (!mounted || items.length === 0) { setServerTotals(null); return; }
+    let alive = true;
+    setPreviewing(true);
+    const t = setTimeout(async () => {
+      try {
+        const payload = items.map((i) => ({ key: i.key, slug: i.slug, name: i.name, vessel: i.vessel, size: i.size, qty: i.qty, compositionId: i.compositionId, productType: i.productType, edition: i.edition }));
+        const res = await fetch("/api/coupons/preview", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items: payload, state: ship.state, couponCode: couponCode || undefined }) });
+        const d = (await res.json()) as { valid?: boolean; totals?: ReturnType<typeof calculateOrderTotals> };
+        if (alive) setServerTotals(d.valid && d.totals ? d.totals : null);
+      } catch { if (alive) setServerTotals(null); }
+      finally { if (alive) setPreviewing(false); }
+    }, 250);
+    return () => { alive = false; clearTimeout(t); };
+  }, [mounted, items, ship.state, couponCode]);
+  const totals = serverTotals ?? clientTotals;
   const couponApplied = couponCode ? totals.promotions.some((p) => p.code === couponCode.toUpperCase()) : false;
   // A known code that stopped qualifying (cart fell below its minimum, or it can't stack with the
   // composition discount) is NOT an unknown code — say which, so the customer can act on it.
@@ -544,6 +565,8 @@ export function CheckoutView() {
             )}
             {codeError ? (
               <p className="checkout__code-error">{codeError}</p>
+            ) : couponCode && !couponApplied && previewing ? (
+              <p className="checkout__code-applied">Checking {couponCode}…</p>
             ) : couponSkipped ? (
               <p className="checkout__code-error">Code {couponCode} no longer applies — {couponSkipped.reason}.</p>
             ) : couponCode && !couponApplied ? (
@@ -559,12 +582,13 @@ export function CheckoutView() {
 
           <div className="checkout__totals">
             <div className="checkout__row"><span>Subtotal</span><span>{formatPaise(totals.subtotal)}</span></div>
-            {totals.discount > 0 ? (
-              <div className="checkout__row checkout__row--discount">
-                <span>Discovery Composition Savings ({COMPOSITION_DISCOUNT_PCT}%)</span>
-                <span>−{formatPaise(totals.discount)}</span>
+            {/* One row per applied promotion (Composition and/or coupon), each with its real label. */}
+            {totals.promotions.filter((p) => p.amount > 0).map((p) => (
+              <div key={p.code} className="checkout__row checkout__row--discount">
+                <span>{p.label}</span>
+                <span>−{formatPaise(p.amount)}</span>
               </div>
-            ) : null}
+            ))}
             <div className="checkout__row">
               <span>Shipping{totals.freeShipping ? "" : " (estimate)"}</span>
               <span>{totals.freeShipping ? "Free" : formatPaise(totals.shipping)}</span>
