@@ -154,7 +154,7 @@ const isWild = (list: string[]) => list.includes("*");
 /** Two promotions may stack iff both are stackable and neither exclusive, AND
  *  (either is a free-shipping promo — those never conflict with a discount — OR
  *  each lists the other in combinableWith / a wildcard). */
-function canCombine(a: PromotionMeta, aKind: PromotionKind, b: PromotionMeta, bKind: PromotionKind): boolean {
+export function canCombine(a: PromotionMeta, aKind: PromotionKind, b: PromotionMeta, bKind: PromotionKind): boolean {
   if (!a.stackable || !b.stackable || a.exclusive || b.exclusive) return false;
   if (aKind === "free_shipping" || bKind === "free_shipping") return true;
   const aOk = isWild(a.combinableWith) || a.combinableWith.includes(b.code);

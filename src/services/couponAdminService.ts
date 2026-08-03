@@ -42,6 +42,8 @@ export interface AdminCoupon {
   expiresAt: string | null;
   status: "draft" | "active" | "paused" | "archived";
   isActive: boolean; // derived (deprecated) — status === 'active'
+  createdAt: string | null;
+  updatedAt: string | null;
   targets: AdminCouponTarget[];
 }
 
@@ -243,6 +245,7 @@ export async function listCoupons(): Promise<AdminCoupon[]> {
     usedCount: Number(r.used_count ?? 0), eligibility: (r.eligibility ?? "everyone"), autoApply: Boolean(r.auto_apply),
     combinable: Boolean(r.combinable), priority: Number(r.priority ?? 100), excludeSale: Boolean(r.exclude_sale),
     startsAt: r.starts_at, expiresAt: r.expires_at, status: (r.status ?? (r.is_active ? "active" : "paused")), isActive: Boolean(r.is_active),
+    createdAt: r.created_at ?? null, updatedAt: r.updated_at ?? null,
     targets: targetsFromRows(byCoupon[r.id] ?? []),
   }));
 }

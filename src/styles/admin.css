@@ -402,6 +402,19 @@
 .cfg-timeline__row { display: grid; grid-template-columns: 160px 1fr auto; gap: 10px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--ad-hair); font-size: 12.5px; }
 .cfg-timeline__when { font-family: var(--font-mono, monospace); font-size: 11px; color: var(--smoke, #6b6259); }
 .cfg-timeline__what { font-family: var(--font-sans); color: var(--ink, #1f1a16); }
+/* Phase 3 — coupon warnings, analytics stats + drill-down, code generator */
+.cpn-warn { display: inline-block; padding: 1px 7px; border-radius: 999px; font-family: var(--font-sans); font-size: 11px; white-space: pre-line; }
+.cpn-warn--critical { background: rgba(168, 68, 58, 0.14); color: #8a3d2f; }
+.cpn-warn--warning { background: rgba(201, 169, 110, 0.2); color: #8a6d3b; }
+.cpn-warn--info { background: rgba(107, 98, 89, 0.12); color: #6b6259; }
+.cpn-codegen { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.cpn-codegen > input:first-child { flex: 1 1 160px; }
+.cpn-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin: 10px 0; }
+.cpn-stat { padding: 10px 12px; border: 1px solid var(--ad-hair); border-radius: 4px; background: #faf8f4; display: flex; flex-direction: column; gap: 2px; }
+.cpn-stat__v { font-family: var(--font-mono, monospace); font-size: 17px; color: var(--ink, #1f1a16); }
+.cpn-stat__l { font-family: var(--font-sans); font-size: 11px; color: var(--smoke, #6b6259); }
+.cpn-warnlist { margin: 8px 0; }
+.cpn-orders { max-height: 44vh; overflow-y: auto; overflow-x: auto; }
 .cfg-day { padding: 6px 12px; border: 1px solid var(--ad-hair); border-radius: 999px; background: #fff; cursor: pointer; font-family: var(--font-sans); font-size: 12px; text-transform: capitalize; }
 .cfg-day[data-on="1"] { background: #1f1a16; color: #faf7f2; border-color: #1f1a16; }
 .cfg-actions { display: flex; align-items: center; gap: 12px; margin-top: 8px; }

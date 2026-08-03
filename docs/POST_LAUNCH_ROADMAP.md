@@ -752,3 +752,33 @@ built to accept them without a rewrite:
   that summary for explicit customer reconfirmation rather than a generic error.
 - **Coupon preview at cart (pre-checkout).** Auto-apply / targeted discounts are authoritative at checkout
   reprice; surfacing them on the cart page/drawer (via the preview endpoint) is a UX enhancement.
+
+### Phase 3 shipped (list + analytics) — and what it deliberately deferred
+
+**Shipped (2026-08-04):** operational coupon list (Attributed Revenue + Gross Discount columns, search,
+filters incl. applies-to + operational-health, sorts), per-coupon analytics + contributing-orders
+drill-down (behind `analytics.view`, deep-linking to the Order Command Centre), optional code generator,
+and severity-aware operational warnings reusing the canonical promotion engine. Attribution is a
+**read-only** model over the Phase-1/2 ledger — Model A (merchandise-only), net-merchandise base
+(`subtotal − discount_amount − loyalty_discount`), conservative refund netting, payment-proven
+qualifying predicate (`state ∈ consumed|restored ∧ consumed_at ∧ order paid`).
+
+**Deferred — do NOT fabricate these; each needs data/tracking we don't yet have:**
+- **Precise merchandise refund allocation.** Today refund netting is deliberately conservative because
+  the refund ledger (`refunds.amount` / `orders.refund_amount`) stores a flat order-level total with NO
+  merchandise/shipping/tax split. Precise netting needs reconciled `return_items.line_amount` linked 1:1
+  to refunds (only return-based refunds carry line detail today). Until then, partial-refund attribution
+  uses `max(0, grossBase − refund_amount)`.
+- **Guest/account identity reconciliation.** `Unique Customers` counts distinct redeeming identities
+  (`coalesce(user_id, guest:email)`); the same person across guest+account or multiple emails counts
+  more than once. Needs an identity-resolution/customer-merge layer.
+- **Attribution/marketing analytics that require tracking we don't capture:** coupon
+  impression→apply→checkout→purchase funnel; conversion rate; GA4 campaign integration; acquisition /
+  source attribution; influencer attribution; incremental lift; coupon-acquired customer cohorts / LTV;
+  repeat-purchase analysis; profitability / contribution margin after coupon (needs COGS); advanced
+  campaign comparison; ROAS / CAC. **These are intentionally NOT implemented** — "Attributed Revenue" is
+  an attribution model, never a causation/ROI claim.
+- **Operational tooling:** configurable warning thresholds (24h expiry is centralized in
+  `couponWarnings.ts` but not yet admin-configurable); analytics exports / scheduled campaign reports;
+  anomaly detection. Server-side financial aggregation is already isolated in `couponAnalyticsService`
+  so pagination can move server-side without a UI rewrite.
