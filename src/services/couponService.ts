@@ -63,6 +63,8 @@ function mapCoupon(r: any, targets: any[] = []): Coupon {
     maxDiscount: r.max_discount != null ? Number(r.max_discount) : undefined,
     active: true,
     autoApply: !!r.auto_apply,
+    eligibility: r.eligibility === "first_order" ? "first_order" : "everyone",
+    minQualifyingQuantity: r.min_qualifying_quantity != null ? Number(r.min_qualifying_quantity) : undefined,
     includes: includes.length ? includes : undefined,
     excludes: excludes.length ? excludes : undefined,
     excludeSale: !!r.exclude_sale,
@@ -124,6 +126,24 @@ export async function validateCoupon(code: string, subtotalPaise: number): Promi
   }
   const c = mapCoupon(data);
   return { ok: true, coupon: { code: c.code, type: c.type, value: c.value, minSubtotal: c.minSubtotal, maxDiscount: c.maxDiscount } };
+}
+
+/** Canonical "has this customer completed a real order before?" — a prior order in the PAID lifecycle
+ *  (paid | partially_refunded | refunded), matching how the rest of the app defines a successful order.
+ *  Pending/failed/abandoned orders don't count. Drives first-order eligibility (Phase 2 #14). Authed
+ *  identity matches user_id; guest matches email case-insensitively (orders.email is stored trimmed). */
+const PAID_STATUSES = ["paid", "partially_refunded", "refunded"];
+export async function customerHasPaidOrder(userId: string | null | undefined, email: string | null | undefined): Promise<boolean> {
+  if (!userId && !email) return false; // unknown identity → cannot disqualify (re-checked at reserve)
+  try {
+    const db = loose();
+    let q = db.from("orders").select("id").in("payment_status", PAID_STATUSES).limit(1);
+    q = userId ? q.eq("user_id", userId) : q.ilike("email", (email ?? "").trim());
+    const { data } = await q;
+    return (data ?? []).length > 0;
+  } catch {
+    return false;
+  }
 }
 
 // NOTE: coupon usage is no longer a best-effort read-then-write counter. Redemption is atomic + race-safe

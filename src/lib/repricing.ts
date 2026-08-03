@@ -9,7 +9,7 @@ import { getProductBySlug } from "@/services/productService";
 import { getHourBySlug, airProductType } from "@/config/theHours";
 import { effectivePrice, isOnSale } from "@/lib/pricing";
 import { computeOrderTotals, type CommerceLine, type OrderTotals } from "@/lib/commerce";
-import { loadCouponRegistry } from "@/services/couponService";
+import { loadCouponRegistry, customerHasPaidOrder } from "@/services/couponService";
 import { BUNDLE_SIZE } from "@/lib/bundle";
 import { COMMERCE } from "@/config/commerce";
 
@@ -56,7 +56,7 @@ const norm = (s: string) => (s ?? "").trim().toLowerCase();
 /** Re-price + validate a client cart against the catalogue for `state`.
  *  `couponCode` (if any) flows into the SAME engine, so the server payable stays
  *  identical to what Checkout showed. */
-export async function repriceCart(items: ClientCartLine[], state?: string, couponCode?: string): Promise<RepriceResult> {
+export async function repriceCart(items: ClientCartLine[], state?: string, couponCode?: string, identity?: { userId?: string | null; email?: string | null }): Promise<RepriceResult> {
   const fail = (reason: string): RepriceResult => ({ valid: false, reason, lines: [], details: {}, totals: null });
   if (!items?.length) return fail("Your bag is empty.");
 
@@ -173,6 +173,13 @@ export async function repriceCart(items: ClientCartLine[], state?: string, coupo
   // typed) so eligible AUTO-APPLY coupons can be selected with no code (point 6). A manual code still only
   // discounts if it resolves here — never a hardcoded array. Empty registry ⇒ no discount, as before.
   const couponRegistry = await loadCouponRegistry();
-  const totals = computeOrderTotals(lines, { state, couponCode, couponRegistry });
+  // Customer eligibility (Phase 2 #14): only resolve first-order status when a first-order coupon is in
+  // play AND we know the customer — so the preview/reprice can reject it IMMEDIATELY (not first at Pay).
+  // Unknown identity → left undefined (allowed now, re-validated atomically at reserve).
+  let firstOrder: boolean | undefined;
+  if (couponRegistry.some((c) => c.eligibility === "first_order") && (identity?.userId || identity?.email)) {
+    firstOrder = !(await customerHasPaidOrder(identity.userId, identity.email));
+  }
+  const totals = computeOrderTotals(lines, { state, couponCode, couponRegistry, firstOrder });
   return { valid: true, lines, details, totals };
 }

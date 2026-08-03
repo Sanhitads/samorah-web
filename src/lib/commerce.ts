@@ -108,6 +108,7 @@ export interface ComputeOpts {
   giftCard?: number; // paise
   couponCode?: string;
   couponRegistry?: Coupon[]; // server injects DB-loaded active coupons; defaults to config
+  firstOrder?: boolean; // customer-eligibility context (Phase 2 #14); undefined = identity unknown
 }
 
 /** The full GST-compliant order totals (paise) for a set of lines. */
@@ -125,7 +126,7 @@ export function computeOrderTotals(lines: CommerceLine[], opts: ComputeOpts = {}
     onSale: l.onSale,
     isGiftCard: l.isGiftCard,
   }));
-  const promo = computePromotions(promoLines, opts.couponCode, opts.couponRegistry); // byLine in paise
+  const promo = computePromotions(promoLines, opts.couponCode, opts.couponRegistry, { firstOrder: opts.firstOrder }); // byLine in paise
 
   // Per line: discount → net → GST extraction at the line's own rate (paise).
   const breakdown: LineBreakdown[] = lines.map((l) => {

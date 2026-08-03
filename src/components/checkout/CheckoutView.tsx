@@ -115,14 +115,14 @@ export function CheckoutView() {
     const t = setTimeout(async () => {
       try {
         const payload = items.map((i) => ({ key: i.key, slug: i.slug, name: i.name, vessel: i.vessel, size: i.size, qty: i.qty, compositionId: i.compositionId, productType: i.productType, edition: i.edition }));
-        const res = await fetch("/api/coupons/preview", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items: payload, state: ship.state, couponCode: couponCode || undefined }) });
+        const res = await fetch("/api/coupons/preview", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items: payload, state: ship.state, couponCode: couponCode || undefined, email: ship.email || undefined }) });
         const d = (await res.json()) as { valid?: boolean; totals?: ReturnType<typeof calculateOrderTotals> };
         if (alive) setServerTotals(d.valid && d.totals ? d.totals : null);
       } catch { if (alive) setServerTotals(null); }
       finally { if (alive) setPreviewing(false); }
     }, 250);
     return () => { alive = false; clearTimeout(t); };
-  }, [mounted, items, ship.state, couponCode]);
+  }, [mounted, items, ship.state, couponCode, ship.email]);
   const totals = serverTotals ?? clientTotals;
   const couponApplied = couponCode ? totals.promotions.some((p) => p.code === couponCode.toUpperCase()) : false;
   // A known code that stopped qualifying (cart fell below its minimum, or it can't stack with the
@@ -218,7 +218,7 @@ export function CheckoutView() {
     setCodeError(""); setPreviewing(true);
     try {
       const payload = items.map((i) => ({ key: i.key, slug: i.slug, name: i.name, vessel: i.vessel, size: i.size, qty: i.qty, compositionId: i.compositionId, productType: i.productType, edition: i.edition }));
-      const res = await fetch("/api/coupons/preview", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items: payload, state: ship.state, couponCode: code }) });
+      const res = await fetch("/api/coupons/preview", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items: payload, state: ship.state, couponCode: code, email: ship.email || undefined }) });
       const d = (await res.json()) as { valid?: boolean; totals?: ReturnType<typeof calculateOrderTotals> };
       if (d.valid && d.totals) {
         const applied = d.totals.promotions.some((p) => p.code === code);

@@ -88,6 +88,8 @@ export interface Coupon extends PromotionMeta {
   maxDiscount?: number; // rupees — cap for percentage coupons (0/undefined = no cap)
   active: boolean;
   autoApply?: boolean; // applies with no code (Phase 1 · point 6) — best eligible one is auto-selected
+  eligibility?: "everyone" | "first_order"; // Phase 2 · point 14 — customer eligibility
+  minQualifyingQuantity?: number; // Phase 2 · point 15 — min ELIGIBLE units (post targeting/exclusions)
   // Targeting (Phase 1 · points 2/3). Empty/undefined `includes` = ENTIRE eligible order (unchanged
   // behaviour). Explicit `excludes` ALWAYS win over includes. `excludeSale` drops sale-priced lines.
   // Gift cards and bundle/composition lines are excluded INTRINSICALLY by the engine (no config needed).
@@ -95,6 +97,10 @@ export interface Coupon extends PromotionMeta {
   excludes?: CouponTarget[];
   excludeSale?: boolean;
 }
+
+/** Context the pricing caller injects so the pure engine can evaluate customer eligibility (Phase 2 #14)
+ *  without doing any I/O. `firstOrder` undefined = identity unknown yet (allow now, re-check at reserve). */
+export interface PromoContext { firstOrder?: boolean }
 
 const couponMeetsMin = (c: Coupon, subtotalPaise: number) => !c.minSubtotal || subtotalPaise >= toPaise(c.minSubtotal);
 
@@ -178,7 +184,7 @@ interface Candidate {
 
 /** Compute all promotions deterministically with stacking rules. `coupons` is the
  *  active registry — the server injects the DB-loaded set; defaults to config. */
-export function computePromotions(lines: PromoLine[], couponCode?: string, coupons: Coupon[] = COUPONS): PromotionResult {
+export function computePromotions(lines: PromoLine[], couponCode?: string, coupons: Coupon[] = COUPONS, ctx: PromoContext = {}): PromotionResult {
   const candidates: Candidate[] = [];
   // Codes that never even entered the running (vs. those skipped for a stacking clash below).
   // Reported so callers can say WHY a code stopped applying instead of guessing "not recognised".
@@ -216,9 +222,18 @@ export function computePromotions(lines: PromoLine[], couponCode?: string, coupo
   interface Spec { coupon: Coupon; eligible: PromoLine[]; benefit: number }
   // Resolve a coupon to a usable spec, or a skip-reason (so the UI can explain rather than say "unknown").
   const specOf = (c: Coupon): Spec | { skip: string } => {
+    // Customer eligibility (point 14). Only rejects when we KNOW the customer isn't first-order; unknown
+    // identity is allowed here and re-validated atomically at reservation.
+    if (c.eligibility === "first_order" && ctx.firstOrder === false) return { skip: "only valid on your first order" };
     if (!couponMeetsMin(c, subtotal)) return { skip: `minimum order of ₹${(c.minSubtotal ?? 0).toLocaleString("en-IN")} not met` };
     const eligible = couponEligibleLines(lines, c); // targeting/exclusions (points 2/3)
     if (c.type !== "free_shipping" && eligible.length === 0) return { skip: "no items in your bag qualify for this code" };
+    // Minimum qualifying quantity (point 15) — ELIGIBLE units after targeting/exclusions (not SKUs, not
+    // cart total; bundle lines are already excluded by couponEligibleLines, per the Phase-1 bundle policy).
+    if (c.minQualifyingQuantity && c.minQualifyingQuantity > 1) {
+      const units = eligible.reduce((s, l) => s + l.qty, 0);
+      if (units < c.minQualifyingQuantity) return { skip: `add ${c.minQualifyingQuantity - units} more qualifying item${c.minQualifyingQuantity - units === 1 ? "" : "s"}` };
+    }
     return { coupon: c, eligible, benefit: couponDiscountPaise(c, eligible, {}) };
   };
   const chosen: Spec[] = [];

@@ -73,10 +73,18 @@ export async function POST(request: Request) {
   if (!address || !email) {
     return NextResponse.json({ error: "Delivery details are required." }, { status: 400 });
   }
+  // Identity (authed user_id else guest email) — for per-customer + first-order eligibility. Resolved
+  // BEFORE pricing so the authoritative reprice already reflects first-order ineligibility.
+  let userId: string | null = null;
+  try {
+    const supa = await createClient();
+    userId = (await supa.auth.getUser()).data.user?.id ?? null;
+  } catch { /* guest checkout — identity falls back to email */ }
+
   // Place of supply = the delivery state — never the client's chosen `state`.
   let priced: Awaited<ReturnType<typeof repriceCart>>;
   try {
-    priced = await repriceCart(body.items ?? [], address.state, body.couponCode);
+    priced = await repriceCart(body.items ?? [], address.state, body.couponCode, { userId, email });
   } catch (e) {
     console.error("repriceCart failed", e);
     return NextResponse.json({ error: "Could not price your bag. Please try again.", ...devDetail(e) }, { status: 500 });
@@ -93,13 +101,6 @@ export async function POST(request: Request) {
     .filter((p) => p.code !== COMPOSITION_CODE)
     .map((p) => ({ code: p.code, benefit: p.freeShipping ? priced.totals!.freeShippingBenefit : p.amount }))
     .filter((p) => p.benefit > 0);
-  // Optional authenticated identity for the per-customer usage limit (else the normalized guest email).
-  let userId: string | null = null;
-  try {
-    const supa = await createClient();
-    const { data: { user } } = await supa.auth.getUser();
-    userId = user?.id ?? null;
-  } catch { /* guest checkout — identity falls back to email */ }
 
   const amount = priced.totals.payable; // paise, server-authoritative
   if (amount <= 0) {
@@ -207,6 +208,7 @@ export async function POST(request: Request) {
         try { const p2 = await repriceCart(body.items ?? [], address.state, undefined); if (p2.valid) t2 = p2.totals; } catch { /* show no summary */ }
         const reason = rr.reason === "per_user" ? "You’ve already used this code." :
           rr.reason === "exhausted" ? "This code has reached its usage limit." :
+          rr.reason === "not_first_order" ? "This code is only valid on your first order." :
           "This code can no longer be applied.";
         return NextResponse.json({
           repriced: true, coupon: ac.code, reason,
