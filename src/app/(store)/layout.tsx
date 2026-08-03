@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { AnnouncementBar } from "@/components/layout/AnnouncementBar";
+import { PromoBanner } from "@/components/layout/PromoBanner";
 import { StoreChrome } from "@/components/layout/StoreChrome";
 import { Footer } from "@/components/layout/Footer";
 import { getSiteSettings } from "@/services/siteSettingsService";
@@ -51,6 +52,7 @@ export default async function StoreLayout({
       ) : null}
       <JsonLd data={siteStructuredData()} />
       <AnnouncementBar />
+      <PromoBanner />
       <AccountSync />
       <StoreChrome branches={nav.branches} />
       {children}

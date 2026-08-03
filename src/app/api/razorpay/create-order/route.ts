@@ -85,11 +85,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: priced.reason ?? "Your bag could not be validated." }, { status: 422 });
   }
 
-  // The DISCOUNT coupon the engine actually applied — MANUAL or AUTO-APPLY (so auto-apply usage is tracked
-  // too). Composition is not a coupon; free-shipping coupons carry amount 0 (their benefit is shipping) and
-  // aren't ledgered here. Its `amount` is the exact benefit to record. A ₹0-benefit coupon isn't reserved.
+  // Every coupon the engine actually applied — MANUAL or AUTO-APPLY, DISCOUNT and/or FREE-SHIPPING (each
+  // is ledgered so all usage limits hold). Composition is not a coupon. Benefit = the promo's line
+  // discount, or for a free-shipping promo the shipping it waived. Zero-benefit coupons aren't reserved.
   const COMPOSITION_CODE = "DISCOVERY_COMPOSITION";
-  const appliedCoupon = priced.totals.promotions.find((p) => p.code !== COMPOSITION_CODE && p.amount > 0);
+  const appliedCoupons = priced.totals.promotions
+    .filter((p) => p.code !== COMPOSITION_CODE)
+    .map((p) => ({ code: p.code, benefit: p.freeShipping ? priced.totals!.freeShippingBenefit : p.amount }))
+    .filter((p) => p.benefit > 0);
   // Optional authenticated identity for the per-customer usage limit (else the normalized guest email).
   let userId: string | null = null;
   try {
@@ -191,14 +194,14 @@ export async function POST(request: Request) {
   //    discounted amount — void this attempt and return the correct total to review + reconfirm (never
   //    overcharge). An AUTO-apply coupon that can't be reserved (per-customer edge) keeps the previewed
   //    price (no overcharge); its global limit is already enforced by the registry, per-user best-effort.
-  if (appliedCoupon) {
-    const rr = await reserveCoupon({
-      orderId: pending.orderId, code: appliedCoupon.code,
-      identity: redemptionIdentity(userId, email), userId, email, benefitPaise: appliedCoupon.amount,
-    });
-    if (!rr.reserved) {
-      const isManual = !!body.couponCode && appliedCoupon.code === body.couponCode.toUpperCase();
+  {
+    const identity = redemptionIdentity(userId, email);
+    for (const ac of appliedCoupons) {
+      const rr = await reserveCoupon({ orderId: pending.orderId, code: ac.code, identity, userId, email, benefitPaise: ac.benefit });
+      if (rr.reserved) continue;
+      const isManual = !!body.couponCode && ac.code === body.couponCode.toUpperCase();
       if (isManual) {
+        // Void this attempt (also releases any coupons already reserved for the order) + reconfirm.
         await voidPendingOrder(pending.orderId);
         let t2: typeof priced.totals | null = null;
         try { const p2 = await repriceCart(body.items ?? [], address.state, undefined); if (p2.valid) t2 = p2.totals; } catch { /* show no summary */ }
@@ -206,11 +209,11 @@ export async function POST(request: Request) {
           rr.reason === "exhausted" ? "This code has reached its usage limit." :
           "This code can no longer be applied.";
         return NextResponse.json({
-          repriced: true, coupon: appliedCoupon.code, reason,
+          repriced: true, coupon: ac.code, reason,
           summary: t2 ? { subtotal: t2.subtotal, discount: t2.discount, shipping: t2.shipping, gst: t2.gst, total: t2.total, payable: t2.payable } : undefined,
         }, { status: 409 });
       }
-      console.warn(`auto-apply coupon ${appliedCoupon.code} not reserved (${rr.reason}) — keeping previewed price`);
+      console.warn(`auto-apply coupon ${ac.code} not reserved (${rr.reason}) — keeping previewed price`);
     }
   }
 

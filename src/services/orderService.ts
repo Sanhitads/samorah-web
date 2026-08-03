@@ -17,7 +17,7 @@ import { COMMERCE } from "@/config/commerce";
 import { validateRazorpayPayment } from "@/lib/razorpayApi";
 import { signOrderToken } from "@/lib/orderToken";
 import { logEvent } from "@/services/auditService";
-import { consumeCoupon } from "@/services/couponRedemptionService";
+import { consumeCoupon, releaseCoupon } from "@/services/couponRedemptionService";
 import { trackServerPurchase } from "@/lib/analytics/server";
 import type { RepriceResult } from "@/lib/repricing";
 import { notifyOps } from "@/lib/notifications/opsEngine";
@@ -206,14 +206,16 @@ export async function createPendingOrder(payload: Record<string, unknown>): Prom
   return { orderId: data.order_id, orderNumber: data.order_number };
 }
 
-/** Void a just-created PENDING order (only if still pending) and release its stock holds. Used when the
- *  coupon can't be reserved after pricing — we abort before the client pays, so nothing lingers held. */
+/** Void a just-created PENDING order (only if still pending), release its stock holds AND any coupon slots
+ *  already reserved for it. Used when a coupon can't be reserved after pricing — we abort before the
+ *  client pays, so nothing lingers held. */
 export async function voidPendingOrder(orderId: string): Promise<void> {
   try {
     const db = createAdminClient();
     await db.from("orders").update({ status: "cancelled", payment_status: "failed", updated_at: new Date().toISOString() })
       .eq("id", orderId).eq("payment_status", "pending");
     await db.from("stock_reservations").delete().eq("order_id", orderId);
+    await releaseCoupon(orderId, "checkout aborted — coupon could not be reserved");
   } catch (e) {
     console.error("voidPendingOrder failed", e);
   }

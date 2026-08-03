@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { hasCapability } from "@/lib/auth/capabilities";
-import { listCoupons, listTargetOptions, listRedemptions } from "@/services/couponAdminService";
+import { listCoupons, listTargetOptions, listRedemptions, getPromoBanner } from "@/services/couponAdminService";
 import { CouponsManager } from "@/components/admin/CouponsManager";
 import { RedemptionsPanel } from "@/components/admin/RedemptionsPanel";
+import { PromoBannerEditor } from "@/components/admin/PromoBannerEditor";
 
 /**
  * Coupons — `/admin/coupons`. Create/expire discount codes; the pricing engine
@@ -22,6 +23,7 @@ export default async function CouponsPage() {
   const coupons = await listCoupons();
   const targetOptions = canManage ? await listTargetOptions() : { categories: [], collections: [], products: [], productTypes: [] };
   const redemptions = canManage ? await listRedemptions() : [];
+  const banner = await getPromoBanner();
 
   return (
     <main className="admin">
@@ -34,6 +36,7 @@ export default async function CouponsPage() {
       {canManage ? (
         <>
           <CouponsManager coupons={coupons} targetOptions={targetOptions} />
+          <PromoBannerEditor initial={banner} />
           <RedemptionsPanel rows={redemptions} />
         </>
       ) : (

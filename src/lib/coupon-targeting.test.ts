@@ -104,6 +104,16 @@ describe("free-shipping coupon (point 1) — shipping only, never product taxabl
     expect(t.freeShipping).toBe(true);
     expect(t.lines.find((l) => l.key === "gift")!.discount).toBe(0); // gift card never discounted
   });
+  it("reports freeShippingBenefit = the shipping it waived (0 if it would ship free anyway)", () => {
+    // ₹1000 < ₹1499 threshold → shipping would apply → the coupon saves the flat rate.
+    const below = computeOrderTotals(lines, { couponCode: "FREESHIP", couponRegistry: reg });
+    const noCoupon = computeOrderTotals(lines, {});
+    expect(below.freeShippingBenefit).toBe(noCoupon.shipping); // exactly the shipping it removed
+    expect(below.freeShippingBenefit).toBeGreaterThan(0);
+    // ₹2000 >= threshold → already free → the coupon saved nothing.
+    const big: CommerceLine[] = [{ key: "c", name: "Candle", unitPrice: 2000, qty: 1, taxClass: "candle" }];
+    expect(computeOrderTotals(big, { couponCode: "FREESHIP", couponRegistry: reg }).freeShippingBenefit).toBe(0);
+  });
 });
 
 describe("targeting keeps GST correct on excluded lines (computeOrderTotals)", () => {

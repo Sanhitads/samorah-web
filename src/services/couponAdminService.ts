@@ -149,6 +149,36 @@ export async function listTargetOptions(): Promise<TargetOptions> {
   };
 }
 
+// ── Promotional banner (admin-controlled storefront strip advertising a code) ─────────────────────────
+export interface PromoBanner { enabled: boolean; message: string; code: string | null }
+const BANNER_KEY = "promo.banner";
+
+/** Read the promo banner config (visibility is the admin's call via `enabled`). Resilient default. */
+export async function getPromoBanner(): Promise<PromoBanner> {
+  try {
+    const db = loose();
+    const { data } = await db.from("settings").select("value").eq("key", BANNER_KEY).maybeSingle();
+    const v = (data?.value ?? {}) as Partial<PromoBanner>;
+    return { enabled: !!v.enabled, message: typeof v.message === "string" ? v.message : "", code: v.code ? String(v.code) : null };
+  } catch {
+    return { enabled: false, message: "", code: null };
+  }
+}
+
+/** Save the promo banner (upsert the settings row). Audited. */
+export async function savePromoBanner(input: PromoBanner, actorId?: string) {
+  const db = loose();
+  const value = { enabled: !!input.enabled, message: (input.message ?? "").trim().slice(0, 200), code: input.code ? normalizeCouponCode(input.code) : null };
+  if (value.enabled && !value.message) return { ok: false, reason: "add a message before enabling the banner" };
+  const { error } = await db.from("settings").upsert(
+    { key: BANNER_KEY, value, section: "general", label: "Promotional banner", updated_by: actorId ?? null, updated_at: new Date().toISOString() },
+    { onConflict: "key" },
+  );
+  if (error) return { ok: false, reason: error.message };
+  await logEvent({ entityType: "settings", event: "promo_banner.updated", actorType: actorId ? "staff" : "system", actorId, notes: value.enabled ? `enabled: ${value.message}` : "disabled" });
+  return { ok: true };
+}
+
 export interface RedemptionRow {
   id: string;
   orderId: string | null;

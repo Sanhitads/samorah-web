@@ -73,6 +73,7 @@ export interface OrderTotals {
   shippingGstRate: number;
   freeShipping: boolean;
   freeShippingRemaining: number; // paise
+  freeShippingBenefit: number; // paise saved by a free-shipping promo (0 if it would ship free anyway)
   taxableValue: number;
   gst: number;
   gstRate: number; // principal rate (display)
@@ -160,7 +161,11 @@ export function computeOrderTotals(lines: CommerceLine[], opts: ComputeOpts = {}
   // Free when a promo grants it, the threshold is met, OR there's nothing to ship
   // (a fully-discounted / empty order carries no shipping and therefore no GST).
   const freeShip = promo.freeShipping || goodsTotal >= freeThreshold || goodsTotal <= 0;
-  const shipping = freeShip ? 0 : toPaise(estimateShipping(SHIPPING.freeThreshold - 1)); // flat rate
+  const flatShipping = toPaise(estimateShipping(SHIPPING.freeThreshold - 1)); // the flat rate that would apply
+  const shipping = freeShip ? 0 : flatShipping;
+  // What a free-shipping PROMO actually saved (0 if the order would ship free anyway) — the redemption
+  // benefit for a free-shipping coupon (points 8/10). goodsTotal>0 && <threshold ⇒ shipping would apply.
+  const freeShippingBenefit = promo.freeShipping && goodsTotal > 0 && goodsTotal < freeThreshold ? flatShipping : 0;
   const shippingGstRate = shippingRate(breakdown);
   const ship = extractPaise(shipping, shippingGstRate);
 
@@ -186,6 +191,7 @@ export function computeOrderTotals(lines: CommerceLine[], opts: ComputeOpts = {}
     shippingGstRate,
     freeShipping: freeShip && goodsTotal > 0,
     freeShippingRemaining: goodsTotal >= freeThreshold ? 0 : freeThreshold - goodsTotal,
+    freeShippingBenefit,
     taxableValue,
     gst,
     gstRate: shippingGstRate,
