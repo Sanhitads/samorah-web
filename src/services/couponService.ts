@@ -8,28 +8,47 @@
  */
 import { createAdminClient } from "@/lib/supabase/admin";
 import { toPaise } from "@/lib/money";
-import type { Coupon } from "@/lib/promotions";
+import type { Coupon, CouponTarget } from "@/lib/promotions";
 
 function loose() {
   return createAdminClient() as unknown as { from: (t: string) => any };
 }
 
-/** DB coupon row → engine Coupon meta. DB enum: percent|fixed → engine percentage|fixed. */
-function mapCoupon(r: any): Coupon {
+/** A coupon_targets row → engine CouponTarget (ID-backed types carry the id; product_type the string). */
+function toTarget(t: any): CouponTarget | null {
+  switch (t.target_type) {
+    case "category": return t.category_id ? { type: "category", id: t.category_id } : null;
+    case "collection": return t.collection_id ? { type: "collection", id: t.collection_id } : null;
+    case "product": return t.product_id ? { type: "product", id: t.product_id } : null;
+    case "variant": return t.variant_id ? { type: "variant", id: t.variant_id } : null;
+    case "product_type": return t.product_type ? { type: "product_type", value: t.product_type } : null;
+    default: return null;
+  }
+}
+
+/** DB coupon row (+ its target rows) → engine Coupon meta. DB enum: percent|fixed → engine percentage|fixed. */
+function mapCoupon(r: any, targets: any[] = []): Coupon {
+  const includes = targets.filter((t) => t.mode === "include").map(toTarget).filter(Boolean) as CouponTarget[];
+  const excludes = targets.filter((t) => t.mode === "exclude").map(toTarget).filter(Boolean) as CouponTarget[];
   return {
     code: String(r.code).toUpperCase(),
     label: r.description ?? String(r.code),
     campaign: r.auto_apply ? "auto" : "coupon",
     version: "db",
+    // NOTE: stacking metadata stays hardcoded here for now (safe: stacks only with free shipping). The
+    // configurable `combinable`/`priority` columns are wired in the later stacking/auto-apply step.
     priority: 20,
     stackable: true,
     exclusive: false,
-    combinableWith: ["FREE_SHIPPING"], // coupons stack with free shipping, not each other
+    combinableWith: ["FREE_SHIPPING"],
     type: r.type === "percent" ? "percentage" : "fixed",
     value: Number(r.value),
     minSubtotal: r.min_order != null ? Number(r.min_order) : undefined,
     maxDiscount: r.max_discount != null ? Number(r.max_discount) : undefined,
     active: true,
+    includes: includes.length ? includes : undefined,
+    excludes: excludes.length ? excludes : undefined,
+    excludeSale: !!r.exclude_sale,
   };
 }
 
@@ -42,13 +61,23 @@ function isUsable(r: any, nowIso: string): boolean {
   return true;
 }
 
-/** Active coupon registry for the pricing engine (server-side reprice). */
+/** Active coupon registry for the pricing engine (server-side reprice). Loads each usable coupon's
+ *  applies-to / exclusion rules (coupon_targets) so the engine can restrict the discount to eligible
+ *  lines. Resilient: if the targets table/query fails, coupons still load (as untargeted = entire order). */
 export async function loadCouponRegistry(): Promise<Coupon[]> {
   try {
     const db = loose();
     const now = new Date().toISOString();
     const { data } = await db.from("coupons").select("*").eq("is_active", true);
-    return (data ?? []).filter((r: any) => isUsable(r, now)).map(mapCoupon);
+    const usable = (data ?? []).filter((r: any) => isUsable(r, now));
+    if (!usable.length) return [];
+    const byCoupon: Record<string, any[]> = {};
+    try {
+      const ids = usable.map((r: any) => r.id);
+      const { data: targets } = await db.from("coupon_targets").select("*").in("coupon_id", ids);
+      for (const t of targets ?? []) (byCoupon[t.coupon_id] ??= []).push(t);
+    } catch { /* targets are optional — fall back to untargeted coupons */ }
+    return usable.map((r: any) => mapCoupon(r, byCoupon[r.id] ?? []));
   } catch {
     return [];
   }

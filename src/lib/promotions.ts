@@ -73,12 +73,55 @@ const COMPOSITION: PromotionMeta = {
 };
 
 // ── Coupon registry (config-driven; none active — architecture only) ──────────
+/** A single applies-to / exclusion rule, matched against a line's identifiers (Phase 1 · points 2/3).
+ *  ID-backed types carry `id`; product_type carries the canonical `value` string. */
+export type CouponTargetType = "category" | "collection" | "product" | "product_type" | "variant";
+export interface CouponTarget {
+  type: CouponTargetType;
+  id?: string; // category/collection/product/variant id
+  value?: string; // product_type canonical string
+}
 export interface Coupon extends PromotionMeta {
   type: Exclude<PromotionKind, "composition">;
   value: number; // % for percentage, ₹ for fixed
   minSubtotal?: number; // rupees
   maxDiscount?: number; // rupees — cap for percentage coupons (0/undefined = no cap)
   active: boolean;
+  // Targeting (Phase 1 · points 2/3). Empty/undefined `includes` = ENTIRE eligible order (unchanged
+  // behaviour). Explicit `excludes` ALWAYS win over includes. `excludeSale` drops sale-priced lines.
+  // Gift cards and bundle/composition lines are excluded INTRINSICALLY by the engine (no config needed).
+  includes?: CouponTarget[];
+  excludes?: CouponTarget[];
+  excludeSale?: boolean;
+}
+
+/** Does a line satisfy a single target rule? */
+function lineMatchesTarget(l: PromoLine, t: CouponTarget): boolean {
+  switch (t.type) {
+    case "category": return !!l.categoryId && l.categoryId === t.id;
+    case "collection": return !!l.collectionId && l.collectionId === t.id;
+    case "product": return !!l.productId && l.productId === t.id;
+    case "variant": return !!l.variantId && l.variantId === t.id;
+    case "product_type": return !!l.productType && l.productType === t.value;
+    default: return false;
+  }
+}
+
+/** The lines a coupon may discount (points 2/3/11). Order of precedence, exclusions ALWAYS winning:
+ *   1. gift-card lines — never discounted by ordinary coupons (separate financial instrument);
+ *   2. bundle/composition lines — excluded from ordinary coupons by default (identified by compositionId);
+ *   3. sale-priced lines when `excludeSale`;
+ *   4. any explicit `excludes` rule;
+ *   5. then `includes` — empty = every remaining line; else must match an include rule. */
+export function couponEligibleLines(lines: PromoLine[], c: Coupon): PromoLine[] {
+  return lines.filter((l) => {
+    if (l.isGiftCard) return false;
+    if (l.compositionId) return false;
+    if (c.excludeSale && l.onSale) return false;
+    if (c.excludes?.some((t) => lineMatchesTarget(l, t))) return false;
+    if (c.includes && c.includes.length) return c.includes.some((t) => lineMatchesTarget(l, t));
+    return true;
+  });
 }
 export const COUPONS: Coupon[] = [
   // { code:"WELCOME10", label:"Welcome Offer (10%)", campaign:"welcome", version:"v1", priority:20, stackable:true, exclusive:false, combinableWith:["FREE_SHIPPING"], type:"percentage", value:10, minSubtotal:999, active:false },
@@ -158,27 +201,36 @@ export function computePromotions(lines: PromoLine[], couponCode?: string, coupo
   const coupon = couponCode ? coupons.find((c) => c.active && c.code === couponCode.toUpperCase()) : undefined;
   if (coupon) {
     const subtotal = lines.reduce((s, l) => s + linePaise(l), 0);
-    const eligible = !coupon.minSubtotal || subtotal >= toPaise(coupon.minSubtotal);
-    if (eligible) {
+    // Min-order gates on the WHOLE cart subtotal (an order minimum), not the targeted subset.
+    const meetsMin = !coupon.minSubtotal || subtotal >= toPaise(coupon.minSubtotal);
+    // Targeting/exclusions (points 2/3): the lines this coupon may actually discount.
+    const eligibleLines = couponEligibleLines(lines, coupon);
+    if (!meetsMin) {
+      // Real case: a coupon applied to a 3-item cart, then an item is removed and the cart drops
+      // below the minimum. The money is already right (no candidate ⇒ no discount) — this is so the
+      // UI can explain it rather than claim the code is unknown.
+      preSkipped.push({ code: coupon.code, reason: `minimum order of ₹${(coupon.minSubtotal ?? 0).toLocaleString("en-IN")} not met` });
+    } else if (coupon.type !== "free_shipping" && eligibleLines.length === 0) {
+      // Targeted/excluded coupon with nothing to apply to → zero benefit, clear reason (point 8 feeds
+      // on this: a ₹0-benefit coupon must not be recorded as redeemed).
+      preSkipped.push({ code: coupon.code, reason: "no items in your bag qualify for this code" });
+    } else {
       candidates.push({
         meta: coupon,
         rule: { kind: coupon.type, value: coupon.type === "free_shipping" ? undefined : coupon.value },
         apply: (byLine) => {
           if (coupon.type === "free_shipping") return { amount: 0, freeShipping: true };
-          const already = Object.values(byLine).reduce((s, v) => s + v, 0);
-          const base = subtotal - already;
-          let amt = coupon.type === "percentage" ? Math.round((base * coupon.value) / 100) : Math.min(toPaise(coupon.value), base);
-          // Percentage cap (e.g. "20% up to ₹500").
+          // Base = eligible lines only, net of any discount already allocated to them (points 3/11).
+          const eligibleBase = eligibleLines.reduce((s, l) => s + linePaise(l) - (byLine[l.key] ?? 0), 0);
+          let amt = coupon.type === "percentage" ? Math.round((eligibleBase * coupon.value) / 100) : Math.min(toPaise(coupon.value), eligibleBase);
+          // Percentage cap (e.g. "20% up to ₹500") — applies to the eligible-subset discount.
           if (coupon.type === "percentage" && coupon.maxDiscount) amt = Math.min(amt, toPaise(coupon.maxDiscount));
-          if (amt > 0) allocatePro(amt, lines, byLine);
+          amt = Math.max(0, amt);
+          // Allocate across ELIGIBLE lines only → excluded/non-targeted lines get exactly ₹0 (point 11).
+          if (amt > 0) allocatePro(amt, eligibleLines, byLine);
           return { amount: amt };
         },
       });
-    } else {
-      // Real case: a coupon applied to a 3-item cart, then an item is removed and the cart drops
-      // below the minimum. The money is already right (no candidate ⇒ no discount) — this is so the
-      // UI can explain it rather than claim the code is unknown.
-      preSkipped.push({ code: coupon.code, reason: `minimum order of ₹${(coupon.minSubtotal ?? 0).toLocaleString("en-IN")} not met` });
     }
   }
 

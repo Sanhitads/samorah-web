@@ -64,9 +64,12 @@ describe("promotion engine — stacking rules + snapshots", () => {
       type: "percentage", value: 5, active: true,
     };
     COUPONS.push(early);
-    // Composition also combinesWith only FREE_SHIPPING → EARLY (priority 1) applies
-    // first, composition then can't combine with a non-listed code → skipped.
-    const r = computePromotions([comp("a", 580), comp("b", 580), comp("c", 580)], "EARLY");
+    // Coupons never discount bundle/composition lines (Phase-1 policy), so the cart also holds a
+    // standalone line "d" the coupon CAN apply to. EARLY (priority 1) applies first; composition
+    // (priority 10) then can't combine with a non-listed code → skipped. Order is deterministic.
+    const solo = (key: string, price: number): PromoLine => ({ key, unitPrice: price, qty: 1 });
+    const r = computePromotions([comp("a", 580), comp("b", 580), comp("c", 580), solo("d", 1000)], "EARLY");
     expect(r.applied[0].code).toBe("EARLY");
+    expect(r.skipped.map((s) => s.code)).toContain("DISCOVERY_COMPOSITION");
   });
 });
