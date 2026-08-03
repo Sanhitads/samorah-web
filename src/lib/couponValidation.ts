@@ -34,6 +34,32 @@ export function normalizeCouponCode(code: string | null | undefined): string {
 const isFiniteNum = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n);
 const targetKey = (t: CouponTargetInput) => `${t.type}:${t.id ?? t.value ?? ""}`;
 const validDate = (s: string) => !Number.isNaN(new Date(s).getTime());
+const neg = (v: number | null | undefined) => v != null && v < 0;
+
+/**
+ * DRAFT validation (Phase 2 · point 7) — lenient: a draft may be INCOMPLETE (no dates, no description,
+ * unfinished targeting). Only rejects values that can never be valid (also enforced by DB CHECKs). Reuses
+ * the same primitives as the strict validator — no duplicated business rules.
+ */
+export function validateCouponDraft(input: CouponConfigInput): string[] {
+  const errors: string[] = [];
+  const code = normalizeCouponCode(input.code);
+  if (!code) errors.push("Code is required.");
+  else if (!/^[A-Z0-9_-]{2,40}$/.test(code)) errors.push("Code must be 2–40 characters: letters, numbers, hyphens or underscores.");
+  if (input.type === "percent" && isFiniteNum(input.value) && input.value > 100) errors.push("Percentage cannot exceed 100.");
+  if (neg(input.value)) errors.push("Value cannot be negative.");
+  if (neg(input.maxDiscount)) errors.push("Maximum discount cannot be negative.");
+  if (neg(input.minOrder)) errors.push("Minimum order cannot be negative.");
+  if (neg(input.maxUses)) errors.push("Maximum uses cannot be negative.");
+  if (neg(input.maxUsesPerUser)) errors.push("Per-customer limit cannot be negative.");
+  return errors;
+}
+
+/** ACTIVATION validation (Phase 2 · point 7) — STRICT readiness. The full config validator: rejects
+ *  contradictions and unsafe/incomplete campaigns with actionable errors. (Same primitives; no dup logic.) */
+export function validateCouponForActivation(input: CouponConfigInput): string[] {
+  return validateCouponConfig(input);
+}
 
 /** Returns a list of human-readable errors; empty array = valid. Deterministic, order-stable. */
 export function validateCouponConfig(input: CouponConfigInput): string[] {

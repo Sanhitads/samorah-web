@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validateCouponConfig, normalizeCouponCode, type CouponConfigInput } from "@/lib/couponValidation";
+import { validateCouponConfig, validateCouponDraft, validateCouponForActivation, normalizeCouponCode, type CouponConfigInput } from "@/lib/couponValidation";
 
 const base: CouponConfigInput = { code: "WELCOME10", type: "percent", value: 10 };
 const errs = (over: Partial<CouponConfigInput>) => validateCouponConfig({ ...base, ...over });
@@ -61,5 +61,22 @@ describe("validateCouponConfig", () => {
     expect(both).toContain("A target can't be both included and excluded.");
     // Different targets are fine.
     expect(errs({ includes: [{ type: "category", id: "cat-1" }], excludes: [{ type: "product", id: "p-9" }] })).toEqual([]);
+  });
+});
+
+describe("draft vs activation validation (Phase 2 #7)", () => {
+  it("DRAFT is lenient — incomplete config is saveable", () => {
+    expect(validateCouponDraft({ code: "WIP", type: "percent", value: 0 })).toEqual([]);
+    expect(validateCouponDraft({ code: "WIP", type: "fixed", value: 0 })).toEqual([]);
+  });
+  it("DRAFT still rejects impossible values + bad code", () => {
+    expect(validateCouponDraft({ code: "X!", type: "percent", value: 10 }).length).toBeGreaterThan(0);
+    expect(validateCouponDraft({ code: "P", type: "percent", value: 150 })).toContain("Percentage cannot exceed 100.");
+    expect(validateCouponDraft({ code: "N", type: "percent", value: -5 })).toContain("Value cannot be negative.");
+  });
+  it("ACTIVATION is strict — the same incomplete config is rejected", () => {
+    expect(validateCouponForActivation({ code: "WIP", type: "percent", value: 0 }).length).toBeGreaterThan(0);
+    expect(validateCouponForActivation({ code: "D", type: "percent", value: 10, startsAt: "2026-02-01", expiresAt: "2026-01-01" })).toContain("Expiry must be after the start date.");
+    expect(validateCouponForActivation({ code: "GOOD", type: "percent", value: 10, minOrder: 999 })).toEqual([]);
   });
 });

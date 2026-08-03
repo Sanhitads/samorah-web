@@ -6,7 +6,7 @@
  */
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logEvent } from "@/services/auditService";
-import { validateCouponConfig, normalizeCouponCode } from "@/lib/couponValidation";
+import { validateCouponDraft, validateCouponForActivation, normalizeCouponCode } from "@/lib/couponValidation";
 
 function loose() {
   return createAdminClient() as unknown as { from: (t: string) => any };
@@ -247,15 +247,24 @@ export async function listCoupons(): Promise<AdminCoupon[]> {
   }));
 }
 
-/** Authoritative server-side config validation (shared with the admin client) — targeting included. */
+/** Authoritative server-side validation (shared with the admin client). Draft = lenient (save incomplete);
+ *  saving as active/paused/archived = strict activation readiness (point 7). Targeting included. */
 function invalid(input: CouponInput): string | null {
   const targets = input.targets ?? [];
-  const errs = validateCouponConfig({
-    ...input,
-    includes: targets.filter((t) => t.mode === "include"),
-    excludes: targets.filter((t) => t.mode === "exclude"),
-  });
+  const withTargets = { ...input, includes: targets.filter((t) => t.mode === "include"), excludes: targets.filter((t) => t.mode === "exclude") };
+  const errs = input.status === "draft" ? validateCouponDraft(withTargets) : validateCouponForActivation(withTargets);
   return errs.length ? errs[0] : null;
+}
+
+/** A stored coupon row (+ targets) → the validator's config shape, for activation-readiness checks. */
+function rowToConfig(c: any, targets: any[]) {
+  const tg = targetsFromRows(targets ?? []);
+  return {
+    code: c.code, type: c.type, value: Number(c.value),
+    maxDiscount: c.max_discount, minOrder: c.min_order, maxUses: c.max_uses, maxUsesPerUser: c.max_uses_per_user,
+    minQualifyingQuantity: c.min_qualifying_quantity, startsAt: c.starts_at, expiresAt: c.expires_at,
+    includes: tg.filter((x) => x.mode === "include"), excludes: tg.filter((x) => x.mode === "exclude"),
+  };
 }
 
 // ── Structured audit diffs (point 20) — before/after per field, reusing the existing audit_events infra ──
@@ -361,6 +370,14 @@ export async function toggleCoupon(id: string, isActive: boolean, actorId?: stri
  *  validation is layered on in the validation step.) */
 export async function setCouponStatus(id: string, next: "draft" | "active" | "paused" | "archived", actorId?: string) {
   const db = loose();
+  if (next === "active") {
+    // Activation readiness (point 7): a draft can be incomplete, but it must be VALID to go live.
+    const { data: c } = await db.from("coupons").select("*").eq("id", id).maybeSingle();
+    if (!c) return { ok: false, reason: "coupon not found" };
+    const { data: t } = await db.from("coupon_targets").select("*").eq("coupon_id", id);
+    const errs = validateCouponForActivation(rowToConfig(c, t ?? []));
+    if (errs.length) return { ok: false, reason: `Can’t activate: ${errs[0]}` };
+  }
   const { error } = await db.from("coupons").update({ status: next, updated_at: new Date().toISOString() }).eq("id", id);
   if (error) return { ok: false, reason: error.message };
   const event = next === "active" ? "coupon.activated" : next === "paused" ? "coupon.paused"
