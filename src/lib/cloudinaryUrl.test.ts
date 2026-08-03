@@ -53,6 +53,7 @@ describe("cloudinaryUrl", () => {
   });
 
   it("bakes a focal-aware crop into the URL (c_fill,g_*,ar_*)", () => {
+    // focal WITHOUT dimensions → coarse compass gravity (fallback)
     expect(cldCrop(RAW, { ar: "16:9", focalX: 0.5, focalY: 0.2 }))
       .toBe("https://res.cloudinary.com/samorah/image/upload/c_fill,g_north,ar_16:9,f_auto,q_auto/v1710000000/products/kashmiri-chai.jpg");
     // no focal → smart g_auto; width included when given
@@ -63,5 +64,20 @@ describe("cloudinaryUrl", () => {
     expect(cldCrop("https://example.com/x.jpg", { ar: "1:1" })).toBe("https://example.com/x.jpg");
     const already = "https://res.cloudinary.com/samorah/image/upload/c_fill,ar_1:1/v1/products/x.jpg";
     expect(cldCrop(already, { ar: "16:9" })).toBe(already);
+  });
+
+  it("bakes a PIXEL-PRECISE focal crop when image dimensions are known (g_xy_center)", () => {
+    // focal (0.25, 0.6) on a 2000×1000 image → x=500, y=600, centred exactly on the clicked point
+    expect(cldCrop(RAW, { ar: "4:5", focalX: 0.25, focalY: 0.6, imgW: 2000, imgH: 1000 }))
+      .toBe("https://res.cloudinary.com/samorah/image/upload/c_fill,g_xy_center,x_500,y_600,ar_4:5,f_auto,q_auto/v1710000000/products/kashmiri-chai.jpg");
+    // coordinates clamp to [0,1] and round to whole pixels
+    expect(cldCrop(RAW, { ar: "1:1", focalX: 1.4, focalY: -0.2, imgW: 1000, imgH: 800 }))
+      .toContain("g_xy_center,x_1000,y_0,");
+    // dimensions but NO focal → still smart g_auto (dims alone don't force xy_center)
+    expect(cldCrop(RAW, { ar: "1:1", imgW: 1000, imgH: 800 }))
+      .toContain("c_fill,g_auto,ar_1:1,");
+    // zero/invalid dimensions fall back to the compass gravity
+    expect(cldCrop(RAW, { ar: "1:1", focalX: 0.1, focalY: 0.1, imgW: 0, imgH: 0 }))
+      .toContain("c_fill,g_north_west,ar_1:1,");
   });
 });

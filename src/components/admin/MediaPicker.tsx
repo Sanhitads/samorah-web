@@ -82,13 +82,16 @@ export function MediaPicker({ open, kind = "image", allowCrop = true, onSelect, 
   const focalMobilePos = posOf(focalMobile);
   const active = dev === "mobile" ? focalMobile : focal; // the focal being edited on the current device tab
   const activeAr = dev === "mobile" ? arMobile : ar;
-  const cropped = (base: string) => (allowCrop && ar && isCloudinary(base) ? cldCrop(base, { ar, focalX: focal?.x, focalY: focal?.y }) : base);
+  // Pixel-precise focal crops (#21) when the asset's dimensions are known → the exact clicked point stays
+  // centred (falls back to a coarse compass gravity only if width/height are missing).
+  const cropped = (base: string) => (allowCrop && ar && isCloudinary(base) ? cldCrop(base, { ar, focalX: focal?.x, focalY: focal?.y, imgW: sel?.width, imgH: sel?.height }) : base);
   const choose = (url: string, fpos?: string, fmpos?: string, murl?: string) => { pushRecent(url); onSelect(url, fpos, fmpos, murl); onClose(); };
   // Confirm: bake the desktop crop into the URL; pass both focals (per-breakpoint framing); and when a
   // MOBILE aspect is chosen, bake a separate mobile crop URL (art-directed, different shape on phones — #21).
   const confirmSel = () => {
     if (!sel) return;
-    const mobileUrl = allowCrop && arMobile && isCloudinary(sel.url) ? cldCrop(sel.url, { ar: arMobile, focalX: (focalMobile ?? focal)?.x, focalY: (focalMobile ?? focal)?.y }) : undefined;
+    const mFocal = focalMobile ?? focal;
+    const mobileUrl = allowCrop && arMobile && isCloudinary(sel.url) ? cldCrop(sel.url, { ar: arMobile, focalX: mFocal?.x, focalY: mFocal?.y, imgW: sel.width, imgH: sel.height }) : undefined;
     choose(cropped(sel.url), focalPos, focalMobilePos, mobileUrl);
   };
 
