@@ -23,42 +23,50 @@ export interface AdminCouponTarget {
 export interface AdminCoupon {
   id: string;
   code: string;
-  description: string | null;
+  publicDescription: string | null;
+  internalNotes: string | null;
   type: "percent" | "fixed" | "free_shipping";
   value: number;
   maxDiscount: number | null;
   minOrder: number;
+  minQualifyingQuantity: number | null;
   maxUses: number | null;
   maxUsesPerUser: number | null;
   usedCount: number;
-  firstOrderOnly: boolean;
+  eligibility: "everyone" | "first_order";
   autoApply: boolean;
   combinable: boolean;
   priority: number;
   excludeSale: boolean;
   startsAt: string | null;
   expiresAt: string | null;
-  isActive: boolean;
+  status: "draft" | "active" | "paused" | "archived";
+  isActive: boolean; // derived (deprecated) — status === 'active'
   targets: AdminCouponTarget[];
 }
 
 export interface CouponInput {
   code: string;
-  description?: string;
+  description?: string; // legacy single field — mapped to publicDescription during transition
+  publicDescription?: string | null;
+  internalNotes?: string | null;
   type: "percent" | "fixed" | "free_shipping";
   value: number;
   maxDiscount?: number | null;
   minOrder?: number;
+  minQualifyingQuantity?: number | null;
   maxUses?: number | null;
   maxUsesPerUser?: number | null;
-  firstOrderOnly?: boolean;
+  firstOrderOnly?: boolean; // legacy — mapped to eligibility
+  eligibility?: "everyone" | "first_order";
   autoApply?: boolean;
   combinable?: boolean;
   priority?: number;
   excludeSale?: boolean;
   startsAt?: string | null;
   expiresAt?: string | null;
-  isActive?: boolean;
+  status?: "draft" | "active" | "paused" | "archived";
+  isActive?: boolean; // legacy toggle — mapped to status active/paused
   targets?: AdminCouponTarget[];
 }
 
@@ -66,23 +74,31 @@ function row(i: CouponInput): Record<string, unknown> {
   // Free-shipping coupons have no percentage/amount — persist value 0 + no cap so meaningless form
   // fields can't produce a nonsensical stored coupon.
   const freeShip = i.type === "free_shipping";
+  // Description split (point 17): public_description is customer-facing; internal_notes never leaves admin.
+  const publicDesc = i.publicDescription ?? i.description ?? null;
+  const eligibility = i.eligibility ?? (i.firstOrderOnly ? "first_order" : "everyone");
   return {
     code: normalizeCouponCode(i.code),
-    description: i.description ?? null,
+    public_description: publicDesc,
+    internal_notes: i.internalNotes ?? null,
+    description: publicDesc, // keep the deprecated column in sync until it's dropped
     type: i.type,
     value: freeShip ? 0 : i.value,
     max_discount: freeShip ? null : (i.maxDiscount ?? null),
     min_order: i.minOrder ?? 0,
+    min_qualifying_quantity: i.minQualifyingQuantity ?? null,
     max_uses: i.maxUses ?? null,
     max_uses_per_user: i.maxUsesPerUser ?? null,
-    first_order_only: i.firstOrderOnly ?? false,
+    eligibility,
+    first_order_only: eligibility === "first_order", // deprecated mirror
     auto_apply: i.autoApply ?? false,
     combinable: i.combinable ?? false,
     priority: i.priority ?? 100,
     exclude_sale: i.excludeSale ?? false,
     starts_at: i.startsAt || null,
     expires_at: i.expiresAt || null,
-    is_active: i.isActive ?? true,
+    // status is the single source of truth; is_active is derived by trigger.
+    status: i.status ?? (i.isActive === false ? "paused" : "active"),
     updated_at: new Date().toISOString(),
   };
 }
@@ -219,12 +235,14 @@ export async function listCoupons(): Promise<AdminCoupon[]> {
     for (const t of targets ?? []) (byCoupon[t.coupon_id] ??= []).push(t);
   }
   return coupons.map((r: any) => ({
-    id: r.id, code: r.code, description: r.description, type: r.type, value: Number(r.value),
+    id: r.id, code: r.code, publicDescription: r.public_description ?? null, internalNotes: r.internal_notes ?? null,
+    type: r.type, value: Number(r.value),
     maxDiscount: r.max_discount != null ? Number(r.max_discount) : null, minOrder: Number(r.min_order ?? 0),
+    minQualifyingQuantity: r.min_qualifying_quantity != null ? Number(r.min_qualifying_quantity) : null,
     maxUses: r.max_uses != null ? Number(r.max_uses) : null, maxUsesPerUser: r.max_uses_per_user != null ? Number(r.max_uses_per_user) : null,
-    usedCount: Number(r.used_count ?? 0), firstOrderOnly: Boolean(r.first_order_only), autoApply: Boolean(r.auto_apply),
+    usedCount: Number(r.used_count ?? 0), eligibility: (r.eligibility ?? "everyone"), autoApply: Boolean(r.auto_apply),
     combinable: Boolean(r.combinable), priority: Number(r.priority ?? 100), excludeSale: Boolean(r.exclude_sale),
-    startsAt: r.starts_at, expiresAt: r.expires_at, isActive: Boolean(r.is_active),
+    startsAt: r.starts_at, expiresAt: r.expires_at, status: (r.status ?? (r.is_active ? "active" : "paused")), isActive: Boolean(r.is_active),
     targets: targetsFromRows(byCoupon[r.id] ?? []),
   }));
 }
@@ -273,11 +291,14 @@ export async function restoreRedemption(orderId: string, reason: string, actorId
   return { ok: true };
 }
 
+/** Pause / resume (the list toggle). Writes `status` (the single source; is_active is derived). Pause is a
+ *  temporary operational stop — resume keeps the campaign config. (Archive is a separate, retiring action.) */
 export async function toggleCoupon(id: string, isActive: boolean, actorId?: string) {
   const db = loose();
-  const { error } = await db.from("coupons").update({ is_active: isActive, updated_at: new Date().toISOString() }).eq("id", id);
+  const status = isActive ? "active" : "paused";
+  const { error } = await db.from("coupons").update({ status, updated_at: new Date().toISOString() }).eq("id", id);
   if (error) return { ok: false, reason: error.message };
-  await logEvent({ entityType: "settings", event: isActive ? "coupon.activated" : "coupon.deactivated", actorType: actorId ? "staff" : "system", actorId });
+  await logEvent({ entityType: "settings", event: isActive ? "coupon.activated" : "coupon.paused", actorType: actorId ? "staff" : "system", actorId, entityId: id });
   return { ok: true };
 }
 

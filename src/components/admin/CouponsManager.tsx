@@ -13,10 +13,10 @@ type Form = {
 };
 
 const toForm = (c: AdminCoupon): Form => ({
-  id: c.id, code: c.code, description: c.description ?? "", type: c.type, value: c.value,
+  id: c.id, code: c.code, description: c.publicDescription ?? "", type: c.type, value: c.value,
   maxDiscount: c.maxDiscount != null ? String(c.maxDiscount) : "", minOrder: String(c.minOrder),
   maxUses: c.maxUses != null ? String(c.maxUses) : "", maxUsesPerUser: c.maxUsesPerUser != null ? String(c.maxUsesPerUser) : "",
-  firstOrderOnly: c.firstOrderOnly, autoApply: c.autoApply, combinable: c.combinable, priority: String(c.priority), excludeSale: c.excludeSale,
+  firstOrderOnly: c.eligibility === "first_order", autoApply: c.autoApply, combinable: c.combinable, priority: String(c.priority), excludeSale: c.excludeSale,
   startsAt: c.startsAt ? c.startsAt.slice(0, 10) : "", expiresAt: c.expiresAt ? c.expiresAt.slice(0, 10) : "", isActive: c.isActive,
   targets: c.targets.map((t) => ({ ...t })),
 });
@@ -86,9 +86,9 @@ export function CouponsManager({ coupons, targetOptions }: { coupons: AdminCoupo
             const b = badge(c);
             return (
               <tr key={c.id}>
-                <td className="admin__mono">{c.code}{c.autoApply ? <span className="bc-tag" data-derived="0"> auto</span> : null}{c.description ? <div className="admin__muted">{c.description}</div> : null}</td>
+                <td className="admin__mono">{c.code}{c.autoApply ? <span className="bc-tag" data-derived="0"> auto</span> : null}{c.publicDescription ? <div className="admin__muted">{c.publicDescription}</div> : null}</td>
                 <td>{c.type === "percent" ? `${c.value}%${c.maxDiscount ? ` up to ₹${c.maxDiscount}` : ""}` : `₹${c.value}`}</td>
-                <td className="admin__muted">{c.minOrder ? `min ₹${c.minOrder}` : "—"}{c.firstOrderOnly ? " · 1st order" : ""}</td>
+                <td className="admin__muted">{c.minOrder ? `min ₹${c.minOrder}` : "—"}{c.eligibility === "first_order" ? " · 1st order" : ""}</td>
                 <td className="admin__mono">{c.usedCount}{c.maxUses != null ? ` / ${c.maxUses}` : ""}</td>
                 <td className="admin__muted">{c.startsAt ? c.startsAt.slice(0, 10) : "—"} → {c.expiresAt ? c.expiresAt.slice(0, 10) : "∞"}</td>
                 <td><span className="om-pay" data-tone={b.t}>{b.l}</span></td>
