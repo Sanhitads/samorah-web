@@ -15,7 +15,7 @@ export interface AdminCoupon {
   id: string;
   code: string;
   description: string | null;
-  type: "percent" | "fixed";
+  type: "percent" | "fixed" | "free_shipping";
   value: number;
   maxDiscount: number | null;
   minOrder: number;
@@ -31,7 +31,7 @@ export interface AdminCoupon {
 export interface CouponInput {
   code: string;
   description?: string;
-  type: "percent" | "fixed";
+  type: "percent" | "fixed" | "free_shipping";
   value: number;
   maxDiscount?: number | null;
   minOrder?: number;
@@ -44,12 +44,15 @@ export interface CouponInput {
 }
 
 function row(i: CouponInput): Record<string, unknown> {
+  // Free-shipping coupons have no percentage/amount — persist value 0 + no cap so meaningless form
+  // fields can't produce a nonsensical stored coupon (fuller validation lands in the validation step).
+  const freeShip = i.type === "free_shipping";
   return {
     code: i.code.trim().toUpperCase(),
     description: i.description ?? null,
     type: i.type,
-    value: i.value,
-    max_discount: i.maxDiscount ?? null,
+    value: freeShip ? 0 : i.value,
+    max_discount: freeShip ? null : (i.maxDiscount ?? null),
     min_order: i.minOrder ?? 0,
     max_uses: i.maxUses ?? null,
     first_order_only: i.firstOrderOnly ?? false,

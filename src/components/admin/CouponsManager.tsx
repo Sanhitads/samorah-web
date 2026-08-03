@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import type { AdminCoupon } from "@/services/couponAdminService";
 
 type Form = {
-  id?: string; code: string; description: string; type: "percent" | "fixed"; value: number;
+  id?: string; code: string; description: string; type: "percent" | "fixed" | "free_shipping"; value: number;
   maxDiscount: string; minOrder: string; maxUses: string; firstOrderOnly: boolean; autoApply: boolean;
   startsAt: string; expiresAt: string; isActive: boolean;
 };
@@ -96,8 +96,8 @@ export function CouponsManager({ coupons }: { coupons: AdminCoupon[] }) {
             <h2 className="om-modal__title">{edit.id ? `Edit ${edit.code}` : "New coupon"}</h2>
             <div className="cfg-grid">
               <label className="cfg-field"><span>Code</span><input value={edit.code} onChange={(e) => setEdit({ ...edit, code: e.target.value.toUpperCase() })} placeholder="WELCOME10" /></label>
-              <label className="cfg-field"><span>Type</span><select value={edit.type} onChange={(e) => setEdit({ ...edit, type: e.target.value as "percent" | "fixed" })}><option value="percent">Percent (%)</option><option value="fixed">Fixed (₹)</option></select></label>
-              <label className="cfg-field"><span>Value {edit.type === "percent" ? "(%)" : "(₹)"}</span><input type="number" value={edit.value} onChange={(e) => setEdit({ ...edit, value: Number(e.target.value) })} /></label>
+              <label className="cfg-field"><span>Type</span><select value={edit.type} onChange={(e) => setEdit({ ...edit, type: e.target.value as Form["type"] })}><option value="percent">Percent (%)</option><option value="fixed">Fixed (₹)</option><option value="free_shipping">Free shipping</option></select></label>
+              {edit.type !== "free_shipping" ? <label className="cfg-field"><span>Value {edit.type === "percent" ? "(%)" : "(₹)"}</span><input type="number" value={edit.value} onChange={(e) => setEdit({ ...edit, value: Number(e.target.value) })} /></label> : null}
               {edit.type === "percent" ? <label className="cfg-field"><span>Max discount (₹)</span><input type="number" value={edit.maxDiscount} onChange={(e) => setEdit({ ...edit, maxDiscount: e.target.value })} placeholder="no cap" /></label> : null}
               <label className="cfg-field"><span>Min order (₹)</span><input type="number" value={edit.minOrder} onChange={(e) => setEdit({ ...edit, minOrder: e.target.value })} /></label>
               <label className="cfg-field"><span>Max uses</span><input type="number" value={edit.maxUses} onChange={(e) => setEdit({ ...edit, maxUses: e.target.value })} placeholder="unlimited" /></label>

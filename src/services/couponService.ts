@@ -41,7 +41,8 @@ function mapCoupon(r: any, targets: any[] = []): Coupon {
     stackable: true,
     exclusive: false,
     combinableWith: ["FREE_SHIPPING"],
-    type: r.type === "percent" ? "percentage" : "fixed",
+    // DB enum percent|fixed|free_shipping → engine percentage|fixed|free_shipping.
+    type: r.type === "percent" ? "percentage" : r.type === "free_shipping" ? "free_shipping" : "fixed",
     value: Number(r.value),
     minSubtotal: r.min_order != null ? Number(r.min_order) : undefined,
     maxDiscount: r.max_discount != null ? Number(r.max_discount) : undefined,
@@ -86,7 +87,7 @@ export async function loadCouponRegistry(): Promise<Coupon[]> {
 export interface CouponValidation {
   ok: boolean;
   reason?: string;
-  coupon?: { code: string; type: "percentage" | "fixed"; value: number; minSubtotal?: number; maxDiscount?: number };
+  coupon?: { code: string; type: "percentage" | "fixed" | "free_shipping"; value: number; minSubtotal?: number; maxDiscount?: number };
 }
 
 /**
@@ -109,7 +110,7 @@ export async function validateCoupon(code: string, subtotalPaise: number): Promi
     return { ok: false, reason: `Add ₹${(Number(data.min_order) - subtotalPaise / 100).toFixed(0)} more to use this code (min ₹${Number(data.min_order)}).` };
   }
   const c = mapCoupon(data);
-  return { ok: true, coupon: { code: c.code, type: c.type as "percentage" | "fixed", value: c.value, minSubtotal: c.minSubtotal, maxDiscount: c.maxDiscount } };
+  return { ok: true, coupon: { code: c.code, type: c.type, value: c.value, minSubtotal: c.minSubtotal, maxDiscount: c.maxDiscount } };
 }
 
 /** Increment a coupon's usage on order finalize (best-effort; never blocks the order). */

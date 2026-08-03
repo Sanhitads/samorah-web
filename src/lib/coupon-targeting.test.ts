@@ -81,6 +81,31 @@ describe("targeted discount allocation (computePromotions)", () => {
   });
 });
 
+describe("free-shipping coupon (point 1) — shipping only, never product taxable value", () => {
+  const lines: CommerceLine[] = [{ key: "candle", name: "Candle", unitPrice: 1000, qty: 1, taxClass: "candle" }];
+  const reg = [coupon({ code: "FREESHIP", type: "free_shipping", value: 0 })];
+
+  it("waives shipping while leaving the product line's price + GST identical", () => {
+    const without = computeOrderTotals(lines, {});
+    const withFs = computeOrderTotals(lines, { couponCode: "FREESHIP", couponRegistry: reg });
+    expect(without.shipping).toBeGreaterThan(0); // ₹1000 < ₹1499 threshold → shipping normally applies
+    expect(withFs.shipping).toBe(0); // coupon waives it
+    expect(withFs.freeShipping).toBe(true);
+    expect(withFs.discount).toBe(0); // free shipping is NOT a product discount
+    const a = withFs.lines.find((l) => l.key === "candle")!;
+    const b = without.lines.find((l) => l.key === "candle")!;
+    expect(a.discount).toBe(0);
+    expect(a.taxableValue).toBe(b.taxableValue); // product taxable value untouched
+    expect(a.gst).toBe(b.gst);
+  });
+  it("applies even when no product line would qualify for a discount (it targets shipping)", () => {
+    const giftOnly: CommerceLine[] = [{ key: "gift", name: "Gift Card", unitPrice: 2000, qty: 1, taxClass: "candle", isGiftCard: true }];
+    const t = computeOrderTotals(giftOnly, { couponCode: "FREESHIP", couponRegistry: reg });
+    expect(t.freeShipping).toBe(true);
+    expect(t.lines.find((l) => l.key === "gift")!.discount).toBe(0); // gift card never discounted
+  });
+});
+
 describe("targeting keeps GST correct on excluded lines (computeOrderTotals)", () => {
   it("excluded spray keeps full price + full 18% GST; candle is discounted at 12%", () => {
     const lines: CommerceLine[] = [
