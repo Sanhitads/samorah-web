@@ -209,22 +209,30 @@ export function CheckoutView() {
     if (Object.keys(found).length === 0) void pay();
   };
 
-  // Validate the code server-side for the specific reason (expired / invalid / min not met),
-  // firing coupon_rejected with that reason (review point 8). Falls back to client apply on error.
+  // Apply a code via the ONE authoritative preview call (validates + prices in a single round-trip, so
+  // the discount reflects immediately — and it knows targeting/exclusions/min-order the old subtotal-only
+  // check couldn't). Sets the server totals right away so there's no second wait.
   const applyCode = async () => {
     const code = codeInput.trim().toUpperCase();
     if (!code) return;
-    setCodeError("");
+    setCodeError(""); setPreviewing(true);
     try {
-      const subtotalPaise = Math.round(items.reduce((s, i) => s + i.price * i.qty, 0) * 100);
-      const res = await fetch("/api/coupons/apply", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code, subtotalPaise }) });
-      const d = (await res.json()) as { ok?: boolean; reason?: string };
-      if (d.ok) { setCouponCode(code); }
-      else { setCodeError(d.reason ?? "This code can't be applied."); trackCouponRejected(code, d.reason); }
+      const payload = items.map((i) => ({ key: i.key, slug: i.slug, name: i.name, vessel: i.vessel, size: i.size, qty: i.qty, compositionId: i.compositionId, productType: i.productType, edition: i.edition }));
+      const res = await fetch("/api/coupons/preview", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items: payload, state: ship.state, couponCode: code }) });
+      const d = (await res.json()) as { valid?: boolean; totals?: ReturnType<typeof calculateOrderTotals> };
+      if (d.valid && d.totals) {
+        const applied = d.totals.promotions.some((p) => p.code === code);
+        const skipped = d.totals.promotionsSkipped.find((p) => p.code === code);
+        if (applied) { setCouponCode(code); setServerTotals(d.totals); setCodeInput(""); }
+        else if (skipped) { setCodeError(`This code can’t be applied — ${skipped.reason}.`); trackCouponRejected(code, skipped.reason); }
+        else { setCodeError("That code isn’t recognised."); trackCouponRejected(code, "unrecognised"); }
+      } else { setCodeError("Couldn’t check that code. Please try again."); }
     } catch {
-      setCouponCode(code); // network hiccup → let the client-side re-price decide
-    }
+      setCouponCode(code); // network hiccup → let the re-price at payment decide
+    } finally { setPreviewing(false); }
   };
+  /** Remove the applied coupon (auto-apply promos, if any, will still show after the re-price). */
+  const clearCoupon = () => { setCouponCode(""); setServerTotals(null); setCodeInput(""); setCodeError(""); setShowCode(false); };
 
   /**
    * Stage 2A — start payment. The server re-prices the cart and returns a
@@ -546,7 +554,7 @@ export function CheckoutView() {
           {/* Coupon — deliberately minimal (not an Amazon-style field) */}
           <div className="checkout__code-wrap">
             {couponApplied ? (
-              <p className="checkout__code-applied">Code {couponCode} applied.</p>
+              <p className="checkout__code-applied">Code {couponCode} applied. <button type="button" className="checkout__code-remove" onClick={clearCoupon}>Remove</button></p>
             ) : !showCode ? (
               <button type="button" className="checkout__code-toggle" onClick={() => setShowCode(true)}>
                 Have a code?
