@@ -87,12 +87,25 @@ export interface Coupon extends PromotionMeta {
   minSubtotal?: number; // rupees
   maxDiscount?: number; // rupees — cap for percentage coupons (0/undefined = no cap)
   active: boolean;
+  autoApply?: boolean; // applies with no code (Phase 1 · point 6) — best eligible one is auto-selected
   // Targeting (Phase 1 · points 2/3). Empty/undefined `includes` = ENTIRE eligible order (unchanged
   // behaviour). Explicit `excludes` ALWAYS win over includes. `excludeSale` drops sale-priced lines.
   // Gift cards and bundle/composition lines are excluded INTRINSICALLY by the engine (no config needed).
   includes?: CouponTarget[];
   excludes?: CouponTarget[];
   excludeSale?: boolean;
+}
+
+const couponMeetsMin = (c: Coupon, subtotalPaise: number) => !c.minSubtotal || subtotalPaise >= toPaise(c.minSubtotal);
+
+/** The discount a coupon would apply to its eligible lines, net of any already-allocated discount (paise).
+ *  Free-shipping coupons return 0 here — their benefit is the waived shipping, handled downstream. */
+function couponDiscountPaise(c: Coupon, eligible: PromoLine[], byLine: Record<string, number>): number {
+  if (c.type === "free_shipping") return 0;
+  const base = eligible.reduce((s, l) => s + linePaise(l) - (byLine[l.key] ?? 0), 0);
+  let amt = c.type === "percentage" ? Math.round((base * c.value) / 100) : Math.min(toPaise(c.value), base);
+  if (c.type === "percentage" && c.maxDiscount) amt = Math.min(amt, toPaise(c.maxDiscount));
+  return Math.max(0, amt);
 }
 
 /** Does a line satisfy a single target rule? */
@@ -197,41 +210,56 @@ export function computePromotions(lines: PromoLine[], couponCode?: string, coupo
     });
   }
 
-  // Optional coupon candidate.
-  const coupon = couponCode ? coupons.find((c) => c.active && c.code === couponCode.toUpperCase()) : undefined;
-  if (coupon) {
-    const subtotal = lines.reduce((s, l) => s + linePaise(l), 0);
-    // Min-order gates on the WHOLE cart subtotal (an order minimum), not the targeted subset.
-    const meetsMin = !coupon.minSubtotal || subtotal >= toPaise(coupon.minSubtotal);
-    // Targeting/exclusions (points 2/3): the lines this coupon may actually discount.
-    const eligibleLines = couponEligibleLines(lines, coupon);
-    if (!meetsMin) {
-      // Real case: a coupon applied to a 3-item cart, then an item is removed and the cart drops
-      // below the minimum. The money is already right (no candidate ⇒ no discount) — this is so the
-      // UI can explain it rather than claim the code is unknown.
-      preSkipped.push({ code: coupon.code, reason: `minimum order of ₹${(coupon.minSubtotal ?? 0).toLocaleString("en-IN")} not met` });
-    } else if (coupon.type !== "free_shipping" && eligibleLines.length === 0) {
-      // Targeted/excluded coupon with nothing to apply to → zero benefit, clear reason (point 8 feeds
-      // on this: a ₹0-benefit coupon must not be recorded as redeemed).
-      preSkipped.push({ code: coupon.code, reason: "no items in your bag qualify for this code" });
-    } else {
-      candidates.push({
-        meta: coupon,
-        rule: { kind: coupon.type, value: coupon.type === "free_shipping" ? undefined : coupon.value },
-        apply: (byLine) => {
-          if (coupon.type === "free_shipping") return { amount: 0, freeShipping: true };
-          // Base = eligible lines only, net of any discount already allocated to them (points 3/11).
-          const eligibleBase = eligibleLines.reduce((s, l) => s + linePaise(l) - (byLine[l.key] ?? 0), 0);
-          let amt = coupon.type === "percentage" ? Math.round((eligibleBase * coupon.value) / 100) : Math.min(toPaise(coupon.value), eligibleBase);
-          // Percentage cap (e.g. "20% up to ₹500") — applies to the eligible-subset discount.
-          if (coupon.type === "percentage" && coupon.maxDiscount) amt = Math.min(amt, toPaise(coupon.maxDiscount));
-          amt = Math.max(0, amt);
-          // Allocate across ELIGIBLE lines only → excluded/non-targeted lines get exactly ₹0 (point 11).
-          if (amt > 0) allocatePro(amt, eligibleLines, byLine);
-          return { amount: amt };
-        },
-      });
-    }
+  // ── Coupon candidates: the manually-entered code (precedence) + eligible AUTO-APPLY coupons ──────
+  // Min-order gates on the WHOLE cart subtotal (an order minimum), not the targeted subset.
+  const subtotal = lines.reduce((s, l) => s + linePaise(l), 0);
+  interface Spec { coupon: Coupon; eligible: PromoLine[]; benefit: number }
+  // Resolve a coupon to a usable spec, or a skip-reason (so the UI can explain rather than say "unknown").
+  const specOf = (c: Coupon): Spec | { skip: string } => {
+    if (!couponMeetsMin(c, subtotal)) return { skip: `minimum order of ₹${(c.minSubtotal ?? 0).toLocaleString("en-IN")} not met` };
+    const eligible = couponEligibleLines(lines, c); // targeting/exclusions (points 2/3)
+    if (c.type !== "free_shipping" && eligible.length === 0) return { skip: "no items in your bag qualify for this code" };
+    return { coupon: c, eligible, benefit: couponDiscountPaise(c, eligible, {}) };
+  };
+  const chosen: Spec[] = [];
+
+  // Manual code — precedence. A specific skip reason is surfaced when it can't apply.
+  const manual = couponCode ? coupons.find((c) => c.active && c.code === couponCode.toUpperCase()) : undefined;
+  if (manual) {
+    const s = specOf(manual);
+    if ("skip" in s) preSkipped.push({ code: manual.code, reason: s.skip });
+    else chosen.push(s);
+  }
+  const manualDiscountHeld = !!manual && manual.type !== "free_shipping" && chosen.some((s) => s.coupon.code === manual.code);
+
+  // Auto-apply coupons (point 6). Deterministic selection through the authoritative engine:
+  //   • free-shipping auto-applies never conflict → all eligible ones stack;
+  //   • among discount auto-applies, pick the GREATEST customer benefit, then lowest priority, then code
+  //     (never DB/array order). Skipped entirely when a manual DISCOUNT coupon already holds precedence.
+  const autoSpecs = coupons
+    .filter((c) => c.active && c.autoApply && (!manual || c.code !== manual.code))
+    .map(specOf)
+    .filter((s): s is Spec => !("skip" in s));
+  for (const s of autoSpecs) if (s.coupon.type === "free_shipping") chosen.push(s);
+  if (!manualDiscountHeld) {
+    const best = autoSpecs
+      .filter((s) => s.coupon.type !== "free_shipping" && s.benefit > 0)
+      .sort((a, b) => b.benefit - a.benefit || a.coupon.priority - b.coupon.priority || (a.coupon.code < b.coupon.code ? -1 : 1))[0];
+    if (best) chosen.push(best);
+  }
+
+  for (const s of chosen) {
+    const c = s.coupon;
+    candidates.push({
+      meta: c,
+      rule: { kind: c.type, value: c.type === "free_shipping" ? undefined : c.value },
+      apply: (byLine) => {
+        if (c.type === "free_shipping") return { amount: 0, freeShipping: true };
+        const amt = couponDiscountPaise(c, s.eligible, byLine); // eligible lines only → excluded get ₹0 (point 11)
+        if (amt > 0) allocatePro(amt, s.eligible, byLine);
+        return { amount: amt };
+      },
+    });
   }
 
   // Deterministic order: by priority, then apply greedily respecting stacking.

@@ -169,9 +169,10 @@ export async function repriceCart(items: ClientCartLine[], state?: string, coupo
     }
   }
 
-  // DB-driven coupon registry (active · in-window · under-limit). A code only
-  // discounts if it resolves here — never a hardcoded array.
-  const couponRegistry = couponCode ? await loadCouponRegistry() : undefined;
+  // DB-driven coupon registry (active · in-window · under-limit). Loaded ALWAYS (not only when a code is
+  // typed) so eligible AUTO-APPLY coupons can be selected with no code (point 6). A manual code still only
+  // discounts if it resolves here — never a hardcoded array. Empty registry ⇒ no discount, as before.
+  const couponRegistry = await loadCouponRegistry();
   const totals = computeOrderTotals(lines, { state, couponCode, couponRegistry });
   return { valid: true, lines, details, totals };
 }

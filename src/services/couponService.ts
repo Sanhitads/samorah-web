@@ -35,18 +35,20 @@ function mapCoupon(r: any, targets: any[] = []): Coupon {
     label: r.description ?? String(r.code),
     campaign: r.auto_apply ? "auto" : "coupon",
     version: "db",
-    // NOTE: stacking metadata stays hardcoded here for now (safe: stacks only with free shipping). The
-    // configurable `combinable`/`priority` columns are wired in the later stacking/auto-apply step.
-    priority: 20,
+    // Stacking config (point 5): `priority` orders application (lower first); `combinable` decides whether
+    // it may stack with OTHER discounts. Default (combinable=false) → stacks only with free shipping,
+    // reproducing the previous safe behaviour. combinable=true → stacks with any stackable promo.
+    priority: r.priority != null ? Number(r.priority) : 100,
     stackable: true,
     exclusive: false,
-    combinableWith: ["FREE_SHIPPING"],
+    combinableWith: r.combinable ? ["*"] : ["FREE_SHIPPING"],
     // DB enum percent|fixed|free_shipping → engine percentage|fixed|free_shipping.
     type: r.type === "percent" ? "percentage" : r.type === "free_shipping" ? "free_shipping" : "fixed",
     value: Number(r.value),
     minSubtotal: r.min_order != null ? Number(r.min_order) : undefined,
     maxDiscount: r.max_discount != null ? Number(r.max_discount) : undefined,
     active: true,
+    autoApply: !!r.auto_apply,
     includes: includes.length ? includes : undefined,
     excludes: excludes.length ? excludes : undefined,
     excludeSale: !!r.exclude_sale,
