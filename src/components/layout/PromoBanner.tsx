@@ -1,13 +1,12 @@
-import { getPromoBanner } from "@/services/couponAdminService";
+import type { PromoBanner as PromoBannerData } from "@/services/couponAdminService";
 
 /**
  * Storefront promotional strip — advertises a coupon (e.g. "Use SAVE10 for 10% off"). Visibility is
- * entirely the admin's call (the `enabled` toggle on /admin/coupons); when off, nothing renders. Server
- * component: reads the setting directly, no client JS, no flash. The highlighted code is shown in a
- * copy-friendly monospace chip; customers still type it at checkout.
+ * entirely the admin's call (the `enabled` toggle on /admin/coupons). It sits just under the announcement
+ * bar; the floating header's offset is widened for it via --top-bars (set in the store layout). Fixed
+ * height so that offset is deterministic. The highlighted code is a copy-friendly chip.
  */
-export async function PromoBanner() {
-  const banner = await getPromoBanner();
+export function PromoBanner({ banner }: { banner: PromoBannerData }) {
   if (!banner.enabled || !banner.message) return null;
   return (
     <div className="promo-banner" role="note">

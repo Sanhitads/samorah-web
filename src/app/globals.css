@@ -247,19 +247,26 @@ h1, h2, h3, h4 {
   overflow: hidden;
 }
 
-/* Promotional banner (admin-controlled coupon strip). Sits just under the announcement bar. */
+/* Promotional banner (admin-controlled coupon strip). Fixed 38px so the floating header's --top-bars
+   offset is exact; sits just under the announcement bar. */
 .promo-banner {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 34px;
-  padding: 7px 20px;
+  height: 38px;
+  padding: 0 20px;
   background: var(--warm-gold, #c9a96e);
   color: #241f1a;
+  position: relative;
+  z-index: 200;
 }
 .promo-banner__text {
   margin: 0;
+  max-width: 100%;
   text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-family: var(--font-sans);
   font-size: 12px;
   letter-spacing: 0.06em;
@@ -3162,7 +3169,7 @@ h1, h2, h3, h4 {
    ivory glass at the top on scroll (below). No border, no shadow. */
 .site-header[data-variant="floating"] {
   position: absolute;
-  top: 38px; /* announcement bar height (.announcement-bar) */
+  top: var(--top-bars, 38px); /* announcement bar (+ promo banner when shown) */
   background: transparent;
   border-color: transparent;
   box-shadow: none;
@@ -3683,7 +3690,7 @@ h1, h2, h3, h4 {
    transparent Header reads against this dark atmosphere. */
 .home-hero {
   position: relative;
-  min-height: calc(100vh - 38px); /* fills the viewport below the announcement */
+  min-height: calc(100vh - var(--top-bars, 38px)); /* fills the viewport below the top bars */
   display: flex;
   align-items: center;
   overflow: hidden;

@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { AnnouncementBar } from "@/components/layout/AnnouncementBar";
 import { PromoBanner } from "@/components/layout/PromoBanner";
+import { getPromoBanner } from "@/services/couponAdminService";
 import { StoreChrome } from "@/components/layout/StoreChrome";
 import { Footer } from "@/components/layout/Footer";
 import { getSiteSettings } from "@/services/siteSettingsService";
@@ -43,16 +44,21 @@ export default async function StoreLayout({
   const jar = await cookies();
   if (jar.get("nav_preview")) preview = (await requireStaff("editor")).ok;
   const nav = await getNavigation({ preview });
+  const banner = await getPromoBanner();
+  const showBanner = banner.enabled && !!banner.message;
 
   return (
     <>
+      {/* When the promo banner shows, widen the top-bars offset so the FLOATING header sits under BOTH
+          the announcement bar and the banner (each 38px) instead of overlapping the banner. */}
+      {showBanner ? <style dangerouslySetInnerHTML={{ __html: ":root{--top-bars:76px}" }} /> : null}
       {preview ? <div className="store-notice" role="status" style={{ background: "#8a3d2f", color: "#fff" }}>Previewing draft navigation — not live.{" "}<ClearPreviewLink cookie="nav_preview">Exit preview</ClearPreviewLink></div> : null}
       {settings.storeNotice.active && settings.storeNotice.text ? (
         <div className="store-notice" role="status">{settings.storeNotice.text}</div>
       ) : null}
       <JsonLd data={siteStructuredData()} />
       <AnnouncementBar />
-      <PromoBanner />
+      <PromoBanner banner={banner} />
       <AccountSync />
       <StoreChrome branches={nav.branches} />
       {children}
