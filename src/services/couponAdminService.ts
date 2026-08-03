@@ -6,6 +6,7 @@
  */
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logEvent } from "@/services/auditService";
+import { validateCouponConfig, normalizeCouponCode } from "@/lib/couponValidation";
 
 function loose() {
   return createAdminClient() as unknown as { from: (t: string) => any };
@@ -48,7 +49,7 @@ function row(i: CouponInput): Record<string, unknown> {
   // fields can't produce a nonsensical stored coupon (fuller validation lands in the validation step).
   const freeShip = i.type === "free_shipping";
   return {
-    code: i.code.trim().toUpperCase(),
+    code: normalizeCouponCode(i.code),
     description: i.description ?? null,
     type: i.type,
     value: freeShip ? 0 : i.value,
@@ -76,22 +77,30 @@ export async function listCoupons(): Promise<AdminCoupon[]> {
   }));
 }
 
+/** Authoritative server-side config validation (shared with the admin client). */
+function invalid(input: CouponInput): string | null {
+  const errs = validateCouponConfig(input);
+  return errs.length ? errs[0] : null;
+}
+
 export async function createCoupon(input: CouponInput, actorId?: string) {
-  if (!input.code?.trim()) return { ok: false, reason: "code required" };
-  if (input.type === "percent" && input.value > 100) return { ok: false, reason: "percent cannot exceed 100" };
+  const bad = invalid(input);
+  if (bad) return { ok: false, reason: bad };
   const db = loose();
   const { error } = await db.from("coupons").insert(row(input));
   if (error) return { ok: false, reason: /duplicate|unique/i.test(error.message) ? "code already exists" : error.message };
-  await logEvent({ entityType: "settings", event: "coupon.created", actorType: actorId ? "staff" : "system", actorId, notes: input.code.toUpperCase() });
+  await logEvent({ entityType: "settings", event: "coupon.created", actorType: actorId ? "staff" : "system", actorId, notes: normalizeCouponCode(input.code) });
   return { ok: true };
 }
 
 export async function updateCoupon(id: string, input: CouponInput, actorId?: string) {
-  if (input.type === "percent" && input.value > 100) return { ok: false, reason: "percent cannot exceed 100" };
+  const bad = invalid(input);
+  if (bad) return { ok: false, reason: bad };
   const db = loose();
   const { error } = await db.from("coupons").update(row(input)).eq("id", id);
-  if (error) return { ok: false, reason: error.message };
-  await logEvent({ entityType: "settings", event: "coupon.updated", actorType: actorId ? "staff" : "system", actorId, notes: input.code.toUpperCase() });
+  // A colliding code hits the DB unique constraint — surface it friendly (was a raw error before).
+  if (error) return { ok: false, reason: /duplicate|unique/i.test(error.message) ? "code already exists" : error.message };
+  await logEvent({ entityType: "settings", event: "coupon.updated", actorType: actorId ? "staff" : "system", actorId, notes: normalizeCouponCode(input.code) });
   return { ok: true };
 }
 

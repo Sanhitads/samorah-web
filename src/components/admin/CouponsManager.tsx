@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { AdminCoupon } from "@/services/couponAdminService";
+import { validateCouponConfig } from "@/lib/couponValidation";
 
 type Form = {
   id?: string; code: string; description: string; type: "percent" | "fixed" | "free_shipping"; value: number;
@@ -45,8 +46,15 @@ export function CouponsManager({ coupons }: { coupons: AdminCoupon[] }) {
       firstOrderOnly: f.firstOrderOnly, autoApply: f.autoApply,
       startsAt: f.startsAt || null, expiresAt: f.expiresAt || null, isActive: f.isActive,
     };
+    // Same validator the server runs — catch it here for instant feedback (server stays authoritative).
+    const errs = validateCouponConfig(coupon);
+    if (errs.length) { setErr(errs[0]); return; }
     if (await post(f.id ? { action: "update", id: f.id, coupon } : { action: "create", coupon })) setEdit(null);
   };
+  const formErrors = edit ? validateCouponConfig({
+    code: edit.code, type: edit.type, value: Number(edit.value), maxDiscount: numOrNull(edit.maxDiscount),
+    minOrder: Number(edit.minOrder || 0), maxUses: numOrNull(edit.maxUses), startsAt: edit.startsAt || null, expiresAt: edit.expiresAt || null,
+  }) : [];
 
   const badge = (c: AdminCoupon) => {
     const now = Date.now();
@@ -110,10 +118,10 @@ export function CouponsManager({ coupons }: { coupons: AdminCoupon[] }) {
               <label className="om-check"><input type="checkbox" checked={edit.firstOrderOnly} onChange={(e) => setEdit({ ...edit, firstOrderOnly: e.target.checked })} /><span>First order only</span></label>
               <label className="om-check"><input type="checkbox" checked={edit.isActive} onChange={(e) => setEdit({ ...edit, isActive: e.target.checked })} /><span>Active</span></label>
             </div>
-            {err ? <p className="ff-err">{err}</p> : null}
+            {formErrors.length ? <p className="ff-err">{formErrors[0]}</p> : err ? <p className="ff-err">{err}</p> : null}
             <div className="om-modal__actions">
               <button type="button" className="ff-btn" disabled={busy} onClick={() => setEdit(null)}>Cancel</button>
-              <button type="button" className="ff-btn ff-btn--primary" disabled={busy || !edit.code.trim()} onClick={() => save(edit)}>{busy ? "Saving…" : "Save"}</button>
+              <button type="button" className="ff-btn ff-btn--primary" disabled={busy || formErrors.length > 0} onClick={() => save(edit)}>{busy ? "Saving…" : "Save"}</button>
             </div>
           </div>
         </div>
