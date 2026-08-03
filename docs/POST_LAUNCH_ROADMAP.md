@@ -672,3 +672,27 @@ Real-world scenario: *"Two editors open the homepage at once — the second sees
 read-only page, takes over when Priya's done, undoes an accidental section delete with Ctrl+Z, checks the
 audit timeline to see exactly which fields Priya changed, previews it in Dark, and Ctrl+S to save."*
 No migration — built on the existing locks/audit tables.
+
+## P10.8 — Homepage Builder: deferred / partial sub-points (Phases 4–8)
+
+Every phase point is implemented and E2E-tested **except** the following, where a lighter working version
+shipped and the full version is deferred. Recorded here so nothing is lost:
+
+- **Responsive art-direction crop — Phase 5 · #21 ("Mobile Crop / Desktop Crop").** The media picker
+  ships one focal + aspect crop baked into the Cloudinary URL, applied at every breakpoint (Crop / Focal
+  Point / Aspect Ratio are done). A **different crop per breakpoint** (mobile vs desktop framing from one
+  field) is **not** built. Needs: a second stored crop/focal per placement + `<picture>`/art-directed
+  `srcSet` in the section renderers. *Medium complexity.*
+- **True dark homepage theme — Phase 8 · #36** (the spec marked Dark + Print "future"). The **Dark**
+  preview is a CSS invert/hue-rotate **approximation** (media re-inverted) — a preview aid, not a
+  shippable dark storefront, because the homepage sections have no dark `data-theme` tokens. **Print** is
+  basic (`iframe.print()`), no dedicated print stylesheet. Needs: authored dark tokens per section.
+- **Featured Journal entity — Phase 7 · #28.** The Journal is a composed page, not a post collection, so
+  "Featured Journal" is backed by an editable `journalHighlights` config rather than a DB posts table. A
+  real Journal CMS (post entity + admin) would replace it; the picker already resolves it identically.
+
+Everything else across points **16–36** (rich text, reorder/repeatable blocks, search, media library +
+tags + folders + recently-used + replace + credits/copyright, alt validation, video MP4/YouTube/Vimeo +
+hero bg video, hero treatment controls, homepage SEO + structured data, section analytics, performance
+meter, featured pickers, seasonal presets, accessibility checker, undo/redo, keyboard shortcuts,
+multi-user read-only + take-over, audit timeline, Desktop/Tablet/Mobile preview) is **fully implemented**.
