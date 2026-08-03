@@ -723,3 +723,32 @@ metacharacter escaping). These lower-risk items are deferred — none is exploit
   `validateContent` on restore and assert `resource` matches.
 - **`cmsLockService` `Date.parse` NaN guard (LOW).** A malformed timestamp yields `NaN`, which compares
   falsey and is treated as stale. Harmless (fails safe toward "expired") but worth an explicit guard.
+
+## P11 — Coupon & Promotions: deferred (Phase 3 / post-launch)
+
+Phases 1 (core rules) and 2 (admin & campaign management) are complete. The following were **intentionally
+deferred** during Phase 2 (locked decision: "do not add customer segmentation, VIP rules, campaign
+analytics or other Phase-3 functionality") and documented here so nothing is lost. The architecture was
+built to accept them without a rewrite:
+
+- **Customer segmentation eligibility.** Today `coupons.eligibility` is `everyone | first_order`. The
+  column is a string enum specifically so `returning | segment | vip | wholesale_excluded` can be added
+  later. Enforcement would extend `customerHasPaidOrder`-style checks (repriceCart + reserve_coupon) with
+  segment membership; no schema rewrite. Needs a customer-segment definition/source first.
+- **Returning-customer & VIP coupons.** As above — a segment predicate resolved at application/repricing
+  and re-validated atomically at reservation, reusing the Phase-1 two-level identity pattern.
+- **Wholesale exclusions.** Exclude wholesale customers/orders from consumer coupons (or vice-versa) once
+  the wholesale customer flag is part of the checkout identity.
+- **Campaign analytics.** Redemption/revenue-impact dashboards (redemptions over time, revenue lift, CTR,
+  first-order conversion). The data already exists — `coupon_redemptions` (lifecycle ledger) + the
+  per-coupon `audit_events` timeline + order snapshots (`coupon_code`, `discount_amount`, per-line
+  `line_discount`). This is a reporting layer, not new capture.
+- **Free-shipping-only usage caps at the ledger.** DONE in Phase 1's extension (multi-coupon-per-order
+  ledger) — free-ship coupons are now tracked. Left here only as a note that it's covered.
+- **is_active column cleanup.** `coupons.is_active` is deprecated (derived from `status` via trigger). A
+  later migration should drop it once no external reader remains.
+- **Checkout reconfirm UI for repriced coupons.** The server already returns a 409 `{repriced, summary}`
+  when a coupon can't be honoured at create-order (never overcharges); the checkout client should render
+  that summary for explicit customer reconfirmation rather than a generic error.
+- **Coupon preview at cart (pre-checkout).** Auto-apply / targeted discounts are authoritative at checkout
+  reprice; surfacing them on the cart page/drawer (via the preview endpoint) is a UX enhancement.
