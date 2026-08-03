@@ -393,6 +393,15 @@
 .cfg-targets__row[data-mode="exclude"] { background: #fbf3f2; border-color: #e6c9c4; }
 .cfg-targets__row select, .cfg-targets__row input { padding: 6px 8px; font-family: var(--font-sans); font-size: 13px; border: 1px solid var(--ad-hair); border-radius: 3px; background: #fff; }
 .cfg-targets__row select:last-of-type, .cfg-targets__row input { flex: 1 1 160px; }
+/* Coupon rule preview + warnings (point 16). */
+.cfg-preview { margin-top: 14px; padding: 10px 12px; border: 1px solid var(--ad-hair); border-radius: 4px; background: #faf8f4; }
+.cfg-preview__lines { margin: 4px 0 0; font-family: var(--font-sans); font-size: 12.5px; color: var(--ink, #1f1a16); line-height: 1.6; }
+.cfg-preview__warn { margin: 6px 0 0; font-family: var(--font-sans); font-size: 12px; color: #8a3d2f; }
+/* Coupon audit timeline (point 20). */
+.cfg-timeline { display: flex; flex-direction: column; gap: 8px; max-height: 60vh; overflow-y: auto; }
+.cfg-timeline__row { display: grid; grid-template-columns: 160px 1fr auto; gap: 10px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--ad-hair); font-size: 12.5px; }
+.cfg-timeline__when { font-family: var(--font-mono, monospace); font-size: 11px; color: var(--smoke, #6b6259); }
+.cfg-timeline__what { font-family: var(--font-sans); color: var(--ink, #1f1a16); }
 .cfg-day { padding: 6px 12px; border: 1px solid var(--ad-hair); border-radius: 999px; background: #fff; cursor: pointer; font-family: var(--font-sans); font-size: 12px; text-transform: capitalize; }
 .cfg-day[data-on="1"] { background: #1f1a16; color: #faf7f2; border-color: #1f1a16; }
 .cfg-actions { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
