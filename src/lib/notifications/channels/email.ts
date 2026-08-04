@@ -23,7 +23,13 @@ async function compose(event: string, msg: { to: string; subject: string; html: 
   return { ...msg, subject: await resolveSubject(event, msg.subject, vars) };
 }
 
-/** Assemble the {to, subject, html, text} for an event, or null if we can't. */
+/**
+ * Assemble the {to, subject, html, text} for an event, or null if we can't.
+ * NB: the per-event `vars` maps below are the canonical send-time variables. They MUST stay in sync
+ * with EMAIL_TEMPLATE_DEFS[event].vars (emailTemplateService) — the admin variables panel advertises
+ * those, and a divergence would let an admin author a {{token}} production never resolves. The guard
+ * test in emailTemplateValidation.test.ts pins the two together.
+ */
 async function render(event: NotificationEvent, ctx: NotificationContext): Promise<{ to: string; subject: string; html: string; text: string } | null> {
   switch (event) {
     case "order.confirmed": {

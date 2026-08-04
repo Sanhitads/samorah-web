@@ -44,6 +44,27 @@ describe("validateEmailTemplate — blocks on publish", () => {
   });
 });
 
+// The variables panel must reflect the ACTUAL send-time vars each event provides in
+// src/lib/notifications/channels/email.ts → render(). If that mapping changes, update DEFS here so
+// the admin panel never advertises a token production won't resolve (which would render blank).
+describe("EMAIL_TEMPLATE_DEFS.vars stay in sync with the send-time variables", () => {
+  const SEND_VARS: Record<string, string[]> = {
+    "order.confirmed": ["orderNumber", "name", "total"],
+    "order.dispatched": ["orderNumber", "name", "courier", "awb"],
+    "order.cancelled": ["orderNumber", "name"],
+    "delivery.completed": ["orderNumber", "name"],
+    "return.requested": ["rmaNumber", "orderNumber"],
+    "return.approved": ["rmaNumber", "orderNumber"],
+    "return.refunded": ["rmaNumber", "orderNumber"],
+  };
+  it("every def's vars exactly match the channel's send-time keys", () => {
+    for (const d of EMAIL_TEMPLATE_DEFS) {
+      expect([...d.vars].sort(), `${d.key} vars`).toEqual([...(SEND_VARS[d.key] ?? [])].sort());
+    }
+    expect(EMAIL_TEMPLATE_DEFS.map((d) => d.key).sort()).toEqual(Object.keys(SEND_VARS).sort());
+  });
+});
+
 describe("renderTemplateContent — same renderer as production", () => {
   it("renders an authored body and injects the details HTML", () => {
     const r = renderTemplateContent(def("order.confirmed"), content({ blocks: [{ type: "paragraph", text: "Hi {{name}}" }, { type: "details" }] }), def("order.confirmed").sample, "<tr><td>DETAILS</td></tr>");
