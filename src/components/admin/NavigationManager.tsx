@@ -148,6 +148,13 @@ export function NavigationManager({ header, footer, entities, canPublish = true 
   };
   const removeItem = (bi: number, ii: number) => { const snapshot = hdr; setHdr((h) => h.map((b, i) => (i === bi ? { ...b, items: b.items.filter((_, j) => j !== ii) } : b))); setUndo({ text: "Link removed", run: () => { setHdr(snapshot); setUndo(null); } }); };
   const removeFtrLink = (si: number, li: number) => { const snapshot = ftr; setFtr((f) => f.map((x, i) => (i === si ? { ...x, links: x.links.filter((_, j) => j !== li) } : x))); setUndo({ text: "Link removed", run: () => { setFtr(snapshot); setUndo(null); } }); };
+  // Drag-reorder for branches + footer columns/links (point 18); ↑ ↓ remain the accessible fallback.
+  const [dragBranch, setDragBranch] = useState<number | null>(null);
+  const dropBranch = (target: number) => { if (dragBranch === null || dragBranch === target) { setDragBranch(null); return; } setHdr((h) => { const a = [...h]; const [m] = a.splice(dragBranch, 1); a.splice(target, 0, m); return a; }); setDragBranch(null); };
+  const [dragCol, setDragCol] = useState<number | null>(null);
+  const dropCol = (target: number) => { if (dragCol === null || dragCol === target) { setDragCol(null); return; } setFtr((f) => { const a = [...f]; const [m] = a.splice(dragCol, 1); a.splice(target, 0, m); return a; }); setDragCol(null); };
+  const [dragFtr, setDragFtr] = useState<{ si: number; li: number } | null>(null);
+  const dropFtrLink = (si: number, target: number) => { if (!dragFtr || dragFtr.si !== si || dragFtr.li === target) { setDragFtr(null); return; } setFtr((f) => f.map((x, i) => (i === si ? { ...x, links: (() => { const a = [...x.links]; const [m] = a.splice(dragFtr.li, 1); a.splice(target, 0, m); return a; })() } : x))); setDragFtr(null); };
 
   // Unsaved-change protection (point 7). Dirty = current tree differs from the last saved snapshot.
   const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify([header.draft, footer.draft]));
@@ -226,8 +233,9 @@ export function NavigationManager({ header, footer, entities, canPublish = true 
       {tab === "header" ? (
         <div>
           {hdr.map((b, bi) => (
-            <div key={bi} className="nav-branch">
+            <div key={bi} className="nav-branch" onDragOver={(e) => { if (dragBranch !== null) e.preventDefault(); }} onDrop={() => dropBranch(bi)}>
               <div className="nav-branch__head">
+                <span className="nav-drag nav-drag--branch" draggable onDragStart={() => setDragBranch(bi)} title="Drag to reorder branch (↑ ↓ also work)">⋮⋮</span>
                 <button type="button" className="nav-collapse" onClick={() => toggleCollapse(`h${bi}`)} aria-expanded={!collapsed.has(`h${bi}`)} title="Collapse / expand branch">{collapsed.has(`h${bi}`) ? "▸" : "▾"}</button>
                 <input className="nav-branch__label" value={b.label} onChange={(e) => setBranch(bi, { label: e.target.value })} placeholder="Branch label" />
                 <input className="nav-branch__id" value={b.id} onChange={(e) => setBranch(bi, { id: e.target.value })} placeholder="id" />
@@ -296,8 +304,9 @@ export function NavigationManager({ header, footer, entities, canPublish = true 
       ) : (
         <div>
           {ftr.map((s, si) => (
-            <div key={si} className="nav-branch">
+            <div key={si} className="nav-branch" onDragOver={(e) => { if (dragCol !== null) e.preventDefault(); }} onDrop={() => dropCol(si)}>
               <div className="nav-branch__head">
+                <span className="nav-drag nav-drag--branch" draggable onDragStart={() => setDragCol(si)} title="Drag to reorder column (↑ ↓ also work)">⋮⋮</span>
                 <button type="button" className="nav-collapse" onClick={() => toggleCollapse(`f${si}`)} aria-expanded={!collapsed.has(`f${si}`)} title="Collapse / expand column">{collapsed.has(`f${si}`) ? "▸" : "▾"}</button>
                 <input className="nav-branch__label" value={s.title} onChange={(e) => setFtr((f) => f.map((x, i) => (i === si ? { ...x, title: e.target.value } : x)))} placeholder="Column title" />
                 <span className="nav-branch__summary admin__muted">{s.links.length} link{s.links.length === 1 ? "" : "s"}</span>
@@ -310,8 +319,9 @@ export function NavigationManager({ header, footer, entities, canPublish = true 
               </div>
               {collapsed.has(`f${si}`) ? null : (<>
               {s.links.map((l, li) => (
-                <div key={li}>
-                  <div className="cfg-row" style={{ gridTemplateColumns: "1.2fr 1.7fr auto auto auto auto auto" }}>
+                <div key={li} draggable onDragStart={() => setDragFtr({ si, li })} onDragOver={(e) => e.preventDefault()} onDrop={() => dropFtrLink(si, li)} className="nav-item">
+                  <div className="cfg-row" style={{ gridTemplateColumns: "auto 1.2fr 1.7fr auto auto auto auto auto" }}>
+                    <span className="nav-drag" title="Drag to reorder (↑ ↓ also work)" aria-hidden>⋮⋮</span>
                     <input value={l.label} onChange={(e) => setFtrLink(si, li, { label: e.target.value })} placeholder="Label" />
                     <DestinationPicker link={l} entities={entities} onChange={(patch) => setFtrLink(si, li, patch)} />
                     <button type="button" className="ff-btn" data-active={openLink === `f${si}-${li}` ? "1" : "0"} onClick={() => setOpenLink(openLink === `f${si}-${li}` ? null : `f${si}-${li}`)} title="SEO options">🔗</button>
