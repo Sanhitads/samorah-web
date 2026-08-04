@@ -179,7 +179,10 @@ export async function getNavigationAdmin(): Promise<{ header: MenuAdminView; foo
     publishAt: row?.publish_at ?? null, unpublishAt: row?.unpublish_at ?? null,
     source: row ? "db" : "config",
   });
-  return { header: view(h, MENU_BRANCHES as any), footer: view(f, FOOTER_SECTIONS as any) };
+  const header = view(h, MENU_BRANCHES as any);
+  // Resolve campaign mediaId → thumbnail URL so the editor shows a preview (media stays referenced by id).
+  try { await resolveCampaignImages(header.draft as NavBranch[]); } catch { /* thumbnails optional */ }
+  return { header, footer: view(f, FOOTER_SECTIONS as any) };
 }
 
 /** Save the DRAFT (work in progress) — does NOT go live until Publish. */

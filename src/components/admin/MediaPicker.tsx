@@ -26,7 +26,7 @@ export function MediaPicker({ open, kind = "image", allowCrop = true, onSelect, 
   open: boolean; kind?: "image" | "video" | "all"; allowCrop?: boolean;
   /** `focal` is a CSS position string ("50% 30%") when the editor set one — applied by full-bleed
    *  surfaces (hero background / content image) as background/object-position. */
-  onSelect: (url: string, focal?: string, focalMobile?: string, mobileUrl?: string) => void; onClose: () => void;
+  onSelect: (url: string, focal?: string, focalMobile?: string, mobileUrl?: string, assetId?: string) => void; onClose: () => void;
 }) {
   const [items, setItems] = useState<MediaRow[]>([]);
   const [folders, setFolders] = useState<string[]>([]);
@@ -85,14 +85,14 @@ export function MediaPicker({ open, kind = "image", allowCrop = true, onSelect, 
   // Pixel-precise focal crops (#21) when the asset's dimensions are known → the exact clicked point stays
   // centred (falls back to a coarse compass gravity only if width/height are missing).
   const cropped = (base: string) => (allowCrop && ar && isCloudinary(base) ? cldCrop(base, { ar, focalX: focal?.x, focalY: focal?.y, imgW: sel?.width, imgH: sel?.height }) : base);
-  const choose = (url: string, fpos?: string, fmpos?: string, murl?: string) => { pushRecent(url); onSelect(url, fpos, fmpos, murl); onClose(); };
+  const choose = (url: string, fpos?: string, fmpos?: string, murl?: string, assetId?: string) => { pushRecent(url); onSelect(url, fpos, fmpos, murl, assetId); onClose(); };
   // Confirm: bake the desktop crop into the URL; pass both focals (per-breakpoint framing); and when a
   // MOBILE aspect is chosen, bake a separate mobile crop URL (art-directed, different shape on phones — #21).
   const confirmSel = () => {
     if (!sel) return;
     const mFocal = focalMobile ?? focal;
     const mobileUrl = allowCrop && arMobile && isCloudinary(sel.url) ? cldCrop(sel.url, { ar: arMobile, focalX: mFocal?.x, focalY: mFocal?.y, imgW: sel.width, imgH: sel.height }) : undefined;
-    choose(cropped(sel.url), focalPos, focalMobilePos, mobileUrl);
+    choose(cropped(sel.url), focalPos, focalMobilePos, mobileUrl, sel.id);
   };
 
   const onUpload = async (file: File) => {

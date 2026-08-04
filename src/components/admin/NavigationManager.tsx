@@ -4,6 +4,22 @@ import { useState, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { NavBranch, NavItem, FooterSection, MenuAdminView, LinkableEntities, EntityType, LinkAttrs, MenuRevision } from "@/services/navigationService";
 import { istLocalToUtc, formatIST } from "@/lib/istTime";
+import { MediaPicker } from "@/components/admin/MediaPicker";
+
+const gradName = (g: string) => g.replace(/^grad-/, "").replace(/^\w/, (c) => c.toUpperCase());
+
+/** Miniature campaign-panel preview — reuses the real gradient class + selected media so the preview
+ *  cannot visually diverge from the storefront campaign panel (point 21). */
+function MiniCampaign({ campaign }: { campaign: NavBranch["campaign"] }) {
+  const style = campaign.image ? { backgroundImage: `url(${campaign.image})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined;
+  return (
+    <div className={`nav-campaign-mini ${campaign.image ? "" : campaign.gradient || ""}`} style={style}>
+      <span className="nav-campaign-mini__eyebrow">{campaign.eyebrow || "Eyebrow"}</span>
+      <span className="nav-campaign-mini__title">{campaign.title || "Campaign title"}</span>
+      <span className="nav-campaign-mini__desc">{campaign.description || "Description…"}</span>
+    </div>
+  );
+}
 
 /** Flatten a nav/footer snapshot to a set of "branch ▸ label → href" strings, for a lightweight diff. */
 function flattenNav(tree: any[]): Set<string> {
@@ -101,6 +117,7 @@ export function NavigationManager({ header, footer, entities, canPublish = true 
   const [revs, setRevs] = useState<MenuRevision[] | null>(null);
   const [openRev, setOpenRev] = useState<string | null>(null); // preview-before-restore expansion
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set()); // collapsed branches (P1)
+  const [mediaFor, setMediaFor] = useState<number | null>(null); // campaign media picker target branch (point 20)
   const [dragItem, setDragItem] = useState<{ bi: number; ii: number } | null>(null); // drag-reorder within a branch
   const toggleCollapse = (k: string) => setCollapsed((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const dropItem = (bi: number, target: number) => {
@@ -242,13 +259,34 @@ export function NavigationManager({ header, footer, entities, canPublish = true 
               ))}
               <button type="button" className="ff-btn" onClick={() => setBranch(bi, { items: [...b.items, { label: "New link", href: "/" }] })}>+ link</button>
               <p className="cfg-sub" style={{ marginTop: 12 }}>Campaign panel</p>
-              <div className="cfg-grid">
-                <label className="cfg-field"><span>Eyebrow</span><input value={b.campaign.eyebrow} onChange={(e) => setCampaign(bi, { eyebrow: e.target.value })} /></label>
-                <label className="cfg-field"><span>Title</span><input value={b.campaign.title} onChange={(e) => setCampaign(bi, { title: e.target.value })} /></label>
-                <label className="cfg-field"><span>Destination</span><DestinationPicker link={b.campaign} entities={entities} onChange={(patch) => setCampaign(bi, patch)} /></label>
-                <label className="cfg-field"><span>Gradient</span><select value={b.campaign.gradient} onChange={(e) => setCampaign(bi, { gradient: e.target.value })}>{GRADS.map((g) => <option key={g} value={g}>{g}</option>)}</select></label>
-                <label className="cfg-field"><span>Description</span><input value={b.campaign.description} onChange={(e) => setCampaign(bi, { description: e.target.value })} /></label>
-                <label className="cfg-field"><span>Media id (optional — overrides gradient)</span><input value={b.campaign.mediaId ?? ""} onChange={(e) => setCampaign(bi, { mediaId: e.target.value || undefined })} placeholder="media asset id" /></label>
+              <div className="nav-campaign">
+                <div>
+                  <div className="cfg-grid">
+                    <label className="cfg-field"><span>Eyebrow</span><input value={b.campaign.eyebrow} onChange={(e) => setCampaign(bi, { eyebrow: e.target.value })} /></label>
+                    <label className="cfg-field"><span>Title</span><input value={b.campaign.title} onChange={(e) => setCampaign(bi, { title: e.target.value })} /></label>
+                    <label className="cfg-field"><span>Destination</span><DestinationPicker link={b.campaign} entities={entities} onChange={(patch) => setCampaign(bi, patch)} /></label>
+                    <label className="cfg-field" data-wide="1"><span>Description</span><input value={b.campaign.description} onChange={(e) => setCampaign(bi, { description: e.target.value })} /></label>
+                  </div>
+                  <div className="nav-field"><span className="cfg-sub">Background gradient</span>
+                    <div className="nav-swatches">
+                      {GRADS.map((g) => <button key={g} type="button" className={`nav-swatch ${g}`} data-on={b.campaign.gradient === g && !b.campaign.mediaId ? "1" : "0"} onClick={() => setCampaign(bi, { gradient: g })} title={gradName(g)} aria-label={gradName(g)} />)}
+                      <span className="admin__muted" style={{ marginLeft: 8 }}>{gradName(b.campaign.gradient || "")}{b.campaign.mediaId ? " · media overrides" : ""}</span>
+                    </div>
+                  </div>
+                  <div className="nav-field"><span className="cfg-sub">Media (overrides gradient)</span>
+                    {b.campaign.mediaId || b.campaign.image ? (
+                      <div className="nav-media">
+                        {b.campaign.image ? <img src={b.campaign.image} className="nav-media__thumb" alt="" /> : <span className="admin__muted">media set · {b.campaign.mediaId?.slice(0, 8)}</span>}
+                        <button type="button" className="ff-btn ff-btn--mini" onClick={() => setMediaFor(bi)}>Replace</button>
+                        <button type="button" className="ff-btn ff-btn--mini ff-btn--danger" onClick={() => setCampaign(bi, { mediaId: undefined, image: undefined })}>Remove</button>
+                      </div>
+                    ) : <button type="button" className="ff-btn ff-btn--mini" onClick={() => setMediaFor(bi)}>Choose media</button>}
+                  </div>
+                </div>
+                <div className="nav-campaign__preview">
+                  <span className="cfg-sub">Preview</span>
+                  <MiniCampaign campaign={b.campaign} />
+                </div>
               </div>
               </>)}
             </div>
@@ -341,6 +379,9 @@ export function NavigationManager({ header, footer, entities, canPublish = true 
           </div>
         </div>
       ) : null}
+
+      {/* Canonical media library picker for campaign imagery (point 20) — stores the asset id, not a URL. */}
+      <MediaPicker open={mediaFor !== null} kind="image" onSelect={(url, _f, _fm, _mu, assetId) => { if (mediaFor !== null) setCampaign(mediaFor, { mediaId: assetId, image: url }); }} onClose={() => setMediaFor(null)} />
     </div>
   );
 }
