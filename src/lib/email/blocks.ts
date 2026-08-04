@@ -7,6 +7,8 @@
  */
 import type { SectionSchema } from "@/lib/cms/sectionSchema";
 import { C, emailLayout, sectionHeader, sectionHero, sectionFooter } from "./templates";
+import { interpolate } from "./tokens"; // canonical token resolver (blanks unknown tokens — defense-in-depth)
+export { interpolate };
 
 const serif = "Georgia,'Times New Roman',serif";
 const sans = "Arial,Helvetica,sans-serif";
@@ -37,9 +39,6 @@ export const EMAIL_TEMPLATE_SCHEMA: SectionSchema = {
   ],
 };
 
-export function interpolate(str: string, vars: Record<string, string>): string {
-  return String(str ?? "").replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k) => (vars[k] !== undefined ? vars[k] : `{{${k}}}`));
-}
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 function blockHtml(b: EmailBlock, vars: Record<string, string>): string {
