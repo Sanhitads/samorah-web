@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { NavBranch, NavItem, FooterSection, MenuAdminView, LinkableEntities, EntityType, LinkAttrs } from "@/services/navigationService";
 import type { Revision } from "@/services/cms/revisions";
@@ -60,6 +60,32 @@ export function NavigationManager({ header, footer, entities, canPublish = true 
   const [unpubAt, setUnpubAt] = useState("");
   const [revs, setRevs] = useState<Revision[] | null>(null);
 
+  // Unsaved-change protection (point 7). Dirty = current tree differs from the last saved snapshot.
+  const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify([header.draft, footer.draft]));
+  const dirty = JSON.stringify([hdr, ftr]) !== savedSnapshot;
+  const markSaved = () => setSavedSnapshot(JSON.stringify([hdr, ftr]));
+
+  // Warn on browser refresh/close while there are unsaved edits.
+  useEffect(() => {
+    if (!dirty) return;
+    const h = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", h);
+    return () => window.removeEventListener("beforeunload", h);
+  }, [dirty]);
+  // Guard in-app navigation (e.g. clicking "Orders" in the sidebar) — App Router has no route-block API,
+  // so intercept anchor clicks in the capture phase and confirm before leaving.
+  useEffect(() => {
+    if (!dirty) return;
+    const h = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey) return;
+      const a = (e.target as HTMLElement)?.closest?.("a");
+      if (!a || !a.getAttribute("href") || a.target === "_blank") return;
+      if (!window.confirm("You have unsaved navigation changes. Leave this page and discard them?")) { e.preventDefault(); e.stopPropagation(); }
+    };
+    document.addEventListener("click", h, true);
+    return () => document.removeEventListener("click", h, true);
+  }, [dirty]);
+
   const view = tab === "header" ? header : footer;
   const data = tab === "header" ? hdr : ftr;
 
@@ -75,8 +101,8 @@ export function NavigationManager({ header, footer, entities, canPublish = true 
     } catch { setBusy(false); setMsg({ tone: "err", text: "Network error" }); return null; }
   };
 
-  const saveDraft = async () => { const d = await post({ action: "save", data }); if (d?.ok) setMsg({ tone: "ok", text: "Draft saved." }); };
-  const publish = async () => { const d = await post({ action: "publish", data, publishAt: fromLocal(pubAt), unpublishAt: fromLocal(unpubAt) }); if (d?.ok) setMsg({ tone: "ok", text: pubAt ? "Scheduled." : "Published live." }); };
+  const saveDraft = async () => { const d = await post({ action: "save", data }); if (d?.ok) { markSaved(); setMsg({ tone: "ok", text: "Draft saved." }); } };
+  const publish = async () => { const d = await post({ action: "publish", data, publishAt: fromLocal(pubAt), unpublishAt: fromLocal(unpubAt) }); if (d?.ok) { markSaved(); setMsg({ tone: "ok", text: pubAt ? "Scheduled." : "Published live." }); } };
   const reset = async () => { const d = await post({ action: "reset" }); if (d?.ok) setMsg({ tone: "ok", text: "Reset to default." }); };
   const openRevs = async () => { const d = await post({ action: "revisions" }); if (d?.revisions) setRevs(d.revisions); };
   const restore = async (id: string) => { const d = await post({ action: "restore", id }); if (d?.ok) { setRevs(null); setMsg({ tone: "ok", text: "Restored into draft — review, then publish." }); } };
@@ -183,6 +209,7 @@ export function NavigationManager({ header, footer, entities, canPublish = true 
           <label className="cfg-field"><span>Unpublish at (optional)</span><input type="datetime-local" value={unpubAt} onChange={(e) => setUnpubAt(e.target.value)} /></label>
         </div>
         <div className="cfg-actions">
+          {dirty ? <span className="cfg-msg cfg-msg--warn" title="Unsaved edits — Save draft to keep them">● Unsaved changes</span> : null}
           <button type="button" className="ff-btn" disabled={busy || pending} onClick={saveDraft}>Save draft</button>
           <button type="button" className="ff-btn" disabled={busy} onClick={preview}>Preview</button>
           <button type="button" className="ff-btn ff-btn--primary" disabled={busy || !canPublish} onClick={publish} title={canPublish ? undefined : "Publishing needs the content.publish capability"}>{pubAt ? "Schedule" : "Publish"}</button>
