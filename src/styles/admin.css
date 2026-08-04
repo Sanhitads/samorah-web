@@ -1086,6 +1086,9 @@ a.adm-badge[data-b="incident"]:hover { background: rgba(168,68,58,0.22); }
 .nav-campaign-mini__eyebrow { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; opacity: .85; }
 .nav-campaign-mini__title { font-family: var(--font-serif, Georgia, serif); font-size: 16px; line-height: 1.2; }
 .nav-campaign-mini__desc { font-size: 11px; opacity: .9; line-height: 1.4; }
+/* Device-framed storefront preview (point 15) — reuses LivePreviewPanel. */
+.nav-preview-wrap { height: 72vh; min-height: 460px; margin-top: 14px; display: flex; flex-direction: column; }
+.nav-preview-wrap .pe-live__panel { flex: 1; min-height: 0; }
 /* Primary destination picker (point 1): entity type + entity/url, inline. */
 .nav-dest { display: flex; gap: 6px; align-items: center; min-width: 0; }
 .nav-dest__kind { flex: 0 0 auto; }

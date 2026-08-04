@@ -13,20 +13,24 @@ const SRC = "samorah-pdp-preview"; // shared message tag (also used by the previ
 
 export function LivePreviewPanel({
   src = "/pdp-preview",
-  draft,
-  focusId,
-  onRefresh,
+  draft = null,
+  focusId = null,
+  onRefresh = () => {},
   desktopWidth = 0,
+  hint = "Live draft · not saved",
 }: {
   src?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  draft: any;
-  focusId: string | null;
-  onRefresh: () => void;
+  draft?: any;
+  focusId?: string | null;
+  onRefresh?: () => void;
   /** Width the "Desktop" tab renders at, then scales to fit the panel. 0 = native panel width (the
    *  PDP default — crisp, no scaling). Set a real desktop width (e.g. 1280) when the panel is narrow
    *  (the Homepage builder), so "Desktop" shows the true desktop layout instead of the mobile fallback. */
   desktopWidth?: number;
+  /** Status label in the bar. Streaming callers keep the default; cookie/saved-draft callers (e.g.
+   *  Navigation) override it — the postMessage stream simply no-ops when `src` doesn't handshake. */
+  hint?: string;
 }) {
   const DEVICES = [
     { k: "desktop", l: "Desktop", w: desktopWidth }, // 0 = native panel width (no down-scaling)
@@ -131,8 +135,8 @@ export function LivePreviewPanel({
           <button type="button" className={`pe-live__dev${dark ? " is-active" : ""}`} title="Preview in dark mode (approximation)" onClick={toggleDark}>🌙 Dark</button>
           <button type="button" className="pe-live__dev" title="Print the preview" onClick={printPreview}>🖨 Print</button>
         </div>
-        <span className="pe-live__hint">Live draft · not saved</span>
-        <button type="button" className="ff-btn ff-btn--mini" onClick={refresh}>Refresh from live</button>
+        <span className="pe-live__hint">{hint}</span>
+        <button type="button" className="ff-btn ff-btn--mini" onClick={refresh}>Refresh</button>
       </div>
       <div className="pe-live__stage" ref={stageRef}>
         <iframe

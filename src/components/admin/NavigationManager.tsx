@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { NavBranch, NavItem, FooterSection, MenuAdminView, LinkableEntities, EntityType, LinkAttrs, MenuRevision } from "@/services/navigationService";
 import { istLocalToUtc, formatIST } from "@/lib/istTime";
 import { MediaPicker } from "@/components/admin/MediaPicker";
+import { LivePreviewPanel } from "@/components/admin/LivePreviewPanel";
 
 const gradName = (g: string) => g.replace(/^grad-/, "").replace(/^\w/, (c) => c.toUpperCase());
 
@@ -118,6 +119,7 @@ export function NavigationManager({ header, footer, entities, canPublish = true 
   const [openRev, setOpenRev] = useState<string | null>(null); // preview-before-restore expansion
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set()); // collapsed branches (P1)
   const [mediaFor, setMediaFor] = useState<number | null>(null); // campaign media picker target branch (point 20)
+  const [showPreview, setShowPreview] = useState(false); // device-framed storefront preview (point 15)
   const [dragItem, setDragItem] = useState<{ bi: number; ii: number } | null>(null); // drag-reorder within a branch
   const toggleCollapse = (k: string) => setCollapsed((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const dropItem = (bi: number, target: number) => {
@@ -210,11 +212,10 @@ export function NavigationManager({ header, footer, entities, canPublish = true 
   const reset = async () => { const d = await post({ action: "reset" }); if (d?.ok) setMsg({ tone: "ok", text: "Reset to default." }); };
   const openRevs = async () => { const d = await post({ action: "revisions" }); if (d?.revisions) setRevs(d.revisions); };
   const restore = async (id: string) => { const d = await post({ action: "restore", id }); if (d?.ok) { setRevs(null); setMsg({ tone: "ok", text: "Restored into draft — review, then publish." }); } };
-  const preview = async () => {
-    await post({ action: "save", data });          // preview the latest edits
-    document.cookie = "nav_preview=1; path=/; max-age=300";
-    window.open("/", "_blank", "noopener");
-  };
+  // Device-framed preview (point 15): save the draft, arm the staff nav_preview cookie, then show the
+  // real storefront in LivePreviewPanel (cookie mode — no postMessage). Preview = the last SAVED draft.
+  const armPreview = async () => { const d = await post({ action: "save", data }); if (d?.ok) { markSaved(); stampSaved(); } document.cookie = "nav_preview=1; path=/; max-age=600"; return d; };
+  const openPreview = async () => { const d = await armPreview(); if (d?.ok || d) setShowPreview(true); };
 
   // header mutators
   const setBranch = (bi: number, patch: Partial<NavBranch>) => setHdr((h) => h.map((b, i) => (i === bi ? { ...b, ...patch } : b)));
@@ -352,13 +353,24 @@ export function NavigationManager({ header, footer, entities, canPublish = true 
           {dirty ? <span className="cfg-msg cfg-msg--warn" title="Unsaved edits — Save draft to keep them">● Unsaved changes</span> : savedAt ? <span className="cfg-msg cfg-msg--ok">✓ Draft saved · {savedAt} IST</span> : null}
           {undo ? <span className="cfg-msg admin__muted">{undo.text} · <button type="button" className="cpn-clear" onClick={undo.run}>Undo</button></span> : null}
           <button type="button" className="ff-btn" disabled={busy || pending} onClick={saveDraft}>Save draft</button>
-          <button type="button" className="ff-btn" disabled={busy} onClick={preview}>Preview</button>
+          <button type="button" className="ff-btn" disabled={busy} onClick={openPreview}>{showPreview ? "Update preview" : "Preview"}</button>
+          {showPreview ? <button type="button" className="ff-btn" onClick={() => setShowPreview(false)}>Close preview</button> : null}
           <button type="button" className="ff-btn ff-btn--primary" disabled={busy || !canPublish} onClick={publish} title={canPublish ? undefined : "Publishing needs the content.publish capability"}>{pubAt ? "Schedule" : "Publish"}</button>
           <button type="button" className="ff-btn" disabled={busy} onClick={openRevs}>History</button>
           {view.source === "db" && canPublish ? <button type="button" className="ff-btn ff-btn--danger" disabled={busy} onClick={reset}>Reset to default</button> : null}
           {msg ? <span className={`cfg-msg cfg-msg--${msg.tone}`}>{msg.text}</span> : null}
         </div>
         {!canPublish ? <p className="cfg-sub" style={{ marginTop: 6 }}>You can prepare and save drafts. Publishing to the live storefront needs the <code>content.publish</code> capability.</p> : null}
+        {showPreview ? (
+          <div className="nav-preview-wrap">
+            <LivePreviewPanel
+              src="/"
+              desktopWidth={1280}
+              hint={dirty ? "Showing last saved draft — Save draft to update preview" : "Showing saved draft · real storefront navigation"}
+              onRefresh={() => { void armPreview(); }}
+            />
+          </div>
+        ) : null}
       </div>
 
       {revs ? (
