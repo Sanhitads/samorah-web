@@ -782,3 +782,155 @@ qualifying predicate (`state ∈ consumed|restored ∧ consumed_at ∧ order pai
   `couponWarnings.ts` but not yet admin-configurable); analytics exports / scheduled campaign reports;
   anomaly detection. Server-side financial aggregation is already isolated in `couponAnalyticsService`
   so pagination can move server-side without a UI rewrite.
+
+---
+
+# Coupons & Promotions — Post-Launch
+
+Coupon module **Phases 1–4 are shipped** (discount types + targeting + exclusions + race-safe
+redemption ledger; lifecycle/eligibility/audit; list & analytics with warnings; full domain/service
+test coverage). Everything below is **deliberately deferred** — documented so it is not lost, and
+**not to be built now**. The guiding rules from the build still hold: **one authoritative pricing
+engine** (`computeOrderTotals` → `computePromotions`), **additive/backward-compatible only**, **never
+a second discount engine**, and **Attributed Revenue is an attribution model, never a causation / ROI
+claim**. Complexity legend as above (**S/M/L/XL**).
+
+> **Scaffolding that already exists** (coordinate with it; do not duplicate): the `phase_2e3_post_launch`
+> migration created **`gift_cards`, `loyalty_transactions`, `referral_codes`, `referral_uses`** tables;
+> `users.loyalty_points` + `users.loyalty_tier` (bronze/silver/gold/platinum); `orders.loyalty_discount`
+> + `orders.gift_card_amount` columns (present, unwired); the **composition/bundle** architecture
+> (`compositions`, `compositionId` on lines); `product_type = 'gift_card'`; the **capability** RBAC
+> (`capabilities.ts`); the canonical warning engine (`couponWarnings` + `couponEligibleLines` +
+> `canCombine`); `couponCodeGen`; and the parked **GA4 Data API (WIF)** integration.
+
+### A. Advanced customer segmentation — **L**
+Eligibility beyond `everyone | first_order`: returning · selected customers · VIP · customer tags ·
+segments · lifetime spend · order count · dormant · wholesale/B2B include/exclude. **Extend the
+`eligibility` enum** (already a string enum for exactly this) and resolve a segment predicate at
+application/repricing **and** re-validate atomically in `reserve_coupon` — reusing the Phase-1
+two-level identity pattern (`customerHasPaidOrder`-style). *Dependency:* a canonical customer-segment
+source/definition (+ `loyalty_tier` for VIP). No pricing-engine change.
+
+### B. Advanced BOGO / quantity promotions — **XL**
+Buy X Get Y · Buy 2 Get 1 · Buy 3 save X% · tiered quantity discounts · mix-and-match · cheapest-item-
+free · category combinations. Build as a **promotion-rule extension** (new `PromotionKind`s + rule
+config feeding the existing allocator), **not** hacks inside basic percent/fixed coupons. Must keep
+per-line GST extraction + deterministic allocation intact. *Dependency:* rule schema + engine kinds.
+
+### C. Bundled promotions — **L**
+"Candle + Room Spray = 15% off"; "choose any 3 = ₹X". **Coordinate with the composition architecture**
+(`compositions` / `compositionId`) — bundle detection already exists and is intrinsically excluded from
+ordinary coupons, so this is a dedicated bundle-promotion rule, not a coupon overload.
+
+### D. Loyalty integration — **XL**
+Loyalty points · member pricing · reward coupons · birthday/anniversary rewards · tier benefits.
+Tables exist (`loyalty_transactions`, `users.loyalty_points/tier`, `orders.loyalty_discount`). **Keep
+loyalty accounting a SEPARATE ledger** from coupon accounting — `loyalty_discount` is already its own
+order column (never folded into `discount_amount`); analytics must not mix the two. *Dependency:*
+loyalty earn/burn engine.
+
+### E. Referral integration — **L**
+Referrer reward · referred-customer discount · referral-code lifecycle · fraud protection · attribution.
+**Coordinate with `referral_codes` + `referral_uses`** (already created). A referral discount is a
+coupon-shaped benefit but keyed to the referral graph; attribution flows into H/I, fraud into T.
+
+### F. Gift card / store credit interactions — **M**
+Define combination rules between coupon · gift card · store credit · loyalty reward · refund credit.
+**Gift cards / store credit stay financial instruments (tender), NOT coupons** — the engine already
+models `giftCard` as tender reducing `payable` (currently unwired), separate from `discount`. The
+store-credit refund method exists but is disabled (needs a ledger). Rule of thumb: coupons discount
+*merchandise*; instruments *pay*. Never route either through the coupon tables.
+
+### G. Influencer / creator campaigns — **M**
+Creator-specific codes · campaign owner · usage · revenue · AOV · new customers · attribution ·
+optional commission. **Most metrics already exist** — the Phase-3 analytics service computes Attributed
+Revenue / AOV / unique customers / redemptions per coupon. Net-new: a `campaign_owner`/creator link,
+new-vs-returning split (needs H), and commission accounting (a payout ledger, only if ever needed).
+
+### H. Campaign attribution — **L**
+Integrate GA4 · UTM params · Meta · email · influencer campaigns; attribute coupon → campaign
+**without assuming the coupon caused the sale**. *Dependency:* capture UTM/campaign on the session/order
+(not tracked today) + the **parked GA4 WIF** pipeline. This is the tracking layer the Phase-3 roadmap
+notes call out as the prerequisite for conversion/acquisition metrics.
+
+### I. Advanced promotion analytics — **L**
+Conversion lift · margin impact · incremental revenue · CAC relationship · new-vs-returning split ·
+product/category performance · cohort behaviour · repeat purchase after coupon · promotion
+profitability. **Requires data we don't capture yet**: COGS/margin (for profitability), the
+session→purchase funnel (for lift/conversion), cohort tracking. Extends — does not replace — the
+read-only Phase-3 attribution model. **Do not fabricate any of these** until the inputs exist.
+
+### J. A/B testing — **L**
+"10% OFF" vs "₹200 OFF" (or competing strategies) with a **statistically valid experiment framework**
+(assignment, exposure logging, significance) — never random coupon switching. *Dependency:* experiment
+assignment + event capture.
+
+### K. Geo-based promotions — **M**
+Eligibility by country · state · shipping zone. Coordinate with the existing shipping-zone/rate config
+(`shipping_rate_version`). Resolve at application + reservation like other eligibility. Do not build
+until required.
+
+### L. Channel-specific promotions — **M**
+Website · email · Instagram · QR · offline/event · influencer · CS-issued. Needs a `channel` dimension
+on the coupon/redemption + issuance context; pairs with Q (unique codes) and U (QR/deep links).
+
+### M. Personalized promotions — **L**
+An individualized-offer rule engine driven by **legitimate first-party behaviour only**. **No invasive
+profiling.** Gate behind explicit consent + first-party data; document the data-use boundary before any
+build.
+
+### N. Promotion approval workflow — **M**
+Draft → Review → Approved → Scheduled → Active, with **role-based permissions** (extend the existing
+`capabilities` RBAC + the current lifecycle state model — add `review`/`approved` between draft and
+active). Trigger approval on thresholds, e.g. `discount > 30%` or `max exposure > ₹X`. Ties into O.
+
+### O. Promotion budget / liability cap — **M**
+"Max total discount spend = ₹50,000 → auto-stop the campaign." **Separate from usage count** — track
+cumulative **gross discount given** (the Phase-3 analytics already computes this per coupon) against a
+`budget_paise` cap and auto-pause via `setCouponStatus` when exceeded. Enforce the cap atomically in
+`reserve_coupon` (same row-lock pattern as `max_uses`) so it can't be raced past.
+
+### P. Bulk coupon operations — **M**
+Bulk activate / pause / archive · export · import · batch-generated unique codes. **Mirror the existing
+`bulkUpdateProducts` service pattern** (single `update … in (ids)`, audited, no N+1). Export/import as
+CSV; batch generation reuses `couponCodeGen`. Feeds Q.
+
+### Q. Single-use unique-code campaigns — **L**
+Generate e.g. **10,000 one-time codes** for email / inserts / influencers / packaging / offline. Needs a
+child-codes table (parent campaign → many single-use codes, each its own `max_uses = 1`), bulk generation
+(`couponCodeGen`, collision-safe via the DB unique constraint), export, and per-code redemption tracking
+(the redemption ledger already supports this). Consider storage/perf at 10k+ scale.
+
+### R. Promotion calendar — **M**
+Calendar view of active / upcoming / expiring / overlapping campaigns with visual conflict detection.
+Read-only over existing coupon dates (`starts_at`/`expires_at`, IST) + the effective-status model.
+Pairs with S.
+
+### S. Promotion conflict simulator — **M**
+Pre-publish check: "This promotion overlaps DIWALI15 between 10–12 Nov" + simulate stacking/priority
+outcomes. **Reuse the canonical engine** — `couponEligibleLines` (target overlap), `canCombine`
+(stacking), the auto-apply-conflict logic already in `couponWarningsService`, and date-range overlap.
+Do **not** build a second conflict detector.
+
+### T. Advanced fraud controls — **L**
+Detect repeated guest identities · coupon farming · suspicious redemption patterns · excessive account
+creation. The `coupon_redemptions` ledger already records the canonical `identity`
+(`coalesce(user_id, 'guest:'||email)`), timestamps, and per-customer holds — the substrate for pattern
+detection. **Never block legitimate customers without evidence** (flag/review, not hard-block).
+
+### U. Coupon QR codes / deep links — **S–M**
+QR / deep link that opens Samorah with the promotion pre-applied (packaging, exhibitions, influencer,
+inserts). A signed deep-link that seeds the code into the cart/checkout preview flow; pairs with L and Q.
+
+### V. Marketing automation — **L**
+Abandoned-cart · win-back · birthday · post-purchase · first-purchase welcome offers. **Coordinate with
+the notifications infrastructure** (see `NOTIFICATIONS_ROADMAP.md`) — issue codes via that pipeline.
+**Avoid uncontrolled discount loops**: rate-limit issuance, cap exposure (O), and single-use codes (Q).
+
+## DO NOT BUILD NOW
+Unless already essentially supported, do **not** expand the current implementation into: advanced
+loyalty · affiliate commission system · full referral engine · complex BOGO · geo-targeting · AI coupon
+generation · personalized dynamic pricing · marketplace promotion synchronization · POS promotions · ERP
+promotion integration · advanced experimentation · full marketing automation. **These live here in the
+roadmap, not in the launch codebase.** Any new coupon capability must stay additive to the single pricing
+engine and must never reconstruct historical financial truth from current configuration.
