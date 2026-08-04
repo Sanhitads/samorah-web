@@ -30,18 +30,24 @@ const PREFIX_ENTITY: Record<string, EntityType> = { chapters: "chapter", collect
 
 type HrefClass =
   | { kind: "empty" }
+  | { kind: "unsafe" } // dangerous scheme (javascript:, data:, …) — ALWAYS blocks
+  | { kind: "malformed" } // not a valid nav destination — ALWAYS blocks
   | { kind: "external" }
   | { kind: "static" }
   | { kind: "entity"; type: EntityType; slug: string }
   | { kind: "page"; slug: string }
   | { kind: "unknown" };
 
-/** Classify a resolved href into what it points at (for lifecycle/existence checks). */
+const SAFE_SCHEMES = new Set(["http", "https", "mailto", "tel"]);
+
+/** Classify a resolved href into what it points at (for lifecycle/existence + safety checks). */
 function classifyHref(href: string | undefined): HrefClass {
   const h = (href ?? "").trim();
   if (!h || h === "#") return { kind: "empty" };
-  if (/^(https?:|mailto:|tel:)/i.test(h)) return { kind: "external" };
-  if (!h.startsWith("/")) return { kind: "external" }; // anchors / relative — can't validate, don't block
+  if (h.startsWith("#")) return { kind: "static" }; // in-page anchor
+  const scheme = h.match(/^([a-z][a-z0-9+.-]*):/i)?.[1]?.toLowerCase();
+  if (scheme) return SAFE_SCHEMES.has(scheme) ? { kind: "external" } : { kind: "unsafe" }; // javascript:/data:/vbscript:/file:…
+  if (!h.startsWith("/")) return { kind: "malformed" }; // relative / garbage — not a valid nav destination
   const segs = h.split(/[?#]/)[0].split("/").filter(Boolean);
   if (segs.length === 0) return { kind: "static" }; // "/"
   const [first, second] = segs;
@@ -77,7 +83,7 @@ async function loadDestinationIndex(): Promise<DestIndex> {
   } catch { return empty; }
 }
 
-type Verdict = { kind: "ok" | "empty" | "missing" | "archived" | "unknown"; detail?: string };
+type Verdict = { kind: "ok" | "empty" | "missing" | "archived" | "unknown" | "unsafe" | "malformed"; detail?: string };
 
 /** Resolve one item's destination against the lifecycle index. */
 function verdictFor(item: any, idx: DestIndex): Verdict {
@@ -93,6 +99,8 @@ function verdictFor(item: any, idx: DestIndex): Verdict {
   // Manual URL — classify the path, then check the deep slug where the route shape is known.
   const c = classifyHref(item.href);
   if (c.kind === "empty") return { kind: "empty" };
+  if (c.kind === "unsafe") return { kind: "unsafe", detail: item.href };
+  if (c.kind === "malformed") return { kind: "malformed", detail: item.href };
   if (c.kind === "external" || c.kind === "static") return { kind: "ok" };
   if (c.kind === "unknown") return { kind: "unknown", detail: item.href };
   const slug = c.slug;
@@ -169,10 +177,13 @@ export async function validateMenu(menu: "header" | "footer", data?: unknown, op
     }
   }
 
-  // Destination lifecycle — errors (block) unless the item is coming-soon (then warn).
+  // Destination lifecycle. Safety/structure ALWAYS block (never downgraded by coming-soon); a not-yet-live
+  // destination is downgraded to a warning ONLY when the item is intentionally coming-soon.
   for (const it of items) {
     const v = verdictFor(it.linkType === "entity" ? { linkType: "entity", entity: it.entity } : { href: it.href }, idx);
     const who = it.isCampaign ? `Campaign "${it.label}"` : `"${it.label}"`;
+    if (v.kind === "unsafe") { errors.push(`${who} has an unsafe link protocol (${v.detail}) — not allowed`); continue; }
+    if (v.kind === "malformed") { errors.push(`${who} → ${v.detail} is not a valid destination`); continue; }
     if (v.kind === "empty") { if (!it.soon) errors.push(`${who} has no destination`); continue; }
     if (v.kind === "missing") { (it.soon ? warnings : errors).push(`${who} → ${v.detail} does not resolve (broken link)`); continue; }
     if (v.kind === "archived") { (it.soon ? warnings : errors).push(`${who} points to an unavailable destination (${v.detail})`); continue; }

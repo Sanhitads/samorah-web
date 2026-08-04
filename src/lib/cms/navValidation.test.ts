@@ -74,6 +74,18 @@ describe("Nav validation — destination lifecycle", () => {
     expect(r.errors.some((e) => /resolve/.test(e))).toBe(false);
     expect(r.warnings.some((w) => /resolve/.test(w))).toBe(true);
   });
+  it("an unsafe protocol ALWAYS blocks — even when the item is coming-soon", async () => {
+    const r = await hdr([{ label: "XSS", href: "javascript:alert(1)", isComingSoon: true }]);
+    expect(r.errors.some((e) => /unsafe link protocol/.test(e))).toBe(true);
+  });
+  it("a malformed relative URL ALWAYS blocks — even when coming-soon", async () => {
+    const r = await hdr([{ label: "Bad", href: "collections/the-everyday", isComingSoon: true }]);
+    expect(r.errors.some((e) => /not a valid destination/.test(e))).toBe(true);
+  });
+  it("safe external links (https/mailto/tel) and in-page anchors pass", async () => {
+    const r = await hdr([{ label: "IG", href: "https://instagram.com/samorah" }, { label: "Mail", href: "mailto:hi@samorah.in" }, { label: "Top", href: "#top" }]);
+    expect(r.errors).toEqual([]);
+  });
   it("valid entity + valid URL destinations pass clean", async () => {
     const r = await hdr([
       { label: "Everyday", linkType: "entity", entity: { type: "collection", id: "the-everyday" } },

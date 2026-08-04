@@ -937,3 +937,33 @@ generation · personalized dynamic pricing · marketplace promotion synchronizat
 promotion integration · advanced experimentation · full marketing automation. **These live here in the
 roadmap, not in the launch codebase.** Any new coupon capability must stay additive to the single pricing
 engine and must never reconstruct historical financial truth from current configuration.
+
+---
+
+# Navigation — Post-Launch
+
+Navigation is a `cms_revisions`-backed publishable resource (draft/published/scheduled + immutable
+snapshot history). Phase 1 (integrity, RBAC edit/publish split, safe scheduling/unpublish, editor UX,
+tests) is being hardened now; the items below are deferred.
+
+### Unify Chapter/Collection lifecycle metadata with canonical CMS/catalog entities — **M**
+Today Navigation validation resolves destination lifecycle for **pages** (`cms_pages.status`) and
+**products** (`products.status`) — so it can BLOCK publish on an archived/unpublished/disabled
+destination. **Chapters** (`HOME_CHAPTERS`) and **collections** (`AIR_VOLUMES`) are **static config with
+no status field**, so those are validated **existence-only** (a missing slug blocks; there is no
+Draft/Scheduled/Published/Archived state to check). Unify chapter/collection lifecycle with the canonical
+CMS/catalog entity model (give them a real status, or back them by the DB `collections` table the picker
+doesn't currently use) so Navigation can validate their full lifecycle rather than mere existence.
+*Dependency:* a canonical status source for chapters/collections. Reuses the existing `verdictFor`
+lifecycle path in `navValidation.ts` — no new validation engine.
+
+### Device-framed navigation preview (Desktop | Tablet | Mobile) + dedicated Mobile Menu — **L**
+Navigation preview already renders the REAL storefront header with the draft tree (staff cookie +
+"Previewing draft" banner). Two follow-ons: (1) a Desktop│Tablet│Mobile framed switcher like the
+Homepage/PDP preview; (2) the dedicated **Mobile Menu ("Component 7")** — today mobile is the same
+canonical tree reflowed by CSS (one content tree feeds both, by design); a true accordion/parent-child
+mobile experience is unbuilt.
+
+### Generalize scheduled activation/deactivation to all publishable resources — **M**
+The nav schedule materialization (predecessor-aware revert, atomic transition, audited) should extend to
+pages/homepage (same `publishable` pattern), which are still purely read-time. Reuse the shared cron.
