@@ -12,14 +12,26 @@ export type CmsResourceType = "page" | "navigation" | "homepage" | "composed-pag
 
 export interface Revision { id: string; snapshot: any; label: string | null; actorId: string | null; createdAt: string }
 
-/** Snapshot a committed version. Non-blocking — a history failure never breaks the save. */
-export async function snapshotRevision(type: CmsResourceType, key: string, snapshot: unknown, actorId?: string, label?: string): Promise<void> {
+/** Snapshot a committed version. Non-blocking — a history failure never breaks the save. Returns the
+ *  new revision id (or null on failure) so callers can record a predecessor pointer into the snapshot. */
+export async function snapshotRevision(type: CmsResourceType, key: string, snapshot: unknown, actorId?: string, label?: string): Promise<string | null> {
   try {
     const db = createAdminClient() as any;
-    await db.from("cms_revisions").insert({ resource_type: type, resource_key: key, snapshot, actor_id: actorId ?? null, label: label ?? null });
+    const { data } = await db.from("cms_revisions").insert({ resource_type: type, resource_key: key, snapshot, actor_id: actorId ?? null, label: label ?? null }).select("id").single();
+    return data?.id ?? null;
   } catch (e) {
     console.error("snapshotRevision failed (non-fatal)", e);
+    return null;
   }
+}
+
+/** The most recent revision id for a resource (the just-published/scheduled one). */
+export async function latestRevisionId(type: CmsResourceType, key: string): Promise<string | null> {
+  try {
+    const db = createAdminClient() as any;
+    const { data } = await db.from("cms_revisions").select("id").eq("resource_type", type).eq("resource_key", key).order("created_at", { ascending: false }).limit(1).maybeSingle();
+    return data?.id ?? null;
+  } catch { return null; }
 }
 
 /** Revision history for a resource, newest first. */

@@ -9,6 +9,7 @@
     { "path": "/api/cron/notifications-retry", "schedule": "*/5 * * * *" },
     { "path": "/api/cron/inventory-alerts", "schedule": "*/30 * * * *" },
     { "path": "/api/cron/notifications-digest", "schedule": "30 12 * * *" },
-    { "path": "/api/cron/notifications-purge", "schedule": "0 20 * * *" }
+    { "path": "/api/cron/notifications-purge", "schedule": "0 20 * * *" },
+    { "path": "/api/cron/cms-schedule", "schedule": "*/5 * * * *" }
   ]
 }

@@ -11,7 +11,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { logEvent } from "@/services/auditService";
 import { MENU_BRANCHES, FOOTER_SECTIONS } from "@/config/navigation";
 import { isLive, publishState, type PublishStatus } from "@/lib/cms/publishable";
-import { snapshotRevision, listRevisions as listCmsRevisions, getRevisionSnapshot, type Revision } from "@/services/cms/revisions";
+import { snapshotRevision, listRevisions as listCmsRevisions, getRevisionSnapshot, latestRevisionId, type Revision } from "@/services/cms/revisions";
 
 /** Cache tag for the live navigation — invalidated via revalidateTag on publish/reset. */
 export const NAV_CACHE_TAG = "navigation";
@@ -63,7 +63,7 @@ export function relOf(o: LinkAttrs & { external?: boolean }): string | undefined
 }
 
 export type MenuId = "header" | "footer";
-interface MenuRow { id: MenuId; draft: any; published: any; status: string; publish_at: string | null; unpublish_at: string | null }
+interface MenuRow { id: MenuId; draft: any; published: any; status: string; publish_at: string | null; unpublish_at: string | null; published_revision_id?: string | null; predecessor_revision_id?: string | null }
 
 async function readRow(id: MenuId): Promise<MenuRow | null> {
   try {
@@ -190,23 +190,80 @@ export async function saveDraft(id: MenuId, data: unknown, actorId?: string): Pr
   return { ok: true };
 }
 
-/** Publish the current draft (optionally scheduled). Snapshots a revision. */
+/** Publish the current draft (optionally scheduled). Snapshots a revision + records the predecessor it
+ *  displaces so a later scheduled unpublish can revert to it (points 10·11). */
 export async function publishMenu(id: MenuId, opts: { publishAt?: string | null; unpublishAt?: string | null } = {}, actorId?: string): Promise<{ ok: boolean; reason?: string }> {
   const existing = await readRow(id);
   if (!existing?.draft) return { ok: false, reason: "nothing to publish" };
-  const scheduled = opts.publishAt && Date.parse(opts.publishAt) > Date.now();
+  // Schedule window must be coherent: unpublish strictly after publish (or after now, for an immediate publish).
+  if (opts.unpublishAt) {
+    const pubTs = opts.publishAt ? Date.parse(opts.publishAt) : Date.now();
+    if (!(Date.parse(opts.unpublishAt) > pubTs)) return { ok: false, reason: "Unpublish time must be after the publish time." };
+  }
+  const scheduled = !!(opts.publishAt && Date.parse(opts.publishAt) > Date.now());
   const db = createAdminClient() as any;
+  // Snapshot the tree being published into the immutable revision store; capture its id for the pointers.
+  const newRev = await snapshotRevision("navigation", id, existing.draft, actorId, scheduled ? "scheduled publish" : undefined);
+  const predecessor = existing.published_revision_id ?? null; // the revision this publication displaces
   const row = {
     id, draft: existing.draft,
-    published: scheduled ? existing.published : existing.draft, // scheduled: keep current live until publish_at
+    published: scheduled ? existing.published : existing.draft, // scheduled: keep current live until publish_at (cron activates)
     status: scheduled ? "scheduled" : "published",
+    // Immediate publish is live now → point at the new revision. Scheduled keeps the current live revision
+    // until the cron activates it; either way the predecessor it will displace is the current live one.
+    published_revision_id: scheduled ? (existing.published_revision_id ?? null) : newRev,
+    predecessor_revision_id: predecessor,
     publish_at: opts.publishAt || null, unpublish_at: opts.unpublishAt || null, updated_at: new Date().toISOString(),
   };
   const { error } = await db.from("navigation_menus").upsert(row, { onConflict: "id" });
   if (error) return { ok: false, reason: error.message };
-  await snapshotRevision("navigation", id, existing.draft, actorId, scheduled ? "scheduled publish" : undefined);
   await logEvent({ entityType: "settings", event: scheduled ? "navigation.scheduled" : "navigation.published", actorType: actorId ? "staff" : "system", actorId, notes: id });
   return { ok: true };
+}
+
+/**
+ * Materialize due navigation schedule transitions (points 10·11) — ATOMIC + AUDITED. Called by the
+ * cron (/api/cron/cms-schedule). Activates a scheduled menu once publish_at passes, and reverts a menu
+ * whose unpublish_at has passed to the exact revision it displaced (predecessor), falling back to the
+ * code-config default only when no predecessor exists — the storefront is never left without navigation.
+ * Read-time `liveTree` keeps the storefront crisp between ticks; this records the durable state + history.
+ */
+export async function processCmsSchedule(now = Date.now()): Promise<{ activated: number; deactivated: number }> {
+  const db = createAdminClient() as any;
+  const { data } = await db.from("navigation_menus").select("*");
+  let activated = 0, deactivated = 0;
+  for (const row of (data ?? []) as MenuRow[]) {
+    const unpub = row.unpublish_at ? Date.parse(row.unpublish_at) : null;
+    const pub = row.publish_at ? Date.parse(row.publish_at) : null;
+    // Deactivation wins once the window has fully elapsed — revert to the displaced revision (or config).
+    if (unpub !== null && now >= unpub && (row.status === "published" || row.status === "scheduled")) {
+      const predSnap = row.predecessor_revision_id ? await getRevisionSnapshot(row.predecessor_revision_id) : null;
+      const revert = Array.isArray(predSnap) && predSnap.length ? predSnap : null;
+      await db.from("navigation_menus").upsert({
+        id: row.id, draft: row.draft,
+        published: revert, status: revert ? "published" : "draft",
+        published_revision_id: revert ? row.predecessor_revision_id : null,
+        predecessor_revision_id: null, publish_at: null, unpublish_at: null, updated_at: new Date().toISOString(),
+      }, { onConflict: "id" });
+      await logEvent({ entityType: "settings", event: "navigation.unpublished", actorType: "system", notes: `${row.id} → ${revert ? `reverted to revision ${row.predecessor_revision_id}` : "code-config default"}` });
+      deactivated++;
+      continue;
+    }
+    // Activation — a scheduled menu whose publish_at has arrived (and window not yet elapsed) goes live.
+    if (row.status === "scheduled" && pub !== null && now >= pub) {
+      const liveRev = await latestRevisionId("navigation", row.id); // the scheduled revision (newest)
+      await db.from("navigation_menus").upsert({
+        id: row.id, draft: row.draft,
+        published: row.draft, status: "published",
+        published_revision_id: liveRev ?? row.published_revision_id ?? null,
+        predecessor_revision_id: row.predecessor_revision_id ?? null,
+        publish_at: null, unpublish_at: row.unpublish_at, updated_at: new Date().toISOString(),
+      }, { onConflict: "id" });
+      await logEvent({ entityType: "settings", event: "navigation.activated", actorType: "system", notes: `${row.id} scheduled publish went live` });
+      activated++;
+    }
+  }
+  return { activated, deactivated };
 }
 
 /** Reset a menu back to the code config (delete the DB override). */

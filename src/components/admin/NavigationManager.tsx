@@ -4,6 +4,7 @@ import { useState, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { NavBranch, NavItem, FooterSection, MenuAdminView, LinkableEntities, EntityType, LinkAttrs } from "@/services/navigationService";
 import type { Revision } from "@/services/cms/revisions";
+import { istLocalToUtc, formatIST } from "@/lib/istTime";
 
 const ENTITY_TYPES: EntityType[] = ["page", "chapter", "collection", "product"];
 
@@ -39,12 +40,9 @@ function move<T>(arr: T[], i: number, dir: number): T[] {
   [next[i], next[j]] = [next[j], next[i]];
   return next;
 }
-const toLocal = (iso?: string | null) => {
-  if (!iso) return "";
-  const d = new Date(iso); const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
-};
-const fromLocal = (v: string) => (v ? new Date(v).toISOString() : null);
+// Schedule times are entered/read in IST (fixed +05:30) and stored canonically as UTC — same discipline
+// as Coupons. istLocalToUtc turns a datetime-local IST wall-clock into a UTC ISO string.
+const schedUtc = (v: string) => (v ? istLocalToUtc(v) : null);
 
 export function NavigationManager({ header, footer, entities, canPublish = true }: { header: MenuAdminView; footer: MenuAdminView; entities: LinkableEntities; canPublish?: boolean }) {
   const router = useRouter();
@@ -102,7 +100,15 @@ export function NavigationManager({ header, footer, entities, canPublish = true 
   };
 
   const saveDraft = async () => { const d = await post({ action: "save", data }); if (d?.ok) { markSaved(); setMsg({ tone: "ok", text: "Draft saved." }); } };
-  const publish = async () => { const d = await post({ action: "publish", data, publishAt: fromLocal(pubAt), unpublishAt: fromLocal(unpubAt) }); if (d?.ok) { markSaved(); setMsg({ tone: "ok", text: pubAt ? "Scheduled." : "Published live." }); } };
+  const publish = async () => {
+    // Client-side guard mirrors the server: unpublish must be after publish (or after now, for immediate).
+    if (unpubAt) {
+      const pubTs = pubAt ? Date.parse(istLocalToUtc(pubAt)!) : Date.now();
+      if (!(Date.parse(istLocalToUtc(unpubAt)!) > pubTs)) { setMsg({ tone: "err", text: "Unpublish time (IST) must be after the publish time." }); return; }
+    }
+    const d = await post({ action: "publish", data, publishAt: schedUtc(pubAt), unpublishAt: schedUtc(unpubAt) });
+    if (d?.ok) { markSaved(); setMsg({ tone: "ok", text: pubAt ? "Scheduled." : "Published live." }); }
+  };
   const reset = async () => { const d = await post({ action: "reset" }); if (d?.ok) setMsg({ tone: "ok", text: "Reset to default." }); };
   const openRevs = async () => { const d = await post({ action: "revisions" }); if (d?.revisions) setRevs(d.revisions); };
   const restore = async (id: string) => { const d = await post({ action: "restore", id }); if (d?.ok) { setRevs(null); setMsg({ tone: "ok", text: "Restored into draft — review, then publish." }); } };
@@ -205,8 +211,8 @@ export function NavigationManager({ header, footer, entities, canPublish = true 
 
       <div className="nav-publish">
         <div className="cfg-grid">
-          <label className="cfg-field"><span>Publish at (optional — schedule)</span><input type="datetime-local" value={pubAt} onChange={(e) => setPubAt(e.target.value)} /></label>
-          <label className="cfg-field"><span>Unpublish at (optional)</span><input type="datetime-local" value={unpubAt} onChange={(e) => setUnpubAt(e.target.value)} /></label>
+          <label className="cfg-field"><span>Publish at (IST — optional schedule)</span><input type="datetime-local" value={pubAt} onChange={(e) => setPubAt(e.target.value)} /><small className="admin__muted">{pubAt ? formatIST(istLocalToUtc(pubAt)!) : "publish immediately"}</small></label>
+          <label className="cfg-field"><span>Unpublish at (IST — optional)</span><input type="datetime-local" value={unpubAt} onChange={(e) => setUnpubAt(e.target.value)} /><small className="admin__muted">{unpubAt ? `${formatIST(istLocalToUtc(unpubAt)!)} · then reverts to the previous published version` : "stays live"}</small></label>
         </div>
         <div className="cfg-actions">
           {dirty ? <span className="cfg-msg cfg-msg--warn" title="Unsaved edits — Save draft to keep them">● Unsaved changes</span> : null}
@@ -227,7 +233,7 @@ export function NavigationManager({ header, footer, entities, canPublish = true 
             {revs.length ? (
               <ul className="rev-list">{revs.map((r) => (
                 <li key={r.id} className="rev-item">
-                  <span className="rev-item__when">{new Date(r.createdAt).toLocaleString()}</span>
+                  <span className="rev-item__when">{formatIST(r.createdAt)}</span>
                   <span className="rev-item__meta admin__muted">{r.label ?? "published"}</span>
                   <button type="button" className="ff-btn" disabled={busy} onClick={() => restore(r.id)}>Restore to draft</button>
                 </li>
