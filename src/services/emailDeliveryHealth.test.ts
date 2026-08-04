@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { deriveHealth, maskRecipient } from "./emailDeliveryService";
+import { deriveHealth, maskRecipient, redactSecrets, toDeliveryRow, DELIVERY_ROW_FIELDS } from "./emailDeliveryService";
 
 const NOW = Date.parse("2026-08-04T12:00:00.000Z");
 const ago = (mins: number) => new Date(NOW - mins * 60_000).toISOString();
@@ -12,6 +12,47 @@ describe("maskRecipient", () => {
   it("handles malformed / empty input safely", () => {
     expect(maskRecipient("notanemail")).toBe("•••");
     expect(maskRecipient("")).toBe("");
+  });
+});
+
+describe("redactSecrets — no credential can leak through the error field", () => {
+  it("redacts bearer tokens, provider keys, and auth/secret assignments", () => {
+    expect(redactSecrets("Authorization: Bearer abc.def-123")).not.toMatch(/abc\.def-123/);
+    expect(redactSecrets("resend 401: key re_1234567890abcd invalid")).toContain("[redacted-key]");
+    expect(redactSecrets("x-api-key=sk_live_9f8e7d6c5b4a")).not.toMatch(/sk_live_9f8e7d6c5b4a/);
+    expect(redactSecrets('{"api_key":"topsecretvalue"}')).not.toContain("topsecretvalue");
+  });
+  it("leaves benign provider errors and null intact", () => {
+    expect(redactSecrets("resend 422: recipient bounced")).toBe("resend 422: recipient bounced");
+    expect(redactSecrets(null)).toBeNull();
+  });
+});
+
+describe("toDeliveryRow — explicit safe allowlist + masking + redaction", () => {
+  const raw = {
+    id: "d1", status: "failed", recipient: "aarohi@example.com",
+    error: "resend 401: Bearer sk_live_deadbeef1234 rejected",
+    provider_message_id: "msg_abc", created_at: "2026-08-04T10:00:00Z",
+    order_id: "o-uuid", entity_ref: "ret-9",
+    // hostile extra columns that must NOT survive the mapping:
+    payload: { authorization: "Bearer secret" }, api_key: "sk_live_leak", raw_response: "…",
+  };
+  const row = toDeliveryRow(raw, "SAM1042");
+
+  it("exposes exactly the allowlisted fields — no payload/credentials/unknown columns", () => {
+    const bag = row as unknown as Record<string, unknown>;
+    expect(Object.keys(row).sort()).toEqual([...DELIVERY_ROW_FIELDS].sort());
+    expect(bag).not.toHaveProperty("payload");
+    expect(bag).not.toHaveProperty("api_key");
+    expect(bag).not.toHaveProperty("raw_response");
+  });
+  it("masks the recipient and redacts secrets in the error", () => {
+    expect(row.recipient).toBe("a***@example.com");
+    expect(row.error).not.toMatch(/sk_live_deadbeef1234/);
+    expect(JSON.stringify(row)).not.toMatch(/sk_live|secret|Bearer sk/);
+  });
+  it("keeps orderNumber null when there is no stored order_id (never fabricated)", () => {
+    expect(toDeliveryRow({ ...raw, order_id: null }, "SAM1042").orderNumber).toBeNull();
   });
 });
 

@@ -34,6 +34,17 @@ Seven transactional templates don't need search/filter today. When templates exp
 gift-card, account, wholesale, review, loyalty, etc., group them by category and add a search box on
 `/admin/emails`. Pure UI/list concern — no schema or send-path change implied.
 
+### Delivery Log authorization — move to an operational capability
+**Status: non-blocking · post-launch. Acceptable under current RBAC; refine later.**
+
+The customer-email Delivery Log (`/admin/emails/deliveries`) is gated by `content.edit` today, reusing
+the Email CMS capability. But delivery records are operational/customer data, not template *content* —
+editing copy and viewing who-was-emailed-and-whether-it-failed are conceptually different rights.
+Longer term, gate delivery records by an **operational** capability (e.g. `notifications.view` or
+`orders.view`) rather than `content.edit`. Do **not** stand up a new RBAC architecture solely for this;
+fold it in when operational-visibility capabilities are next revisited. Recipients are already masked
+and provider errors redacted, so the current exposure is bounded.
+
 ### Delivery Log → failed-job deep-link (NOT built — verified limitation)
 **Status: non-blocking · post-launch. Requires a schema decision; do not reconstruct heuristically.**
 

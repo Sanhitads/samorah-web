@@ -50,6 +50,40 @@ export function maskRecipient(email: string): string {
   return `${first}***${s.slice(at)}`;
 }
 
+/**
+ * Defense-in-depth: the stored `error` can include a slice of a raw provider response
+ * (provider.ts formats it as "resend <status>: <body slice>"). Provider *message ids* are safe to
+ * show; secrets are not. Redact anything shaped like a key, bearer token, or auth/secret assignment
+ * before it reaches the admin. Provider-response bodies don't carry our API key, but this guarantees
+ * a future provider/format change can't leak one through this surface.
+ */
+export function redactSecrets(text: string | null): string | null {
+  if (!text) return text ?? null;
+  return String(text)
+    .replace(/\b(bearer)\s+[\w.\-]+/gi, "$1 [redacted]")
+    .replace(/\b(?:re|sk|rk|pk)_[A-Za-z0-9]{6,}\b/g, "[redacted-key]")
+    .replace(/\b(authorization|api[-_]?key|x-api-key|secret|token|password)\b(\s*"?\s*[:=]\s*"?)[^\s"',}]+/gi, "$1$2[redacted]");
+}
+
+/** The EXACT set of fields exposed for a delivery row — an explicit allowlist. Raw provider payloads,
+ *  credentials, headers or any un-listed column must never appear here. */
+export const DELIVERY_ROW_FIELDS = ["id", "status", "recipient", "error", "providerMessageId", "createdAt", "orderId", "orderNumber", "entityRef"] as const;
+
+/** Pure, testable mapper from a raw dispatch row → the safe display row (mask + redact + allowlist). */
+export function toDeliveryRow(r: any, orderNumber: string | null): EmailDispatchRow {
+  return {
+    id: r.id,
+    status: r.status,
+    recipient: maskRecipient(r.recipient),
+    error: redactSecrets(r.error ?? null),
+    providerMessageId: r.provider_message_id ?? null,
+    createdAt: r.created_at,
+    orderId: r.order_id ?? null,
+    orderNumber: r.order_id ? orderNumber : null,
+    entityRef: r.entity_ref ? String(r.entity_ref) : null,
+  };
+}
+
 interface RawRow { event: string; status: string; created_at: string; error: string | null }
 
 /** Pure health derivation from a set of recent dispatch rows (newest-first not required). Exported for
@@ -122,11 +156,6 @@ export async function listEmailDeliveries(event: string, limit = 50): Promise<Em
       const { data: orders } = await db.from("orders").select("id,order_number").in("id", orderIds);
       for (const o of (orders ?? []) as any[]) numById.set(o.id, o.order_number);
     }
-    return rows.map((r) => ({
-      id: r.id, status: r.status, recipient: maskRecipient(r.recipient), error: r.error ?? null,
-      providerMessageId: r.provider_message_id ?? null, createdAt: r.created_at,
-      orderId: r.order_id ?? null, orderNumber: r.order_id ? (numById.get(r.order_id) ?? null) : null,
-      entityRef: r.entity_ref ? String(r.entity_ref) : null,
-    }));
+    return rows.map((r) => toDeliveryRow(r, r.order_id ? (numById.get(r.order_id) ?? null) : null));
   } catch { return []; }
 }
