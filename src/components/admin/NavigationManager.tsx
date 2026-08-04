@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import type { NavBranch, NavItem, FooterSection, MenuAdminView, LinkableEntities, EntityType, LinkAttrs, MenuRevision } from "@/services/navigationService";
+import type { NavBranch, NavItem, FooterSection, MenuAdminView, LinkableEntities, EntityType, LinkAttrs, MenuRevision, FooterMeta } from "@/services/navigationService";
 import { istLocalToUtc, formatIST } from "@/lib/istTime";
 import { MediaPicker } from "@/components/admin/MediaPicker";
 import { LivePreviewPanel } from "@/components/admin/LivePreviewPanel";
@@ -103,7 +103,7 @@ function move<T>(arr: T[], i: number, dir: number): T[] {
 // as Coupons. istLocalToUtc turns a datetime-local IST wall-clock into a UTC ISO string.
 const schedUtc = (v: string) => (v ? istLocalToUtc(v) : null);
 
-export function NavigationManager({ header, footer, entities, canPublish = true }: { header: MenuAdminView; footer: MenuAdminView; entities: LinkableEntities; canPublish?: boolean }) {
+export function NavigationManager({ header, footer, entities, canPublish = true, footerMeta }: { header: MenuAdminView; footer: MenuAdminView; entities: LinkableEntities; canPublish?: boolean; footerMeta: FooterMeta }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [tab, setTab] = useState<"header" | "footer">("header");
@@ -120,6 +120,7 @@ export function NavigationManager({ header, footer, entities, canPublish = true 
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set()); // collapsed branches (P1)
   const [mediaFor, setMediaFor] = useState<number | null>(null); // campaign media picker target branch (point 20)
   const [showPreview, setShowPreview] = useState(false); // device-framed storefront preview (point 15)
+  const [fm, setFm] = useState<FooterMeta>(footerMeta); // editable footer text (tagline/copyright/made-in)
   const [dragItem, setDragItem] = useState<{ bi: number; ii: number } | null>(null); // drag-reorder within a branch
   const toggleCollapse = (k: string) => setCollapsed((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const dropItem = (bi: number, target: number) => {
@@ -210,6 +211,8 @@ export function NavigationManager({ header, footer, entities, canPublish = true 
     if (d?.ok) { markSaved(); setMsg({ tone: "ok", text: pubAt ? "Scheduled." : "Published live." }); }
   };
   const reset = async () => { const d = await post({ action: "reset" }); if (d?.ok) setMsg({ tone: "ok", text: "Reset to default." }); };
+  // Footer editorial text — live on save (settings KV, not the draft/publish tree). Needs content.publish.
+  const saveFooterText = async () => { const d = await post({ action: "save-footer-meta", meta: fm }); if (d?.ok) setMsg({ tone: "ok", text: "Footer text saved — live on the storefront." }); };
   const openRevs = async () => { const d = await post({ action: "revisions" }); if (d?.revisions) setRevs(d.revisions); };
   const restore = async (id: string) => { const d = await post({ action: "restore", id }); if (d?.ok) { setRevs(null); setMsg({ tone: "ok", text: "Restored into draft — review, then publish." }); } };
   // Device-framed preview (point 15): save the draft, arm the staff nav_preview cookie, then show the
@@ -304,6 +307,18 @@ export function NavigationManager({ header, footer, entities, canPublish = true 
         </div>
       ) : (
         <div>
+          <div className="nav-branch nav-footer-text">
+            <p className="cfg-sub">Footer text (tagline · copyright · made-in)</p>
+            <div className="cfg-grid">
+              <label className="cfg-field" data-wide="1"><span>Tagline (leave blank to hide)</span><input value={fm.poetic} onChange={(e) => setFm({ ...fm, poetic: e.target.value })} placeholder="Fragrance designed to linger beyond the flame." /></label>
+              <label className="cfg-field"><span>Copyright</span><input value={fm.copyright} onChange={(e) => setFm({ ...fm, copyright: e.target.value })} placeholder="© Samorah Studio" /></label>
+              <label className="cfg-field"><span>Made in</span><input value={fm.madeIn} onChange={(e) => setFm({ ...fm, madeIn: e.target.value })} placeholder="Made with care in India." /></label>
+            </div>
+            <div className="cfg-actions">
+              <button type="button" className="ff-btn ff-btn--primary" disabled={busy || !canPublish} onClick={saveFooterText} title={canPublish ? undefined : "Publishing needs the content.publish capability"}>Save footer text</button>
+              <span className="admin__muted">Saves immediately &amp; goes live — it's site text, not part of the draft/publish menu.</span>
+            </div>
+          </div>
           {ftr.map((s, si) => (
             <div key={si} className="nav-branch" onDragOver={(e) => { if (dragCol !== null) e.preventDefault(); }} onDrop={() => dropCol(si)}>
               <div className="nav-branch__head">

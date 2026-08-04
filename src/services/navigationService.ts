@@ -282,6 +282,45 @@ export async function resetMenu(id: MenuId, actorId?: string): Promise<{ ok: boo
   return { ok: true };
 }
 
+// ── Footer editorial text (tagline / copyright / made-in) — site chrome, admin-editable ─────────────
+// Stored in the shared `settings` KV (same pattern as the promo banner), NOT in the publishable footer
+// tree — so it never touches the footer data model, validation, revisions or scheduling. Live on save.
+export interface FooterMeta { poetic: string; copyright: string; madeIn: string }
+export const FOOTER_META_DEFAULTS: FooterMeta = {
+  poetic: "Fragrance designed to linger beyond the flame.",
+  copyright: "© Samorah Studio",
+  madeIn: "Made with care in India.",
+};
+const FOOTER_META_KEY = "footer.meta";
+const cleanText = (s: unknown) => String(s ?? "").replace(/<[^>]*>/g, "").replace(/[<>]/g, "").replace(/\s+/g, " ").trim().slice(0, 200);
+
+/** Read the footer text (falls back to the built-in defaults per field when unset). */
+export async function getFooterMeta(): Promise<FooterMeta> {
+  try {
+    const db = createAdminClient() as any;
+    const { data } = await db.from("settings").select("value").eq("key", FOOTER_META_KEY).maybeSingle();
+    const v = (data?.value ?? {}) as Partial<FooterMeta>;
+    return {
+      poetic: typeof v.poetic === "string" ? v.poetic : FOOTER_META_DEFAULTS.poetic,
+      copyright: typeof v.copyright === "string" ? v.copyright : FOOTER_META_DEFAULTS.copyright,
+      madeIn: typeof v.madeIn === "string" ? v.madeIn : FOOTER_META_DEFAULTS.madeIn,
+    };
+  } catch { return FOOTER_META_DEFAULTS; }
+}
+
+/** Save the footer text (sanitized, ≤200 chars/field; empty is allowed so a line can be hidden). Audited. */
+export async function saveFooterMeta(input: Partial<FooterMeta>, actorId?: string): Promise<{ ok: boolean; reason?: string }> {
+  const db = createAdminClient() as any;
+  const value: FooterMeta = { poetic: cleanText(input.poetic), copyright: cleanText(input.copyright), madeIn: cleanText(input.madeIn) };
+  const { error } = await db.from("settings").upsert(
+    { key: FOOTER_META_KEY, value, section: "general", label: "Footer text", updated_by: actorId ?? null, updated_at: new Date().toISOString() },
+    { onConflict: "key" },
+  );
+  if (error) return { ok: false, reason: error.message };
+  await logEvent({ entityType: "settings", event: "footer_meta.updated", actorType: actorId ? "staff" : "system", actorId, notes: FOOTER_META_KEY });
+  return { ok: true };
+}
+
 // ── Revisions (shared store) ─────────────────────────────────────────────────
 export interface MenuRevision extends Revision { actorName: string }
 

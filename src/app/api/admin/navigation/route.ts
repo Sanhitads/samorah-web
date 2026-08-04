@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { requireCapability } from "@/lib/auth/requireStaff";
 import { hasCapability } from "@/lib/auth/capabilities";
-import { saveDraft, publishMenu, resetMenu, listMenuRevisions, restoreMenuRevision, type MenuId } from "@/services/navigationService";
+import { saveDraft, publishMenu, resetMenu, listMenuRevisions, restoreMenuRevision, saveFooterMeta, type MenuId } from "@/services/navigationService";
 import { validateMenu } from "@/lib/cms/navValidation";
 
 /**
@@ -12,7 +12,7 @@ import { validateMenu } from "@/lib/cms/navValidation";
  * here on the server, not merely by hiding buttons.
  */
 export const runtime = "nodejs";
-const LIVE_CHANGING = new Set(["publish", "reset"]); // actions that alter what customers see
+const LIVE_CHANGING = new Set(["publish", "reset", "save-footer-meta"]); // actions that alter what customers see
 
 export async function POST(request: Request) {
   // Everyone reaching this route must at least be able to edit drafts.
@@ -54,6 +54,11 @@ export async function POST(request: Request) {
     case "restore": {
       if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
       return NextResponse.json(await restoreMenuRevision(menu, body.id, actor));
+    }
+    case "save-footer-meta": { // footer editorial text (tagline / copyright / made-in) — live on save
+      const res = await saveFooterMeta(body.meta ?? {}, actor);
+      if (res.ok) revalidateTag("navigation"); // footer text renders in the store layout alongside nav
+      return NextResponse.json(res);
     }
     default: return NextResponse.json({ error: "unknown action" }, { status: 400 });
   }

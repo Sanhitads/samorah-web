@@ -5,7 +5,7 @@ import { getPromoBanner } from "@/services/couponAdminService";
 import { StoreChrome } from "@/components/layout/StoreChrome";
 import { Footer } from "@/components/layout/Footer";
 import { getSiteSettings } from "@/services/siteSettingsService";
-import { getNavigation } from "@/services/navigationService";
+import { getNavigation, getFooterMeta } from "@/services/navigationService";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { ClearPreviewLink } from "@/components/page/ClearPreviewLink";
 import { AccountSync } from "@/components/account/AccountSync";
@@ -44,6 +44,7 @@ export default async function StoreLayout({
   const jar = await cookies();
   if (jar.get("nav_preview")) preview = (await requireStaff("editor")).ok;
   const nav = await getNavigation({ preview });
+  const footerMeta = await getFooterMeta();
   const banner = await getPromoBanner();
   const showBanner = banner.enabled && !!banner.message;
 
@@ -62,7 +63,7 @@ export default async function StoreLayout({
       <AccountSync />
       <StoreChrome branches={nav.branches} />
       {children}
-      <Footer sections={nav.footer} />
+      <Footer sections={nav.footer} poetic={footerMeta.poetic} copyright={footerMeta.copyright} madeIn={footerMeta.madeIn} />
     </>
   );
 }

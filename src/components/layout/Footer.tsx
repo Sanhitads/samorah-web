@@ -16,14 +16,16 @@ import { TrackedNavLink } from "@/components/layout/TrackedNavLink";
  */
 const POETIC_LINE = "Fragrance designed to linger beyond the flame.";
 
-export function Footer({ sections }: { sections?: FooterSection[] }) {
+export function Footer({ sections, poetic = POETIC_LINE, copyright = "© Samorah Studio", madeIn = "Made with care in India." }: { sections?: FooterSection[]; poetic?: string; copyright?: string; madeIn?: string }) {
   const cols = sections && sections.length ? sections : (FOOTER_SECTIONS as FooterSection[]);
   return (
     <footer className="site-footer">
       <div className="site-footer__inner">
-        <div className="site-footer__intro">
-          <p className="site-footer__poetic">{POETIC_LINE}</p>
-        </div>
+        {poetic ? (
+          <div className="site-footer__intro">
+            <p className="site-footer__poetic">{poetic}</p>
+          </div>
+        ) : null}
 
         <div className="site-footer__columns">
           {cols.map((section) => (
@@ -51,8 +53,8 @@ export function Footer({ sections }: { sections?: FooterSection[] }) {
         </div>
 
         <div className="site-footer__bottom">
-          <span className="site-footer__copyright">© Samorah Studio</span>
-          <span className="site-footer__made">Made with care in India.</span>
+          <span className="site-footer__copyright">{copyright}</span>
+          <span className="site-footer__made">{madeIn}</span>
         </div>
       </div>
     </footer>

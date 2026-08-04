@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { hasCapability } from "@/lib/auth/capabilities";
-import { getNavigationAdmin, listLinkableEntities } from "@/services/navigationService";
+import { getNavigationAdmin, listLinkableEntities, getFooterMeta } from "@/services/navigationService";
 import { NavigationManager } from "@/components/admin/NavigationManager";
 
 /**
@@ -20,7 +20,7 @@ export default async function NavigationPage() {
   // RBAC split (point 9): content.edit to prepare drafts; content.publish to change the live storefront.
   const canEdit = hasCapability(staff.role, "content.edit");
   const canPublish = hasCapability(staff.role, "content.publish");
-  const [{ header, footer }, entities] = await Promise.all([getNavigationAdmin(), listLinkableEntities()]);
+  const [{ header, footer }, entities, footerMeta] = await Promise.all([getNavigationAdmin(), listLinkableEntities(), getFooterMeta()]);
 
   return (
     <main className="admin">
@@ -30,7 +30,7 @@ export default async function NavigationPage() {
         <p className="admin__count">Header · {header.state} · Footer · {footer.state}{canEdit ? (canPublish ? "" : " · draft-only (needs content.publish to go live)") : " · read-only (needs content.edit)"}</p>
       </header>
       {canEdit ? (
-        <NavigationManager header={header} footer={footer} entities={entities} canPublish={canPublish} />
+        <NavigationManager header={header} footer={footer} entities={entities} canPublish={canPublish} footerMeta={footerMeta} />
       ) : (
         <p className="admin__empty">Editing navigation needs the content.edit capability.</p>
       )}
