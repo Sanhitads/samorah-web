@@ -1033,6 +1033,13 @@ a.adm-badge[data-b="incident"]:hover { background: rgba(168,68,58,0.22); }
 .rev-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .rev-item { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border: 1px solid var(--ad-hair); border-radius: 4px; }
 .rev-item--wide { flex-wrap: wrap; row-gap: 6px; }
+/* Rich history (point 8): who/when/diff + preview-before-restore. */
+.rev-item--rich { display: block; }
+.rev-item__row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.rev-item__row .ff-actions { margin-left: auto; }
+.rev-item__meta { font-size: 12px; }
+.rev-item__preview { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--ad-hair); max-height: 40vh; overflow-y: auto; }
+.rev-item__line { font-size: 11.5px; color: var(--smoke, #6b6259); padding: 1px 0; }
 .rev-item--wide .ff-actions { margin-left: auto; flex-wrap: wrap; }
 .rev-item__when { font-family: var(--font-sans); font-size: 13px; }
 .rev-item__meta { font-size: 12px; margin-right: auto; }

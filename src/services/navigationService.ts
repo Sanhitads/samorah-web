@@ -280,8 +280,22 @@ export async function resetMenu(id: MenuId, actorId?: string): Promise<{ ok: boo
 }
 
 // ── Revisions (shared store) ─────────────────────────────────────────────────
-export async function listMenuRevisions(id: MenuId, limit = 30): Promise<Revision[]> {
-  return listCmsRevisions("navigation", id, limit);
+export interface MenuRevision extends Revision { actorName: string }
+
+/** Revision history with the actor's name resolved (point 8) — who changed it, when, and the snapshot
+ *  (the client computes the diff + previews it before restoring). */
+export async function listMenuRevisions(id: MenuId, limit = 30): Promise<MenuRevision[]> {
+  const revs = await listCmsRevisions("navigation", id, limit);
+  const ids = [...new Set(revs.map((r) => r.actorId).filter(Boolean) as string[])];
+  const names = new Map<string, string>();
+  if (ids.length) {
+    try {
+      const db = createAdminClient() as any;
+      const { data } = await db.from("users").select("id, full_name, email").in("id", ids);
+      for (const u of data ?? []) names.set(u.id, u.full_name || u.email || "staff");
+    } catch { /* names optional */ }
+  }
+  return revs.map((r) => ({ ...r, actorName: r.actorId ? (names.get(r.actorId) ?? "staff") : "system" }));
 }
 
 /** Restore a revision into the DRAFT (non-destructive — review before re-publishing). */

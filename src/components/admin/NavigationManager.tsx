@@ -2,9 +2,30 @@
 
 import { useState, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import type { NavBranch, NavItem, FooterSection, MenuAdminView, LinkableEntities, EntityType, LinkAttrs } from "@/services/navigationService";
-import type { Revision } from "@/services/cms/revisions";
+import type { NavBranch, NavItem, FooterSection, MenuAdminView, LinkableEntities, EntityType, LinkAttrs, MenuRevision } from "@/services/navigationService";
 import { istLocalToUtc, formatIST } from "@/lib/istTime";
+
+/** Flatten a nav/footer snapshot to a set of "branch ▸ label → href" strings, for a lightweight diff. */
+function flattenNav(tree: any[]): Set<string> {
+  const out = new Set<string>();
+  for (const node of tree ?? []) {
+    const branch = node.label ?? node.title ?? node.id ?? "";
+    const items = node.items ?? node.links ?? [];
+    for (const it of items) out.add(`${branch} ▸ ${it.label ?? ""} → ${it.href ?? (it.entity ? `${it.entity.type}:${it.entity.id}` : "")}`);
+    if (node.campaign) out.add(`${branch} ▸ [campaign] ${node.campaign.title ?? ""} → ${node.campaign.href ?? ""}`);
+  }
+  return out;
+}
+/** Short human diff between two snapshots (newer vs older). */
+function diffRevisions(newer: any[], older: any[] | undefined): string {
+  if (!older) return "First published version";
+  const a = flattenNav(newer), b = flattenNav(older);
+  let added = 0, removed = 0;
+  for (const x of a) if (!b.has(x)) added++;
+  for (const x of b) if (!a.has(x)) removed++;
+  if (!added && !removed) return "No link changes";
+  return [added ? `+${added} link${added > 1 ? "s" : ""}` : "", removed ? `−${removed} link${removed > 1 ? "s" : ""}` : ""].filter(Boolean).join(", ");
+}
 
 const ENTITY_TYPES: EntityType[] = ["page", "chapter", "collection", "product"];
 const ENTITY_LABEL: Record<EntityType, string> = { page: "Page", chapter: "Chapter", collection: "Collection", product: "Product" };
@@ -77,7 +98,8 @@ export function NavigationManager({ header, footer, entities, canPublish = true 
   const [ftr, setFtr] = useState<FooterSection[]>(footer.draft as FooterSection[]);
   const [pubAt, setPubAt] = useState("");
   const [unpubAt, setUnpubAt] = useState("");
-  const [revs, setRevs] = useState<Revision[] | null>(null);
+  const [revs, setRevs] = useState<MenuRevision[] | null>(null);
+  const [openRev, setOpenRev] = useState<string | null>(null); // preview-before-restore expansion
 
   // Unsaved-change protection (point 7). Dirty = current tree differs from the last saved snapshot.
   const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify([header.draft, footer.draft]));
@@ -251,14 +273,25 @@ export function NavigationManager({ header, footer, entities, canPublish = true 
           <div className="om-modal__card" onClick={(e) => e.stopPropagation()}>
             <h2 className="om-modal__title">History · {tab}</h2>
             {revs.length ? (
-              <ul className="rev-list">{revs.map((r) => (
-                <li key={r.id} className="rev-item">
-                  <span className="rev-item__when">{formatIST(r.createdAt)}</span>
-                  <span className="rev-item__meta admin__muted">{r.label ?? "published"}</span>
-                  <button type="button" className="ff-btn" disabled={busy} onClick={() => restore(r.id)}>Restore to draft</button>
+              <ul className="rev-list">{revs.map((r, i) => (
+                <li key={r.id} className="rev-item rev-item--rich">
+                  <div className="rev-item__row">
+                    <span className="rev-item__when">{formatIST(r.createdAt)}{i === 0 ? <span className="adm-badge" style={{ marginLeft: 8 }}>current</span> : null}</span>
+                    <span className="rev-item__meta admin__muted">by {r.actorName} · {diffRevisions(r.snapshot, revs[i + 1]?.snapshot)}{r.label ? ` · ${r.label}` : ""}</span>
+                    <span className="ff-actions">
+                      <button type="button" className="ff-btn ff-btn--mini" onClick={() => setOpenRev(openRev === r.id ? null : r.id)}>{openRev === r.id ? "Hide" : "Preview"}</button>
+                      <button type="button" className="ff-btn ff-btn--mini" disabled={busy} onClick={() => restore(r.id)} title="Loads this version into the draft — review, then publish normally">Restore to draft</button>
+                    </span>
+                  </div>
+                  {openRev === r.id ? (
+                    <div className="rev-item__preview">
+                      {[...flattenNav(r.snapshot)].map((line, k) => <div key={k} className="rev-item__line admin__mono">{line}</div>)}
+                      {flattenNav(r.snapshot).size === 0 ? <div className="admin__muted">(empty)</div> : null}
+                    </div>
+                  ) : null}
                 </li>
               ))}</ul>
-            ) : <p className="admin__empty">No published versions yet.</p>}
+            ) : <p className="admin__empty">No changes recorded yet.</p>}
             <div className="om-modal__actions"><button type="button" className="ff-btn" onClick={() => setRevs(null)}>Close</button></div>
           </div>
         </div>
