@@ -6,7 +6,11 @@
 import { COMMERCE } from "@/config/commerce";
 import { productionOrigin } from "@/config/site";
 
-export const C = { ink: "#1f1a16", gold: "#c9a96e", smoke: "#6b6259", ivory: "#faf7f2", hair: "rgba(31,26,22,0.1)" };
+// `gold` (#c9a96e) is the DECORATIVE brand accent (eyebrows, section labels) — 2.24:1 on white, so it
+// must never carry link/body text. `link` is a dedicated deeper-gold for actionable/informational link
+// TEXT: measured 6.22:1 on the white card and 5.82:1 on the ivory page — both ≥ WCAG AA 4.5:1 — while
+// staying in the same warm brand family. Links also keep an underline so they don't rely on colour alone.
+export const C = { ink: "#1f1a16", gold: "#c9a96e", link: "#7a5c1e", smoke: "#6b6259", ivory: "#faf7f2", hair: "rgba(31,26,22,0.1)" };
 const serif = "Georgia,'Times New Roman',serif";
 const sans = "Arial,Helvetica,sans-serif";
 
@@ -69,7 +73,7 @@ export function sectionActions(orderUrl: string, invoiceUrl: string | null): str
   const invoiceBtn = invoiceUrl
     ? `<a href="${invoiceUrl}" style="display:inline-block;padding:14px 30px;background:${C.ink};color:${C.ivory};font:400 11px/1 ${sans};letter-spacing:2px;text-transform:uppercase;text-decoration:none;">Download Tax Invoice</a>`
     : "";
-  const viewLink = `<a href="${orderUrl}" style="font:400 11px/1 ${sans};letter-spacing:1px;color:${C.gold};text-decoration:underline;">View Order</a>`;
+  const viewLink = `<a href="${orderUrl}" style="font:400 11px/1 ${sans};letter-spacing:1px;color:${C.link};text-decoration:underline;">View Order</a>`;
   return `<tr><td style="padding:8px 40px 4px;text-align:center;">
     ${invoiceBtn}
     <div style="margin-top:${invoiceUrl ? "14px" : "0"};">${viewLink}</div>
@@ -94,7 +98,7 @@ export function sectionFooter(): string {
   const a = COMMERCE.registeredAddress;
   return `<tr><td style="padding:22px 40px 36px;text-align:center;border-top:1px solid ${C.hair};">
     <div style="font:400 12px/1 ${serif};letter-spacing:3px;text-transform:uppercase;color:${C.ink};">${COMMERCE.brandName.toUpperCase()}</div>
-    <div style="margin-top:10px;"><a href="${origin}" style="font:400 11px/1.7 ${sans};color:${C.gold};text-decoration:none;">${origin}</a></div>
+    <div style="margin-top:10px;"><a href="${origin}" style="font:400 11px/1.7 ${sans};color:${C.link};text-decoration:underline;">${origin}</a></div>
     <div><a href="mailto:${COMMERCE.support.email}" style="font:400 11px/1.7 ${sans};color:${C.smoke};text-decoration:none;">${COMMERCE.support.email}</a></div>
     <div style="font:400 11px/1.7 ${sans};color:${C.smoke};">${a.city}, ${a.state}, ${a.country}</div>
   </td></tr>`;

@@ -59,7 +59,7 @@ function blockHtml(b: EmailBlock, vars: Record<string, string>): string {
       const msg = t || "Questions? We're here to help.";
       return `<tr><td style="padding:16px 40px;text-align:center;font:400 13px/1.7 ${serif};color:${C.smoke};border-top:1px solid ${C.hair};">
         ${esc(msg)}<br/>
-        <a href="mailto:${COMMERCE.support.email}" style="color:${C.gold};text-decoration:none;">${COMMERCE.support.email}</a>
+        <a href="mailto:${COMMERCE.support.email}" style="color:${C.link};text-decoration:underline;">${COMMERCE.support.email}</a>
       </td></tr>`;
     }
     case "paragraph":

@@ -29,19 +29,20 @@ describe("plain-text fallback exists across both render paths (point 20)", () =>
 });
 
 /**
- * Point 19 — the fixed brand palette carries the email's information colours. This LOCKS that the
- * text colours meet WCAG AA. `gold` is a decorative accent that does NOT meet AA (2.24:1) — pinned
- * here so a regression that starts using gold for body text or that changes ink/smoke is caught, and
- * so the known gold-link limitation stays tracked (see POST_LAUNCH_ROADMAP).
+ * Point 19 — the fixed brand palette carries the email's information colours. This LOCKS that every
+ * colour used for text or links meets WCAG AA on both email backgrounds. `gold` stays the DECORATIVE
+ * accent only (eyebrows/labels); `link` is the dedicated accessible colour for actionable link text.
  */
 describe("email palette contrast is controlled (point 19)", () => {
-  it("body + heading text colours meet WCAG AA on white and ivory", () => {
+  it("text + link colours meet WCAG AA 4.5:1 on white and ivory", () => {
     for (const bg of ["#ffffff", C.ivory]) {
       expect(contrastRatio(C.ink, bg)!).toBeGreaterThanOrEqual(AA_NORMAL);
       expect(contrastRatio(C.smoke, bg)!).toBeGreaterThanOrEqual(AA_NORMAL);
+      expect(contrastRatio(C.link, bg)!).toBeGreaterThanOrEqual(AA_NORMAL); // accessible link text
     }
   });
-  it("gold is a sub-AA decorative accent (documented, not used for body text)", () => {
-    expect(contrastRatio(C.gold, "#ffffff")!).toBeLessThan(AA_NORMAL); // known — tracked in roadmap
+  it("keeps #c9a96e as the decorative-only accent (never used for link/body text)", () => {
+    expect(C.gold).toBe("#c9a96e"); // brand accent unchanged
+    expect(contrastRatio(C.gold, "#ffffff")!).toBeLessThan(AA_NORMAL); // hence decorative-only, by design
   });
 });
