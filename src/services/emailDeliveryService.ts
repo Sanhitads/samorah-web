@@ -36,8 +36,9 @@ export interface EmailDispatchRow {
   error: string | null;
   providerMessageId: string | null;
   createdAt: string;
-  orderId: string | null; // STORED — deep-linkable to the order when present
-  entityRef: string | null; // STORED — return id for return events ('' → null)
+  orderId: string | null; // STORED — the FK on the dispatch row
+  orderNumber: string | null; // resolved from order_id (stored FK) for the /admin/orders route key
+  entityRef: string | null; // STORED — return id for return events ('' → null); deep-links to /admin/returns
 }
 
 /** Mask a recipient for admin display: a***@example.com (never render full customer addresses). */
@@ -113,10 +114,19 @@ export async function listEmailDeliveries(event: string, limit = 50): Promise<Em
       .eq("event", event)
       .order("created_at", { ascending: false })
       .limit(limit);
-    return ((data ?? []) as any[]).map((r) => ({
+    const rows = (data ?? []) as any[];
+    // Resolve order_id → order_number (a STORED FK) so the row can deep-link to /admin/orders/[orderNumber].
+    const orderIds = [...new Set(rows.map((r) => r.order_id).filter(Boolean))];
+    const numById = new Map<string, string>();
+    if (orderIds.length) {
+      const { data: orders } = await db.from("orders").select("id,order_number").in("id", orderIds);
+      for (const o of (orders ?? []) as any[]) numById.set(o.id, o.order_number);
+    }
+    return rows.map((r) => ({
       id: r.id, status: r.status, recipient: maskRecipient(r.recipient), error: r.error ?? null,
       providerMessageId: r.provider_message_id ?? null, createdAt: r.created_at,
-      orderId: r.order_id ?? null, entityRef: r.entity_ref ? String(r.entity_ref) : null,
+      orderId: r.order_id ?? null, orderNumber: r.order_id ? (numById.get(r.order_id) ?? null) : null,
+      entityRef: r.entity_ref ? String(r.entity_ref) : null,
     }));
   } catch { return []; }
 }

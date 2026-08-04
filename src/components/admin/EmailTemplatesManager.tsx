@@ -2,7 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import type { EmailTemplateAdmin } from "@/services/emailTemplateService";
+import type { EmailHealth } from "@/services/emailDeliveryService";
 import type { FieldDef } from "@/lib/cms/sectionSchema";
 import { SchemaForm, type MediaOption } from "./SchemaForm";
 
@@ -18,7 +20,29 @@ import { SchemaForm, type MediaOption } from "./SchemaForm";
 interface Validation { errors: string[]; warnings: string[] }
 interface Revision { id: string; label: string | null; actorId: string | null; createdAt: string }
 
-export function EmailTemplatesManager({ templates, fields, media, canPublish }: { templates: EmailTemplateAdmin[]; fields: FieldDef[]; media: MediaOption[]; canPublish: boolean }) {
+const HEALTH_LABEL: Record<string, string> = { healthy: "Healthy", degraded: "Recovered", failing: "Failing", idle: "No recent sends" };
+const relTime = (iso: string | null): string => {
+  if (!iso) return "never";
+  const m = Math.round((Date.now() - Date.parse(iso)) / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m} min ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h} h ago`;
+  return `${Math.round(h / 24)} d ago`;
+};
+const fmtDate = (iso: string | null): string => (iso ? new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "");
+
+/** Operational status label for a template (point 14): source + custom body vs subject + live/draft. */
+function statusBadge(t: EmailTemplateAdmin): { text: string; warn: boolean } {
+  if (t.source !== "db") return { text: "DEFAULT", warn: false };
+  const live = t.published.enabled ? "LIVE" : "OFF";
+  const kind = t.published.blocks?.length ? "CUSTOM · BODY" : "CUSTOM";
+  const parts = [kind, live];
+  if (t.status === "draft") parts.push("DRAFT CHANGES");
+  return { text: parts.join(" · "), warn: t.status === "draft" };
+}
+
+export function EmailTemplatesManager({ templates, fields, media, canPublish, health }: { templates: EmailTemplateAdmin[]; fields: FieldDef[]; media: MediaOption[]; canPublish: boolean; health: Record<string, EmailHealth> }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState(false);
@@ -97,12 +121,19 @@ export function EmailTemplatesManager({ templates, fields, media, canPublish }: 
       {templates.map((t) => {
         const v = valid[t.key]; const m = msg[t.key];
         const blocked = (v?.errors?.length ?? 0) > 0;
-        const badge = t.status === "draft" ? "unpublished draft" : t.source === "db" ? (t.published.blocks?.length ? "authored body" : "custom subject") : "default";
+        const badge = statusBadge(t);
+        const h = health[t.key];
         return (
           <div key={t.key} className="nav-branch">
             <div className="nav-branch__head">
               <span className="hp-section__name">{t.def.label}<span className="admin__muted"> · {t.key}</span></span>
-              <span className={`adm-badge${t.status === "draft" ? " adm-badge--warn" : ""}`}>{badge}</span>
+              <span className={`adm-badge${badge.warn ? " adm-badge--warn" : ""}`}>{badge.text}</span>
+              {t.updatedAt ? <span className="admin__muted em-updated">Updated {fmtDate(t.updatedAt)}</span> : null}
+              {h ? (
+                <Link href={`/admin/emails/deliveries?event=${encodeURIComponent(t.key)}`} className={`em-health em-health--${h.status}`} title={`Last sent ${relTime(h.lastSentAt)}${h.failed24h ? ` · ${h.failed24h} failed (24h)` : ""} — view delivery log`}>
+                  <span className="em-health__dot" /> {HEALTH_LABEL[h.status] ?? h.status}{h.failed24h ? ` · ${h.failed24h} failed` : ""}
+                </Link>
+              ) : null}
               <button type="button" className="ff-btn" onClick={() => setOpen(open === t.key ? null : t.key)}>{open === t.key ? "Close" : "Edit"}</button>
             </div>
             {open === t.key ? (

@@ -497,6 +497,19 @@
 .cfg-validation { margin: 8px 0; display: flex; flex-direction: column; gap: 3px; }
 .cfg-validation .cfg-msg { font-size: 12px; }
 .adm-badge--warn { background: rgba(201,169,110,0.24); color: #8a6d3b; }
+.adm-badge--err { background: rgba(138,61,47,0.12); color: #8a3d2f; }
+.adm-badge--ok { background: rgba(60,120,70,0.12); color: #2f6b3c; }
+.admin__back { color: var(--smoke, #6b6259); text-decoration: none; }
+.admin__back:hover { color: var(--ad-ink, #1f1a16); }
+.em-updated { font-size: 11px; }
+.em-health { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-sans); font-size: 11px; text-decoration: none; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--ad-hair); color: #6b6259; }
+.em-health:hover { background: var(--soft-beige, #efe9e0); }
+.em-health__dot { width: 7px; height: 7px; border-radius: 50%; background: #9a9086; }
+.em-health--healthy .em-health__dot { background: #2f6b3c; }
+.em-health--degraded .em-health__dot { background: #c9a96e; }
+.em-health--failing { color: #8a3d2f; border-color: rgba(138,61,47,0.4); }
+.em-health--failing .em-health__dot { background: #8a3d2f; }
+.em-health--idle .em-health__dot { background: #b8b0a6; }
 .adm-chip { padding: 2px 7px; border: 1px solid var(--ad-hair); border-radius: 3px; background: #fff; cursor: pointer; font-family: var(--font-mono, monospace); font-size: 11px; color: #6b6259; }
 .adm-chip:hover { background: var(--soft-beige, #efe9e0); }
 .ff-btn--ghost { background: transparent; color: var(--smoke, #6b6259); }

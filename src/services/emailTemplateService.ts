@@ -40,7 +40,7 @@ export interface EmailContent { subject: string; preheader: string; intro: strin
 /** Send-facing view (the PUBLISHED content merged over the coded default). */
 export interface EmailTemplate extends EmailContent { key: string; source: "db" | "default"; def: EmailTemplateDef }
 /** Admin view: published + draft + status. */
-export interface EmailTemplateAdmin { key: string; def: EmailTemplateDef; published: EmailContent; draft: EmailContent; status: "published" | "draft"; source: "db" | "default" }
+export interface EmailTemplateAdmin { key: string; def: EmailTemplateDef; published: EmailContent; draft: EmailContent; status: "published" | "draft"; source: "db" | "default"; updatedAt: string | null }
 
 const emptyContent = (def: EmailTemplateDef): EmailContent => ({ subject: def.defaultSubject, preheader: "", intro: "", signoff: "", eyebrow: "", heading: "", blocks: [], enabled: true });
 /** The PUBLISHED content = the scalar columns merged over the coded default. */
@@ -139,7 +139,7 @@ export async function getEmailTemplateAdmin(key: string): Promise<EmailTemplateA
   try { const db = createAdminClient() as any; row = (await db.from("email_templates").select("*").eq("key", key).maybeSingle()).data; } catch { /* default */ }
   const published = publishedFromRow(row, def);
   const draft = (row?.draft && typeof row.draft === "object") ? { ...published, ...row.draft } as EmailContent : published;
-  return { key, def, published, draft, status: row?.draft ? "draft" : "published", source: row ? "db" : "default" };
+  return { key, def, published, draft, status: row?.draft ? "draft" : "published", source: row ? "db" : "default", updatedAt: row?.updated_at ?? null };
 }
 export async function listEmailTemplatesAdmin(): Promise<EmailTemplateAdmin[]> {
   return Promise.all(EMAIL_TEMPLATE_DEFS.map((d) => getEmailTemplateAdmin(d.key) as Promise<EmailTemplateAdmin>));
