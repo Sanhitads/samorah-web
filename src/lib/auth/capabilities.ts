@@ -16,6 +16,8 @@ export const CAPABILITIES = [
   "returns.operate", // receive / inspect / restock
   "returns.approve", // approve / reject a return (financial consequence)
   "catalog.manage",
+  "content.edit", // CMS: prepare/save drafts (navigation, pages…) — does NOT grant publish
+  "content.publish", // CMS: make a draft live / schedule / unpublish / reset — storefront deployment
   "rules.manage",
   "shipping.configure",
   "analytics.view",
@@ -28,7 +30,10 @@ export type Capability = (typeof CAPABILITIES)[number];
 /** Role → capabilities. Higher roles inherit lower ones by construction. */
 const WAREHOUSE: Capability[] = ["fulfillment.operate", "fulfillment.triage", "returns.operate"];
 const CS_FINANCE: Capability[] = [...WAREHOUSE, "order.cancel", "order.refund", "returns.approve", "analytics.view", "data.export"];
-const ADMIN: Capability[] = [...CS_FINANCE, "catalog.manage", "rules.manage", "shipping.configure", "users.manage"];
+// content.edit and content.publish both land at admin+ so current access is unchanged (admins can edit
+// AND publish). The split is server-enforced and future-ready: to let a lower role PREPARE navigation
+// without deploy authority, add "content.edit" (only) to that role's bundle — publish stays gated here.
+const ADMIN: Capability[] = [...CS_FINANCE, "catalog.manage", "content.edit", "content.publish", "rules.manage", "shipping.configure", "users.manage"];
 
 export const ROLE_CAPABILITIES: Record<string, readonly Capability[]> = {
   customer: [],

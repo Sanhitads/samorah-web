@@ -46,7 +46,7 @@ const toLocal = (iso?: string | null) => {
 };
 const fromLocal = (v: string) => (v ? new Date(v).toISOString() : null);
 
-export function NavigationManager({ header, footer, entities }: { header: MenuAdminView; footer: MenuAdminView; entities: LinkableEntities }) {
+export function NavigationManager({ header, footer, entities, canPublish = true }: { header: MenuAdminView; footer: MenuAdminView; entities: LinkableEntities; canPublish?: boolean }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [tab, setTab] = useState<"header" | "footer">("header");
@@ -185,11 +185,12 @@ export function NavigationManager({ header, footer, entities }: { header: MenuAd
         <div className="cfg-actions">
           <button type="button" className="ff-btn" disabled={busy || pending} onClick={saveDraft}>Save draft</button>
           <button type="button" className="ff-btn" disabled={busy} onClick={preview}>Preview</button>
-          <button type="button" className="ff-btn ff-btn--primary" disabled={busy} onClick={publish}>{pubAt ? "Schedule" : "Publish"}</button>
+          <button type="button" className="ff-btn ff-btn--primary" disabled={busy || !canPublish} onClick={publish} title={canPublish ? undefined : "Publishing needs the content.publish capability"}>{pubAt ? "Schedule" : "Publish"}</button>
           <button type="button" className="ff-btn" disabled={busy} onClick={openRevs}>History</button>
-          {view.source === "db" ? <button type="button" className="ff-btn ff-btn--danger" disabled={busy} onClick={reset}>Reset to default</button> : null}
+          {view.source === "db" && canPublish ? <button type="button" className="ff-btn ff-btn--danger" disabled={busy} onClick={reset}>Reset to default</button> : null}
           {msg ? <span className={`cfg-msg cfg-msg--${msg.tone}`}>{msg.text}</span> : null}
         </div>
+        {!canPublish ? <p className="cfg-sub" style={{ marginTop: 6 }}>You can prepare and save drafts. Publishing to the live storefront needs the <code>content.publish</code> capability.</p> : null}
       </div>
 
       {revs ? (

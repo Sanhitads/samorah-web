@@ -17,7 +17,9 @@ export const dynamic = "force-dynamic";
 export default async function NavigationPage() {
   const staff = await requireStaff("editor");
   if (!staff.ok) redirect("/login");
-  const canManage = hasCapability(staff.role, "catalog.manage");
+  // RBAC split (point 9): content.edit to prepare drafts; content.publish to change the live storefront.
+  const canEdit = hasCapability(staff.role, "content.edit");
+  const canPublish = hasCapability(staff.role, "content.publish");
   const [{ header, footer }, entities] = await Promise.all([getNavigationAdmin(), listLinkableEntities()]);
 
   return (
@@ -25,12 +27,12 @@ export default async function NavigationPage() {
       <header className="admin__head">
         <p className="admin__eyebrow">Content · {staff.role}</p>
         <h1 className="admin__title">Navigation</h1>
-        <p className="admin__count">Header · {header.state} · Footer · {footer.state}{canManage ? "" : " · read-only (needs catalog.manage)"}</p>
+        <p className="admin__count">Header · {header.state} · Footer · {footer.state}{canEdit ? (canPublish ? "" : " · draft-only (needs content.publish to go live)") : " · read-only (needs content.edit)"}</p>
       </header>
-      {canManage ? (
-        <NavigationManager header={header} footer={footer} entities={entities} />
+      {canEdit ? (
+        <NavigationManager header={header} footer={footer} entities={entities} canPublish={canPublish} />
       ) : (
-        <p className="admin__empty">Editing navigation needs the catalog.manage capability.</p>
+        <p className="admin__empty">Editing navigation needs the content.edit capability.</p>
       )}
     </main>
   );

@@ -1,15 +1,23 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { requireCapability } from "@/lib/auth/requireStaff";
+import { hasCapability } from "@/lib/auth/capabilities";
 import { saveDraft, publishMenu, resetMenu, listMenuRevisions, restoreMenuRevision, type MenuId } from "@/services/navigationService";
 import { validateMenu } from "@/lib/cms/navValidation";
 
-/** POST /api/admin/navigation { action, menu, ... } — edit header/footer menus. catalog.manage. */
+/**
+ * POST /api/admin/navigation { action, menu, ... } — edit header/footer menus.
+ * RBAC split (Phase 1 · point 9): drafting needs `content.edit`; anything that changes the LIVE
+ * storefront (publish / schedule / unpublish / reset) additionally needs `content.publish`. Enforced
+ * here on the server, not merely by hiding buttons.
+ */
 export const runtime = "nodejs";
+const LIVE_CHANGING = new Set(["publish", "reset"]); // actions that alter what customers see
 
 export async function POST(request: Request) {
-  const staff = await requireCapability("catalog.manage");
-  if (!staff.ok) return NextResponse.json({ error: "Forbidden — catalog.manage required." }, { status: 403 });
+  // Everyone reaching this route must at least be able to edit drafts.
+  const staff = await requireCapability("content.edit");
+  if (!staff.ok) return NextResponse.json({ error: "Forbidden — content.edit required." }, { status: 403 });
   const actor = staff.userId ?? undefined;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -17,6 +25,11 @@ export async function POST(request: Request) {
   try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
   const menu = body.menu as MenuId;
   if (menu !== "header" && menu !== "footer") return NextResponse.json({ error: "menu must be header or footer" }, { status: 400 });
+
+  // Live-changing actions require the distinct publish capability — editing never implies publishing.
+  if (LIVE_CHANGING.has(body.action) && !hasCapability(staff.role, "content.publish")) {
+    return NextResponse.json({ error: "Forbidden — content.publish required to change the live storefront." }, { status: 403 });
+  }
 
   switch (body.action) {
     case "save": {
