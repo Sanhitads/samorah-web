@@ -26,7 +26,14 @@ export function RedemptionsPanel({ rows }: { rows: RedemptionRow[] }) {
 
   const restore = async (r: RedemptionRow) => {
     if (!r.orderId) return;
-    const reason = window.prompt(`Restore the ${r.couponCode} redemption for order ${r.orderNumber ?? r.orderId}?\nEnter a reason (required):`);
+    // Restore is operationally sensitive: released → restored does NOT itself prove the order was paid,
+    // and it re-holds a coupon slot (used_count +1). Require an explicit, reasoned confirmation.
+    const reason = window.prompt(
+      `Restore the ${r.couponCode} redemption for order ${r.orderNumber ?? r.orderId}?\n\n` +
+      `Use ONLY when this redemption was released incorrectly. Restoring re-holds the coupon slot ` +
+      `(usage +1); it does not by itself prove the order was paid, and analytics still only count it once the order is genuinely paid.\n\n` +
+      `Enter a reason (required, audited):`,
+    );
     if (!reason?.trim()) return;
     setBusy(r.id); setErr("");
     try {

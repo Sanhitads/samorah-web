@@ -402,19 +402,90 @@
 .cfg-timeline__row { display: grid; grid-template-columns: 160px 1fr auto; gap: 10px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--ad-hair); font-size: 12.5px; }
 .cfg-timeline__when { font-family: var(--font-mono, monospace); font-size: 11px; color: var(--smoke, #6b6259); }
 .cfg-timeline__what { font-family: var(--font-sans); color: var(--ink, #1f1a16); }
-/* Phase 3 — coupon warnings, analytics stats + drill-down, code generator */
-.cpn-warn { display: inline-block; padding: 1px 7px; border-radius: 999px; font-family: var(--font-sans); font-size: 11px; white-space: pre-line; }
-.cpn-warn--critical { background: rgba(168, 68, 58, 0.14); color: #8a3d2f; }
-.cpn-warn--warning { background: rgba(201, 169, 110, 0.2); color: #8a6d3b; }
-.cpn-warn--info { background: rgba(107, 98, 89, 0.12); color: #6b6259; }
+/* ── Phase 3 — coupon list/analytics UI polish ─────────────────────────────── */
+/* Secondary operational text — readable at 100% zoom (min ~12px), not brand-tiny. */
+.cpn-sub { font-family: var(--font-sans); font-size: 12px; color: var(--smoke, #6b6259); line-height: 1.4; margin-top: 2px; }
+.cpn .admin__mono, .cpn-code { font-size: 12.5px; }
+
+/* Compact operational table — tighter rows, middle-aligned (no tall gaps from the actions cell). */
+.cpn-table.admin__table--board { min-width: 1040px; }
+.cpn-table.admin__table--board tbody td { vertical-align: middle; padding: 7px 10px; }
+.cpn-table thead th { padding: 7px 10px; }
+.cpn-table td:first-child { max-width: 210px; }
+.cpn-table .cpn-sub { white-space: normal; word-break: break-word; }
+.cpn-statuscell { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+
+/* Toolbar — two intentional zones. */
+.cpn-toolbar__top { display: flex; gap: 12px; align-items: center; margin: 8px 0 10px; }
+.cpn-search { position: relative; flex: 1 1 auto; max-width: 460px; }
+.cpn-search__icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--smoke, #6b6259); font-size: 15px; pointer-events: none; }
+.cpn-search input { width: 100%; padding: 8px 12px 8px 30px; border: 1px solid var(--ad-hair); border-radius: 999px; background: #fff; font-family: var(--font-sans); font-size: 13px; }
+.cpn-search input:focus { outline: none; border-color: var(--smoke, #6b6259); }
+.cpn-toolbar__top .ff-btn--primary { white-space: nowrap; }
+.cpn-toolbar__filters { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+.cpn-filtergroup, .cpn-sortgroup { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cpn-filtergroup select, .cpn-sort select { padding: 6px 8px; border: 1px solid var(--ad-hair); border-radius: 4px; background: #fff; font-family: var(--font-sans); font-size: 12.5px; }
+.cpn-autocheck { white-space: nowrap; }
+.cpn-sort { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-sans); font-size: 12px; color: var(--smoke, #6b6259); }
+.cpn-clear { border: none; background: none; color: #8a3d2f; font-family: var(--font-sans); font-size: 12.5px; cursor: pointer; text-decoration: underline; }
+.cpn-meta { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; font-size: 12px; }
+
+/* Usage cell — explicit redemptions vs capacity. */
+.cpn-usage { display: flex; flex-direction: column; gap: 1px; }
+.cpn-usage > span:first-child { font-size: 12.5px; }
+
+/* Row actions — Edit + Analytics inline, everything else in a ••• overflow menu. */
+.cpn-rowactions { display: flex; gap: 6px; align-items: center; white-space: nowrap; }
+.cpn-morewrap { position: relative; }
+.cpn-more { font-weight: 700; letter-spacing: 1px; }
+.cpn-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 40; min-width: 168px; background: #fff; border: 1px solid var(--ad-hair); border-radius: 6px; box-shadow: 0 8px 24px rgba(31,26,22,0.14); padding: 4px; display: flex; flex-direction: column; }
+.cpn-menu__item { text-align: left; background: none; border: none; padding: 7px 10px; border-radius: 4px; font-family: var(--font-sans); font-size: 12.5px; color: var(--ink, #1f1a16); cursor: pointer; }
+.cpn-menu__item:hover { background: rgba(31,26,22,0.05); }
+.cpn-menu__item--sep { border-top: 1px solid var(--ad-hair); margin-top: 4px; padding-top: 8px; }
+.cpn-menu__item--danger { color: #8a3d2f; }
+.cpn-menu__item:disabled { opacity: .4; cursor: default; }
+
+/* Warning chip — restrained, reflects highest severity; click for a detailed popover. */
+.cpn-warncell { position: relative; }
+.cpn-warn { display: inline-flex; align-items: center; gap: 3px; padding: 1px 8px; border-radius: 999px; border: 1px solid transparent; font-family: var(--font-sans); font-size: 11.5px; cursor: pointer; }
+.cpn-warn--critical { background: rgba(168, 68, 58, 0.12); color: #8a3d2f; border-color: rgba(168,68,58,0.3); font-weight: 600; }
+.cpn-warn--warning { background: rgba(201, 169, 110, 0.18); color: #8a6d3b; }
+.cpn-warn--info { background: rgba(107, 98, 89, 0.1); color: #6b6259; }
+.cpn-pop { position: absolute; right: 0; top: calc(100% + 4px); z-index: 40; width: 260px; background: #fff; border: 1px solid var(--ad-hair); border-radius: 6px; box-shadow: 0 8px 24px rgba(31,26,22,0.14); padding: 8px; }
+.cpn-pop__row { margin: 0 0 6px; font-family: var(--font-sans); font-size: 12px; line-height: 1.45; display: grid; grid-template-columns: 16px 1fr; gap: 6px; }
+.cpn-pop__row:last-child { margin-bottom: 0; }
+.cpn-pop__row--critical > span:first-child { color: #8a3d2f; font-weight: 700; }
+.cpn-pop__row--warning > span:first-child { color: #8a6d3b; }
+.cpn-pop__row--info > span:first-child { color: #6b6259; }
+
+/* Code generator row. */
 .cpn-codegen { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .cpn-codegen > input:first-child { flex: 1 1 160px; }
-.cpn-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin: 10px 0; }
-.cpn-stat { padding: 10px 12px; border: 1px solid var(--ad-hair); border-radius: 4px; background: #faf8f4; display: flex; flex-direction: column; gap: 2px; }
-.cpn-stat__v { font-family: var(--font-mono, monospace); font-size: 17px; color: var(--ink, #1f1a16); }
-.cpn-stat__l { font-family: var(--font-sans); font-size: 11px; color: var(--smoke, #6b6259); }
-.cpn-warnlist { margin: 8px 0; }
-.cpn-orders { max-height: 44vh; overflow-y: auto; overflow-x: auto; }
+.cpn-codegen > input:nth-child(2) { max-width: 150px; }
+
+/* Editor sections. */
+.cfg-section { margin-top: 16px; }
+.cfg-section__h { margin: 0 0 8px; font-family: var(--font-sans); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--smoke, #6b6259); border-bottom: 1px solid var(--ad-hair); padding-bottom: 5px; }
+.cfg-field--inline { flex-direction: row; align-items: center; gap: 8px; }
+.cfg-field--inline input { max-width: 90px; }
+.cfg-preview__warns { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--ad-hair); }
+
+/* Analytics modal — primary vs secondary metric hierarchy. */
+.cpn-analytics-state { padding: 24px 0; display: flex; align-items: center; gap: 12px; }
+.cpn-fsnote { margin: 0 0 10px; font-size: 12.5px; }
+.cpn-stats { display: grid; gap: 10px; margin: 10px 0; }
+.cpn-stats--primary { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+.cpn-stats--secondary { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-top: 8px; }
+.cpn-stat { padding: 10px 12px; border: 1px solid var(--ad-hair); border-radius: 4px; background: #faf8f4; display: flex; flex-direction: column; gap: 3px; }
+.cpn-stat--primary { background: #f5f1ea; border-color: rgba(31,26,22,0.12); }
+.cpn-stat__v { font-family: var(--font-mono, monospace); color: var(--ink, #1f1a16); font-size: 15px; }
+.cpn-stat--primary .cpn-stat__v { font-size: 21px; }
+.cpn-stat__l { font-family: var(--font-sans); font-size: 11.5px; color: var(--smoke, #6b6259); }
+.cpn-stat__i { opacity: .5; }
+.cpn-warnlist { margin: 10px 0; }
+.cpn-orders__h { margin-top: 14px; }
+.cpn-orders { max-height: 40vh; overflow-y: auto; overflow-x: auto; border: 1px solid var(--ad-hair); border-radius: 4px; }
+.cpn-orders .admin__table { min-width: 640px; }
 .cfg-day { padding: 6px 12px; border: 1px solid var(--ad-hair); border-radius: 999px; background: #fff; cursor: pointer; font-family: var(--font-sans); font-size: 12px; text-transform: capitalize; }
 .cfg-day[data-on="1"] { background: #1f1a16; color: #faf7f2; border-color: #1f1a16; }
 .cfg-actions { display: flex; align-items: center; gap: 12px; margin-top: 8px; }

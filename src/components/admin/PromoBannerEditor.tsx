@@ -29,9 +29,12 @@ export function PromoBannerEditor({ initial }: { initial: PromoBanner }) {
 
   return (
     <section style={{ marginTop: 32 }}>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 10 }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 10, flexWrap: "wrap" }}>
         <p className="admin__eyebrow">Coupons · storefront</p>
         <h2 className="admin__title" style={{ fontSize: 18 }}>Promotional banner</h2>
+        <span className="om-pay" data-tone={form.enabled ? "paid" : "refunded"} title={form.enabled ? "The banner is showing on the storefront." : "The banner is saved but hidden from the storefront."}>
+          Storefront banner: {form.enabled ? "Live" : "Hidden"}
+        </span>
       </div>
       {/* Live preview mirrors the storefront strip. */}
       {form.message ? (

@@ -22,8 +22,11 @@ type Form = {
 
 const str = (n: number | null) => (n != null ? String(n) : "");
 const numOrNull = (s: string) => (s.trim() === "" ? null : Number(s));
-/** paise → ₹ (whole rupees, Indian grouping). Money always arrives pre-computed from the server. */
-const rupee = (paise: number) => "₹" + Math.round(paise / 100).toLocaleString("en-IN");
+/** paise → ₹ — whole rupees unless there's a genuine paise remainder (decimals only when necessary). */
+const money = (paise: number) => {
+  const r = paise / 100;
+  return r % 1 === 0 ? "₹" + r.toLocaleString("en-IN") : "₹" + r.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
 
 const toForm = (c: AdminCoupon): Form => ({
   id: c.id, code: c.code, publicDescription: c.publicDescription ?? "", internalNotes: c.internalNotes ?? "",
@@ -32,7 +35,9 @@ const toForm = (c: AdminCoupon): Form => ({
   eligibility: c.eligibility, autoApply: c.autoApply, combinable: c.combinable, priority: String(c.priority), excludeSale: c.excludeSale,
   startsAt: utcToIstLocal(c.startsAt), expiresAt: utcToIstLocal(c.expiresAt), status: c.status, targets: c.targets.map((t) => ({ ...t })),
 });
-const blank: Form = { code: "", publicDescription: "", internalNotes: "", type: "percent", value: 10, maxDiscount: "", minOrder: "0", minQualifyingQuantity: "", maxUses: "", maxUsesPerUser: "1", eligibility: "everyone", autoApply: false, combinable: false, priority: "100", excludeSale: false, startsAt: "", expiresAt: "", status: "draft", targets: [] };
+// Defaults are intentionally UNRESTRICTED: no minimum quantity, unlimited per-customer. The admin opts
+// into limits explicitly (see the defaults note reported to the merchant).
+const blank: Form = { code: "", publicDescription: "", internalNotes: "", type: "percent", value: 10, maxDiscount: "", minOrder: "0", minQualifyingQuantity: "", maxUses: "", maxUsesPerUser: "", eligibility: "everyone", autoApply: false, combinable: false, priority: "100", excludeSale: false, startsAt: "", expiresAt: "", status: "draft", targets: [] };
 
 const couponPayload = (f: Form, status: Lifecycle) => ({
   code: f.code, publicDescription: f.publicDescription || null, internalNotes: f.internalNotes || null,
@@ -47,10 +52,11 @@ const configFor = (f: Form): CouponConfigInput => ({
 
 const STATUS_TONE: Record<CouponEffectiveStatus, string> = { draft: "pending", scheduled: "refundprog", active: "paid", paused: "pending", expired: "failed", exhausted: "failed", archived: "refunded" };
 const effStatus = (c: AdminCoupon) => couponStatus({ status: c.status, startsAt: c.startsAt, expiresAt: c.expiresAt, maxUses: c.maxUses, usedCount: c.usedCount });
-const SEV_ICON: Record<WarningSeverity, string> = { critical: "⛔", warning: "⚠", info: "ℹ" };
+const SEV_ICON: Record<WarningSeverity, string> = { critical: "!", warning: "⚠", info: "ⓘ" };
 const topSev = (ws: CouponWarning[]): WarningSeverity | null => ws.some((w) => w.severity === "critical") ? "critical" : ws.some((w) => w.severity === "warning") ? "warning" : ws.some((w) => w.severity === "info") ? "info" : null;
 
 type SortKey = "created" | "updated" | "most_used" | "attr_rev" | "gross_disc" | "ending_soon";
+const SORT_LABEL: Record<SortKey, string> = { created: "Recently created", updated: "Recently updated", most_used: "Most used", attr_rev: "Highest attributed revenue", gross_disc: "Highest gross discount", ending_soon: "Ending soon" };
 
 export function CouponsManager({ coupons, targetOptions }: { coupons: AdminCoupon[]; targetOptions: TargetOptions }) {
   const router = useRouter();
@@ -60,7 +66,10 @@ export function CouponsManager({ coupons, targetOptions }: { coupons: AdminCoupo
   const [edit, setEdit] = useState<Form | null>(null);
   const [genPrefix, setGenPrefix] = useState("");
   const [timeline, setTimeline] = useState<{ code: string; entries: CouponAuditEntry[] } | null>(null);
-  const [analytics, setAnalytics] = useState<{ coupon: AdminCoupon; data: CouponAnalytics | null; orders: ContributingOrder[] | null; warnings: CouponWarning[] } | null>(null);
+  const [analytics, setAnalytics] = useState<{ coupon: AdminCoupon; data: CouponAnalytics | null; orders: ContributingOrder[] | null; warnings: CouponWarning[]; error: boolean } | null>(null);
+  const [analyticsLoadingId, setAnalyticsLoadingId] = useState<string | null>(null);
+  const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [warnFor, setWarnFor] = useState<string | null>(null);
 
   // Filters + sort (config search/filter/sort is client-side; financial aggregation is server-side).
   const [q, setQ] = useState("");
@@ -71,6 +80,8 @@ export function CouponsManager({ coupons, targetOptions }: { coupons: AdminCoupo
   const [fHealth, setFHealth] = useState<string>("");
   const [fAuto, setFAuto] = useState(false);
   const [sort, setSort] = useState<SortKey>("created");
+  const filtersActive = !!(q || fStatus !== "live" || fType || fElig || fApplies || fHealth || fAuto || sort !== "created");
+  const clearFilters = () => { setQ(""); setFStatus("live"); setFType(""); setFElig(""); setFApplies(""); setFHealth(""); setFAuto(false); setSort("created"); };
 
   // Server-computed analytics (Attributed Revenue + Gross Discount) + warnings, behind analytics.view.
   const [summary, setSummary] = useState<Record<string, CouponSummaryMetrics>>({});
@@ -86,11 +97,17 @@ export function CouponsManager({ coupons, targetOptions }: { coupons: AdminCoupo
       })
       .catch(() => setAnalyticsAllowed(false));
   };
-  // Reload analytics whenever the coupon set changes (after any mutation router.refresh()es the list).
   useEffect(loadAnalytics, [coupons]);
+  // Close overflow menu / warning popover on any outside click.
+  useEffect(() => {
+    if (!menuFor && !warnFor) return;
+    const h = () => { setMenuFor(null); setWarnFor(null); };
+    document.addEventListener("click", h);
+    return () => document.removeEventListener("click", h);
+  }, [menuFor, warnFor]);
 
   const post = async (body: Record<string, unknown>) => {
-    setBusy(true); setErr("");
+    setBusy(true); setErr(""); setMenuFor(null);
     try {
       const res = await fetch("/api/admin/coupons", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const d = await res.json();
@@ -114,10 +131,18 @@ export function CouponsManager({ coupons, targetOptions }: { coupons: AdminCoupo
     if (d?.entries) setTimeline({ code: c.code, entries: d.entries });
   };
   const openAnalytics = async (c: AdminCoupon) => {
-    setAnalytics({ coupon: c, data: null, orders: null, warnings: warnings[c.id] ?? [] });
-    const call = (action: string) => fetch("/api/admin/coupons/analytics", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, id: c.id }) }).then((r) => r.json());
-    const [detail, ords] = await Promise.all([call("detail"), call("orders")]);
-    setAnalytics((a) => (a && a.coupon.id === c.id ? { ...a, data: detail.analytics ?? null, orders: ords.orders ?? [] } : a));
+    setMenuFor(null);
+    setAnalyticsLoadingId(c.id);
+    setAnalytics({ coupon: c, data: null, orders: null, warnings: warnings[c.id] ?? [], error: false });
+    const call = (action: string) => fetch("/api/admin/coupons/analytics", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, id: c.id }) }).then((r) => (r.ok ? r.json() : Promise.reject(new Error("http"))));
+    try {
+      const [detail, ords] = await Promise.all([call("detail"), call("orders")]);
+      setAnalytics((a) => (a && a.coupon.id === c.id ? { ...a, data: detail.analytics ?? null, orders: ords.orders ?? [] } : a));
+    } catch {
+      setAnalytics((a) => (a && a.coupon.id === c.id ? { ...a, error: true } : a));
+    } finally {
+      setAnalyticsLoadingId(null);
+    }
   };
 
   const formErrors = edit ? validateCouponDraft(configFor(edit)) : [];
@@ -140,8 +165,7 @@ export function CouponsManager({ coupons, targetOptions }: { coupons: AdminCoupo
       const codes = new Set(ws.map((w) => w.code));
       return {
         needs: ws.some((w) => w.severity === "critical" || w.severity === "warning"),
-        expiring: codes.has("expiring_soon"),
-        near: codes.has("near_limit"),
+        expiring: codes.has("expiring_soon"), near: codes.has("near_limit"),
         config: codes.has("no_eligible_products") || codes.has("invalid_config") || codes.has("auto_conflict") || codes.has("archived_target"),
       };
     };
@@ -165,10 +189,7 @@ export function CouponsManager({ coupons, targetOptions }: { coupons: AdminCoupo
         if (fHealth === "near" && !h.near) return false;
         if (fHealth === "config" && !h.config) return false;
       }
-      if (term) {
-        const hay = `${c.code} ${c.publicDescription ?? ""} ${c.internalNotes ?? ""}`.toLowerCase();
-        if (!hay.includes(term)) return false;
-      }
+      if (term && !`${c.code} ${c.publicDescription ?? ""} ${c.internalNotes ?? ""}`.toLowerCase().includes(term)) return false;
       return true;
     });
     const rev = (id: string) => summary[id]?.attributedRevenuePaise ?? -1;
@@ -196,114 +217,195 @@ export function CouponsManager({ coupons, targetOptions }: { coupons: AdminCoupo
     const inc = c.targets.filter((t) => t.mode === "include");
     return inc.length ? inc.map(labelOf).join(", ") : "Entire order";
   };
-  const money = analyticsAllowed !== false; // hide the two financial columns if analytics.view is denied
-  const colCount = money ? 10 : 8;
+  const money$ = analyticsAllowed !== false; // hide the two financial columns if analytics.view is denied
+  const colCount = money$ ? 9 : 7;
+
+  // Lower-frequency lifecycle actions → overflow menu (Edit + Analytics stay inline).
+  const menuItems = (c: AdminCoupon) => {
+    const items: { label: string; onClick: () => void; danger?: boolean; sep?: boolean }[] = [];
+    if (c.status === "draft" || c.status === "paused") items.push({ label: "Activate", onClick: () => post({ action: "activate", id: c.id }) });
+    if (c.status === "active") items.push({ label: "Pause", onClick: () => post({ action: "pause", id: c.id }) });
+    items.push({ label: "Duplicate", onClick: () => { setMenuFor(null); const code = window.prompt(`Duplicate ${c.code} as (new code):`); if (code?.trim()) post({ action: "duplicate", id: c.id, code }); } });
+    items.push({ label: "View history", onClick: () => { setMenuFor(null); openTimeline(c); } });
+    if (c.status === "archived") items.push({ label: "Restore to draft", onClick: () => post({ action: "restore", id: c.id }) });
+    if (c.status === "active" || c.status === "paused") items.push({ label: "Archive", onClick: () => post({ action: "archive", id: c.id }), danger: true, sep: true });
+    if (c.status === "draft") items.push({ label: "Delete draft", onClick: () => post({ action: "delete", id: c.id }), danger: true, sep: true });
+    return items;
+  };
 
   return (
-    <div className="cfg">
-      <div className="cfg-actions" style={{ flexWrap: "wrap", gap: 8 }}>
-        <button type="button" className="ff-btn ff-btn--primary" onClick={() => { setErr(""); setGenPrefix(""); setEdit({ ...blank }); }}>New coupon</button>
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search code / description / notes" title="Search code, public description, internal notes" style={{ minWidth: 220 }} />
-        <select value={fStatus} onChange={(e) => setFStatus(e.target.value)} title="Status"><option value="live">All (live)</option><option value="draft">Draft</option><option value="scheduled">Scheduled</option><option value="active">Active</option><option value="paused">Paused</option><option value="expired">Expired</option><option value="exhausted">Exhausted</option><option value="archived">Archived</option><option value="">Everything</option></select>
-        <select value={fHealth} onChange={(e) => setFHealth(e.target.value)} title="Operational health"><option value="">All health</option><option value="needs">Needs attention</option><option value="healthy">Healthy</option><option value="expiring">Expiring soon</option><option value="near">Near usage limit</option><option value="config">Configuration issue</option></select>
-        <select value={fType} onChange={(e) => setFType(e.target.value)} title="Type"><option value="">All types</option><option value="percent">Percent</option><option value="fixed">Fixed</option><option value="free_shipping">Free shipping</option></select>
-        <select value={fApplies} onChange={(e) => setFApplies(e.target.value)} title="Applies to"><option value="">Any target</option><option value="entire">Entire order</option><option value="category">Category</option><option value="collection">Chapter</option><option value="product">Product</option><option value="product_type">Product type</option><option value="variant">Variant</option></select>
-        <select value={fElig} onChange={(e) => setFElig(e.target.value)} title="Eligibility"><option value="">All customers</option><option value="everyone">Everyone</option><option value="first_order">First order</option></select>
-        <label className="om-check"><input type="checkbox" checked={fAuto} onChange={(e) => setFAuto(e.target.checked)} /><span>Auto-apply</span></label>
-        <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} title="Sort"><option value="created">Recently created</option><option value="updated">Recently updated</option><option value="most_used">Most used</option><option value="attr_rev">Highest attributed revenue</option><option value="gross_disc">Highest gross discount</option><option value="ending_soon">Ending soon</option></select>
+    <div className="cfg cpn">
+      {/* Zone 1: search + primary action */}
+      <div className="cpn-toolbar__top">
+        <div className="cpn-search">
+          <span className="cpn-search__icon" aria-hidden>⌕</span>
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search code, description or notes" aria-label="Search coupons" />
+        </div>
+        <button type="button" className="ff-btn ff-btn--primary" onClick={() => { setErr(""); setGenPrefix(""); setEdit({ ...blank }); }}>+ New coupon</button>
+      </div>
+      {/* Zone 2: filters (left) + sort (right) */}
+      <div className="cpn-toolbar__filters">
+        <div className="cpn-filtergroup">
+          <select value={fStatus} onChange={(e) => setFStatus(e.target.value)} aria-label="Status"><option value="live">All (live)</option><option value="draft">Draft</option><option value="scheduled">Scheduled</option><option value="active">Active</option><option value="paused">Paused</option><option value="expired">Expired</option><option value="exhausted">Exhausted</option><option value="archived">Archived</option><option value="">Everything</option></select>
+          <select value={fHealth} onChange={(e) => setFHealth(e.target.value)} aria-label="Operational health"><option value="">All health</option><option value="needs">Needs attention</option><option value="healthy">Healthy</option><option value="expiring">Expiring soon</option><option value="near">Near usage limit</option><option value="config">Configuration issue</option></select>
+          <select value={fType} onChange={(e) => setFType(e.target.value)} aria-label="Type"><option value="">All types</option><option value="percent">Percent</option><option value="fixed">Fixed</option><option value="free_shipping">Free shipping</option></select>
+          <select value={fApplies} onChange={(e) => setFApplies(e.target.value)} aria-label="Applies to"><option value="">Any target</option><option value="entire">Entire order</option><option value="category">Category</option><option value="collection">Chapter</option><option value="product">Product</option><option value="product_type">Product type</option><option value="variant">Variant</option></select>
+          <select value={fElig} onChange={(e) => setFElig(e.target.value)} aria-label="Customer"><option value="">All customers</option><option value="everyone">Everyone</option><option value="first_order">First order</option></select>
+          <label className="om-check cpn-autocheck"><input type="checkbox" checked={fAuto} onChange={(e) => setFAuto(e.target.checked)} /><span>Auto-apply</span></label>
+        </div>
+        <div className="cpn-sortgroup">
+          {filtersActive ? <button type="button" className="cpn-clear" onClick={clearFilters}>Clear filters</button> : null}
+          <label className="cpn-sort">Sort <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} aria-label="Sort">{(Object.keys(SORT_LABEL) as SortKey[]).map((k) => <option key={k} value={k}>{SORT_LABEL[k]}</option>)}</select></label>
+        </div>
+      </div>
+      <div className="cpn-meta">
+        <span className="admin__muted">Showing {rows.length} of {coupons.length} coupons</span>
         {pending ? <span className="ff-refreshing">updating…</span> : null}
         {err && !edit ? <span className="ff-err">{err}</span> : null}
       </div>
 
-      <table className="admin__table admin__table--board">
-        <thead><tr>
-          <th>Code</th><th>Offer</th><th>Applies to</th><th title="Successful redemptions and capacity (capacity includes live reservations)">Usage</th>
-          {money ? <th title="Net merchandise attributed to this coupon (pro-rata by discount share, refund-netted). An attribution model — not accounting revenue, profit, ROI or ROAS.">Attributed Revenue</th> : null}
-          {money ? <th title="Gross coupon benefit from the ledger. Subsequent refunds do NOT claw this back.">Gross Discount</th> : null}
-          <th>Validity (IST)</th><th>Status</th><th>Warnings</th><th>Actions</th>
-        </tr></thead>
-        <tbody>
-          {rows.map((c) => {
-            const s = effStatus(c);
-            const m = summary[c.id];
-            const ws = warnings[c.id] ?? [];
-            const sev = topSev(ws);
-            return (
-              <tr key={c.id}>
-                <td className="admin__mono">{c.code}{c.autoApply ? <span className="admin__muted"> · auto</span> : null}{c.publicDescription ? <div className="admin__muted">{c.publicDescription}</div> : null}</td>
-                <td>{c.type === "percent" ? `${c.value}%${c.maxDiscount ? ` up to ₹${c.maxDiscount}` : ""}` : c.type === "fixed" ? `₹${c.value}` : "Free ship"}{c.eligibility === "first_order" ? <div className="admin__muted">1st order</div> : null}{c.minOrder ? <div className="admin__muted">min ₹{c.minOrder}{c.minQualifyingQuantity ? ` · ${c.minQualifyingQuantity} items` : ""}</div> : c.minQualifyingQuantity ? <div className="admin__muted">{c.minQualifyingQuantity} items</div> : null}</td>
-                <td className="admin__muted">{appliesTo(c)}{c.excludeSale ? " · excl. sale" : ""}</td>
-                <td className="admin__mono" title="Successful redemptions · capacity used / limit (capacity includes reservations)">{m ? m.successfulRedemptions : 0} used{c.maxUses != null ? <div className="admin__muted">cap {c.usedCount}/{c.maxUses}</div> : <div className="admin__muted">{c.usedCount} cap · no limit</div>}</td>
-                {money ? <td className="admin__mono" title="Net Merchandise Attributed Revenue">{m ? rupee(m.attributedRevenuePaise) : "—"}</td> : null}
-                {money ? <td className="admin__mono" title="Gross Discount Given (ledger, not refund-adjusted)">{m ? rupee(m.grossDiscountPaise) : "—"}</td> : null}
-                <td className="admin__muted" title={s.reason}>{c.startsAt || c.expiresAt ? `${c.startsAt ? formatIST(c.startsAt, { dateOnly: true, withZone: false }) : "now"} – ${c.expiresAt ? formatIST(c.expiresAt, { dateOnly: true, withZone: false }) : "∞"}` : "—"}</td>
-                <td><span className="om-pay" data-tone={STATUS_TONE[s.status]} title={s.reason}>{s.status}</span></td>
-                <td>{sev ? <span className={`cpn-warn cpn-warn--${sev}`} title={ws.map((w) => `${SEV_ICON[w.severity]} ${w.message}`).join("\n")}>{SEV_ICON[sev]} {ws.length}</span> : <span className="admin__muted">—</span>}</td>
-                <td><div className="ff-actions" style={{ flexWrap: "wrap" }}>
-                  {money ? <button type="button" className="ff-btn ff-btn--mini" onClick={() => openAnalytics(c)} title="Analytics">📊 stats</button> : null}
-                  {(c.status === "draft" || c.status === "paused") ? <button type="button" className="ff-btn ff-btn--mini" disabled={busy} onClick={() => post({ action: "activate", id: c.id })} title="Activate">▶ activate</button> : null}
-                  {c.status === "active" ? <button type="button" className="ff-btn ff-btn--mini" disabled={busy} onClick={() => post({ action: "pause", id: c.id })} title="Pause">⏸ pause</button> : null}
-                  {c.status !== "archived" ? <button type="button" className="ff-btn ff-btn--mini" onClick={() => { setErr(""); setEdit(toForm(c)); }}>Edit</button> : null}
-                  <button type="button" className="ff-btn ff-btn--mini" onClick={() => openTimeline(c)} title="History">log</button>
-                  <button type="button" className="ff-btn ff-btn--mini" disabled={busy} onClick={() => { const code = window.prompt(`Duplicate ${c.code} as (new code):`); if (code?.trim()) post({ action: "duplicate", id: c.id, code }); }} title="Duplicate">dup</button>
-                  {(c.status === "active" || c.status === "paused") ? <button type="button" className="ff-btn ff-btn--mini" disabled={busy} onClick={() => post({ action: "archive", id: c.id })} title="Archive">archive</button> : null}
-                  {c.status === "archived" ? <button type="button" className="ff-btn ff-btn--mini" disabled={busy} onClick={() => post({ action: "restore", id: c.id })} title="Restore to draft">restore</button> : null}
-                  {c.status === "draft" ? <button type="button" className="ff-btn ff-btn--mini ff-btn--danger" disabled={busy} onClick={() => post({ action: "delete", id: c.id })} title="Delete draft">del</button> : null}
-                </div></td>
-              </tr>
-            );
-          })}
-          {rows.length === 0 ? <tr><td colSpan={colCount} className="admin__empty">No coupons match. Create one, or change the filters.</td></tr> : null}
-        </tbody>
-      </table>
+      <div className="admin__table-wrap">
+        <table className="admin__table admin__table--board cpn-table">
+          <thead><tr>
+            <th>Code</th><th>Offer</th><th>Applies to</th><th title="Successful (paid) redemptions, and capacity used vs limit. Capacity includes live reservations.">Usage</th>
+            {money$ ? <th title="Net merchandise attributed to this coupon (pro-rata by discount share, refund-netted). An attribution model — not accounting revenue, profit, ROI or ROAS.">Attributed Revenue</th> : null}
+            {money$ ? <th title="Historical promotional value given, before refund netting. Subsequent refunds do NOT claw this back.">Gross Discount Given</th> : null}
+            <th>Validity (IST)</th><th>Status</th><th>Actions</th>
+          </tr></thead>
+          <tbody>
+            {rows.map((c) => {
+              const s = effStatus(c);
+              const m = summary[c.id];
+              const ws = warnings[c.id] ?? [];
+              const sev = topSev(ws);
+              return (
+                <tr key={c.id}>
+                  <td className="admin__mono cpn-code">{c.code}{c.autoApply ? <span className="admin__muted"> · auto</span> : null}{c.publicDescription ? <div className="cpn-sub">{c.publicDescription}</div> : null}</td>
+                  <td>{c.type === "percent" ? `${c.value}%${c.maxDiscount ? ` up to ₹${c.maxDiscount}` : ""}` : c.type === "fixed" ? `₹${c.value}` : "Free ship"}{c.eligibility === "first_order" ? <div className="cpn-sub">1st order</div> : null}{c.minOrder ? <div className="cpn-sub">min ₹{c.minOrder}{c.minQualifyingQuantity ? ` · ${c.minQualifyingQuantity} items` : ""}</div> : c.minQualifyingQuantity ? <div className="cpn-sub">{c.minQualifyingQuantity} items</div> : null}</td>
+                  <td className="cpn-sub">{appliesTo(c)}{c.excludeSale ? " · excl. sale" : ""}</td>
+                  <td className="cpn-usage"><span>Redemptions {m ? m.successfulRedemptions : 0}</span><span className="cpn-sub">Capacity {c.maxUses != null ? `${c.usedCount} / ${c.maxUses}` : "Unlimited"}</span></td>
+                  {money$ ? <td className="admin__mono">{m ? money(m.attributedRevenuePaise) : "—"}</td> : null}
+                  {money$ ? <td className="admin__mono">{m ? money(m.grossDiscountPaise) : "—"}</td> : null}
+                  <td className="cpn-sub" title={s.reason}>{c.startsAt || c.expiresAt ? `${c.startsAt ? formatIST(c.startsAt, { dateOnly: true, withZone: false }) : "now"} – ${c.expiresAt ? formatIST(c.expiresAt, { dateOnly: true, withZone: false }) : "∞"}` : "—"}</td>
+                  <td className="cpn-statuscell cpn-warncell">
+                    <span className="om-pay" data-tone={STATUS_TONE[s.status]} title={s.reason}>{s.status}</span>
+                    {sev ? (
+                      <>
+                        <button type="button" className={`cpn-warn cpn-warn--${sev}`} onClick={(e) => { e.stopPropagation(); setWarnFor(warnFor === c.id ? null : c.id); setMenuFor(null); }} aria-label={`${ws.length} ${sev} warning${ws.length > 1 ? "s" : ""}`}>{SEV_ICON[sev]} {ws.length}</button>
+                        {warnFor === c.id ? (
+                          <div className="cpn-pop" onClick={(e) => e.stopPropagation()}>
+                            {ws.map((w, i) => <p key={i} className={`cpn-pop__row cpn-pop__row--${w.severity}`}><span>{SEV_ICON[w.severity]}</span> {w.message}</p>)}
+                          </div>
+                        ) : null}
+                      </>
+                    ) : null}
+                  </td>
+                  <td>
+                    <div className="cpn-rowactions">
+                      {c.status !== "archived" ? <button type="button" className="ff-btn ff-btn--mini" onClick={() => { setErr(""); setEdit(toForm(c)); }}>Edit</button> : null}
+                      {money$ ? <button type="button" className="ff-btn ff-btn--mini" disabled={analyticsLoadingId === c.id} onClick={() => openAnalytics(c)}>{analyticsLoadingId === c.id ? "…" : "Analytics"}</button> : null}
+                      <div className="cpn-morewrap">
+                        <button type="button" className="ff-btn ff-btn--mini cpn-more" aria-label="More actions" aria-haspopup="menu" onClick={(e) => { e.stopPropagation(); setMenuFor(menuFor === c.id ? null : c.id); setWarnFor(null); }}>•••</button>
+                        {menuFor === c.id ? (
+                          <div className="cpn-menu" role="menu" onClick={(e) => e.stopPropagation()}>
+                            {menuItems(c).map((it, i) => (
+                              <button key={i} type="button" role="menuitem" className={`cpn-menu__item${it.danger ? " cpn-menu__item--danger" : ""}${it.sep ? " cpn-menu__item--sep" : ""}`} disabled={busy} onClick={it.onClick}>{it.label}</button>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+            {rows.length === 0 ? <tr><td colSpan={colCount} className="admin__empty">No coupons match. {filtersActive ? <button type="button" className="cpn-clear" onClick={clearFilters}>Clear filters</button> : "Create one to get started."}</td></tr> : null}
+          </tbody>
+        </table>
+      </div>
 
       {edit ? (
         <div className="om-modal" role="dialog" aria-modal="true" onClick={() => !busy && setEdit(null)}>
           <div className="om-modal__card om-modal__card--wide" onClick={(e) => e.stopPropagation()}>
             <h2 className="om-modal__title">{edit.id ? `Edit ${edit.code}` : "New coupon"}{edit.id ? <span className="admin__muted"> · {edit.status}</span> : null}</h2>
-            <div className="cfg-grid">
-              <label className="cfg-field" data-wide="1"><span>Code</span>
-                <div className="cpn-codegen">
-                  <input value={edit.code} onChange={(e) => patch({ code: e.target.value.toUpperCase() })} placeholder="WELCOME10" />
-                  <input value={genPrefix} onChange={(e) => setGenPrefix(e.target.value)} placeholder="prefix (optional)" title="Optional prefix for Generate, e.g. WELCOME → WELCOME-K7M9P" style={{ maxWidth: 150 }} />
-                  <button type="button" className="ff-btn ff-btn--mini" onClick={() => patch({ code: generateCouponCode(genPrefix) })} title="Generate a readable, unguessable code (manual entry still works)">Generate</button>
-                </div>
-              </label>
-              <label className="cfg-field"><span>Type</span><select value={edit.type} onChange={(e) => patch({ type: e.target.value as Form["type"] })}><option value="percent">Percent (%)</option><option value="fixed">Fixed (₹)</option><option value="free_shipping">Free shipping</option></select></label>
-              {edit.type !== "free_shipping" ? <label className="cfg-field"><span>Value {edit.type === "percent" ? "(%)" : "(₹)"}</span><input type="number" value={edit.value} onChange={(e) => patch({ value: Number(e.target.value) })} /></label> : null}
-              {edit.type === "percent" ? <label className="cfg-field"><span>Max discount (₹)</span><input type="number" value={edit.maxDiscount} onChange={(e) => patch({ maxDiscount: e.target.value })} placeholder="no cap" /></label> : null}
-              <label className="cfg-field"><span>Min order (₹)</span><input type="number" value={edit.minOrder} onChange={(e) => patch({ minOrder: e.target.value })} /></label>
-              <label className="cfg-field"><span>Min qualifying items</span><input type="number" value={edit.minQualifyingQuantity} onChange={(e) => patch({ minQualifyingQuantity: e.target.value })} placeholder="1" title="Minimum eligible units" /></label>
-              <label className="cfg-field"><span>Customer eligibility</span><select value={edit.eligibility} onChange={(e) => patch({ eligibility: e.target.value as Form["eligibility"] })}><option value="everyone">Everyone</option><option value="first_order">First-order only</option></select></label>
-              <label className="cfg-field"><span>Max uses (total)</span><input type="number" value={edit.maxUses} onChange={(e) => patch({ maxUses: e.target.value })} placeholder="unlimited" /></label>
-              <label className="cfg-field"><span>Per customer</span><input type="number" value={edit.maxUsesPerUser} onChange={(e) => patch({ maxUsesPerUser: e.target.value })} placeholder="unlimited" /></label>
-              {edit.autoApply || edit.combinable ? <label className="cfg-field"><span>Priority</span><input type="number" value={edit.priority} onChange={(e) => patch({ priority: e.target.value })} title="Lower applies first / wins ties" /></label> : null}
-              <label className="cfg-field"><span>Starts (IST)</span><input type="datetime-local" value={edit.startsAt} onChange={(e) => patch({ startsAt: e.target.value })} /><small className="admin__muted">{edit.startsAt ? formatIST(istLocalToUtc(edit.startsAt)) : "no start"}</small></label>
-              <label className="cfg-field"><span>Ends (IST)</span><input type="datetime-local" value={edit.expiresAt} onChange={(e) => patch({ expiresAt: e.target.value })} /><small className="admin__muted">{edit.expiresAt ? formatIST(istLocalToUtc(edit.expiresAt)) : "no end"}</small></label>
-              <label className="cfg-field" data-wide="1"><span>Public description (shown to customers)</span><input value={edit.publicDescription} onChange={(e) => patch({ publicDescription: e.target.value })} placeholder="Welcome offer — 10% off your first order" /></label>
-              <label className="cfg-field" data-wide="1"><span>Internal notes (admin-only — never shown to customers)</span><input value={edit.internalNotes} onChange={(e) => patch({ internalNotes: e.target.value })} placeholder="Instagram launch, Aug 2026" /></label>
-            </div>
-            <div className="cfg-checks">
-              <label className="om-check"><input type="checkbox" checked={edit.autoApply} onChange={(e) => patch({ autoApply: e.target.checked })} /><span>Auto-apply (no code needed)</span></label>
-              <label className="om-check"><input type="checkbox" checked={edit.combinable} onChange={(e) => patch({ combinable: e.target.checked })} /><span>Combinable (stack with other discounts)</span></label>
-              <label className="om-check"><input type="checkbox" checked={edit.excludeSale} onChange={(e) => patch({ excludeSale: e.target.checked })} /><span>Exclude sale items</span></label>
-            </div>
 
-            <CouponTargetsEditor targets={edit.targets} options={targetOptions} onChange={(targets) => patch({ targets })} />
+            <section className="cfg-section">
+              <h4 className="cfg-section__h">Offer &amp; limits</h4>
+              <div className="cfg-grid">
+                <label className="cfg-field" data-wide="1"><span>Code</span>
+                  <div className="cpn-codegen">
+                    <input value={edit.code} onChange={(e) => patch({ code: e.target.value.toUpperCase() })} placeholder="WELCOME10" />
+                    <input value={genPrefix} onChange={(e) => setGenPrefix(e.target.value)} placeholder="prefix (optional)" title="Optional prefix for Generate, e.g. WELCOME → WELCOME-K7M9P" />
+                    <button type="button" className="ff-btn ff-btn--mini" onClick={() => patch({ code: generateCouponCode(genPrefix) })} title="Generate a readable, unguessable code (manual entry still works)">Generate</button>
+                  </div>
+                </label>
+                <label className="cfg-field"><span>Type</span><select value={edit.type} onChange={(e) => patch({ type: e.target.value as Form["type"] })}><option value="percent">Percent (%)</option><option value="fixed">Fixed (₹)</option><option value="free_shipping">Free shipping</option></select></label>
+                {edit.type !== "free_shipping" ? <label className="cfg-field"><span>Value {edit.type === "percent" ? "(%)" : "(₹)"}</span><input type="number" value={edit.value} onChange={(e) => patch({ value: Number(e.target.value) })} /></label> : null}
+                {edit.type === "percent" ? <label className="cfg-field"><span>Max discount (₹)</span><input type="number" value={edit.maxDiscount} onChange={(e) => patch({ maxDiscount: e.target.value })} placeholder="no cap" /></label> : null}
+                <label className="cfg-field"><span>Min order (₹)</span><input type="number" value={edit.minOrder} onChange={(e) => patch({ minOrder: e.target.value })} /></label>
+                <label className="cfg-field"><span>Min qualifying items</span><input type="number" value={edit.minQualifyingQuantity} onChange={(e) => patch({ minQualifyingQuantity: e.target.value })} placeholder="none" title="Minimum eligible units (blank = no minimum)" /></label>
+                <label className="cfg-field"><span>Max uses (total)</span><input type="number" value={edit.maxUses} onChange={(e) => patch({ maxUses: e.target.value })} placeholder="unlimited" /></label>
+                <label className="cfg-field"><span>Per customer</span><input type="number" value={edit.maxUsesPerUser} onChange={(e) => patch({ maxUsesPerUser: e.target.value })} placeholder="unlimited" /></label>
+              </div>
+            </section>
+
+            <section className="cfg-section">
+              <h4 className="cfg-section__h">Eligibility</h4>
+              <div className="cfg-grid">
+                <label className="cfg-field"><span>Customer eligibility</span><select value={edit.eligibility} onChange={(e) => patch({ eligibility: e.target.value as Form["eligibility"] })}><option value="everyone">Everyone</option><option value="first_order">First-order only</option></select></label>
+              </div>
+            </section>
+
+            <section className="cfg-section">
+              <h4 className="cfg-section__h">Schedule</h4>
+              <div className="cfg-grid">
+                <label className="cfg-field"><span>Starts (IST)</span><input type="datetime-local" value={edit.startsAt} onChange={(e) => patch({ startsAt: e.target.value })} /><small className="admin__muted">{edit.startsAt ? formatIST(istLocalToUtc(edit.startsAt)) : "no start"}</small></label>
+                <label className="cfg-field"><span>Ends (IST)</span><input type="datetime-local" value={edit.expiresAt} onChange={(e) => patch({ expiresAt: e.target.value })} /><small className="admin__muted">{edit.expiresAt ? formatIST(istLocalToUtc(edit.expiresAt)) : "no end"}</small></label>
+              </div>
+            </section>
+
+            <section className="cfg-section">
+              <h4 className="cfg-section__h">Customer messaging</h4>
+              <div className="cfg-grid">
+                <label className="cfg-field" data-wide="1"><span>Public description (shown to customers)</span><input value={edit.publicDescription} onChange={(e) => patch({ publicDescription: e.target.value })} placeholder="Welcome offer — 10% off your first order" /></label>
+                <label className="cfg-field" data-wide="1"><span>Internal notes (admin-only — never shown to customers)</span><input value={edit.internalNotes} onChange={(e) => patch({ internalNotes: e.target.value })} placeholder="Instagram launch, Aug 2026" /></label>
+              </div>
+            </section>
+
+            <section className="cfg-section">
+              <h4 className="cfg-section__h">Promotion behaviour</h4>
+              <div className="cfg-checks">
+                <label className="om-check"><input type="checkbox" checked={edit.autoApply} onChange={(e) => patch({ autoApply: e.target.checked })} /><span>Auto-apply (no code needed)</span></label>
+                <label className="om-check"><input type="checkbox" checked={edit.combinable} onChange={(e) => patch({ combinable: e.target.checked })} /><span>Combinable (stack with other discounts)</span></label>
+                <label className="om-check"><input type="checkbox" checked={edit.excludeSale} onChange={(e) => patch({ excludeSale: e.target.checked })} /><span>Exclude sale items</span></label>
+                {edit.autoApply || edit.combinable ? <label className="cfg-field cfg-field--inline"><span>Priority</span><input type="number" value={edit.priority} onChange={(e) => patch({ priority: e.target.value })} title="Lower applies first / wins ties" /></label> : null}
+              </div>
+            </section>
+
+            <section className="cfg-section">
+              <h4 className="cfg-section__h">Targeting &amp; exclusions</h4>
+              <CouponTargetsEditor targets={edit.targets} options={targetOptions} onChange={(targets) => patch({ targets })} />
+            </section>
 
             {preview ? (
-              <div className="cfg-preview">
-                <p className="admin__eyebrow">Rule summary</p>
-                <p className="cfg-preview__lines">{preview.lines.join(" · ")}</p>
-                {preview.warnings.map((w, i) => <p key={i} className="cfg-preview__warn">⚠ {w}</p>)}
-              </div>
+              <section className="cfg-section">
+                <h4 className="cfg-section__h">Rule summary</h4>
+                <div className="cfg-preview">
+                  <p className="cfg-preview__lines">{preview.lines.join(" · ")}</p>
+                  {preview.warnings.length ? (
+                    <div className="cfg-preview__warns">
+                      {preview.warnings.map((w, i) => <p key={i} className="cfg-preview__warn">⚠ {w}</p>)}
+                    </div>
+                  ) : null}
+                </div>
+              </section>
             ) : null}
 
             {formErrors.length ? <p className="ff-err">{formErrors[0]}</p> : err ? <p className="ff-err">{err}</p> : null}
             <div className="om-modal__actions">
               <button type="button" className="ff-btn" disabled={busy} onClick={() => setEdit(null)}>Cancel</button>
               {edit.status === "active" ? (
-                <button type="button" className="ff-btn ff-btn--primary" disabled={busy} onClick={() => save(edit, true)}>{busy ? "Saving…" : "Save"}</button>
+                <button type="button" className="ff-btn ff-btn--primary" disabled={busy} onClick={() => save(edit, true)}>{busy ? "Saving…" : "Save changes"}</button>
               ) : (
                 <>
                   <button type="button" className="ff-btn" disabled={busy || formErrors.length > 0} onClick={() => save(edit, false)}>{busy ? "Saving…" : `Save ${edit.status === "draft" ? "draft" : edit.status}`}</button>
@@ -315,14 +417,14 @@ export function CouponsManager({ coupons, targetOptions }: { coupons: AdminCoupo
         </div>
       ) : null}
 
-      {analytics ? <AnalyticsModal a={analytics} onClose={() => setAnalytics(null)} /> : null}
+      {analytics ? <AnalyticsModal a={analytics} onRetry={() => openAnalytics(analytics.coupon)} onClose={() => setAnalytics(null)} /> : null}
 
       {timeline ? (
         <div className="om-modal" role="dialog" aria-modal="true" onClick={() => setTimeline(null)}>
           <div className="om-modal__card" onClick={(e) => e.stopPropagation()}>
             <h2 className="om-modal__title">History · {timeline.code}</h2>
             <div className="cfg-timeline">
-              {timeline.entries.length === 0 ? <p className="admin__muted">No history recorded.</p> : null}
+              {timeline.entries.length === 0 ? <p className="admin__muted">No changes recorded yet.</p> : null}
               {timeline.entries.map((e) => (
                 <div key={e.id} className="cfg-timeline__row">
                   <span className="cfg-timeline__when">{formatIST(e.createdAt)}</span>
@@ -340,48 +442,55 @@ export function CouponsManager({ coupons, targetOptions }: { coupons: AdminCoupo
 }
 
 /** Read-only per-coupon analytics + contributing-orders drill-down (deep-links to the Order Command Centre). */
-function AnalyticsModal({ a, onClose }: { a: { coupon: AdminCoupon; data: CouponAnalytics | null; orders: ContributingOrder[] | null; warnings: CouponWarning[] }; onClose: () => void }) {
+function AnalyticsModal({ a, onRetry, onClose }: { a: { coupon: AdminCoupon; data: CouponAnalytics | null; orders: ContributingOrder[] | null; warnings: CouponWarning[]; error: boolean }; onRetry: () => void; onClose: () => void }) {
   const d = a.data;
-  const stat = (label: string, value: string, title?: string) => (
-    <div className="cpn-stat" title={title}><span className="cpn-stat__v">{value}</span><span className="cpn-stat__l">{label}</span></div>
+  const money2 = (paise: number) => { const r = paise / 100; return r % 1 === 0 ? "₹" + r.toLocaleString("en-IN") : "₹" + r.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+  const stat = (label: string, value: string, title?: string, primary?: boolean) => (
+    <div className={`cpn-stat${primary ? " cpn-stat--primary" : ""}`} title={title}><span className="cpn-stat__v">{value}</span><span className="cpn-stat__l">{label}{title ? <span className="cpn-stat__i" aria-hidden> ⓘ</span> : null}</span></div>
   );
-  const cap = d ? (d.maxUses != null ? `${d.usedCount} / ${d.maxUses}` : `${d.usedCount} used · no limit`) : "—";
+  const cap = d ? (d.maxUses != null ? `${d.usedCount} / ${d.maxUses}` : `${d.usedCount} · Unlimited`) : "—";
   return (
     <div className="om-modal" role="dialog" aria-modal="true" onClick={onClose}>
       <div className="om-modal__card om-modal__card--wide" onClick={(e) => e.stopPropagation()}>
         <h2 className="om-modal__title">Analytics · {a.coupon.code}</h2>
-        {!d ? <p className="admin__muted">Loading…</p> : (
+        {a.error ? (
+          <div className="cpn-analytics-state"><p>Couldn’t load analytics.</p><button type="button" className="ff-btn ff-btn--mini" onClick={onRetry}>Retry</button></div>
+        ) : !d ? (
+          <p className="admin__muted cpn-analytics-state">Loading coupon analytics…</p>
+        ) : (
           <>
-            {d.isFreeShipping ? <p className="admin__muted">Free-shipping coupon — its benefit is shipping, so it earns ₹0 <em>merchandise</em> attributed revenue by design (Model A).</p> : null}
-            <div className="cpn-stats">
-              {stat("Successful Redemptions", String(d.successfulRedemptions), "Payment-proven completed redemptions (consumed/restored, paid).")}
-              {stat("Orders Using Coupon", String(d.ordersUsingCoupon))}
+            {d.isFreeShipping ? <p className="admin__muted cpn-fsnote">Free-shipping coupon — its benefit is shipping, so it earns ₹0 <em>merchandise</em> attributed revenue by design (Model A).</p> : null}
+            <div className="cpn-stats cpn-stats--primary">
+              {stat("Attributed Revenue", money2(d.attributedRevenuePaise), "Net Merchandise Attributed Revenue — an attribution model, not accounting revenue / profit / ROI / ROAS.", true)}
+              {stat("Gross Discount Given", money2(d.grossDiscountPaise), "Historical promotional value given, before refund netting. Refunds do NOT claw this back.", true)}
+              {stat("Successful Redemptions", String(d.successfulRedemptions), "Payment-proven completed redemptions (consumed/restored, paid).", true)}
+              {stat("Orders", String(d.ordersUsingCoupon), undefined, true)}
+            </div>
+            <div className="cpn-stats cpn-stats--secondary">
               {stat("Unique Customers", String(d.uniqueCustomers), "Distinct account identity or normalized guest email. The same person using multiple identities may be counted more than once.")}
-              {stat("Attributed Revenue", rupeeFull(d.attributedRevenuePaise), "Net Merchandise Attributed Revenue — an attribution model, not accounting revenue / profit / ROI / ROAS.")}
-              {stat("Gross Discount Given", rupeeFull(d.grossDiscountPaise), "Ledger benefit granted. Refunds do NOT claw this back.")}
-              {stat("Attributed Revenue / Order", d.attributedAovPaise != null ? rupeeFull(d.attributedAovPaise) : "—")}
-              {stat("Avg Discount / Order", d.avgDiscountPerOrderPaise != null ? rupeeFull(d.avgDiscountPerOrderPaise) : "—")}
+              {stat("Attributed Revenue / Order", d.attributedAovPaise != null ? money2(d.attributedAovPaise) : "—")}
+              {stat("Avg Discount / Order", d.avgDiscountPerOrderPaise != null ? money2(d.avgDiscountPerOrderPaise) : "—")}
               {stat("Usage / Capacity", cap, "Capacity includes live reservations, so it can exceed successful redemptions.")}
-              {stat("Attribution Efficiency", d.efficiencyRatio != null ? `${d.efficiencyRatio.toFixed(1)}×` : "—", "₹ attributed revenue per ₹1 gross discount. An efficiency ratio — NOT ROI, ROAS or profit.")}
+              {stat("Attribution Efficiency", d.efficiencyRatio != null ? `${d.efficiencyRatio.toFixed(1)}×` : "—", "Revenue attributed per ₹1 of gross coupon discount. An efficiency ratio — NOT profit, ROI or ROAS.")}
             </div>
             {a.warnings.length ? (
               <div className="cpn-warnlist">
-                {a.warnings.map((w, i) => <p key={i} className={`cpn-warn cpn-warn--${w.severity}`} style={{ display: "block", margin: "2px 0" }}>{w.message}</p>)}
+                {a.warnings.map((w, i) => <p key={i} className={`cpn-pop__row cpn-pop__row--${w.severity}`}><span>{SEV_ICON[w.severity]}</span> {w.message}</p>)}
               </div>
             ) : null}
-            <p className="admin__eyebrow" style={{ marginTop: 12 }}>Contributing orders</p>
+            <p className="admin__eyebrow cpn-orders__h">Contributing orders</p>
             <div className="cpn-orders">
-              <table className="admin__table">
+              <table className="admin__table cpn-table">
                 <thead><tr><th>Order #</th><th>Date</th><th>Customer</th><th>Order Value</th><th>Coupon Discount</th><th>Attributed Revenue</th><th>State</th></tr></thead>
                 <tbody>
                   {(a.orders ?? []).map((o) => (
                     <tr key={o.orderNumber}>
                       <td className="admin__mono"><a href={`/admin/orders/${o.orderNumber}`} target="_blank" rel="noreferrer">{o.orderNumber}</a></td>
-                      <td className="admin__muted">{formatIST(o.createdAt, { dateOnly: true, withZone: false })}</td>
-                      <td className="admin__muted">{o.customer}</td>
-                      <td className="admin__mono">{rupeeFull(o.orderValuePaise)}</td>
-                      <td className="admin__mono">{rupeeFull(o.couponDiscountPaise)}</td>
-                      <td className="admin__mono">{rupeeFull(o.attributedRevenuePaise)}</td>
+                      <td className="cpn-sub">{formatIST(o.createdAt, { dateOnly: true, withZone: false })}</td>
+                      <td className="cpn-sub">{o.customer}</td>
+                      <td className="admin__mono">{money2(o.orderValuePaise)}</td>
+                      <td className="admin__mono">{money2(o.couponDiscountPaise)}</td>
+                      <td className="admin__mono">{money2(o.attributedRevenuePaise)}</td>
                       <td><span className="om-pay" data-tone={o.paymentState === "refunded" ? "refunded" : o.paymentState === "partially_refunded" ? "refundprog" : "paid"}>{o.paymentState}</span></td>
                     </tr>
                   ))}
@@ -397,8 +506,6 @@ function AnalyticsModal({ a, onClose }: { a: { coupon: AdminCoupon; data: Coupon
     </div>
   );
 }
-
-const rupeeFull = (paise: number) => "₹" + (paise / 100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const fmtVal = (v: unknown) => (v == null || v === "" ? "—" : Array.isArray(v) ? (v.length ? v.join(", ") : "none") : String(v));
 function renderAudit(e: CouponAuditEntry): string {
