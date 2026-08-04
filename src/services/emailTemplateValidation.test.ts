@@ -44,6 +44,58 @@ describe("validateEmailTemplate — blocks on publish", () => {
   });
 });
 
+describe("CTA destination structure (point 18)", () => {
+  const cta = (ctaHref: string, ctaLabel = "Track your order") =>
+    validateEmailTemplate(def("order.dispatched"), content({ subject: "Order {{orderNumber}}", blocks: [{ type: "cta", ctaLabel, ctaHref }, { type: "details" }] }));
+
+  it("blocks a malformed href (whitespace / backslash / ..)", () => {
+    expect(cta("/account/ orders").errors.some((e) => /malformed/i.test(e))).toBe(true);
+    expect(cta("/account\\orders").errors.some((e) => /malformed/i.test(e))).toBe(true);
+    expect(cta("/account/../secret").errors.some((e) => /malformed/i.test(e))).toBe(true);
+  });
+  it("blocks a broken button (no href / '#')", () => {
+    expect(cta("#").errors.some((e) => /no working link/i.test(e))).toBe(true);
+    expect(cta("").errors.some((e) => /no working link/i.test(e))).toBe(true);
+  });
+  it("accepts well-formed known internal paths (incl. tokens) and safe external links", () => {
+    expect(cta("/account/orders/{{orderNumber}}").errors).toEqual([]);
+    expect(cta("/order/{{orderNumber}}/track").errors).toEqual([]);
+    expect(cta("/returns").errors).toEqual([]);
+    expect(cta("https://samorah.example/help").errors).toEqual([]);
+    expect(cta("mailto:care@samorah.example").errors).toEqual([]);
+  });
+  it("warns (not blocks) on a well-formed but unrecognised internal path", () => {
+    const v = cta("/totally-made-up-page");
+    expect(v.errors).toEqual([]);
+    expect(v.warnings.some((w) => /known site page/i.test(w))).toBe(true);
+  });
+  it("blocks an unsafe external protocol", () => {
+    expect(cta("javascript:alert(1)").errors.some((e) => /unsafe protocol/i.test(e))).toBe(true);
+    expect(cta("data:text/html,<b>x</b>").errors.some((e) => /unsafe protocol/i.test(e))).toBe(true);
+  });
+});
+
+describe("Accessibility of the structured content (point 19)", () => {
+  it("blocks a button with no label", () => {
+    const v = validateEmailTemplate(def("order.dispatched"), content({ subject: "Order {{orderNumber}}", blocks: [{ type: "cta", ctaLabel: "", ctaHref: "/order/{{orderNumber}}/track" }, { type: "details" }] }));
+    expect(v.errors.some((e) => /missing its label/i.test(e))).toBe(true);
+  });
+  it("warns on a non-descriptive CTA label", () => {
+    const v = validateEmailTemplate(def("order.dispatched"), content({ subject: "Order {{orderNumber}}", blocks: [{ type: "cta", ctaLabel: "Click here", ctaHref: "/order/{{orderNumber}}/track" }, { type: "details" }] }));
+    expect(v.warnings.some((w) => /descriptive/i.test(w))).toBe(true);
+    expect(v.errors).toEqual([]); // a warning, never a publish block
+  });
+  it("warns on an empty heading block", () => {
+    const v = validateEmailTemplate(def("order.confirmed"), content({ blocks: [{ type: "heading", text: "  " }, { type: "details" }] }));
+    expect(v.warnings.some((w) => /heading block has no text/i.test(w))).toBe(true);
+  });
+  it("a descriptive label + good link is clean", () => {
+    const v = validateEmailTemplate(def("order.dispatched"), content({ subject: "Order {{orderNumber}}", blocks: [{ type: "cta", ctaLabel: "Track your order", ctaHref: "/order/{{orderNumber}}/track" }, { type: "details" }] }));
+    expect(v.errors).toEqual([]);
+    expect(v.warnings).toEqual([]);
+  });
+});
+
 // The variables panel must reflect the ACTUAL send-time vars each event provides in
 // src/lib/notifications/channels/email.ts → render(). If that mapping changes, update DEFS here so
 // the admin panel never advertises a token production won't resolve (which would render blank).

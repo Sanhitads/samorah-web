@@ -34,6 +34,26 @@ export const EMAIL_TEMPLATE_DEFS: EmailTemplateDef[] = [
 
 const DEF_BY_KEY = new Map(EMAIL_TEMPLATE_DEFS.map((d) => [d.key, d]));
 const SAFE_SCHEMES = new Set(["http", "https", "mailto", "tel"]);
+// Known top-level storefront/account segments — an internal CTA path outside this set is flagged
+// (warn, not block) so a typo'd destination is caught without false-positiving on a valid new route.
+const KNOWN_INTERNAL_SEGMENTS = new Set(["", "account", "order", "orders", "returns", "return", "shop", "collections", "products", "product", "wishlist", "cart", "checkout", "track", "invoice", "contact", "about", "blog", "login", "register"]);
+// Non-descriptive CTA labels — meaningless to a screen-reader user reading links out of context (a11y).
+const GENERIC_CTA_LABELS = new Set(["click here", "click", "here", "link", "this link", "read more", "learn more", "more", "tap here", "go", "submit"]);
+
+/** Validate a CTA destination's structure (point 18). Returns an error (blocks publish) for malformed
+ *  or unsafe links, or a warning for an unrecognised internal path. Tokens are resolved at send. */
+function validateCtaHref(h: string): { error?: string; warn?: string } {
+  if (h.startsWith("{{")) return {}; // whole-URL token — resolved against send-time vars
+  if (/[\s\\]/.test(h) || h.includes("..") || [...h].some((ch) => ch.charCodeAt(0) < 32)) return { error: `Button URL "${h}" is malformed.` };
+  const scheme = h.match(/^([a-z][a-z0-9+.-]*):/i)?.[1]?.toLowerCase();
+  if (scheme) return SAFE_SCHEMES.has(scheme) ? {} : { error: `Button URL has an unsafe protocol: ${h}` };
+  if (h.startsWith("/")) {
+    const seg = h.slice(1).split(/[/?#]/, 1)[0].replace(/\{\{.*$/, "").toLowerCase();
+    return KNOWN_INTERNAL_SEGMENTS.has(seg) ? {} : { warn: `Button URL "${h}" doesn't match a known site page — double-check the destination.` };
+  }
+  if (h.startsWith("#")) return {}; // in-email anchor
+  return { warn: `Button URL "${h}" should be an absolute https:// link or a "/" site path.` };
+}
 
 /** The editable content of a template (draft OR published). */
 export interface EmailContent { subject: string; preheader: string; intro: string; signoff: string; eyebrow: string; heading: string; blocks: EmailBlock[]; enabled: boolean }
@@ -63,10 +83,18 @@ export function validateEmailTemplate(def: EmailTemplateDef, c: EmailContent): T
   for (const tok of unknown) { const s = suggestToken(tok, [...def.vars]); errors.push(`Unknown variable {{${tok}}}${s ? ` — did you mean {{${s}}}?` : ` (valid: ${def.vars.map((v) => `{{${v}}}`).join(", ")})`}`); }
   if (!(c.subject ?? "").trim()) errors.push("Subject is empty.");
   if ((c.blocks ?? []).length && def.requiresDetails && !c.blocks.some((b) => b.type === "details")) errors.push(`This email must include an "Order/details" block so the transactional details aren't dropped.`);
-  for (const b of c.blocks ?? []) if (b.type === "cta" && b.ctaHref) {
-    const h = b.ctaHref.trim(); const scheme = h.match(/^([a-z][a-z0-9+.-]*):/i)?.[1]?.toLowerCase();
-    if (scheme && !SAFE_SCHEMES.has(scheme)) errors.push(`Button URL has an unsafe protocol: ${h}`);
-    else if (!scheme && !h.startsWith("/") && !h.startsWith("{{") && !h.startsWith("#")) warnings.push(`Button URL "${h}" may be malformed.`);
+  for (const b of c.blocks ?? []) {
+    // CTA (point 18 — destination structure/safety; point 19 — a11y label quality).
+    if (b.type === "cta") {
+      const label = (b.ctaLabel ?? "").trim();
+      const href = (b.ctaHref ?? "").trim();
+      if (!label) errors.push("A button is missing its label.");
+      else if (GENERIC_CTA_LABELS.has(label.toLowerCase())) warnings.push(`Button label "${label}" isn't descriptive — a screen-reader user hears links out of context. Use a specific action (e.g. "Track your order").`);
+      if (!href || href === "#") errors.push(`Button "${label || "(unlabelled)"}" has no working link.`);
+      else { const v = validateCtaHref(href); if (v.error) errors.push(v.error); else if (v.warn) warnings.push(v.warn); }
+    }
+    // Heading a11y — an empty heading block adds a structural heading with no text.
+    if (b.type === "heading" && !(b.text ?? "").trim()) warnings.push("A heading block has no text.");
   }
   return { errors, warnings };
 }
