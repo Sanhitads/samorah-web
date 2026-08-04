@@ -29,7 +29,8 @@ export interface LinkAttrs {
   labelI18n?: Record<string, string>; // localisation-ready; empty today
 }
 export interface NavItem extends LinkAttrs { label: string; href?: string; isComingSoon?: boolean; tier?: "parent" | "child" | "cta" }
-export interface NavCampaign { eyebrow: string; title: string; description: string; href: string; gradient: string; mediaId?: string; image?: string }
+// Campaign panels are entity-linkable too (point 1) — extends LinkAttrs so its href can come from an entity.
+export interface NavCampaign extends LinkAttrs { eyebrow: string; title: string; description: string; href: string; gradient: string; mediaId?: string; image?: string }
 export interface NavBranch { id: string; label: string; items: NavItem[]; campaign: NavCampaign }
 export interface FooterLink extends LinkAttrs { label: string; href?: string; external?: boolean }
 export interface FooterSection { title: string; links: FooterLink[] }
@@ -105,7 +106,10 @@ async function resolveCampaignImages(branches: NavBranch[]): Promise<void> {
  */
 /** Compute final href + localised label for every link (entity resolution, i18n). */
 function resolveLinks(branches: NavBranch[], footer: FooterSection[]): void {
-  for (const b of branches) for (const it of b.items) { it.href = resolveHref(it); it.label = resolveLabel(it); }
+  for (const b of branches) {
+    for (const it of b.items) { it.href = resolveHref(it); it.label = resolveLabel(it); }
+    if (b.campaign) b.campaign.href = resolveHref(b.campaign); // entity-linked campaign resolves its URL too
+  }
   for (const s of footer) for (const l of s.links) { l.href = resolveHref(l); l.label = resolveLabel(l); }
 }
 
