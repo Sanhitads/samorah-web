@@ -1063,6 +1063,16 @@ a.adm-badge[data-b="incident"]:hover { background: rgba(168,68,58,0.22); }
 .nav-branch__id { width: 120px; padding: 8px 10px; font-family: ui-monospace, monospace; font-size: 12px; border: 1px solid var(--ad-hair); border-radius: 4px; box-sizing: border-box; }
 .nav-warn { list-style: none; margin: 12px 0; padding: 10px 12px; border: 1px solid rgba(201,169,110,0.5); background: rgba(201,169,110,0.1); border-radius: 5px; font-size: 12px; color: #8a6d3b; display: flex; flex-direction: column; gap: 4px; }
 .nav-publish { margin-top: 14px; border-top: 1px solid var(--ad-hair); padding-top: 14px; }
+/* Editor UX (P1): collapse, branch summary, drag handle, hierarchy visualization. */
+.nav-collapse { background: none; border: none; cursor: pointer; font-size: 13px; color: var(--smoke, #6b6259); padding: 0 6px 0 0; line-height: 1; }
+.nav-branch__summary { margin-left: 2px; margin-right: auto; font-size: 12px; white-space: nowrap; }
+.nav-item { border-radius: 4px; }
+.nav-drag { cursor: grab; color: var(--smoke, #6b6259); user-select: none; text-align: center; letter-spacing: -2px; align-self: center; }
+.nav-item[data-tier="child"] { margin-left: 22px; border-left: 2px solid var(--ad-hair); padding-left: 6px; }
+.nav-item[data-tier="child"] .nav-drag::after { content: "↳ "; }
+.nav-item[data-tier="parent"] .cfg-row > input:first-of-type { font-weight: 600; }
+.nav-item[data-tier="cta"] .cfg-row > input:first-of-type { font-style: italic; }
+.nav-item[draggable="true"]:hover { background: rgba(31,26,22,0.02); }
 /* Primary destination picker (point 1): entity type + entity/url, inline. */
 .nav-dest { display: flex; gap: 6px; align-items: center; min-width: 0; }
 .nav-dest__kind { flex: 0 0 auto; }

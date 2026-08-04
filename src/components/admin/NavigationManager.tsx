@@ -100,6 +100,14 @@ export function NavigationManager({ header, footer, entities, canPublish = true 
   const [unpubAt, setUnpubAt] = useState("");
   const [revs, setRevs] = useState<MenuRevision[] | null>(null);
   const [openRev, setOpenRev] = useState<string | null>(null); // preview-before-restore expansion
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set()); // collapsed branches (P1)
+  const [dragItem, setDragItem] = useState<{ bi: number; ii: number } | null>(null); // drag-reorder within a branch
+  const toggleCollapse = (k: string) => setCollapsed((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
+  const dropItem = (bi: number, target: number) => {
+    if (!dragItem || dragItem.bi !== bi || dragItem.ii === target) { setDragItem(null); return; }
+    setHdr((h) => h.map((b, i) => { if (i !== bi) return b; const items = [...b.items]; const [m] = items.splice(dragItem.ii, 1); items.splice(target, 0, m); return { ...b, items }; }));
+    setDragItem(null);
+  };
 
   // Unsaved-change protection (point 7). Dirty = current tree differs from the last saved snapshot.
   const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify([header.draft, footer.draft]));
@@ -180,17 +188,21 @@ export function NavigationManager({ header, footer, entities, canPublish = true 
           {hdr.map((b, bi) => (
             <div key={bi} className="nav-branch">
               <div className="nav-branch__head">
+                <button type="button" className="nav-collapse" onClick={() => toggleCollapse(`h${bi}`)} aria-expanded={!collapsed.has(`h${bi}`)} title="Collapse / expand branch">{collapsed.has(`h${bi}`) ? "▸" : "▾"}</button>
                 <input className="nav-branch__label" value={b.label} onChange={(e) => setBranch(bi, { label: e.target.value })} placeholder="Branch label" />
                 <input className="nav-branch__id" value={b.id} onChange={(e) => setBranch(bi, { id: e.target.value })} placeholder="id" />
+                <span className="nav-branch__summary admin__muted">{b.items.length} link{b.items.length === 1 ? "" : "s"}{b.campaign?.title ? " · campaign" : ""}</span>
                 <span className="ff-actions">
                   <button type="button" className="ff-btn" onClick={() => setHdr((h) => move(h, bi, -1))}>↑</button>
                   <button type="button" className="ff-btn" onClick={() => setHdr((h) => move(h, bi, 1))}>↓</button>
                   <button type="button" className="ff-btn ff-btn--danger" onClick={() => setHdr((h) => h.filter((_, i) => i !== bi))}>Remove branch</button>
                 </span>
               </div>
+              {collapsed.has(`h${bi}`) ? null : (<>
               {b.items.map((it, ii) => (
-                <div key={ii}>
-                  <div className="cfg-row" style={{ gridTemplateColumns: "1fr 1.7fr 0.7fr auto auto auto auto auto" }}>
+                <div key={ii} className="nav-item" data-tier={it.tier || "flat"} draggable onDragStart={() => setDragItem({ bi, ii })} onDragOver={(e) => e.preventDefault()} onDrop={() => dropItem(bi, ii)}>
+                  <div className="cfg-row" style={{ gridTemplateColumns: "auto 1fr 1.7fr 0.7fr auto auto auto auto auto" }}>
+                    <span className="nav-drag" title="Drag to reorder (↑ ↓ also work)" aria-hidden>⋮⋮</span>
                     <input value={it.label} onChange={(e) => setItem(bi, ii, { label: e.target.value })} placeholder="Label" />
                     <DestinationPicker link={it} entities={entities} onChange={(patch) => setItem(bi, ii, patch)} />
                     <select value={it.tier ?? ""} onChange={(e) => setItem(bi, ii, { tier: (e.target.value || undefined) as NavItem["tier"] })}>{TIERS.map((t) => <option key={t} value={t}>{t || "flat"}</option>)}</select>
@@ -213,6 +225,7 @@ export function NavigationManager({ header, footer, entities, canPublish = true 
                 <label className="cfg-field"><span>Description</span><input value={b.campaign.description} onChange={(e) => setCampaign(bi, { description: e.target.value })} /></label>
                 <label className="cfg-field"><span>Media id (optional — overrides gradient)</span><input value={b.campaign.mediaId ?? ""} onChange={(e) => setCampaign(bi, { mediaId: e.target.value || undefined })} placeholder="media asset id" /></label>
               </div>
+              </>)}
             </div>
           ))}
           <button type="button" className="ff-btn" onClick={() => setHdr((h) => [...h, { id: `branch-${h.length + 1}`, label: "New branch", items: [{ label: "Link", href: "/" }], campaign: { eyebrow: "Featured", title: "Title", description: "", href: "/", gradient: "grad-chai" } }])}>+ branch</button>
