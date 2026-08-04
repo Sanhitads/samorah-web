@@ -787,10 +787,13 @@ qualifying predicate (`state ∈ consumed|restored ∧ consumed_at ∧ order pai
 
 # Coupons & Promotions — Post-Launch
 
-Coupon module **Phases 1–4 are shipped** (discount types + targeting + exclusions + race-safe
-redemption ledger; lifecycle/eligibility/audit; list & analytics with warnings; full domain/service
-test coverage). Everything below is **deliberately deferred** — documented so it is not lost, and
-**not to be built now**. The guiding rules from the build still hold: **one authoritative pricing
+**Status — CLOSED (2026-08-04).** Coupon module **Phase 1, Phase 2, Phase 3 and the final UI/UX QA
+pass are COMPLETED and closed**; Phase 4 (domain/service test coverage) and Phase 5 (this roadmap) are
+done. Shipped: discount types + targeting + exclusions + race-safe redemption ledger (P1);
+lifecycle/eligibility/description-split/audit (P2); list & analytics with attribution + warnings +
+drill-down (P3); compact/responsive admin UI (final QA). New Coupon defaults are intentionally
+unrestricted (min qualifying items = none, per-customer = unlimited). Everything below is
+**deliberately deferred** — documented so it is not lost, and **not to be built now**. The guiding rules from the build still hold: **one authoritative pricing
 engine** (`computeOrderTotals` → `computePromotions`), **additive/backward-compatible only**, **never
 a second discount engine**, and **Attributed Revenue is an attribution model, never a causation / ROI
 claim**. Complexity legend as above (**S/M/L/XL**).
