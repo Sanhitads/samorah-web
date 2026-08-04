@@ -108,6 +108,29 @@ export function NavigationManager({ header, footer, entities, canPublish = true 
     setHdr((h) => h.map((b, i) => { if (i !== bi) return b; const items = [...b.items]; const [m] = items.splice(dragItem.ii, 1); items.splice(target, 0, m); return { ...b, items }; }));
     setDragItem(null);
   };
+  const [savedAt, setSavedAt] = useState<string | null>(null); // ✓ Draft saved · time (point 23)
+  const [undo, setUndo] = useState<{ text: string; run: () => void } | null>(null); // draft-only Undo (point 22)
+  const stampSaved = () => setSavedAt(new Date().toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" }));
+  // Deep clone with fresh " (copy)" label; branch clones also get a fresh stable id (point 24).
+  const cloneBranch = (b: NavBranch): NavBranch => ({ ...JSON.parse(JSON.stringify(b)), id: `${b.id || "branch"}-copy-${Math.abs((JSON.stringify(hdr).length * 31 + b.items.length))%9973}`, label: `${b.label} (copy)` });
+  const clone = <T extends { label?: string; title?: string }>(x: T): T => { const c = JSON.parse(JSON.stringify(x)); if (c.label != null) c.label = `${c.label} (copy)`; if (c.title != null) c.title = `${c.title} (copy)`; return c; };
+  // Remove a header branch with impact-aware confirm + draft-only Undo (no save/revision until Save).
+  const removeBranch = (bi: number) => {
+    const b = hdr[bi]; const n = b.items.length;
+    if (!window.confirm(`Remove "${b.label || b.id}"? This removes ${n} link${n === 1 ? "" : "s"}${b.campaign?.title ? " and its campaign panel" : ""} from this draft.`)) return;
+    const snapshot = hdr;
+    setHdr((h) => h.filter((_, i) => i !== bi));
+    setUndo({ text: `Removed "${b.label || b.id}"`, run: () => { setHdr(snapshot); setUndo(null); } });
+  };
+  const removeColumn = (si: number) => {
+    const s = ftr[si]; const n = s.links.length;
+    if (!window.confirm(`Remove "${s.title}"? This removes ${n} link${n === 1 ? "" : "s"} from this draft.`)) return;
+    const snapshot = ftr;
+    setFtr((f) => f.filter((_, i) => i !== si));
+    setUndo({ text: `Removed "${s.title}"`, run: () => { setFtr(snapshot); setUndo(null); } });
+  };
+  const removeItem = (bi: number, ii: number) => { const snapshot = hdr; setHdr((h) => h.map((b, i) => (i === bi ? { ...b, items: b.items.filter((_, j) => j !== ii) } : b))); setUndo({ text: "Link removed", run: () => { setHdr(snapshot); setUndo(null); } }); };
+  const removeFtrLink = (si: number, li: number) => { const snapshot = ftr; setFtr((f) => f.map((x, i) => (i === si ? { ...x, links: x.links.filter((_, j) => j !== li) } : x))); setUndo({ text: "Link removed", run: () => { setFtr(snapshot); setUndo(null); } }); };
 
   // Unsaved-change protection (point 7). Dirty = current tree differs from the last saved snapshot.
   const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify([header.draft, footer.draft]));
@@ -150,7 +173,7 @@ export function NavigationManager({ header, footer, entities, canPublish = true 
     } catch { setBusy(false); setMsg({ tone: "err", text: "Network error" }); return null; }
   };
 
-  const saveDraft = async () => { const d = await post({ action: "save", data }); if (d?.ok) { markSaved(); setMsg({ tone: "ok", text: "Draft saved." }); } };
+  const saveDraft = async () => { const d = await post({ action: "save", data }); if (d?.ok) { markSaved(); stampSaved(); setUndo(null); setMsg(null); } };
   const publish = async () => {
     // Client-side guard mirrors the server: unpublish must be after publish (or after now, for immediate).
     if (unpubAt) {
@@ -193,24 +216,26 @@ export function NavigationManager({ header, footer, entities, canPublish = true 
                 <input className="nav-branch__id" value={b.id} onChange={(e) => setBranch(bi, { id: e.target.value })} placeholder="id" />
                 <span className="nav-branch__summary admin__muted">{b.items.length} link{b.items.length === 1 ? "" : "s"}{b.campaign?.title ? " · campaign" : ""}</span>
                 <span className="ff-actions">
-                  <button type="button" className="ff-btn" onClick={() => setHdr((h) => move(h, bi, -1))}>↑</button>
-                  <button type="button" className="ff-btn" onClick={() => setHdr((h) => move(h, bi, 1))}>↓</button>
-                  <button type="button" className="ff-btn ff-btn--danger" onClick={() => setHdr((h) => h.filter((_, i) => i !== bi))}>Remove branch</button>
+                  <button type="button" className="ff-btn" onClick={() => setHdr((h) => move(h, bi, -1))} title="Move up">↑</button>
+                  <button type="button" className="ff-btn" onClick={() => setHdr((h) => move(h, bi, 1))} title="Move down">↓</button>
+                  <button type="button" className="ff-btn" onClick={() => setHdr((h) => [...h.slice(0, bi + 1), cloneBranch(h[bi]), ...h.slice(bi + 1)])} title="Duplicate branch">Duplicate</button>
+                  <button type="button" className="ff-btn ff-btn--danger" onClick={() => removeBranch(bi)}>Remove branch</button>
                 </span>
               </div>
               {collapsed.has(`h${bi}`) ? null : (<>
               {b.items.map((it, ii) => (
                 <div key={ii} className="nav-item" data-tier={it.tier || "flat"} draggable onDragStart={() => setDragItem({ bi, ii })} onDragOver={(e) => e.preventDefault()} onDrop={() => dropItem(bi, ii)}>
-                  <div className="cfg-row" style={{ gridTemplateColumns: "auto 1fr 1.7fr 0.7fr auto auto auto auto auto" }}>
+                  <div className="cfg-row" style={{ gridTemplateColumns: "auto 1fr 1.6fr 0.7fr auto auto auto auto auto auto" }}>
                     <span className="nav-drag" title="Drag to reorder (↑ ↓ also work)" aria-hidden>⋮⋮</span>
                     <input value={it.label} onChange={(e) => setItem(bi, ii, { label: e.target.value })} placeholder="Label" />
                     <DestinationPicker link={it} entities={entities} onChange={(patch) => setItem(bi, ii, patch)} />
                     <select value={it.tier ?? ""} onChange={(e) => setItem(bi, ii, { tier: (e.target.value || undefined) as NavItem["tier"] })}>{TIERS.map((t) => <option key={t} value={t}>{t || "flat"}</option>)}</select>
                     <button type="button" className="cfg-toggle" data-on={it.isComingSoon ? "1" : "0"} onClick={() => setItem(bi, ii, { isComingSoon: !it.isComingSoon })}>{it.isComingSoon ? "Soon" : "Live"}</button>
                     <button type="button" className="ff-btn" data-active={openLink === `h${bi}-${ii}` ? "1" : "0"} onClick={() => setOpenLink(openLink === `h${bi}-${ii}` ? null : `h${bi}-${ii}`)} title="SEO options">🔗</button>
-                    <button type="button" className="ff-btn" onClick={() => setBranch(bi, { items: move(b.items, ii, -1) })}>↑</button>
-                    <button type="button" className="ff-btn" onClick={() => setBranch(bi, { items: move(b.items, ii, 1) })}>↓</button>
-                    <button type="button" className="ff-btn ff-btn--danger" onClick={() => setBranch(bi, { items: b.items.filter((_, j) => j !== ii) })}>×</button>
+                    <button type="button" className="ff-btn" onClick={() => setBranch(bi, { items: [...b.items.slice(0, ii + 1), clone(it), ...b.items.slice(ii + 1)] })} title="Duplicate link">⎘</button>
+                    <button type="button" className="ff-btn" onClick={() => setBranch(bi, { items: move(b.items, ii, -1) })} title="Move up">↑</button>
+                    <button type="button" className="ff-btn" onClick={() => setBranch(bi, { items: move(b.items, ii, 1) })} title="Move down">↓</button>
+                    <button type="button" className="ff-btn ff-btn--danger" onClick={() => removeItem(bi, ii)} title="Remove link">×</button>
                   </div>
                   {openLink === `h${bi}-${ii}` ? <LinkEditor link={it} onChange={(patch) => setItem(bi, ii, patch)} /> : null}
                 </div>
@@ -235,27 +260,33 @@ export function NavigationManager({ header, footer, entities, canPublish = true 
           {ftr.map((s, si) => (
             <div key={si} className="nav-branch">
               <div className="nav-branch__head">
+                <button type="button" className="nav-collapse" onClick={() => toggleCollapse(`f${si}`)} aria-expanded={!collapsed.has(`f${si}`)} title="Collapse / expand column">{collapsed.has(`f${si}`) ? "▸" : "▾"}</button>
                 <input className="nav-branch__label" value={s.title} onChange={(e) => setFtr((f) => f.map((x, i) => (i === si ? { ...x, title: e.target.value } : x)))} placeholder="Column title" />
+                <span className="nav-branch__summary admin__muted">{s.links.length} link{s.links.length === 1 ? "" : "s"}</span>
                 <span className="ff-actions">
-                  <button type="button" className="ff-btn" onClick={() => setFtr((f) => move(f, si, -1))}>↑</button>
-                  <button type="button" className="ff-btn" onClick={() => setFtr((f) => move(f, si, 1))}>↓</button>
-                  <button type="button" className="ff-btn ff-btn--danger" onClick={() => setFtr((f) => f.filter((_, i) => i !== si))}>Remove column</button>
+                  <button type="button" className="ff-btn" onClick={() => setFtr((f) => move(f, si, -1))} title="Move up">↑</button>
+                  <button type="button" className="ff-btn" onClick={() => setFtr((f) => move(f, si, 1))} title="Move down">↓</button>
+                  <button type="button" className="ff-btn" onClick={() => setFtr((f) => [...f.slice(0, si + 1), clone(f[si]), ...f.slice(si + 1)])} title="Duplicate column">Duplicate</button>
+                  <button type="button" className="ff-btn ff-btn--danger" onClick={() => removeColumn(si)}>Remove column</button>
                 </span>
               </div>
+              {collapsed.has(`f${si}`) ? null : (<>
               {s.links.map((l, li) => (
                 <div key={li}>
-                  <div className="cfg-row" style={{ gridTemplateColumns: "1.2fr 1.7fr auto auto auto auto" }}>
+                  <div className="cfg-row" style={{ gridTemplateColumns: "1.2fr 1.7fr auto auto auto auto auto" }}>
                     <input value={l.label} onChange={(e) => setFtrLink(si, li, { label: e.target.value })} placeholder="Label" />
                     <DestinationPicker link={l} entities={entities} onChange={(patch) => setFtrLink(si, li, patch)} />
                     <button type="button" className="ff-btn" data-active={openLink === `f${si}-${li}` ? "1" : "0"} onClick={() => setOpenLink(openLink === `f${si}-${li}` ? null : `f${si}-${li}`)} title="SEO options">🔗</button>
-                    <button type="button" className="ff-btn" onClick={() => setFtr((f) => f.map((x, i) => (i === si ? { ...x, links: move(x.links, li, -1) } : x)))}>↑</button>
-                    <button type="button" className="ff-btn" onClick={() => setFtr((f) => f.map((x, i) => (i === si ? { ...x, links: move(x.links, li, 1) } : x)))}>↓</button>
-                    <button type="button" className="ff-btn ff-btn--danger" onClick={() => setFtr((f) => f.map((x, i) => (i === si ? { ...x, links: x.links.filter((_, j) => j !== li) } : x)))}>×</button>
+                    <button type="button" className="ff-btn" onClick={() => setFtr((f) => f.map((x, i) => (i === si ? { ...x, links: [...x.links.slice(0, li + 1), clone(l), ...x.links.slice(li + 1)] } : x)))} title="Duplicate link">⎘</button>
+                    <button type="button" className="ff-btn" onClick={() => setFtr((f) => f.map((x, i) => (i === si ? { ...x, links: move(x.links, li, -1) } : x)))} title="Move up">↑</button>
+                    <button type="button" className="ff-btn" onClick={() => setFtr((f) => f.map((x, i) => (i === si ? { ...x, links: move(x.links, li, 1) } : x)))} title="Move down">↓</button>
+                    <button type="button" className="ff-btn ff-btn--danger" onClick={() => removeFtrLink(si, li)} title="Remove link">×</button>
                   </div>
                   {openLink === `f${si}-${li}` ? <LinkEditor link={l} onChange={(patch) => setFtrLink(si, li, patch)} /> : null}
                 </div>
               ))}
               <button type="button" className="ff-btn" onClick={() => setFtr((f) => f.map((x, i) => (i === si ? { ...x, links: [...x.links, { label: "New link", href: "/" }] } : x)))}>+ link</button>
+              </>)}
             </div>
           ))}
           <button type="button" className="ff-btn" onClick={() => setFtr((f) => [...f, { title: "New column", links: [{ label: "Link", href: "/" }] }])}>+ column</button>
@@ -270,7 +301,8 @@ export function NavigationManager({ header, footer, entities, canPublish = true 
           <label className="cfg-field"><span>Unpublish at (IST — optional)</span><input type="datetime-local" value={unpubAt} onChange={(e) => setUnpubAt(e.target.value)} /><small className="admin__muted">{unpubAt ? `${formatIST(istLocalToUtc(unpubAt)!)} · then reverts to the previous published version` : "stays live"}</small></label>
         </div>
         <div className="cfg-actions">
-          {dirty ? <span className="cfg-msg cfg-msg--warn" title="Unsaved edits — Save draft to keep them">● Unsaved changes</span> : null}
+          {dirty ? <span className="cfg-msg cfg-msg--warn" title="Unsaved edits — Save draft to keep them">● Unsaved changes</span> : savedAt ? <span className="cfg-msg cfg-msg--ok">✓ Draft saved · {savedAt} IST</span> : null}
+          {undo ? <span className="cfg-msg admin__muted">{undo.text} · <button type="button" className="cpn-clear" onClick={undo.run}>Undo</button></span> : null}
           <button type="button" className="ff-btn" disabled={busy || pending} onClick={saveDraft}>Save draft</button>
           <button type="button" className="ff-btn" disabled={busy} onClick={preview}>Preview</button>
           <button type="button" className="ff-btn ff-btn--primary" disabled={busy || !canPublish} onClick={publish} title={canPublish ? undefined : "Publishing needs the content.publish capability"}>{pubAt ? "Schedule" : "Publish"}</button>
