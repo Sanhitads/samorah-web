@@ -967,3 +967,49 @@ mobile experience is unbuilt.
 ### Generalize scheduled activation/deactivation to all publishable resources — **M**
 The nav schedule materialization (predecessor-aware revert, atomic transition, audited) should extend to
 pages/homepage (same `publishable` pattern), which are still purely read-time. Reuse the shared cron.
+
+---
+
+# Navigation — Phase 3 (post-launch)
+
+Phase 3 analysis (code-grounded, after Phases 1–2). The only shipped item is **nav click
+instrumentation** — `MegaMenu` + `Footer` links now fire the canonical GA4 `select_item` event
+(`trackSelectItem("primary_nav" | "footer_nav", { item_id: href, item_name: label })`) via the existing
+consent-gated pipeline, keyed on the **destination** (stable across reorder — no per-item id needed).
+Everything below is **deferred**; each names the exact reusable infra so nothing gets rebuilt.
+
+### Navigation CTR reporting — **M** (data now accruing)
+Instrumentation is live; the **report** is deferred. Open decision (yours): source = **GA4 Data API**
+(reuse the parked GA4 WIF — see [[ga4-wif-post-deploy]]) **or** a **first-party `nav_clicks`** log
+(mirror `src/lib/analytics/searchLog.ts`) + a card in `/admin/analytics` behind `analytics.view`. Reuse
+`marketingAnalyticsService` + the existing analytics dashboards — do NOT build a second dashboard.
+
+### A/B experimentation for navigation — **XL** (defer)
+No experiment framework exists (`select_item` is present; bucketing/assignment/exposure/significance are
+not). A per-variant live tree would be a **second source of truth** for the live nav, in tension with
+atomic single-published-tree + immutable revisions. If ever built, select a variant **at read time**,
+never store a parallel nav engine. Depends on CTR data (above) to be meaningful.
+
+### Localization beyond the seam — **L** (defer until a 2nd locale ships)
+The label-i18n **seam already exists**: `LinkAttrs.labelI18n` + `resolveLabel(o, locale)` +
+`DEFAULT_LOCALE`, already run by `resolveLinks`. Remaining: locale detection → `getNavigation({ locale })`,
+a per-locale label editor in the admin, and localized **destinations** (per-locale slugs — a catalog
+concern). Labels need **no schema change** (they live in the JSONB tree). Reuse `resolveLabel`/`labelI18n`;
+coordinate with any app-wide i18n — don't fork one.
+
+### Market-specific navigation — **L** (defer; single-market IN launch)
+`navigation_menus.id` is constrained to `('header','footer')` — one tree per menu, no market dimension.
+Multi-market needs a market-scoped key/column + read-path market resolution + an admin market switcher +
+per-market revisions/scheduling. Acceptable ONLY as market-scoped rows reusing the same engine (predecessor
+scheduling, immutable revisions) — not a parallel nav system.
+
+### Advanced scheduling / merchandising — **M–L** (defer; basic scheduling already ships)
+Basic scheduling is COMPLETE (P1: `publish_at`/`unpublish_at`, predecessor-based revert, `/api/cron/
+cms-schedule`, atomic). Deferred: a **schedule queue** (multiple future revisions each with their own
+window — extend the cron/predecessor model, don't replace it), recurring schedules, and rule-based
+auto-merchandising (e.g. auto-surface bestsellers into nav). Reuse `cms_revisions` + the existing cron.
+
+### Positional item identity (carry-over from Phase 2) — no action
+Nav links/items remain positional (no stable id). **No launch-adjacent feature requires stable item
+identity** — CTR keys on the destination. Stable ids would only help A/B variant matching and per-item
+localization overrides across reorders (both deferred). **Do NOT add a schema change for this.**

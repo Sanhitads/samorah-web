@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { MENU_BRANCHES } from "@/config/navigation";
 import { type NavBranch, relOf } from "@/services/navigationService";
 import { useOverlay } from "@/hooks/useOverlay";
+import { trackSelectItem } from "@/lib/analytics/events";
 
 /**
  * Fullscreen Editorial Mega Menu (Phase 6 · Component 3).
@@ -145,7 +146,7 @@ export function MegaMenu({ open, onClose, branches }: MegaMenuProps) {
                       key={item.label}
                       href={item.href ?? "#"}
                       className={`mega__link${tier}`}
-                      onClick={onClose}
+                      onClick={() => { trackSelectItem("primary_nav", { item_id: item.href ?? "", item_name: item.label }); onClose(); }}
                       target={item.target}
                       rel={relOf(item)}
                     >
@@ -159,7 +160,7 @@ export function MegaMenu({ open, onClose, branches }: MegaMenuProps) {
                 href={active.campaign.href}
                 className={`mega__campaign ${active.campaign.gradient}`}
                 style={active.campaign.image ? { backgroundImage: `url(${active.campaign.image})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
-                onClick={onClose}
+                onClick={() => { trackSelectItem("primary_nav", { item_id: active.campaign.href, item_name: active.campaign.title }); onClose(); }}
               >
                 <span className="mega__campaign-overlay" aria-hidden="true" />
                 <span className="mega__campaign-content">

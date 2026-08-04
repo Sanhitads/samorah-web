@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { FOOTER_SECTIONS } from "@/config/navigation";
 import { type FooterSection, relOf } from "@/services/navigationService";
+import { TrackedNavLink } from "@/components/layout/TrackedNavLink";
 
 /**
  * Editorial Footer (Phase 6 · Component 6) — the quiet closing note.
@@ -32,20 +32,17 @@ export function Footer({ sections }: { sections?: FooterSection[] }) {
               <ul className="site-footer__links">
                 {section.links.map((link) => (
                   <li key={link.label}>
-                    {link.external || link.target === "_blank" ? (
-                      <a
-                        href={link.href ?? "#"}
-                        className="site-footer__link"
-                        target="_blank"
-                        rel={relOf(link) ?? "noopener noreferrer"}
-                      >
-                        {link.label}
-                      </a>
-                    ) : (
-                      <Link href={link.href ?? "#"} className="site-footer__link" rel={relOf(link)}>
-                        {link.label}
-                      </Link>
-                    )}
+                    <TrackedNavLink
+                      list="footer_nav"
+                      itemName={link.label}
+                      href={link.href ?? "#"}
+                      external={link.external || link.target === "_blank"}
+                      className="site-footer__link"
+                      rel={relOf(link)}
+                      target={link.target}
+                    >
+                      {link.label}
+                    </TrackedNavLink>
                   </li>
                 ))}
               </ul>
