@@ -136,4 +136,13 @@ describe("renderTemplateContent — same renderer as production", () => {
     expect(r.authored).toBe(false);
     expect(r.html).toContain("CODED");
   });
+
+  it("renders the Support/contact brand block in both HTML and text (point 17)", () => {
+    const c = content({ blocks: [{ type: "paragraph", text: "Hi {{name}}" }, { type: "details" }, { type: "support", text: "Need a hand?" }] });
+    const r = renderTemplateContent(def("order.confirmed"), c, def("order.confirmed").sample, "<tr><td>D</td></tr>");
+    expect(r.html).toContain("Need a hand?");
+    expect(r.html).toMatch(/mailto:[^"']+@/); // canonical support address, not author free-text
+    expect(r.text).toContain("Need a hand?");
+    expect(r.text).toMatch(/@/);
+  });
 });
