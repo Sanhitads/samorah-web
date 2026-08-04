@@ -27,6 +27,17 @@ preheader could apply to the coded default too — without duplicating a rendere
 fallback guarantee. Must preserve: coded-default emails always send even with no/invalid customization;
 one renderer and one token path; no second email system.
 
+### Gold accent link contrast (WCAG AA) — accessibility, brand-sensitive
+**Status: non-blocking · post-launch. Surfaced by Phase 3 point 19; needs a brand-safe fix.**
+
+The fixed email palette's body/heading colours meet WCAG AA (ink 17:1, smoke ~6:1), but the **gold
+accent** (`#c9a96e`) is **2.24:1 on white** — below AA even for large text. Gold is used for *links*
+(footer URL, the "View Order" link, the Support/contact address), so those links don't meet
+text-contrast guidance. Not changed now: the palette is a locked brand foundation and Phase 3 is
+additive. A brand-safe fix (e.g. a darker gold for link text, or underline + darker ink for links
+while keeping gold for decorative eyebrows) should be considered with design. Pinned by a test in
+`emailFallback.test.ts` so the current state is tracked and ink/smoke can't silently regress.
+
 ### Email Templates list — categories + search
 **Status: non-blocking · post-launch. (Phase 2 point 15, intentionally deferred.)**
 
