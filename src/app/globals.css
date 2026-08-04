@@ -3473,6 +3473,13 @@ h1, h2, h3, h4 {
   color: var(--charcoal);
 }
 
+/* Mobile touch targets (Nav QA · point 16): give tapped nav links a ≥44px hit area on touch widths
+   without affecting the desktop mega-menu. Vertical rhythm (the .mega__links gap) is preserved. */
+@media (max-width: 768px) {
+  .mega__link { min-height: 44px; display: flex; align-items: center; }
+  .mega__branch { min-height: 44px; }
+}
+
 /* RIGHT — campaign panel (4:5), the whole panel is the link */
 .mega__campaign {
   position: relative;
