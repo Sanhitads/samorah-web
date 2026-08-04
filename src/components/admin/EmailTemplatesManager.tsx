@@ -6,6 +6,7 @@ import Link from "next/link";
 import type { EmailTemplateAdmin } from "@/services/emailTemplateService";
 import type { EmailHealth } from "@/services/emailDeliveryService";
 import type { FieldDef } from "@/lib/cms/sectionSchema";
+import { previewWidth, type PreviewMode } from "@/lib/email/preview";
 import { SchemaForm, type MediaOption } from "./SchemaForm";
 
 /**
@@ -52,6 +53,7 @@ export function EmailTemplatesManager({ templates, fields, media, canPublish, he
   const [msg, setMsg] = useState<Record<string, { tone: string; text: string }>>({});
   const [testTo, setTestTo] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState<{ html: string; authored: boolean } | null>(null);
+  const [previewMode, setPreviewMode] = useState<PreviewMode>("desktop");
   const [history, setHistory] = useState<{ key: string; revisions: Revision[] } | null>(null);
 
   const draftOf = (t: EmailTemplateAdmin): Record<string, unknown> =>
@@ -183,7 +185,13 @@ export function EmailTemplatesManager({ templates, fields, media, canPublish, he
         <div className="om-modal" role="dialog" aria-modal="true" onClick={() => setPreview(null)}>
           <div className="om-modal__card om-modal__card--wide" onClick={(e) => e.stopPropagation()}>
             <h2 className="om-modal__title">Email preview <span className="admin__muted">· {preview.authored ? "authored body" : "coded default"}</span></h2>
-            <iframe title="Email preview" srcDoc={preview.html} style={{ width: "100%", height: "60vh", border: "1px solid var(--ad-hair)", borderRadius: 4, background: "#fff" }} />
+            <div className="em-preview__bar" role="group" aria-label="Preview width">
+              <button type="button" className={`ff-btn ff-btn--sm${previewMode === "desktop" ? " ff-btn--primary" : ""}`} aria-pressed={previewMode === "desktop"} onClick={() => setPreviewMode("desktop")}>Desktop</button>
+              <button type="button" className={`ff-btn ff-btn--sm${previewMode === "mobile" ? " ff-btn--primary" : ""}`} aria-pressed={previewMode === "mobile"} onClick={() => setPreviewMode("mobile")}>Mobile</button>
+            </div>
+            <div className="em-preview__stage">
+              <iframe title="Email preview" srcDoc={preview.html} style={{ width: previewWidth(previewMode), maxWidth: "100%", height: "60vh", border: "1px solid var(--ad-hair)", borderRadius: 4, background: "#fff" }} />
+            </div>
             <div className="om-modal__actions"><button type="button" className="ff-btn" onClick={() => setPreview(null)}>Close</button></div>
           </div>
         </div>

@@ -510,6 +510,9 @@
 .em-health--failing { color: #8a3d2f; border-color: rgba(138,61,47,0.4); }
 .em-health--failing .em-health__dot { background: #8a3d2f; }
 .em-health--idle .em-health__dot { background: #b8b0a6; }
+.ff-btn--sm { padding: 5px 12px; font-size: 11px; }
+.em-preview__bar { display: flex; gap: 6px; justify-content: center; margin: 4px 0 10px; }
+.em-preview__stage { display: flex; justify-content: center; }
 .adm-chip { padding: 2px 7px; border: 1px solid var(--ad-hair); border-radius: 3px; background: #fff; cursor: pointer; font-family: var(--font-mono, monospace); font-size: 11px; color: #6b6259; }
 .adm-chip:hover { background: var(--soft-beige, #efe9e0); }
 .ff-btn--ghost { background: transparent; color: var(--smoke, #6b6259); }
