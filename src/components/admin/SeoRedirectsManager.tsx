@@ -10,7 +10,7 @@ import { KebabMenu } from "./KebabMenu";
 import { postSeo } from "./seo/postSeo";
 import { RobotsControls, OgImageField, CharCount, SerpCard, SocialCard, ProvenanceBadge } from "./seo/SeoPrimitives";
 import { draftPreview } from "@/lib/seo/effectivePreview";
-import { isNoindex, isMajorRoute } from "@/lib/seo/seoValidation";
+import { isNoindex, isMajorRoute, parseRobots } from "@/lib/seo/seoValidation";
 import { findOverrideDuplicates } from "@/lib/seo/duplicateMeta";
 import { setTabNotice, noticeFor, type TabNotices, type SeoTab } from "@/lib/seo/tabNotice";
 import { HEALTH_LABEL } from "@/lib/seo/redirectHealth";
@@ -144,7 +144,11 @@ export function SeoRedirectsManager({ redirects, seo, entities, canPublish, orig
 
   return (
     <div className="cfg">
-      <p className="seo-summary">{activeCount} active redirect{activeCount === 1 ? "" : "s"} · {seo.length} SEO override{seo.length === 1 ? "" : "s"} · <span className={issues ? "seo-summary__issues" : ""}>{issues} issue{issues === 1 ? "" : "s"}</span></p>
+      <div className="seo-summary">
+        <span className="seo-stat"><b>{activeCount}</b> active redirect{activeCount === 1 ? "" : "s"}</span>
+        <span className="seo-stat"><b>{seo.length}</b> SEO override{seo.length === 1 ? "" : "s"}</span>
+        <span className={`seo-stat${issues ? " seo-stat--warn" : ""}`}><b>{issues}</b> issue{issues === 1 ? "" : "s"}</span>
+      </div>
       <nav className="ff-queues" role="tablist" aria-label="SEO & Redirects sections">
         <button type="button" role="tab" id="tab-redirects" aria-selected={tab === "redirects"} aria-controls="panel-redirects" className="ff-queue" data-active={tab === "redirects" ? "1" : "0"} onClick={() => setTab("redirects")}>Redirects</button>
         <button type="button" role="tab" id="tab-seo" aria-selected={tab === "seo"} aria-controls="panel-seo" className="ff-queue" data-active={tab === "seo" ? "1" : "0"} onClick={() => setTab("seo")}>Meta overrides</button>
@@ -295,14 +299,23 @@ export function SeoRedirectsManager({ redirects, seo, entities, canPublish, orig
             </div>
           ) : null}
           <table className="admin__table admin__table--board" style={{ marginTop: 10 }}>
-            <thead><tr><th>Route</th><th>Title</th><th>Robots</th><th></th></tr></thead>
+            <thead><tr><th>Route</th><th>Search title</th><th>Indexing</th><th>Overrides</th><th></th></tr></thead>
             <tbody>
-              {seo.map((s) => (
-                <tr key={s.path}><td className="admin__mono">{s.path}</td><td>{s.title || <span className="admin__muted">—</span>}</td><td>{s.robots || <span className="admin__muted">index,follow</span>}</td>
-                  <td><div className="rowactions"><button type="button" className="ff-btn ff-btn--sm" disabled={busy} onClick={() => editSeo(s)}>Edit</button>
-                    <KebabMenu items={[{ label: "Remove override", onClick: () => deleteSeo(s), danger: true, disabled: !canPublish }]} /></div></td></tr>
-              ))}
-              {!seo.length ? <tr><td colSpan={4} className="admin__empty">No per-route overrides — routes use the global SEO defaults (Settings).</td></tr> : null}
+              {seo.map((s) => {
+                const rc = parseRobots(s.robots);
+                const fields = [s.title && "Title", s.description && "Desc", s.ogImage && "OG", s.canonical && "Canonical"].filter(Boolean).join(" · ");
+                return (
+                  <tr key={s.path}>
+                    <td className="admin__mono">{s.path}</td>
+                    <td>{s.title || <span className="admin__muted">—</span>}</td>
+                    <td className={rc.index ? "" : "admin__warn"}>{rc.index ? "Index" : "Noindex"} · {rc.follow ? "Follow" : "Nofollow"}</td>
+                    <td className="admin__muted">{fields || "—"}</td>
+                    <td><div className="rowactions"><button type="button" className="ff-btn ff-btn--sm" disabled={busy} onClick={() => editSeo(s)}>Edit</button>
+                      <KebabMenu items={[{ label: "Remove override", onClick: () => deleteSeo(s), danger: true, disabled: !canPublish }]} /></div></td>
+                  </tr>
+                );
+              })}
+              {!seo.length ? <tr><td colSpan={5}><div className="seo-empty"><strong>No SEO overrides yet</strong><span>Routes use the global SEO defaults (Settings). Add an override to customise a specific page’s search &amp; social appearance.</span></div></td></tr> : null}
             </tbody>
           </table>
         </div>
