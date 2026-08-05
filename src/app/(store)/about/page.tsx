@@ -3,7 +3,8 @@ import { getAboutSections } from "@/services/aboutService";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { ComposedSections } from "@/components/page/ComposedSections";
 import { PreviewBanner } from "@/components/page/PreviewBanner";
-import { withRouteSeo } from "@/services/seoRedirectService";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { withRouteSeo, getRouteStructuredData } from "@/services/seoRedirectService";
 
 /**
  * About — consumer #2 of the Composable Page framework. Same engine, same shared
@@ -20,10 +21,13 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function AboutPage({ searchParams }: { searchParams: Promise<{ preview?: string }> }) {
   const sp = await searchParams;
   const preview = sp.preview === "1" ? (await requireStaff("editor")).ok : false;
-  const sections = await getAboutSections({ preview });
+  // Emit the route's custom JSON-LD (SEO override structured_data) via the canonical getRouteStructuredData
+  // + JsonLd path — same mechanism as the homepage (mechanism A). No second JSON-LD store or renderer.
+  const [sections, structuredData] = await Promise.all([getAboutSections({ preview }), getRouteStructuredData("/about")]);
 
   return (
     <main>
+      {structuredData ? <JsonLd data={structuredData} /> : null}
       {preview ? <PreviewBanner label="About page" livePath="/about" /> : null}
       <ComposedSections sections={sections} />
     </main>

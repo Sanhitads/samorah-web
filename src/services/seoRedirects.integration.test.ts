@@ -32,7 +32,19 @@ const WRS = "/seo-it-wrs";
 afterAll(async () => {
   if (!RUN) return;
   await del("redirects", `from_path=in.(${[OLD, MID, FIN, IDA, IDA2, IDB].join(",")})`);
-  await del("seo_overrides", `path=in.(${[ROUTE, WRS].join(",")})`);
+  await del("seo_overrides", `path=in.(${[ROUTE, WRS, "/about", "/journal"].join(",")})`);
+});
+
+d("custom JSON-LD (mechanism A) reaches the storefront emitter for about/journal (P0-6)", () => {
+  it("stored seo_overrides.structured_data is returned by getRouteStructuredData for /about and /journal", async () => {
+    const jsonld = { "@context": "https://schema.org", "@type": "WebPage", name: "About Samorah" };
+    for (const p of ["/about", "/journal"]) {
+      await svc.upsertSeoOverride({ path: p, structuredData: JSON.stringify(jsonld) }, { confirmed: true });
+      expect(await svc.getRouteStructuredData(p)).toEqual(jsonld); // the exact fn the fixed page now calls
+      await svc.deleteSeoOverride(p);
+      expect(await svc.getRouteStructuredData(p)).toBeNull(); // removed → nothing emitted
+    }
+  });
 });
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
