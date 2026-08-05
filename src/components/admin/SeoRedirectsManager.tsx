@@ -151,7 +151,7 @@ export function SeoRedirectsManager({ redirects, seo, entities, canPublish, orig
               </select>
             </label>
             <div style={{ display: "flex", alignItems: "flex-end", gap: 6 }}>
-              <button type="button" className="ff-btn ff-btn--primary" disabled={busy || !canPublish} onClick={saveRedirect}>{nr.id ? "Update" : "Add"}</button>
+              <button type="button" className="ff-btn ff-btn--primary" disabled={busy || !canPublish} onClick={saveRedirect}>{nr.id ? "Update redirect" : "Add redirect"}</button>
               {nr.id ? <button type="button" className="ff-btn" disabled={busy} onClick={() => { setNr(EMPTY_R); setRAnalysis(null); }}>Cancel</button> : null}
             </div>
           </div>
@@ -254,7 +254,7 @@ export function SeoRedirectsManager({ redirects, seo, entities, canPublish, orig
 
           <div className="cfg-actions">
             <button type="button" className="ff-btn ff-btn--primary" disabled={busy || !canPublish} onClick={saveSeo}>Save</button>
-            {ns.path ? <button type="button" className="ff-btn" disabled={busy} onClick={() => { setNs(EMPTY_S); setEffective(null); }}>Clear</button> : null}
+            {ns.path ? <button type="button" className="ff-btn ff-btn--ghost" disabled={busy} onClick={() => { setNs(EMPTY_S); setEffective(null); }}>Discard changes</button> : null}
           </div>
 
           {effective ? (

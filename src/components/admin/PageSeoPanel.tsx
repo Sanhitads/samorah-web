@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { productionOrigin } from "@/config/site";
 import type { MediaOption } from "./SchemaForm";
 import type { EffectiveSeo } from "@/services/seoRedirectService";
 import { postSeo } from "./seo/postSeo";
@@ -23,9 +24,12 @@ const ORG_TEMPLATE = JSON.stringify({
   description: "Slow-crafted luxury scented candles inspired by ritual, silence and timeless warmth.",
 }, null, 2);
 
-export function PageSeoPanel({ path, label, initial, origin }: {
-  path: string; label: string; initial: PageSeo; origin: string; media?: MediaOption[];
+export function PageSeoPanel({ path, label, initial }: {
+  path: string; label: string; initial: PageSeo; origin?: string; media?: MediaOption[];
 }) {
+  // Presentation only: previews/placeholders show the PRODUCTION site identity (never localhost in a
+  // local admin). Runtime metadata/canonical/robots behaviour is untouched — this is display-only.
+  const displayOrigin = productionOrigin();
   const [open, setOpen] = useState(false);
   const [seo, setSeo] = useState<PageSeo>(initial);
   const [busy, setBusy] = useState(false);
@@ -65,7 +69,7 @@ export function PageSeoPanel({ path, label, initial, origin }: {
               <textarea rows={2} value={seo.description} onChange={(e) => set("description", e.target.value)} placeholder="Shown under the title in search results" /></label>
             <div className="cfg-field"><span>OG / social image</span>
               <OgImageField value={seo.ogImage} onChange={(url) => set("ogImage", url)} /></div>
-            <label className="cfg-field"><span>Canonical URL</span><input value={seo.canonical} onChange={(e) => set("canonical", e.target.value)} placeholder={`${origin}${path === "/" ? "" : path}`} /></label>
+            <label className="cfg-field"><span>Canonical URL</span><input value={seo.canonical} onChange={(e) => set("canonical", e.target.value)} placeholder={`${displayOrigin}${path === "/" ? "" : path}`} /></label>
             <RobotsControls value={seo.robots} onChange={(r) => set("robots", r)} />
             <label className="cfg-field"><span>Structured data (JSON-LD) <span className="admin__muted">— optional, advanced</span></span>
               <textarea rows={4} className="hp-seo__jsonld" value={seo.structuredData} onChange={(e) => set("structuredData", e.target.value)} placeholder='{ "@context": "https://schema.org", "@type": "WebPage", … }' spellCheck={false} />
@@ -77,7 +81,7 @@ export function PageSeoPanel({ path, label, initial, origin }: {
           </div>
 
           <div className="hp-seo__previews">
-            <SeoPreview preview={preview} origin={origin} path={path} heading="Draft preview" note="your unsaved edits over the resolved baseline" />
+            <SeoPreview preview={preview} origin={displayOrigin} path={path} heading="Draft preview" note="your unsaved edits over the resolved baseline" />
             {effective ? (
               <div className="seo-resolved-strip">
                 <span className="admin__muted">Resolved baseline:</span>
