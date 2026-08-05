@@ -51,6 +51,40 @@ describe("applySitemapSeo (points 15·16·17)", () => {
   });
 });
 
+describe("noindex exclusion uses the canonical robots parser, not string equality (invariant C)", () => {
+  const included = (robots: string) => applySitemapSeo(
+    [{ path: "/shop/x", changeFrequency: "weekly", priority: 0.7 }],
+    [{ path: "/shop/x", robots, sitemapPriority: "", changeFreq: "" }],
+    () => false,
+  ).some((e) => e.path === "/shop/x");
+
+  it("EXCLUDES every noindex variant", () => {
+    for (const r of ["noindex", "noindex,follow", "noindex,nofollow", "NOINDEX, FOLLOW", "follow,noindex"]) {
+      expect(included(r), r).toBe(false);
+    }
+  });
+  it("KEEPS indexable / default variants", () => {
+    for (const r of ["", "index,follow", "index", "nofollow", "all"]) {
+      expect(included(r), r).toBe(true);
+    }
+  });
+});
+
+describe("graceful fallback when DB-backed data can't load (invariant D)", () => {
+  it("returns the base static routes unchanged (non-empty), exactly the catch-branch call", () => {
+    // This is the exact expression sitemap.ts's catch uses: applySitemapSeo(base, [], () => false).
+    const staticBase = [
+      { path: "", changeFrequency: "weekly", priority: 1 },
+      { path: "/shop", changeFrequency: "weekly", priority: 0.8 },
+      { path: "/bundles", changeFrequency: "weekly", priority: 0.8 },
+    ] as const;
+    const out = applySitemapSeo([...staticBase], [], () => false);
+    expect(out).toHaveLength(3);                    // non-empty — never a broken/empty sitemap
+    expect(out.map((e) => e.path)).toEqual(["", "/shop", "/bundles"]);
+    expect(out.find((e) => e.path === "")!.priority).toBe(1); // defaults preserved
+  });
+});
+
 describe("sitemap validation helpers (point 23)", () => {
   it("priority must be 0–1", () => {
     expect(isValidPriority(0)).toBe(true);
