@@ -28,10 +28,63 @@ const rest = (table: string, q: string) => fetch(`${URL}/rest/v1/${table}?${q}`,
 const patch = (table: string, q: string, body: unknown) => fetch(`${URL}/rest/v1/${table}?${q}`, { method: "PATCH", headers: { ...H, Prefer: "return=minimal" }, body: JSON.stringify(body) });
 
 beforeAll(async () => { if (RUN) svc = await import("@/services/seoRedirectService"); });
+const WRS = "/seo-it-wrs";
 afterAll(async () => {
   if (!RUN) return;
   await del("redirects", `from_path=in.(${[OLD, MID, FIN, IDA, IDA2, IDB].join(",")})`);
-  await del("seo_overrides", `path=eq.${ROUTE}`);
+  await del("seo_overrides", `path=in.(${[ROUTE, WRS].join(",")})`);
+});
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const canon = (m: any) => m.alternates?.canonical;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const ogImages = (m: any) => m.openGraph?.images;
+
+d("SEO override route-existence validation (P0-3, Invariant 4, real DB)", () => {
+  it("an unresolved custom path (likely typo) requires confirmation, a known route does not", async () => {
+    const typo = await svc.analyzeSeoOverride({ path: "/abuot" });
+    expect(typo.errors).toEqual([]); // structurally valid — not blocked, but…
+    expect(typo.confirmations.some((c) => /doesn't match a known storefront route/i.test(c))).toBe(true);
+
+    const known = await svc.analyzeSeoOverride({ path: "/about" }); // static storefront route
+    expect(known.confirmations.some((c) => /known storefront route/i.test(c))).toBe(false);
+  });
+
+  it("upsert BLOCKS an unresolved-path override until confirmed (server-enforced)", async () => {
+    const blocked = await svc.upsertSeoOverride({ path: "/abuot-typo-xyz", title: "T" }, {});
+    expect(blocked.ok).toBe(false);
+    expect(blocked.analysis?.confirmations.length).toBeGreaterThan(0);
+    await svc.deleteSeoOverride("/abuot-typo-xyz"); // no row created, but be safe
+  });
+});
+
+d("storefront withRouteSeo override round-trip (P0-1, Invariant 1 at the storefront)", () => {
+  it("inherited → override → storefront metadata changes → remove → inherited (title/desc/canonical/robots/OG)", async () => {
+    const base = { title: "Base Title", description: "Base description", openGraph: { images: ["https://base.example/og.jpg"] } };
+    await svc.deleteSeoOverride(WRS); // clean slate
+
+    // Baseline: no override → withRouteSeo returns the route's own base (site defaults may fill description/OG).
+    const inherited = await svc.withRouteSeo(WRS, base);
+    expect(inherited.title).toBe("Base Title");
+
+    // Add an override — the ACTUAL storefront mapping must change (not just getRouteSeo).
+    await svc.upsertSeoOverride({ path: WRS, title: "Override Title", description: "Override description", canonical: `https://samorahstudio.com${WRS}`, robots: "noindex", ogImage: "https://cdn.example/override-og.jpg" }, { confirmed: true });
+    const overridden = await svc.withRouteSeo(WRS, base);
+    expect(overridden.title).toBe("Override Title");                       // title override wins
+    expect(overridden.description).toBe("Override description");            // description override wins
+    expect(canon(overridden)).toBe(`https://samorahstudio.com${WRS}`);     // canonical → alternates.canonical
+    expect(overridden.robots).toBe("noindex");                             // robots override
+    expect(ogImages(overridden)).toEqual(["https://cdn.example/override-og.jpg"]); // ogImage → openGraph.images
+
+    // Remove the override → storefront returns to the exact inherited state (not empty, not stale).
+    await svc.deleteSeoOverride(WRS);
+    const restored = await svc.withRouteSeo(WRS, base);
+    expect(restored.title).toBe(inherited.title);
+    expect(restored.description).toBe(inherited.description);
+    expect(canon(restored)).toBe(canon(inherited));   // canonical cleared back to inherited
+    expect(restored.robots).toBe(inherited.robots);   // robots cleared
+    expect(ogImages(restored)).toEqual(ogImages(inherited)); // OG back to the base image
+  });
 });
 
 d("redirect editing preserves identity + re-validates the graph (P1)", () => {

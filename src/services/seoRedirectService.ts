@@ -12,7 +12,7 @@ import { SITE_CONFIG } from "@/config/site";
 import { analyzeRedirectGraph } from "@/lib/seo/redirectGraph";
 import { normalizePath } from "@/lib/redirects";
 import { validatePathStructure, validateCanonical, isNoindex, isMajorRoute } from "@/lib/seo/seoValidation";
-import { loadDestinationIndex, verdictFor } from "@/lib/cms/navValidation";
+import { loadDestinationIndex, verdictFor, classifyHref } from "@/lib/cms/navValidation";
 import { classifyRedirectHealth, type RedirectHealth } from "@/lib/seo/redirectHealth";
 
 // ── Redirects ────────────────────────────────────────────────────────────────
@@ -149,6 +149,27 @@ export async function analyzeSeoOverride(input: { path: string; title?: string; 
     else a.warnings.push(`${path} is set to "noindex" — it won't appear in search results.`);
     if (input.canonical) a.warnings.push(`This page is "noindex" but also sets a canonical — those signals can conflict.`);
   }
+  // Route existence (Invariant 4) — reuse the canonical Navigation classifier + lifecycle index (no
+  // second resolver). An unresolved internal route is a likely typo → CONFIRM (don't silently accept
+  // /abuot); a not-live entity → warn. Confirmation (not a hard block) preserves legitimate custom/
+  // future-route capability. Skipped only if the index can't load at all.
+  const TYPO = (p: string) => `${p} doesn't match a known storefront route — confirm it's intentional (a custom or future route), or fix a likely typo.`;
+  try {
+    const idx = await loadDestinationIndex();
+    const c = classifyHref(path);
+    if (c.kind === "page") {
+      const status = idx.pages.get(c.slug);
+      if (status === undefined) a.confirmations.push(TYPO(path));
+      else if (status !== "published") a.warnings.push(`${path} points to a page that isn't currently live (${status}).`);
+    } else if (c.kind === "entity") {
+      if (c.type === "product") { const st = idx.products.get(c.slug); if (st === undefined) a.confirmations.push(TYPO(path)); else if (st !== "active") a.warnings.push(`${path} points to a product that isn't live (${st}).`); }
+      else if (c.type === "chapter" && idx.chapters.size && !idx.chapters.has(c.slug)) a.confirmations.push(TYPO(path));
+      else if (c.type === "collection" && idx.collections.size && !idx.collections.has(c.slug)) a.confirmations.push(TYPO(path));
+    } else if (c.kind === "unknown") {
+      a.warnings.push(`${path} is a deep custom route we can't verify — double-check it resolves.`);
+    }
+    // empty / static / external → no existence concern
+  } catch { /* index unavailable → skip existence check (never fabricate) */ }
   return a;
 }
 

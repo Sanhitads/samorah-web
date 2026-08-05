@@ -15,7 +15,8 @@ describe("analyzeSeoOverride — robots + canonical safety (no DB)", () => {
   });
 
   it("noindex on a minor route is only a warning, not a confirmation", async () => {
-    const a = await analyzeSeoOverride({ path: "/some-minor-landing", robots: "noindex" });
+    // /faq is a known static route → no route-existence confirmation regardless of DB availability.
+    const a = await analyzeSeoOverride({ path: "/faq", robots: "noindex" });
     expect(a.confirmations).toEqual([]);
     expect(a.warnings.some((w) => /won't appear in search/i.test(w))).toBe(true);
   });

@@ -40,8 +40,9 @@ type HrefClass =
 
 const SAFE_SCHEMES = new Set(["http", "https", "mailto", "tel"]);
 
-/** Classify a resolved href into what it points at (for lifecycle/existence + safety checks). */
-function classifyHref(href: string | undefined): HrefClass {
+/** Classify a resolved href into what it points at (for lifecycle/existence + safety checks).
+ *  Exported so other admin modules (SEO) reuse the SAME route classifier — not a second one. */
+export function classifyHref(href: string | undefined): HrefClass {
   const h = (href ?? "").trim();
   if (!h || h === "#") return { kind: "empty" };
   if (h.startsWith("#")) return { kind: "static" }; // in-page anchor
