@@ -69,16 +69,14 @@ collection; explicit-override duplicate-metadata warning; accessible tabs.
 - Generalized CMS-page sitemap discovery (Phase 3 added `/about`+`/journal` as known routes only).
 - Generalized product/collection lifecycle/RLS/service changes; product-picker `.limit(200)` redesign.
 
-### ⚠️ Finding — external redirect destinations don't function (needs a decision)
-The redirect **middleware is same-origin by design**: it sets `pathname` on a clone of the canonical-
-origin URL (`middleware.ts`), so a redirect can never leave the site — a `javascript:`/external `to`
-becomes a same-origin path (proved by `middleware.integration.test`). This is a strong anti-open-redirect
-property, but it also means the validation's `allowExternal` for redirect **destinations** permits saving
-external URLs that then produce a broken same-origin redirect. **P1-8 (external-redirect confirmation) is
-therefore moot as specified** — there is no functional external-redirect capability to confirm. Proposed
-fix (pending approval): make redirect-destination validation **reject/strongly-warn external URLs** to
-match the middleware's same-origin reality, rather than adding confirmation for a non-working feature.
-Do NOT change the middleware to enable external redirects (that would add open-redirect risk).
+### ✅ Resolved — external redirect destinations blocked (P1-8)
+The redirect **middleware is same-origin by design** (sets `pathname` on a clone of the canonical-origin
+URL), so external destinations never function — a `javascript:`/external `to` becomes a same-origin path
+(proved by `middleware.integration.test`). Phase 3 aligned the canonical redirect analysis path to this
+reality: absolute external URLs and protocol-relative `//…` destinations are now a **blocking** error
+(server-enforced in `upsertRedirect`), unsafe protocols stay blocked, internal paths still validated by
+the canonical lifecycle rules. The middleware was **not** changed (kept as defense in depth). No
+external-redirect capability exists or is planned.
 
 ### Known boundary (accepted, documented)
 A `noindex` set **only** inside a route's own `generateMetadata` (never written to the `seo_overrides`
