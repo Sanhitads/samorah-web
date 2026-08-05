@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { hasCapability } from "@/lib/auth/capabilities";
-import { listRedirects, listSeoOverrides } from "@/services/seoRedirectService";
+import { listRedirectsWithHealth, listSeoOverrides } from "@/services/seoRedirectService";
 import { listLinkableEntities } from "@/services/navigationService";
 import { listMedia } from "@/services/media/mediaService";
 import { SeoRedirectsManager } from "@/components/admin/SeoRedirectsManager";
@@ -23,7 +23,7 @@ export default async function SeoPage() {
   }
   const canPublish = hasCapability(staff.role, "content.publish");
   const [redirects, seo, entities, media] = await Promise.all([
-    listRedirects(),
+    listRedirectsWithHealth(),
     listSeoOverrides(),
     listLinkableEntities(),
     listMedia({ limit: 60 }).then((rows) => rows.map((m) => ({ id: m.id, url: m.url, title: m.title || m.url }))),

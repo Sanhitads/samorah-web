@@ -13,14 +13,30 @@ import { analyzeRedirectGraph } from "@/lib/seo/redirectGraph";
 import { normalizePath } from "@/lib/redirects";
 import { validatePathStructure, validateCanonical, isNoindex, isMajorRoute } from "@/lib/seo/seoValidation";
 import { loadDestinationIndex, verdictFor } from "@/lib/cms/navValidation";
+import { classifyRedirectHealth, type RedirectHealth } from "@/lib/seo/redirectHealth";
 
 // ── Redirects ────────────────────────────────────────────────────────────────
-export interface RedirectRow { id: string; fromPath: string; toPath: string; code: number; enabled: boolean; hits: number }
+export interface RedirectRow { id: string; fromPath: string; toPath: string; code: number; enabled: boolean; hits: number; createdAt: string }
 
 export async function listRedirects(): Promise<RedirectRow[]> {
   const db = createAdminClient() as any;
   const { data } = await db.from("redirects").select("*").order("from_path");
-  return (data ?? []).map((r: any) => ({ id: r.id, fromPath: r.from_path, toPath: r.to_path, code: r.code, enabled: r.enabled, hits: r.hits ?? 0 }));
+  return (data ?? []).map((r: any) => ({ id: r.id, fromPath: r.from_path, toPath: r.to_path, code: r.code, enabled: r.enabled, hits: r.hits ?? 0, createdAt: r.created_at ?? "" }));
+}
+
+/** Redirects with deterministic health (point 20) — one lifecycle-index load, then a pure classify per
+ *  row. No traffic signal (instrumentation deferred). */
+export interface RedirectRowH extends RedirectRow { health: RedirectHealth; healthDetail?: string }
+export async function listRedirectsWithHealth(): Promise<RedirectRowH[]> {
+  const rows = await listRedirects();
+  const idx = await loadDestinationIndex();
+  const enabledSources = new Map(rows.filter((r) => r.enabled).map((r) => [normalizePath(r.fromPath), normalizePath(r.toPath)]));
+  return rows.map((r) => {
+    let broken = false;
+    if (r.enabled && r.toPath.startsWith("/")) { const v = verdictFor({ href: r.toPath }, idx); broken = v.kind === "missing" || v.kind === "archived"; }
+    const h = classifyRedirectHealth(r, enabledSources, broken);
+    return { ...r, health: h.health, healthDetail: h.detail };
+  });
 }
 
 const cleanPath = (p: string) => { p = String(p ?? "").trim(); if (p && !p.startsWith("/") && !p.startsWith("http")) p = `/${p}`; return p; };

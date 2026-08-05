@@ -1,13 +1,16 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import type { RedirectRow, SeoOverrideRow, SeoAnalysis, EffectiveSeo, EffectiveField } from "@/services/seoRedirectService";
+import type { RedirectRow, SeoOverrideRow, SeoAnalysis, EffectiveSeo, EffectiveField, RedirectRowH } from "@/services/seoRedirectService";
 import { ENTITY_ROUTE, type EntityType, type LinkableEntities } from "@/services/navigationService";
 import { MediaPicker } from "./MediaPicker";
 import type { MediaOption } from "./SchemaForm";
+import { KebabMenu } from "./KebabMenu";
 import { parseRobots, buildRobots, titleGuidance, descriptionGuidance } from "@/lib/seo/seoValidation";
 import { setTabNotice, noticeFor, type TabNotices, type SeoTab } from "@/lib/seo/tabNotice";
+import { HEALTH_LABEL } from "@/lib/seo/redirectHealth";
+import { filterSortRedirects, type RedirectFilter, type RedirectSort } from "@/lib/seo/redirectFilter";
 
 const EMPTY_R = { id: "", fromPath: "", toPath: "", code: 301, enabled: true };
 const EMPTY_S = { path: "", title: "", description: "", ogImage: "", robots: "", canonical: "", sitemapPriority: "", changeFreq: "" };
@@ -44,10 +47,12 @@ function ProvBadge({ f }: { f: EffectiveField }) {
   return <span className={`seo-prov seo-prov--${f.provenance}`}>{PROV_LABEL[f.provenance]}</span>;
 }
 
-export function SeoRedirectsManager({ redirects, seo, entities, media, canPublish }: { redirects: RedirectRow[]; seo: SeoOverrideRow[]; entities: LinkableEntities; media: MediaOption[]; canPublish: boolean }) {
+export function SeoRedirectsManager({ redirects, seo, entities, canPublish }: { redirects: RedirectRowH[]; seo: SeoOverrideRow[]; entities: LinkableEntities; media?: MediaOption[]; canPublish: boolean }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [tab, setTab] = useState<SeoTab>("redirects");
+  const [rQuery, setRQuery] = useState(""); const [rFilter, setRFilter] = useState<RedirectFilter>("all"); const [rSort, setRSort] = useState<RedirectSort>("created");
+  const shownRedirects = useMemo(() => filterSortRedirects(redirects, { query: rQuery, filter: rFilter, sort: rSort }), [redirects, rQuery, rFilter, rSort]);
   const [busy, setBusy] = useState(false);
   const [notices, setNotices] = useState<TabNotices>({});
   const [undo, setUndo] = useState<{ text: string; run: () => void } | null>(null);
@@ -168,20 +173,41 @@ export function SeoRedirectsManager({ redirects, seo, entities, media, canPublis
             </div>
           ) : null}
 
+          {redirects.length ? (
+            <div className="seo-toolbar">
+              <input type="search" value={rQuery} onChange={(e) => setRQuery(e.target.value)} placeholder="Search source or destination" aria-label="Search redirects" />
+              <select value={rFilter} onChange={(e) => setRFilter(e.target.value as RedirectFilter)} aria-label="Filter">
+                <option value="all">All</option><option value="active">Active</option><option value="disabled">Disabled</option>
+                <option value="permanent">Permanent (301)</option><option value="temporary">Temporary (302)</option><option value="problems">Problems</option>
+              </select>
+              <select value={rSort} onChange={(e) => setRSort(e.target.value as RedirectSort)} aria-label="Sort">
+                <option value="created">Recently created</option><option value="alpha">Alphabetical</option>
+              </select>
+            </div>
+          ) : null}
           <table className="admin__table admin__table--board" style={{ marginTop: 10 }}>
-            <thead><tr><th>From</th><th>To</th><th>Type</th><th>Status</th><th>Actions</th></tr></thead>
+            <thead><tr><th>From</th><th>To</th><th>Type</th><th>Health</th><th></th></tr></thead>
             <tbody>
-              {redirects.map((r) => (
+              {shownRedirects.map((r) => (
                 <tr key={r.id}>
                   <td className="admin__mono">{r.fromPath}</td><td className="admin__mono">{r.toPath}</td><td>{r.code === 302 ? "302 · Temp" : "301 · Perm"}</td>
-                  <td><button type="button" className="cfg-toggle" data-on={r.enabled ? "1" : "0"} disabled={busy || !canPublish} onClick={() => toggleRedirect(r)}>{r.enabled ? "On" : "Off"}</button></td>
-                  <td><button type="button" className="ff-btn ff-btn--sm" disabled={busy} onClick={() => editRedirect(r)}>Edit</button> <button type="button" className="ff-btn ff-btn--danger ff-btn--sm" disabled={busy || !canPublish} onClick={() => deleteRedirect(r)}>Delete</button></td>
+                  <td><span className={`seo-health seo-health--${r.health}`} title={r.healthDetail ?? ""}><span className="seo-health__dot" />{HEALTH_LABEL[r.health]}</span></td>
+                  <td>
+                    <div className="rowactions">
+                      <button type="button" className="ff-btn ff-btn--sm" disabled={busy} onClick={() => editRedirect(r)}>Edit</button>
+                      <KebabMenu items={[
+                        { label: r.enabled ? "Disable" : "Enable", onClick: () => toggleRedirect(r), disabled: !canPublish },
+                        { label: "Delete", onClick: () => deleteRedirect(r), danger: true, sep: true, disabled: !canPublish },
+                      ]} />
+                    </div>
+                  </td>
                 </tr>
               ))}
+              {redirects.length && !shownRedirects.length ? <tr><td colSpan={5} className="admin__empty">No redirects match.</td></tr> : null}
               {!redirects.length ? <tr><td colSpan={5} className="admin__empty">No redirects yet.</td></tr> : null}
             </tbody>
           </table>
-          <p className="cfg-hint">Redirects apply within ~60s (cached in middleware) and run <strong>before</strong> the page renders. Loops and broken destinations are blocked; redirecting a live page asks for confirmation. Hit counts aren't tracked yet.</p>
+          <p className="cfg-hint">Redirects apply within ~60s (cached in middleware) and run <strong>before</strong> the page renders. Loops and broken destinations are blocked; redirecting a live page asks for confirmation. Health is derived from the redirect graph — traffic metrics are deferred (post-launch).</p>
         </div>
       ) : (
         <div>
