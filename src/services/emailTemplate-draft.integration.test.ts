@@ -120,7 +120,9 @@ d("email templates — draft/publish safety (real DB)", () => {
     expect(prodStill?.html).toContain("BODY A");
     expect(prodStill?.html).not.toContain("BODY B");
 
-    // Send Test path (mirrors route send-test exactly): admin.draft ?? admin.published → renderTemplateContent.
+    // Send Test renders the operator's current editor content (draft + any unsaved edits) via the same
+    // renderTemplateContent as production preview. Here there are no unsaved edits, so it equals the
+    // saved draft B — proving the test reflects B while production still renders A.
     const admin = await svc.getEmailTemplateAdmin(K);
     const c = admin!.draft ?? admin!.published;
     const test = svc.renderTemplateContent(def, c, def.sample, details);

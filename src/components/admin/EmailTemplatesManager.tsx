@@ -89,7 +89,8 @@ export function EmailTemplatesManager({ templates, fields, media, canPublish, he
 
   const sendTest = async (t: EmailTemplateAdmin) => {
     const to = (testTo[t.key] ?? "").trim();
-    setBusy(true); const { data } = await api({ action: "send-test", key: t.key, to }); setBusy(false);
+    // Send the CURRENT editor content (same as Preview) so what you preview is what you test.
+    setBusy(true); const { data } = await api({ action: "send-test", key: t.key, to, patch: draftOf(t) }); setBusy(false);
     if (data.error) { say(t.key, "err", data.error); return; }
     say(t.key, "ok", `Test sent to ${data.to} — marked [TEST], no customer/order state changed.`);
   };

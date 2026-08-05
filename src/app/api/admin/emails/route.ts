@@ -98,10 +98,10 @@ export async function POST(request: Request) {
       const to = String(body.to ?? "").trim();
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return NextResponse.json({ error: "A valid test recipient is required." }, { status: 400 });
       if (!emailConfigured()) return NextResponse.json({ error: "Email provider is not configured." }, { status: 400 });
-      // Test renders the CURRENT DRAFT (what the operator is about to publish), never mutating any state.
-      const admin = await getEmailTemplateAdmin(key);
-      const c = admin?.draft ?? admin?.published;
-      if (!c) return NextResponse.json({ error: "nothing to test" }, { status: 400 });
+      // Test renders the operator's CURRENT editor content (merged over the saved draft) — identical
+      // to Preview, so "what you preview is what you test". Strictly side-effect-free: no save, and the
+      // published version customers receive is never touched.
+      const c = await contentFromPatch();
       const { subject, html, text } = renderTemplateContent(def, c, def.sample, sampleDetailsHtml());
       const r = await sendEmail({ to, subject: `[TEST] ${subject}`, html, text });
       return r.sent
