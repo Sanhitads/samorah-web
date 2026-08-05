@@ -486,7 +486,7 @@ function readingTime(text: string): number {
   return Math.max(1, Math.round(words / 200));
 }
 
-function faqSchema(faq: ChapterFaq[]): unknown {
+export function faqSchema(faq: ChapterFaq[]): unknown {
   return {
     "@context": "https://schema.org",
     "@type": "FAQPage",

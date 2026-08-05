@@ -4,6 +4,7 @@ import type { ProductPageView } from "@/lib/productPage";
 import type { SectionInstance } from "@/platform/section";
 import type { CandlePdpContent } from "@/lib/productEditorial";
 import { TrackEvent } from "@/components/analytics/TrackEvent";
+import { productBreadcrumb } from "@/lib/seo/breadcrumbLd";
 import { ProductPurchasePanel } from "@/components/product/ProductPurchasePanel";
 import { ProductGallery } from "@/components/product/ProductGallery";
 import { SectionRenderer } from "@/components/sections/SectionRenderer";
@@ -63,6 +64,9 @@ export function CandleProductDetail({
       ) : null}
       {ld && !preview ? (
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld) }} />
+      ) : null}
+      {!preview ? (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productBreadcrumb(p.name, p.slug)) }} />
       ) : null}
       {!preview ? (
         <TrackEvent event="view_item" params={{ item_id: p.slug, item_name: p.name, price: p.variants[0]?.price }} />

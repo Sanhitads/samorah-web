@@ -7,6 +7,7 @@ import { bootstrapPlatform } from "@/components/page/bootstrap";
 import { buildAirEditorial } from "@/lib/productEditorial";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { airProductLd } from "@/lib/seo/productLd";
+import { productBreadcrumb } from "@/lib/seo/breadcrumbLd";
 import type { AirVolume, HourEntry, HourGroup } from "@/config/theHours";
 
 /**
@@ -70,6 +71,7 @@ export function AirProductDetail({
   return (
     <main className="pdp pdp--air" data-theme="warm-ivory" data-cid={scopeId} style={mainStyle}>
       {!preview ? <JsonLd data={airProductLd(hour, volume.tagline)} /> : null}
+      {!preview ? <JsonLd data={productBreadcrumb(hour.name, hour.productSlug)} /> : null}
       {hour.customGradientCss ? (
         <style dangerouslySetInnerHTML={{ __html: `[data-cid="${scopeId}"] .pdp__layout .asset-image{background:${hour.customGradientCss} !important}` }} />
       ) : null}

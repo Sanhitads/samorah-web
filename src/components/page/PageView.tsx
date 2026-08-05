@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import type { Page } from "@/platform/page";
 import { resolvePage, type ResolvePageOptions } from "@/platform/pageResolver";
 import { SectionRenderer } from "@/components/sections/SectionRenderer";
+import { breadcrumbLdFromItems } from "@/lib/seo/breadcrumbLd";
 import { bootstrapPlatform } from "./bootstrap";
 
 /**
@@ -19,6 +20,8 @@ export function PageView({
 }): ReactNode {
   bootstrapPlatform();
   const { sections, context } = resolvePage(page, options);
+  // BreadcrumbList from the page's OWN canonical breadcrumb trail (no fabricated hierarchy).
+  const breadcrumb = breadcrumbLdFromItems(page.breadcrumb);
 
   return (
     <main data-page={page.id} data-experience={page.experienceId}>
@@ -31,6 +34,7 @@ export function PageView({
           }}
         />
       ) : null}
+      {breadcrumb ? <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumb) }} /> : null}
       <SectionRenderer sections={sections} context={context} />
     </main>
   );
