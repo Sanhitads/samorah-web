@@ -223,74 +223,84 @@ export function SeoRedirectsManager({ redirects, seo, entities, canPublish, orig
           <p className="cfg-hint">Redirects apply within ~60s (cached in middleware) and run <strong>before</strong> the page renders. Loops and broken destinations are blocked; redirecting a live page asks for confirmation. Health is derived from the redirect graph — traffic metrics are deferred (post-launch).</p>
         </div>
       ) : (
-        <div className="seo-editor" id="panel-seo" role="tabpanel" aria-labelledby="tab-seo">
-          <section className="seo-group">
-            <h4 className="seo-group__title">Route</h4>
-            <label className="cfg-field" data-wide="1"><span>Which page is this SEO for?</span>
-              <PathPicker value={ns.path} entities={entities} onChange={(p) => setNs((s) => ({ ...s, path: p }))} onCommit={(p) => loadEffective(p)} />
-            </label>
-          </section>
+        <div id="panel-seo" role="tabpanel" aria-labelledby="tab-seo">
+          <div className="seo-editor--2col">
+            <div className="seo-editor__form">
+              <section className="seo-group">
+                <h4 className="seo-group__title">Route</h4>
+                <label className="cfg-field" data-wide="1"><span>Which page is this SEO for?</span>
+                  <PathPicker value={ns.path} entities={entities} onChange={(p) => setNs((s) => ({ ...s, path: p }))} onCommit={(p) => loadEffective(p)} />
+                </label>
+              </section>
 
-          <section className="seo-group">
-            <h4 className="seo-group__title">Search appearance</h4>
-            <label className="cfg-field" data-wide="1"><span>Meta title <CharCount value={ns.title} kind="title" /> {ns.title ? <button type="button" className="seo-reset" onClick={() => resetField("title")}>↺ inherited</button> : null}</span>
-              <input value={ns.title} onChange={(e) => setNs({ ...ns, title: e.target.value })} /></label>
-            <label className="cfg-field" data-wide="1"><span>Meta description <CharCount value={ns.description} kind="description" /> {ns.description ? <button type="button" className="seo-reset" onClick={() => resetField("description")}>↺ inherited</button> : null}</span>
-              <textarea value={ns.description} onChange={(e) => setNs({ ...ns, description: e.target.value })} rows={2} /></label>
-            <p className="seo-preview__cap admin__muted">Search preview</p>
-            <SerpCard preview={preview} origin={origin} path={ns.path} />
-            <p className="cfg-hint">Search engines may rewrite titles and descriptions — this is a guide, not a guarantee.</p>
-          </section>
+              <section className="seo-group">
+                <h4 className="seo-group__title">Search appearance</h4>
+                <label className="cfg-field" data-wide="1"><span>Meta title <CharCount value={ns.title} kind="title" /> {ns.title ? <button type="button" className="seo-reset" onClick={() => resetField("title")}>↺ inherited</button> : null}</span>
+                  <input value={ns.title} onChange={(e) => setNs({ ...ns, title: e.target.value })} /></label>
+                <label className="cfg-field" data-wide="1"><span>Meta description <CharCount value={ns.description} kind="description" /> {ns.description ? <button type="button" className="seo-reset" onClick={() => resetField("description")}>↺ inherited</button> : null}</span>
+                  <textarea value={ns.description} onChange={(e) => setNs({ ...ns, description: e.target.value })} rows={2} /></label>
+              </section>
 
-          <section className="seo-group">
-            <h4 className="seo-group__title">Indexing &amp; canonical</h4>
-            <RobotsControls value={ns.robots} onChange={(r) => setNs({ ...ns, robots: r })} />
-            <p className="cfg-hint">Most storefront pages should stay Index + Follow.</p>
-            <label className="cfg-field" data-wide="1"><span>Canonical URL {ns.canonical ? <button type="button" className="seo-reset" onClick={() => resetField("canonical")}>↺ inherited</button> : null}</span>
-              <input value={ns.canonical} onChange={(e) => setNs({ ...ns, canonical: e.target.value })} placeholder="https://samorahstudio.com/…" />
-              <span className="cfg-hint">Leave blank for normal pages. Set a canonical only when this page duplicates or closely matches another URL.</span></label>
-          </section>
+              <section className="seo-group">
+                <h4 className="seo-group__title">Indexing &amp; canonical</h4>
+                <RobotsControls value={ns.robots} onChange={(r) => setNs({ ...ns, robots: r })} />
+                <p className="cfg-hint">Most storefront pages should stay Index + Follow.</p>
+                <label className="cfg-field" data-wide="1"><span>Canonical URL {ns.canonical ? <button type="button" className="seo-reset" onClick={() => resetField("canonical")}>↺ inherited</button> : null}</span>
+                  <input value={ns.canonical} onChange={(e) => setNs({ ...ns, canonical: e.target.value })} placeholder="https://samorahstudio.com/…" />
+                  <span className="cfg-hint">Leave blank for normal pages. Set a canonical only when this page duplicates or closely matches another URL.</span></label>
+              </section>
 
-          <section className="seo-group">
-            <h4 className="seo-group__title">Social sharing</h4>
-            <div className="cfg-field" data-wide="1"><span>OG image {ns.ogImage ? <button type="button" className="seo-reset" onClick={() => resetField("ogImage")}>↺ inherited</button> : null}</span>
-              <OgImageField value={ns.ogImage} onChange={(url) => setNs({ ...ns, ogImage: url })} /></div>
-            <p className="seo-preview__cap admin__muted">Social preview</p>
-            <SocialCard preview={preview} origin={origin} />
-          </section>
+              <section className="seo-group">
+                <h4 className="seo-group__title">Social sharing</h4>
+                <div className="cfg-field" data-wide="1"><span>OG image {ns.ogImage ? <button type="button" className="seo-reset" onClick={() => resetField("ogImage")}>↺ inherited</button> : null}</span>
+                  <OgImageField value={ns.ogImage} onChange={(url) => setNs({ ...ns, ogImage: url })} /></div>
+              </section>
 
-          <details className="seo-group seo-details" open={advOpen} onToggle={(e) => setAdvOpen((e.target as HTMLDetailsElement).open)}>
-            <summary className="seo-group__title">Advanced sitemap settings</summary>
-            <div className="cfg-field" data-wide="1"><span>These tune this route in the generated sitemap.xml.</span>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <input value={ns.sitemapPriority} onChange={(e) => setNs({ ...ns, sitemapPriority: e.target.value })} placeholder="priority (0–1)" aria-label="Sitemap priority" />
-                <select value={ns.changeFreq} onChange={(e) => setNs({ ...ns, changeFreq: e.target.value })} aria-label="Change frequency">
-                  <option value="">change frequency (default)</option>
-                  {["always", "hourly", "daily", "weekly", "monthly", "yearly", "never"].map((f) => <option key={f} value={f}>{f}</option>)}
-                </select>
-              </div>
-              {ns.sitemapPriority && (Number.isNaN(Number(ns.sitemapPriority)) || Number(ns.sitemapPriority) < 0 || Number(ns.sitemapPriority) > 1) ? <span className="cfg-msg cfg-msg--warn">Priority must be between 0 and 1 — an out-of-range value is ignored.</span> : null}
-            </div>
-          </details>
-
-          <div className="cfg-actions">
-            <button type="button" className="ff-btn ff-btn--primary" disabled={busy || !canPublish} onClick={saveSeo}>Save</button>
-            {ns.path ? <button type="button" className="ff-btn ff-btn--ghost" disabled={busy} onClick={() => { setNs(EMPTY_S); setEffective(null); setAdvOpen(false); }}>Discard changes</button> : null}
-          </div>
-
-          {effective ? (
-            <div className="seo-effective">
-              <h3>Effective storefront SEO <span className="admin__muted">— what the storefront currently resolves for {ns.path || "this route"}</span></h3>
-              {([["Title", effective.title], ["Description", effective.description], ["Canonical", effective.canonical], ["Robots", effective.robots], ["OG image", effective.ogImage]] as [string, EffectiveField][]).map(([label, f]) => (
-                <div className="seo-eff-row" key={label}>
-                  <span className="seo-eff-label">{label}</span>
-                  <span className="seo-eff-value">{f.value ?? <em className="admin__muted">Inherited from page/entity</em>}</span>
-                  <ProvenanceBadge f={f} />
+              <details className="seo-group seo-details" open={advOpen} onToggle={(e) => setAdvOpen((e.target as HTMLDetailsElement).open)}>
+                <summary className="seo-group__title">Advanced sitemap settings</summary>
+                <div className="cfg-field" data-wide="1"><span>These tune this route in the generated sitemap.xml.</span>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <input value={ns.sitemapPriority} onChange={(e) => setNs({ ...ns, sitemapPriority: e.target.value })} placeholder="priority (0–1)" aria-label="Sitemap priority" />
+                    <select value={ns.changeFreq} onChange={(e) => setNs({ ...ns, changeFreq: e.target.value })} aria-label="Change frequency">
+                      <option value="">change frequency (default)</option>
+                      {["always", "hourly", "daily", "weekly", "monthly", "yearly", "never"].map((f) => <option key={f} value={f}>{f}</option>)}
+                    </select>
+                  </div>
+                  {ns.sitemapPriority && (Number.isNaN(Number(ns.sitemapPriority)) || Number(ns.sitemapPriority) < 0 || Number(ns.sitemapPriority) > 1) ? <span className="cfg-msg cfg-msg--warn">Priority must be between 0 and 1 — an out-of-range value is ignored.</span> : null}
                 </div>
-              ))}
-              <p className="cfg-hint">From the same resolver the storefront uses (site defaults + this override). A value the page sets in code (e.g. an entity title) is shown honestly as “Inherited from page/entity”, not fabricated.</p>
+              </details>
+
+              <div className="cfg-actions">
+                <button type="button" className="ff-btn ff-btn--primary" disabled={busy || !canPublish} onClick={saveSeo}>Save</button>
+                {ns.path ? <button type="button" className="ff-btn ff-btn--ghost" disabled={busy} onClick={() => { setNs(EMPTY_S); setEffective(null); setAdvOpen(false); }}>Discard changes</button> : null}
+              </div>
             </div>
-          ) : null}
+
+            <aside className="seo-editor__aside" aria-label="Preview and inheritance">
+              <div className="seo-aside-block">
+                <p className="seo-preview__cap admin__muted">Search preview</p>
+                <SerpCard preview={preview} origin={origin} path={ns.path} />
+                <p className="cfg-hint">Search engines may rewrite titles and descriptions — this is a guide, not a guarantee.</p>
+              </div>
+              <div className="seo-aside-block">
+                <p className="seo-preview__cap admin__muted">Social preview</p>
+                <SocialCard preview={preview} origin={origin} />
+              </div>
+              {effective ? (
+                <div className="seo-effective">
+                  <h3>Effective storefront SEO <span className="admin__muted">— what the storefront currently resolves for {ns.path || "this route"}</span></h3>
+                  {([["Title", effective.title], ["Description", effective.description], ["Canonical", effective.canonical], ["Robots", effective.robots], ["OG image", effective.ogImage]] as [string, EffectiveField][]).map(([label, f]) => (
+                    <div className="seo-eff-row" key={label}>
+                      <span className="seo-eff-label">{label}</span>
+                      <span className="seo-eff-value">{f.value ?? <em className="admin__muted">Inherited from page/entity</em>}</span>
+                      <ProvenanceBadge f={f} />
+                    </div>
+                  ))}
+                  <p className="cfg-hint">From the same resolver the storefront uses (site defaults + this override). A value the page sets in code (e.g. an entity title) is shown honestly as “Inherited from page/entity”, not fabricated.</p>
+                </div>
+              ) : null}
+            </aside>
+          </div>
 
           {overrideDups.length ? (
             <div className="cfg-validation" style={{ marginTop: 10 }}>

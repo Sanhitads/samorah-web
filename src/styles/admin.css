@@ -578,6 +578,13 @@
 .seo-stat--warn b { color: #8a3d2f; }
 .admin__warn { color: #8a6d3b; }
 .seo-editor { display: flex; flex-direction: column; gap: 4px; }
+/* Bounded two-column Meta editor: form left, preview/inheritance aside right at >=1024px; single column below. */
+.seo-editor--2col { display: grid; grid-template-columns: 1fr; gap: 22px; align-items: start; }
+.seo-editor__form { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.seo-editor__aside { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.seo-editor__aside .seo-serp, .seo-editor__aside .seo-og { max-width: 100%; }
+.seo-aside-block { display: flex; flex-direction: column; gap: 6px; }
+@media (min-width: 1024px) { .seo-editor--2col { grid-template-columns: minmax(0, 62%) minmax(0, 1fr); gap: 32px; } }
 .seo-group { padding: 14px 0; border-top: 1px solid var(--ad-hair); }
 .seo-group:first-child { border-top: none; padding-top: 4px; }
 .seo-group__title { font-family: var(--font-sans); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ad-ink, #1f1a16); margin: 0 0 10px; }
