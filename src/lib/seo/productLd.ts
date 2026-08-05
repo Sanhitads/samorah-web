@@ -54,3 +54,18 @@ export function productLd(p: LdInput): Record<string, unknown> {
     offers,
   };
 }
+
+/** Product + Offer JSON-LD for an Air/Room/Linen product, from its canonical Hours data — the SAME
+ *  builder as candles (no separate air schema engine). Gradient placeholder images are dropped by
+ *  productLd; a single price yields a single Offer with InStock availability. */
+export function airProductLd(hour: { name: string; productSlug: string; price: number; priceLabel: string; cardImage?: string }, description?: string | null): Record<string, unknown> {
+  return productLd({
+    name: hour.name,
+    slug: hour.productSlug,
+    description: description ?? null,
+    gallery: hour.cardImage ? [{ src: hour.cardImage }] : [],
+    priceLabel: hour.priceLabel,
+    variants: hour.price > 0 ? [{ price: hour.price, inStock: true }] : [],
+    price: hour.price,
+  });
+}
