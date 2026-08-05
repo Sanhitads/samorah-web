@@ -46,6 +46,8 @@ d("generated sitemap URL correctness (invariant A)", () => {
   it("includes home, shop and a representative product / chapter / air-volume", () => {
     expect(urls).toContain(ORIGIN);            // homepage (bare canonical origin)
     expect(urls).toContain(`${ORIGIN}/shop`);  // shop listing
+    expect(urls).toContain(`${ORIGIN}/about`);   // editorial page (P0-4)
+    expect(urls).toContain(`${ORIGIN}/journal`); // editorial page (P0-4)
     const shape = (re: RegExp) => urls.some((u) => re.test(u));
     // At least one of the data-driven route families should be present in a live DB.
     expect(

@@ -19,6 +19,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { path: "", changeFrequency: "weekly", priority: 1 },
     { path: "/shop", changeFrequency: "weekly", priority: 0.8 },
     { path: "/bundles", changeFrequency: "weekly", priority: 0.8 },
+    // Known indexable editorial routes (composable pages, always live). Generalized CMS-page sitemap
+    // discovery is deferred (would need a route inventory) — see POST_LAUNCH_ROADMAP.
+    { path: "/about", changeFrequency: "monthly", priority: 0.5 },
+    { path: "/journal", changeFrequency: "weekly", priority: 0.5 },
     ...getAirVolumes().map((v) => ({ path: `/collections/${v.slug}`, changeFrequency: "monthly" as const, priority: 0.6 })),
   ];
 

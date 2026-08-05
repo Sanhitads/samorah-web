@@ -19,6 +19,7 @@ import { AuthProvider } from "@/components/auth/AuthProvider";
 import { UtmCapture } from "@/components/analytics/UtmCapture";
 import { AnalyticsProvider } from "@/components/analytics/AnalyticsProvider";
 import { canonicalOrigin } from "@/config/site";
+import { robotsForEnv } from "@/lib/seo/envRobots";
 import { buildThemeStylesheet } from "@/platform/themeStylesheet";
 
 // Fonts from the prototype design system (BRD §4.3), loaded via next/font.
@@ -46,6 +47,9 @@ export const metadata: Metadata = {
   },
   description:
     "Editorial luxury candles, handmade in India. Fragrance stories steeped in memory, ritual, and craft.",
+  // Non-production (Vercel preview / dev) → noindex,nofollow so a preview URL can't be indexed;
+  // production stays index/follow. Per-route noindex (checkout/cart/…) still overrides this per page.
+  robots: robotsForEnv(),
 };
 
 export default function RootLayout({
