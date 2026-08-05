@@ -51,6 +51,7 @@ export function validatePathStructure(raw: string, opts: { allowExternal?: boole
   if (!h) return { error: "Path is required." };
   // eslint-disable-next-line no-control-regex
   if (/[\s\\]/.test(h) || h.includes("..") || [...h].some((ch) => ch.charCodeAt(0) < 32)) return { error: `"${h}" is malformed (no spaces, backslashes or "..").` };
+  if (h.startsWith("//")) return { error: `Protocol-relative URLs ("//…") aren't allowed — use a "/" site path.` };
   const scheme = h.match(/^([a-z][a-z0-9+.-]*):/i)?.[1]?.toLowerCase();
   if (scheme) {
     if (!SAFE_SCHEMES.has(scheme)) return { error: `Unsafe link protocol "${scheme}:" is not allowed.` };

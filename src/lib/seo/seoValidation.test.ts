@@ -43,6 +43,10 @@ describe("validatePathStructure (points 1·3)", () => {
   it("blocks unsafe protocols always", () => {
     expect(validatePathStructure("javascript:alert(1)", { allowExternal: true }).error).toMatch(/unsafe/i);
   });
+  it("blocks protocol-relative URLs (//example.com) even when external is allowed", () => {
+    expect(validatePathStructure("//example.com/x", { allowExternal: true }).error).toMatch(/protocol-relative/i);
+    expect(validatePathStructure("//evil.com").error).toMatch(/protocol-relative/i);
+  });
   it("blocks external URLs unless allowed", () => {
     expect(validatePathStructure("https://x.com", {}).error).toMatch(/aren't allowed/i);
     expect(validatePathStructure("https://x.com", { allowExternal: true }).error).toBeUndefined();

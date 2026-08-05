@@ -52,7 +52,15 @@ export async function analyzeRedirect(input: { id?: string; fromPath: string; to
   const from = cleanPath(input.fromPath), to = cleanPath(input.toPath);
   if (!from || !to) { a.errors.push("Both a 'from' and 'to' path are required."); return a; }
   const fs = validatePathStructure(from, { role: "source" }); if (fs.error) a.errors.push(`From: ${fs.error}`); if (fs.warn) a.warnings.push(fs.warn);
-  const ts = validatePathStructure(to, { allowExternal: true, role: "destination" }); if (ts.error) a.errors.push(`To: ${ts.error}`);
+  // Destinations must be INTERNAL paths. The redirect middleware is same-origin by design (it sets the
+  // pathname on the canonical-origin URL), so an absolute/protocol-relative external URL can never
+  // function as an external redirect — it would become a same-origin junk path. Block it at write.
+  const toScheme = to.match(/^([a-z][a-z0-9+.-]*):/i)?.[1]?.toLowerCase();
+  if (toScheme || to.startsWith("//")) {
+    a.errors.push(`To: External redirect destinations aren't supported. Redirects must point to a path on ${SITE_CONFIG.primaryDomain}.`);
+  } else {
+    const ts = validatePathStructure(to, { role: "destination" }); if (ts.error) a.errors.push(`To: ${ts.error}`);
+  }
   if (a.errors.length) return a;
   // Graph: loops (block) + chains (warn + flatten target).
   const rows = existing ?? await listRedirects();

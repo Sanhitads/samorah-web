@@ -141,8 +141,8 @@ export function SeoRedirectsManager({ redirects, seo, entities, canPublish, orig
           <div className="cfg-row" style={{ gridTemplateColumns: "1.3fr 1.6fr 0.9fr auto" }}>
             <label className="cfg-field"><span>From (old path)</span><input value={nr.fromPath} onChange={(e) => setNr({ ...nr, fromPath: e.target.value })} onBlur={() => analyzeR(nr)} placeholder="/old-path" /></label>
             <label className="cfg-field"><span>To (destination)</span>
-              <input value={nr.toPath} onChange={(e) => setNr({ ...nr, toPath: e.target.value })} onBlur={() => analyzeR(nr)} placeholder="/new-path or https://…" />
-              <PathPicker entities={entities} allowExternal onPick={(p) => { const f = { ...nr, toPath: p }; setNr(f); analyzeR(f); }} />
+              <input value={nr.toPath} onChange={(e) => setNr({ ...nr, toPath: e.target.value })} onBlur={() => analyzeR(nr)} placeholder="/new-path (a path on this site)" />
+              <PathPicker entities={entities} onPick={(p) => { const f = { ...nr, toPath: p }; setNr(f); analyzeR(f); }} />
             </label>
             <label className="cfg-field"><span>Type</span>
               <select value={nr.code} onChange={(e) => setNr({ ...nr, code: Number(e.target.value) })}>

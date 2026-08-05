@@ -52,6 +52,21 @@ const canon = (m: any) => m.alternates?.canonical;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ogImages = (m: any) => m.openGraph?.images;
 
+d("external redirect destinations are blocked server-side (P1-8, real DB)", () => {
+  it("blocks absolute + protocol-relative external destinations with the standard copy; allows internal", async () => {
+    for (const bad of ["https://evil.com", "http://evil.com/x", "//evil.com/x"]) {
+      const a = await svc.analyzeRedirect({ fromPath: "/ext-old", toPath: bad });
+      expect(a.errors.some((e) => /External redirect destinations aren't supported/i.test(e)), bad).toBe(true);
+    }
+    expect((await svc.analyzeRedirect({ fromPath: "/ext-old", toPath: "/shop" })).errors).toEqual([]);
+  });
+  it("cannot PERSIST an external destination even through a crafted service call (confirmed:true)", async () => {
+    const r = await svc.upsertRedirect({ fromPath: "/ext-crafted", toPath: "https://evil.com" }, { confirmed: true });
+    expect(r.ok).toBe(false);
+    expect((await svc.listRedirects()).some((x) => x.fromPath === "/ext-crafted")).toBe(false); // nothing written
+  });
+});
+
 d("SEO override route-existence validation (P0-3, Invariant 4, real DB)", () => {
   it("an unresolved custom path (likely typo) requires confirmation, a known route does not", async () => {
     const typo = await svc.analyzeSeoOverride({ path: "/abuot" });
