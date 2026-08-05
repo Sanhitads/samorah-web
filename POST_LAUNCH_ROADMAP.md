@@ -3,6 +3,35 @@
 Non-blocking enhancements deliberately deferred past launch. Nothing here gates a release; each entry
 records a decision made during build so it is not silently lost.
 
+## SEO & Redirects
+
+SEO & Redirects **Phase 1 is closed** (points 1–14: redirect-graph validation, reused Navigation
+lifecycle, live-route confirmation, structured robots, canonical validation, getRouteSeo-backed
+Resolved-SEO + inheritance, field reset, exact-state Undo, cross-tab isolation, content.edit/
+content.publish RBAC, enriched audit). The items below are **intentionally deferred to Phase 2+** and
+must **not** reopen Phase 1.
+
+### 🔒 Invariant — one SEO backend (do not violate in any future phase)
+`/admin/seo` (SeoRedirectsManager) and `PageSeoPanel` **must continue to share the canonical SEO
+persistence + resolution backend**: the `seo_overrides` table, `seoRedirectService` (`upsertSeoOverride`
+/`getRouteSeo`/`withRouteSeo`/`getEffectiveSeo`), and the single redirect engine (`redirects` table →
+`lib/redirects` → middleware). **Any future UI unification must NOT create a second SEO/metadata
+resolver, a second redirect engine, or a parallel persistence path.** Effective/preview metadata must
+always come from `getRouteSeo`/`getEffectiveSeo`, never a component-local re-computation.
+
+### Deferred Phase-2 candidates
+- **Sitemap priority / change-frequency integration** — `seo_overrides.sitemap_priority`/`change_freq`
+  are stored but `app/sitemap.ts` still uses hard-coded values. Wiring must have `sitemap.ts` read the
+  overrides table (single source). The Phase-1 UI marks these fields "not yet applied".
+- **Real redirect hit instrumentation** — the `hits` column exists but is never incremented; the
+  Phase-1 UI removed the misleading "0". Real tracking (middleware increment / RPC) is future work.
+- **Heterogeneous product/collection lifecycle audit** — `getShopProducts`/`getProducts`/
+  `getCollections` don't filter by status/visibility; there is no single "is `/shop/x` live?" service.
+  Separate audit; storefront services were **not** changed in SEO Phase 1.
+- **PageSeoPanel ↔ /admin/seo UI unification** — the two SEO editing surfaces share the backend but
+  differ in UX (PageSeoPanel has its own local SERP preview). A future pass may unify the UI **subject
+  to the invariant above** — reusing `getEffectiveSeo`, never a new resolver.
+
 ## Email
 
 ### Unify preheader / message-envelope handling across coded-default and authored emails
