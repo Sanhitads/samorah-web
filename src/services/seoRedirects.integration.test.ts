@@ -23,12 +23,45 @@ const del = (table: string, q: string) => fetch(`${URL}/rest/v1/${table}?${q}`, 
 
 let svc: typeof import("@/services/seoRedirectService");
 const OLD = "/seo-it-old", MID = "/seo-it-mid", FIN = "/seo-it-final", ROUTE = "/seo-it-route";
+const IDA = "/seo-it-id-a", IDA2 = "/seo-it-id-a2", IDB = "/seo-it-id-b";
+const rest = (table: string, q: string) => fetch(`${URL}/rest/v1/${table}?${q}`, { headers: H }).then((r) => r.json());
+const patch = (table: string, q: string, body: unknown) => fetch(`${URL}/rest/v1/${table}?${q}`, { method: "PATCH", headers: { ...H, Prefer: "return=minimal" }, body: JSON.stringify(body) });
 
 beforeAll(async () => { if (RUN) svc = await import("@/services/seoRedirectService"); });
 afterAll(async () => {
   if (!RUN) return;
-  await del("redirects", `from_path=in.(${[OLD, MID, FIN].join(",")})`);
+  await del("redirects", `from_path=in.(${[OLD, MID, FIN, IDA, IDA2, IDB].join(",")})`);
   await del("seo_overrides", `path=eq.${ROUTE}`);
+});
+
+d("redirect editing preserves identity + re-validates the graph (P1)", () => {
+  it("editing updates the row by id (id + hits preserved), never inserts a duplicate", async () => {
+    expect((await svc.upsertRedirect({ fromPath: IDA, toPath: "/x" }, { confirmed: true })).ok).toBe(true);
+    const created = (await rest("redirects", `from_path=eq.${IDA}&select=id,hits`))[0];
+    await patch("redirects", `id=eq.${created.id}`, { hits: 7 }); // simulate accrued history
+
+    // Edit the destination via update-by-id.
+    expect((await svc.upsertRedirect({ id: created.id, fromPath: IDA, toPath: "/y" }, { confirmed: true })).ok).toBe(true);
+    const afterEdit = (await rest("redirects", `from_path=eq.${IDA}&select=id,to_path,hits`))[0];
+    expect(afterEdit.id).toBe(created.id);   // identity preserved
+    expect(afterEdit.hits).toBe(7);          // history preserved (an insert would reset to 0)
+    expect(afterEdit.to_path).toBe("/y");
+    expect((await rest("redirects", `from_path=eq.${IDA}&select=id`)).length).toBe(1); // no duplicate row
+  });
+
+  it("editing the SOURCE path keeps the same id (identity), and re-runs graph validation", async () => {
+    const row = (await rest("redirects", `from_path=eq.${IDA}&select=id`))[0];
+    expect((await svc.upsertRedirect({ id: row.id, fromPath: IDA2, toPath: "/y" }, { confirmed: true })).ok).toBe(true);
+    expect((await rest("redirects", `from_path=eq.${IDA}&select=id`)).length).toBe(0); // old source gone
+    const moved = (await rest("redirects", `from_path=eq.${IDA2}&select=id`))[0];
+    expect(moved.id).toBe(row.id); // same identity, source changed
+
+    // A source edit that collides with another redirect's source is blocked by the graph analyzer.
+    await svc.upsertRedirect({ fromPath: IDB, toPath: "/z" }, { confirmed: true });
+    const collide = await svc.upsertRedirect({ id: moved.id, fromPath: IDB, toPath: "/y" }, { confirmed: true });
+    expect(collide.ok).toBe(false);
+    expect(collide.analysis?.errors.some((e) => /already sends/i.test(e))).toBe(true);
+  });
 });
 
 d("redirect analysis + destination lifecycle (real DB)", () => {

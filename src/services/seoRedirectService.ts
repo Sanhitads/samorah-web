@@ -74,8 +74,12 @@ export async function upsertRedirect(input: { id?: string; fromPath: string; toP
   const db = createAdminClient() as any;
   const before = await redirectBefore(db, input);
   const row: any = { from_path: from, to_path: to, code: input.code === 302 ? 302 : 301, enabled: input.enabled !== false };
-  if (input.id) row.id = input.id;
-  const { error } = await db.from("redirects").upsert(row, { onConflict: "from_path" });
+  // Preserve identity: editing UPDATES the existing row by id (so id/hits and the source path can change
+  // without orphaning a row); a new redirect INSERTS. analyzeRedirect already re-validated the proposed
+  // graph (loops/duplicate/lifecycle) with this row's id excluded, so a source edit can't break the graph.
+  const { error } = input.id
+    ? await db.from("redirects").update(row).eq("id", input.id)
+    : await db.from("redirects").insert(row);
   if (error) return { ok: false, reason: /duplicate|unique/i.test(error.message) ? "A redirect from that path already exists" : error.message };
   // Enriched audit: distinguish create / enable / disable / update, with before→after.
   const event = !before ? "redirect.created"
