@@ -65,8 +65,9 @@ export function OgImageField({ value, onChange }: { value: string; onChange: (ur
 }
 
 export function CharCount({ value, kind }: { value: string; kind: "title" | "description" }) {
+  const max = kind === "title" ? 60 : 160; // the guidance boundary (not a new threshold)
   const g = kind === "title" ? titleGuidance(value.length) : descriptionGuidance(value.length);
-  return <span className="admin__muted">{value.length} chars{g ? ` · ${g.text}` : ""}</span>;
+  return <span className="seo-count" data-over={value.length > max ? "1" : "0"}>{value.length} / {max}{g ? ` · ${g.text}` : ""}</span>;
 }
 
 const domainOf = (origin: string) => origin.replace(/^https?:\/\//, "").replace(/\/$/, "");
@@ -86,17 +87,20 @@ export function SerpCard({ preview, origin, path }: { preview: PreviewSeo; origi
   );
 }
 
-/** Social/OG share card (effective baseline + unsaved draft overlay). */
+/** Social/OG share card. Rich card when an image exists; a COMPACT card (no big blank 1.91:1 box) when
+ *  there's no OG image, so the empty state doesn't reserve large vertical space. */
 export function SocialCard({ preview, origin }: { preview: PreviewSeo; origin: string }) {
+  const isImg = /^https?:\/\//.test(preview.ogImage);
   return (
-    <div className="seo-og">
-      {/^https?:\/\//.test(preview.ogImage) ? (
+    <div className={`seo-og${isImg ? "" : " seo-og--empty"}`}>
+      {isImg ? (
         /* eslint-disable-next-line @next/next/no-img-element */ <img className="seo-og__img" src={preview.ogImage} alt="" />
-      ) : <div className="seo-og__img seo-og__img--empty">No OG image — add one for rich link cards</div>}
+      ) : null}
       <div className="seo-og__body">
         <span className="seo-og__domain">{domainOf(origin)}</span>
         <span className="seo-og__title">{previewTitle(preview.title)}</span>
         <span className="seo-og__desc">{previewDesc(preview.description)}</span>
+        {!isImg ? <span className="seo-og__noimg">No OG image — add one for a rich link card.</span> : null}
       </div>
     </div>
   );

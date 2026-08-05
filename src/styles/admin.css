@@ -911,8 +911,12 @@
 .seo-serp { display: flex; flex-direction: column; gap: 3px; }
 .seo-serp__crumbs { font-family: var(--font-sans); font-size: 11px; color: #4d5156; }
 .seo-serp__crumbs span { color: #9aa0a6; margin: 0 2px; }
-.seo-serp__title { color: #1a0dab; font-family: var(--font-sans); font-size: 16px; line-height: 1.3; }
-.seo-serp__desc { color: #4d5156; font-family: var(--font-sans); font-size: 12px; line-height: 1.4; }
+.seo-serp__title { color: #1a0dab; font-family: var(--font-sans); font-size: 18px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.seo-serp__desc { color: #4d5156; font-family: var(--font-sans); font-size: 12.5px; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.seo-count { font-family: var(--font-sans); font-size: 11px; color: var(--smoke, #6b6259); }
+.seo-count[data-over="1"] { color: #8a6d3b; }
+.seo-og--empty { border-style: dashed; }
+.seo-og__noimg { font-family: var(--font-sans); font-size: 11px; color: var(--smoke, #6b6259); font-style: italic; margin-top: 2px; }
 .seo-og, .seo-tw { border: 1px solid var(--ad-hair); border-radius: 8px; overflow: hidden; }
 .seo-tw { border-radius: 14px; }
 .seo-og__img { width: 100%; aspect-ratio: 1.91 / 1; object-fit: cover; display: block; }
