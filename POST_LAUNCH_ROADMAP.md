@@ -51,6 +51,35 @@ Matrix from Phase 2 analysis (recorded for a future, separately-approved pass):
   note; not solved now).
 These are audit findings only — no storefront visibility/RLS/service change was made in Phase 2.
 
+### Phase 3 status + deferrals
+**Done in Phase 3 (P0/P1/P2):** storefront `withRouteSeo` override round-trip tests; SEO override
+route-existence validation (typo → confirm, reusing `classifyHref`); `/about`+`/journal` in the sitemap;
+application-level non-production `noindex` (`robotsForEnv` via `VERCEL_ENV`); custom JSON-LD emission
+fix for /about & /journal (mechanism A); Air PDP `Product` schema via the shared builder; real
+`middleware()` redirect tests; structured-data regression suite; `BreadcrumbList` on product/chapter/
+collection; explicit-override duplicate-metadata warning; accessible tabs.
+
+**Explicitly deferred to post-launch (do not implement without a new request):**
+- Full-site SEO crawler/audit and **sitewide** duplicate title/description detection (Phase 3 shipped
+  only *explicit-override* duplicate detection — effective titles of un-overridden routes aren't stored).
+- Bulk redirect CSV import/export (dry-run, row errors, dup + loop/chain validation, preview).
+- Redirect traffic/hit instrumentation + analytics UX + traffic-based health (Edge/no-`waitUntil`).
+- Full SEO revision/version engine (audit + inherited-reset + Undo remain sufficient).
+- `Article`/`BlogPosting` schema — until individual journal-article routes/content exist.
+- Generalized CMS-page sitemap discovery (Phase 3 added `/about`+`/journal` as known routes only).
+- Generalized product/collection lifecycle/RLS/service changes; product-picker `.limit(200)` redesign.
+
+### ⚠️ Finding — external redirect destinations don't function (needs a decision)
+The redirect **middleware is same-origin by design**: it sets `pathname` on a clone of the canonical-
+origin URL (`middleware.ts`), so a redirect can never leave the site — a `javascript:`/external `to`
+becomes a same-origin path (proved by `middleware.integration.test`). This is a strong anti-open-redirect
+property, but it also means the validation's `allowExternal` for redirect **destinations** permits saving
+external URLs that then produce a broken same-origin redirect. **P1-8 (external-redirect confirmation) is
+therefore moot as specified** — there is no functional external-redirect capability to confirm. Proposed
+fix (pending approval): make redirect-destination validation **reject/strongly-warn external URLs** to
+match the middleware's same-origin reality, rather than adding confirmation for a non-working feature.
+Do NOT change the middleware to enable external redirects (that would add open-redirect risk).
+
 ### Known boundary (accepted, documented)
 A `noindex` set **only** inside a route's own `generateMetadata` (never written to the `seo_overrides`
 layer) is not centrally discoverable by the sitemap. We do **not** re-run every route's

@@ -10,6 +10,7 @@ import { postSeo } from "./seo/postSeo";
 import { RobotsControls, OgImageField, CharCount, SerpCard, SocialCard, ProvenanceBadge } from "./seo/SeoPrimitives";
 import { draftPreview } from "@/lib/seo/effectivePreview";
 import { isNoindex, isMajorRoute } from "@/lib/seo/seoValidation";
+import { findOverrideDuplicates } from "@/lib/seo/duplicateMeta";
 import { setTabNotice, noticeFor, type TabNotices, type SeoTab } from "@/lib/seo/tabNotice";
 import { HEALTH_LABEL } from "@/lib/seo/redirectHealth";
 import { filterSortRedirects, type RedirectFilter, type RedirectSort } from "@/lib/seo/redirectFilter";
@@ -122,20 +123,21 @@ export function SeoRedirectsManager({ redirects, seo, entities, canPublish, orig
   const issues = redirects.filter((r) => r.health === "broken" || r.health === "chain").length
     + seo.filter((s) => isNoindex(s.robots) && isMajorRoute(s.path)).length;
   const activeCount = redirects.filter((r) => r.enabled).length;
+  const overrideDups = useMemo(() => findOverrideDuplicates(seo.map((s) => ({ path: s.path, title: s.title, description: s.description }))), [seo]);
 
   return (
     <div className="cfg">
       <p className="seo-summary">{activeCount} active redirect{activeCount === 1 ? "" : "s"} · {seo.length} SEO override{seo.length === 1 ? "" : "s"} · <span className={issues ? "seo-summary__issues" : ""}>{issues} issue{issues === 1 ? "" : "s"}</span></p>
-      <nav className="ff-queues" aria-label="Section">
-        <button type="button" className="ff-queue" data-active={tab === "redirects" ? "1" : "0"} onClick={() => setTab("redirects")}>Redirects</button>
-        <button type="button" className="ff-queue" data-active={tab === "seo" ? "1" : "0"} onClick={() => setTab("seo")}>Meta overrides</button>
-        {note ? <span className={`cfg-msg cfg-msg--${note.tone}`} style={{ marginLeft: "auto" }}>{note.text}</span> : null}
+      <nav className="ff-queues" role="tablist" aria-label="SEO & Redirects sections">
+        <button type="button" role="tab" id="tab-redirects" aria-selected={tab === "redirects"} aria-controls="panel-redirects" className="ff-queue" data-active={tab === "redirects" ? "1" : "0"} onClick={() => setTab("redirects")}>Redirects</button>
+        <button type="button" role="tab" id="tab-seo" aria-selected={tab === "seo"} aria-controls="panel-seo" className="ff-queue" data-active={tab === "seo" ? "1" : "0"} onClick={() => setTab("seo")}>Meta overrides</button>
+        {note ? <span className={`cfg-msg cfg-msg--${note.tone}`} role="status" style={{ marginLeft: "auto" }}>{note.text}</span> : null}
       </nav>
       {undo ? <div className="seo-undo">{undo.text}. <button type="button" className="ff-link" onClick={undo.run}>Undo</button></div> : null}
       {!canPublish ? <p className="cfg-hint">You can review and validate here, but saving changes needs the <strong>content.publish</strong> capability.</p> : null}
 
       {tab === "redirects" ? (
-        <div>
+        <div id="panel-redirects" role="tabpanel" aria-labelledby="tab-redirects">
           <div className="cfg-row" style={{ gridTemplateColumns: "1.3fr 1.6fr 0.9fr auto" }}>
             <label className="cfg-field"><span>From (old path)</span><input value={nr.fromPath} onChange={(e) => setNr({ ...nr, fromPath: e.target.value })} onBlur={() => analyzeR(nr)} placeholder="/old-path" /></label>
             <label className="cfg-field"><span>To (destination)</span>
@@ -201,7 +203,7 @@ export function SeoRedirectsManager({ redirects, seo, entities, canPublish, orig
           <p className="cfg-hint">Redirects apply within ~60s (cached in middleware) and run <strong>before</strong> the page renders. Loops and broken destinations are blocked; redirecting a live page asks for confirmation. Health is derived from the redirect graph — traffic metrics are deferred (post-launch).</p>
         </div>
       ) : (
-        <div className="seo-editor">
+        <div className="seo-editor" id="panel-seo" role="tabpanel" aria-labelledby="tab-seo">
           <section className="seo-group">
             <h4 className="seo-group__title">Route</h4>
             <label className="cfg-field" data-wide="1"><span>Which page is this SEO for?</span>
@@ -269,6 +271,12 @@ export function SeoRedirectsManager({ redirects, seo, entities, canPublish, orig
             </div>
           ) : null}
 
+          {overrideDups.length ? (
+            <div className="cfg-validation" style={{ marginTop: 10 }}>
+              {overrideDups.map((d, i) => <p key={i} className="cfg-msg cfg-msg--warn">⚠ Duplicate {d.field}: {d.paths.join(", ")} share “{d.value.length > 50 ? d.value.slice(0, 50) + "…" : d.value}”.</p>)}
+              <p className="admin__muted" style={{ fontSize: 11 }}>Checks your stored overrides only — not a full-site duplicate scan (effective titles of un-overridden routes aren’t stored).</p>
+            </div>
+          ) : null}
           <table className="admin__table admin__table--board" style={{ marginTop: 10 }}>
             <thead><tr><th>Route</th><th>Title</th><th>Robots</th><th></th></tr></thead>
             <tbody>
