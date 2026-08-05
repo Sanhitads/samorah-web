@@ -3,7 +3,8 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { RedirectRow, SeoOverrideRow, SeoAnalysis, EffectiveSeo, EffectiveField, RedirectRowH } from "@/services/seoRedirectService";
-import { ENTITY_ROUTE, type EntityType, type LinkableEntities } from "@/services/navigationService";
+import { type LinkableEntities } from "@/services/navigationService";
+import { valueForKind, entityPath, isEntityKind, type PickerKind } from "@/lib/seo/pathPicker";
 import type { MediaOption } from "./SchemaForm";
 import { KebabMenu } from "./KebabMenu";
 import { postSeo } from "./seo/postSeo";
@@ -20,26 +21,41 @@ const EMPTY_S = { path: "", title: "", description: "", ogImage: "", robots: "",
 type RedirectForm = typeof EMPTY_R;
 type SeoForm = typeof EMPTY_S;
 
-/** Pick a canonical storefront route (Homepage / Page / Product / Collection / Chapter) or a custom path. */
-function PathPicker({ entities, onPick, allowExternal }: { entities: LinkableEntities; onPick: (path: string) => void; allowExternal?: boolean }) {
-  const [kind, setKind] = useState<"custom" | "home" | EntityType>("custom");
-  const list = kind === "page" || kind === "product" || kind === "collection" || kind === "chapter" ? entities[kind] : [];
+/**
+ * Type-first destination/route picker (#2/#7). The KIND (Custom / Homepage / Page / Product / Collection
+ * / Chapter) leads; the matching control follows. It is CONTROLLED by `value` and emits a single canonical
+ * path via `onChange` (state) / `onCommit` (run analysis on blur/select). Switching kind clears any prior
+ * path (valueForKind) so a stale entity/custom path can never be submitted under a different kind. Reuses
+ * the canonical entity list + ENTITY_ROUTE — no second resolver.
+ */
+function PathPicker({ value, entities, onChange, onCommit }: { value: string; entities: LinkableEntities; onChange: (path: string) => void; onCommit?: (path: string) => void }) {
+  const [kind, setKind] = useState<PickerKind>("custom");
+  const list = isEntityKind(kind) ? entities[kind] : [];
+  const setBoth = (p: string) => { onChange(p); onCommit?.(p); };
+  const changeKind = (k: PickerKind) => { setKind(k); setBoth(valueForKind(k)); };
   return (
     <div className="seo-picker">
-      <select aria-label="Target type" value={kind} onChange={(e) => { const k = e.target.value as typeof kind; setKind(k); if (k === "home") onPick("/"); }}>
-        <option value="custom">Custom path{allowExternal ? " / URL" : ""}</option>
+      <select aria-label="Destination type" value={kind} onChange={(e) => changeKind(e.target.value as PickerKind)}>
+        <option value="custom">Custom path</option>
         <option value="home">Homepage</option>
         <option value="page">Page</option>
         <option value="product">Product</option>
         <option value="collection">Collection</option>
         <option value="chapter">Chapter</option>
       </select>
-      {kind !== "custom" && kind !== "home" ? (
-        <select aria-label={`Choose ${kind}`} defaultValue="" onChange={(e) => e.target.value && onPick(ENTITY_ROUTE[kind](e.target.value))}>
-          <option value="">Choose {kind}…</option>
-          {list.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
-        </select>
-      ) : null}
+      {kind === "custom" ? (
+        <input aria-label="Custom path" value={value} onChange={(e) => onChange(e.target.value)} onBlur={() => onCommit?.(value)} placeholder="/custom-path" />
+      ) : kind === "home" ? (
+        <span className="seo-picker__resolved">Homepage → <code>/</code></span>
+      ) : (
+        <>
+          <select aria-label={`Choose ${kind}`} value="" onChange={(e) => e.target.value && setBoth(entityPath(kind, e.target.value))}>
+            <option value="">Choose {kind}…</option>
+            {list.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+          </select>
+          {value ? <span className="seo-picker__resolved">→ <code>{value}</code></span> : null}
+        </>
+      )}
     </div>
   );
 }
@@ -141,8 +157,7 @@ export function SeoRedirectsManager({ redirects, seo, entities, canPublish, orig
           <div className="cfg-row" style={{ gridTemplateColumns: "1.3fr 1.6fr 0.9fr auto" }}>
             <label className="cfg-field"><span>From (old path)</span><input value={nr.fromPath} onChange={(e) => setNr({ ...nr, fromPath: e.target.value })} onBlur={() => analyzeR(nr)} placeholder="/old-path" /></label>
             <label className="cfg-field"><span>To (destination)</span>
-              <input value={nr.toPath} onChange={(e) => setNr({ ...nr, toPath: e.target.value })} onBlur={() => analyzeR(nr)} placeholder="/new-path (a path on this site)" />
-              <PathPicker entities={entities} onPick={(p) => { const f = { ...nr, toPath: p }; setNr(f); analyzeR(f); }} />
+              <PathPicker value={nr.toPath} entities={entities} onChange={(p) => setNr((r) => ({ ...r, toPath: p }))} onCommit={(p) => analyzeR({ ...nr, toPath: p })} />
             </label>
             <label className="cfg-field"><span>Type</span>
               <select value={nr.code} onChange={(e) => setNr({ ...nr, code: Number(e.target.value) })}>
@@ -207,8 +222,7 @@ export function SeoRedirectsManager({ redirects, seo, entities, canPublish, orig
           <section className="seo-group">
             <h4 className="seo-group__title">Route</h4>
             <label className="cfg-field" data-wide="1"><span>Which page is this SEO for?</span>
-              <input value={ns.path} onChange={(e) => setNs({ ...ns, path: e.target.value })} onBlur={() => loadEffective(ns.path)} placeholder="/about" />
-              <PathPicker entities={entities} onPick={(p) => { setNs({ ...ns, path: p }); loadEffective(p); }} />
+              <PathPicker value={ns.path} entities={entities} onChange={(p) => setNs((s) => ({ ...s, path: p }))} onCommit={(p) => loadEffective(p)} />
             </label>
           </section>
 

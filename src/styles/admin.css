@@ -514,8 +514,11 @@
 .em-preview__bar { display: flex; gap: 6px; justify-content: center; margin: 4px 0 10px; }
 .em-preview__stage { display: flex; justify-content: center; }
 /* SEO & Redirects manager */
-.seo-picker { display: flex; gap: 6px; margin-top: 5px; }
-.seo-picker select { padding: 6px 8px; font-family: var(--font-sans); font-size: 12px; border: 1px solid var(--ad-hair); border-radius: 3px; background: #fff; flex: 1; }
+.seo-picker { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.seo-picker select, .seo-picker input { padding: 7px 9px; font-family: var(--font-sans); font-size: 13px; border: 1px solid var(--ad-hair); border-radius: 3px; background: #fff; flex: 1 1 160px; min-width: 0; }
+.seo-picker > select:first-child { flex: 0 0 auto; min-width: 130px; }
+.seo-picker__resolved { flex-basis: 100%; font-family: var(--font-sans); font-size: 11px; color: var(--smoke, #6b6259); }
+.seo-picker__resolved code { font-size: 11px; }
 .seo-radio { display: flex; flex-direction: column; gap: 4px; font-family: var(--font-sans); font-size: 13px; }
 .seo-radio label { display: flex; align-items: center; gap: 6px; }
 .seo-reset { border: none; background: none; color: var(--smoke, #6b6259); font-family: var(--font-sans); font-size: 10px; cursor: pointer; text-decoration: underline; padding: 0 4px; }
