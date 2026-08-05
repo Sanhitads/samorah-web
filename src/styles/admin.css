@@ -513,6 +513,24 @@
 .ff-btn--sm { padding: 5px 12px; font-size: 11px; }
 .em-preview__bar { display: flex; gap: 6px; justify-content: center; margin: 4px 0 10px; }
 .em-preview__stage { display: flex; justify-content: center; }
+/* SEO & Redirects manager */
+.seo-picker { display: flex; gap: 6px; margin-top: 5px; }
+.seo-picker select { padding: 6px 8px; font-family: var(--font-sans); font-size: 12px; border: 1px solid var(--ad-hair); border-radius: 3px; background: #fff; flex: 1; }
+.seo-radio { display: flex; flex-direction: column; gap: 4px; font-family: var(--font-sans); font-size: 13px; }
+.seo-radio label { display: flex; align-items: center; gap: 6px; }
+.seo-reset { border: none; background: none; color: var(--smoke, #6b6259); font-family: var(--font-sans); font-size: 10px; cursor: pointer; text-decoration: underline; padding: 0 4px; }
+.seo-reset:hover { color: var(--ad-ink, #1f1a16); }
+.seo-undo { margin: 6px 0; padding: 6px 10px; background: rgba(31,26,22,0.05); border-radius: 4px; font-family: var(--font-sans); font-size: 12px; }
+.seo-effective { margin: 12px 0; padding: 12px 14px; border: 1px solid var(--ad-hair); border-radius: 5px; background: #fff; }
+.seo-effective h3 { font-family: var(--font-sans); font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; margin: 0 0 8px; color: var(--ad-ink, #1f1a16); }
+.seo-eff-row { display: grid; grid-template-columns: 90px 1fr auto; gap: 10px; align-items: baseline; padding: 5px 0; border-bottom: 1px solid rgba(31,26,22,0.06); font-family: var(--font-sans); font-size: 12px; }
+.seo-eff-label { color: var(--smoke, #6b6259); text-transform: uppercase; font-size: 10px; letter-spacing: 0.06em; }
+.seo-eff-value { word-break: break-word; }
+.seo-prov { font-family: var(--font-sans); font-size: 9px; letter-spacing: 0.04em; text-transform: uppercase; padding: 1px 7px; border-radius: 3px; white-space: nowrap; }
+.seo-prov--overridden { background: rgba(60,120,70,0.12); color: #2f6b3c; }
+.seo-prov--site-default { background: rgba(90,130,180,0.16); color: #3d5a80; }
+.seo-prov--inherited-page { background: rgba(201,169,110,0.24); color: #8a6d3b; }
+.seo-prov--not-overridden { background: rgba(31,26,22,0.06); color: #6b6259; }
 .adm-chip { padding: 2px 7px; border: 1px solid var(--ad-hair); border-radius: 3px; background: #fff; cursor: pointer; font-family: var(--font-mono, monospace); font-size: 11px; color: #6b6259; }
 .adm-chip:hover { background: var(--soft-beige, #efe9e0); }
 .ff-btn--ghost { background: transparent; color: var(--smoke, #6b6259); }

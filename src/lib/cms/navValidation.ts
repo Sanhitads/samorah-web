@@ -57,12 +57,13 @@ function classifyHref(href: string | undefined): HrefClass {
   return { kind: "unknown" }; // a deep internal path we don't recognise (treat as a soft warning)
 }
 
-interface DestIndex { pages: Map<string, string>; products: Map<string, string>; chapters: Set<string>; collections: Set<string> }
+export interface DestIndex { pages: Map<string, string>; products: Map<string, string>; chapters: Set<string>; collections: Set<string> }
 
 /** Slug → lifecycle status for pages/products (all statuses, so we can detect archived), plus the
  *  existence sets for config-backed chapters/collections. Best-effort — a load failure degrades to
- *  structural-only validation rather than crashing a save/publish. */
-async function loadDestinationIndex(): Promise<DestIndex> {
+ *  structural-only validation rather than crashing a save/publish.
+ *  Exported so other admin modules (e.g. SEO redirects) reuse the SAME lifecycle source, never a second one. */
+export async function loadDestinationIndex(): Promise<DestIndex> {
   const empty: DestIndex = { pages: new Map(), products: new Map(), chapters: new Set(), collections: new Set() };
   try {
     const db = createAdminClient() as any;
@@ -83,10 +84,11 @@ async function loadDestinationIndex(): Promise<DestIndex> {
   } catch { return empty; }
 }
 
-type Verdict = { kind: "ok" | "empty" | "missing" | "archived" | "unknown" | "unsafe" | "malformed"; detail?: string };
+export type Verdict = { kind: "ok" | "empty" | "missing" | "archived" | "unknown" | "unsafe" | "malformed"; detail?: string };
 
-/** Resolve one item's destination against the lifecycle index. */
-function verdictFor(item: any, idx: DestIndex): Verdict {
+/** Resolve one item's destination against the lifecycle index. Exported for reuse (SEO redirect
+ *  destination lifecycle) — call as `verdictFor({ href }, idx)` for a plain path. */
+export function verdictFor(item: any, idx: DestIndex): Verdict {
   // Entity link — definitive existence + lifecycle (pages/products carry status; chapters/collections existence-only).
   if (item.linkType === "entity" && item.entity) {
     const { type, id } = item.entity;
