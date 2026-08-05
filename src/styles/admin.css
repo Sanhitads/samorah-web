@@ -12,7 +12,7 @@
 .admin__title { font-family: var(--font-serif); font-size: clamp(1.6rem, 3vw, 2.2rem); }
 .admin__count { font-family: var(--font-sans); font-size: 12px; color: var(--smoke, #6b6259); margin-top: 6px; }
 
-.admin__table-wrap { overflow-x: auto; border: 1px solid var(--ad-hair); border-radius: 4px; }
+.admin__table-wrap { overflow-x: auto; min-width: 0; border: 1px solid var(--ad-hair); border-radius: 4px; }
 .admin__table { width: 100%; border-collapse: collapse; font-family: var(--font-sans); font-size: 13px; min-width: 820px; }
 .admin__table thead th {
   text-align: left;
@@ -318,6 +318,10 @@
 
 @media (max-width: 860px) {
   .ash { flex-direction: column; }
+  /* Column-flex makes flex-shrink govern the vertical axis, so a wide child (e.g. the 1080px board
+     table) is no longer width-constrained by the row layout. Clamp main to the viewport so its inner
+     .admin__table-wrap scrolls instead of stretching the whole shell into horizontal overflow. */
+  .ash__main { max-width: 100%; }
   .ash__sidebar { flex-basis: auto; width: 100%; min-height: 0; position: static; border-right: none; border-bottom: 1px solid var(--ad-hair); }
   .ash-nav { flex-direction: row; flex-wrap: wrap; gap: 12px 20px; padding: 14px 16px; }
   .ash-brand { border-bottom: none; padding: 0 8px 0 0; }
@@ -585,6 +589,11 @@
 .seo-editor__aside .seo-serp, .seo-editor__aside .seo-og { max-width: 100%; }
 .seo-aside-block { display: flex; flex-direction: column; gap: 6px; }
 @media (min-width: 1024px) { .seo-editor--2col { grid-template-columns: minmax(0, 62%) minmax(0, 1fr); gap: 32px; } }
+/* Redirect create form — responsive grid (stacks on narrow screens; children never force overflow). */
+.seo-redirect-form { grid-template-columns: 1.3fr 1.6fr 0.9fr auto; }
+.seo-redirect-form > * { min-width: 0; }
+@media (max-width: 860px) { .seo-redirect-form { grid-template-columns: 1fr; } }
+.seo-toolbar { flex-wrap: wrap; }
 .seo-group { padding: 14px 0; border-top: 1px solid var(--ad-hair); }
 .seo-group:first-child { border-top: none; padding-top: 4px; }
 .seo-group__title { font-family: var(--font-sans); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ad-ink, #1f1a16); margin: 0 0 10px; }

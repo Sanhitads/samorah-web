@@ -12,6 +12,7 @@ import { RobotsControls, OgImageField, CharCount, SerpCard, SocialCard, Provenan
 import { draftPreview } from "@/lib/seo/effectivePreview";
 import { isNoindex, isMajorRoute, parseRobots } from "@/lib/seo/seoValidation";
 import { findOverrideDuplicates } from "@/lib/seo/duplicateMeta";
+import { discardDraft, shouldAutoOpenAdvanced, preserveDraftAcrossDisclosure } from "@/lib/seo/overrideEditorState";
 import { setTabNotice, noticeFor, type TabNotices, type SeoTab } from "@/lib/seo/tabNotice";
 import { HEALTH_LABEL } from "@/lib/seo/redirectHealth";
 import { filterSortRedirects, type RedirectFilter, type RedirectSort } from "@/lib/seo/redirectFilter";
@@ -118,7 +119,7 @@ export function SeoRedirectsManager({ redirects, seo, entities, canPublish, orig
     if (!path) { setEffective(null); return; }
     try { const r = await fetch("/api/admin/seo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "seo.effective", path }) }); const d = await r.json(); setEffective(d.effective ?? null); } catch { /* ignore */ }
   };
-  const editSeo = (s: SeoOverrideRow) => { setNs({ path: s.path, title: s.title, description: s.description, ogImage: s.ogImage, robots: s.robots, canonical: s.canonical, sitemapPriority: s.sitemapPriority, changeFreq: s.changeFreq }); setAdvOpen(Boolean(s.sitemapPriority || s.changeFreq)); loadEffective(s.path); };
+  const editSeo = (s: SeoOverrideRow) => { setNs({ path: s.path, title: s.title, description: s.description, ogImage: s.ogImage, robots: s.robots, canonical: s.canonical, sitemapPriority: s.sitemapPriority, changeFreq: s.changeFreq }); setAdvOpen(shouldAutoOpenAdvanced(s)); loadEffective(s.path); };
   const saveSeo = async () => {
     const { ok, data } = await api({ action: "seo.save", seo: ns });
     if (ok) { const warn = data.analysis?.warnings?.[0]; notify("seo", warn ? { tone: "warn", text: `Saved. Note: ${warn}` } : { tone: "ok", text: "SEO override saved." }); loadEffective(ns.path); }
@@ -159,7 +160,7 @@ export function SeoRedirectsManager({ redirects, seo, entities, canPublish, orig
 
       {tab === "redirects" ? (
         <div id="panel-redirects" role="tabpanel" aria-labelledby="tab-redirects">
-          <div className="cfg-row" style={{ gridTemplateColumns: "1.3fr 1.6fr 0.9fr auto" }}>
+          <div className="cfg-row seo-redirect-form">
             <label className="cfg-field"><span>From (old path)</span><input value={nr.fromPath} onChange={(e) => setNr({ ...nr, fromPath: e.target.value })} onBlur={() => analyzeR(nr)} placeholder="/old-path" /></label>
             <label className="cfg-field"><span>To (destination)</span>
               <PathPicker value={nr.toPath} entities={entities} onChange={(p) => setNr((r) => ({ ...r, toPath: p }))} onCommit={(p) => analyzeR({ ...nr, toPath: p })} />
@@ -198,7 +199,8 @@ export function SeoRedirectsManager({ redirects, seo, entities, canPublish, orig
               </select>
             </div>
           ) : null}
-          <table className="admin__table admin__table--board" style={{ marginTop: 10 }}>
+          <div className="admin__table-wrap" style={{ marginTop: 10 }}>
+          <table className="admin__table admin__table--board">
             <thead><tr><th>From</th><th>To</th><th>Type</th><th>Health</th><th></th></tr></thead>
             <tbody>
               {shownRedirects.map((r) => (
@@ -220,6 +222,7 @@ export function SeoRedirectsManager({ redirects, seo, entities, canPublish, orig
               {!redirects.length ? <tr><td colSpan={5}><div className="seo-empty"><strong>No redirects yet</strong><span>Redirect old URLs when a page moves or its URL changes. This helps visitors and search engines reach the correct page.</span></div></td></tr> : null}
             </tbody>
           </table>
+          </div>
           <p className="cfg-hint">Redirects apply within ~60s (cached in middleware) and run <strong>before</strong> the page renders. Loops and broken destinations are blocked; redirecting a live page asks for confirmation. Health is derived from the redirect graph — traffic metrics are deferred (post-launch).</p>
         </div>
       ) : (
@@ -256,7 +259,7 @@ export function SeoRedirectsManager({ redirects, seo, entities, canPublish, orig
                   <OgImageField value={ns.ogImage} onChange={(url) => setNs({ ...ns, ogImage: url })} /></div>
               </section>
 
-              <details className="seo-group seo-details" open={advOpen} onToggle={(e) => setAdvOpen((e.target as HTMLDetailsElement).open)}>
+              <details className="seo-group seo-details" open={advOpen} onToggle={(e) => { const r = preserveDraftAcrossDisclosure(ns, (e.target as HTMLDetailsElement).open); setNs(r.draft); setAdvOpen(r.open); }}>
                 <summary className="seo-group__title">Advanced sitemap settings</summary>
                 <div className="cfg-field" data-wide="1"><span>These tune this route in the generated sitemap.xml.</span>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -272,7 +275,7 @@ export function SeoRedirectsManager({ redirects, seo, entities, canPublish, orig
 
               <div className="cfg-actions">
                 <button type="button" className="ff-btn ff-btn--primary" disabled={busy || !canPublish} onClick={saveSeo}>Save</button>
-                {ns.path ? <button type="button" className="ff-btn ff-btn--ghost" disabled={busy} onClick={() => { setNs(EMPTY_S); setEffective(null); setAdvOpen(false); }}>Discard changes</button> : null}
+                {ns.path ? <button type="button" className="ff-btn ff-btn--ghost" disabled={busy} onClick={() => { setNs(discardDraft()); setEffective(null); setAdvOpen(false); }}>Discard changes</button> : null}
               </div>
             </div>
 
@@ -308,7 +311,8 @@ export function SeoRedirectsManager({ redirects, seo, entities, canPublish, orig
               <p className="admin__muted" style={{ fontSize: 11 }}>Checks your stored overrides only — not a full-site duplicate scan (effective titles of un-overridden routes aren’t stored).</p>
             </div>
           ) : null}
-          <table className="admin__table admin__table--board" style={{ marginTop: 10 }}>
+          <div className="admin__table-wrap" style={{ marginTop: 10 }}>
+          <table className="admin__table admin__table--board">
             <thead><tr><th>Route</th><th>Search title</th><th>Indexing</th><th>Overrides</th><th></th></tr></thead>
             <tbody>
               {seo.map((s) => {
@@ -328,6 +332,7 @@ export function SeoRedirectsManager({ redirects, seo, entities, canPublish, orig
               {!seo.length ? <tr><td colSpan={5}><div className="seo-empty"><strong>No SEO overrides yet</strong><span>Routes use the global SEO defaults (Settings). Add an override to customise a specific page’s search &amp; social appearance.</span></div></td></tr> : null}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>
