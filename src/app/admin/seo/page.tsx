@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { hasCapability } from "@/lib/auth/capabilities";
+import { canonicalOrigin } from "@/config/site";
 import { listRedirectsWithHealth, listSeoOverrides } from "@/services/seoRedirectService";
 import { listLinkableEntities } from "@/services/navigationService";
 import { listMedia } from "@/services/media/mediaService";
@@ -36,7 +37,7 @@ export default async function SeoPage() {
         <h1 className="admin__title">SEO &amp; Redirects</h1>
         <p className="admin__count">{redirects.length} redirects · {seo.length} meta overrides{canPublish ? "" : " · read-only (needs content.publish to change)"}</p>
       </header>
-      <SeoRedirectsManager redirects={redirects} seo={seo} entities={entities} media={media} canPublish={canPublish} />
+      <SeoRedirectsManager redirects={redirects} seo={seo} entities={entities} media={media} canPublish={canPublish} origin={canonicalOrigin()} />
     </main>
   );
 }

@@ -69,37 +69,47 @@ export function CharCount({ value, kind }: { value: string; kind: "title" | "des
   return <span className="admin__muted">{value.length} chars{g ? ` · ${g.text}` : ""}</span>;
 }
 
-/** SERP + social preview cards. Fed by a PreviewSeo (effective baseline + unsaved draft overlay). */
-export function SeoPreview({ preview, origin, path, heading = "Draft preview", note }: { preview: PreviewSeo; origin: string; path: string; heading?: string; note?: string }) {
-  const domain = origin.replace(/^https?:\/\//, "").replace(/\/$/, "");
-  const title = preview.title || "Untitled page";
-  const desc = preview.description || "No description — search engines will choose an excerpt.";
+const domainOf = (origin: string) => origin.replace(/^https?:\/\//, "").replace(/\/$/, "");
+const previewTitle = (t: string) => t || "Untitled page";
+const previewDesc = (d: string) => d || "No description — search engines will choose an excerpt.";
+
+/** Google search-result card (effective baseline + unsaved draft overlay). */
+export function SerpCard({ preview, origin, path }: { preview: PreviewSeo; origin: string; path: string }) {
+  const domain = domainOf(origin);
   const crumb = `${domain}${path && path !== "/" ? path : ""}`;
+  return (
+    <div className="seo-serp">
+      <div className="seo-serp__crumbs">{crumb.split("/").filter(Boolean).join(" › ") || domain}</div>
+      <div className="seo-serp__title">{previewTitle(preview.title)}</div>
+      <div className="seo-serp__desc">{previewDesc(preview.description)}</div>
+    </div>
+  );
+}
+
+/** Social/OG share card (effective baseline + unsaved draft overlay). */
+export function SocialCard({ preview, origin }: { preview: PreviewSeo; origin: string }) {
+  return (
+    <div className="seo-og">
+      {/^https?:\/\//.test(preview.ogImage) ? (
+        /* eslint-disable-next-line @next/next/no-img-element */ <img className="seo-og__img" src={preview.ogImage} alt="" />
+      ) : <div className="seo-og__img seo-og__img--empty">No OG image — add one for rich link cards</div>}
+      <div className="seo-og__body">
+        <span className="seo-og__domain">{domainOf(origin)}</span>
+        <span className="seo-og__title">{previewTitle(preview.title)}</span>
+        <span className="seo-og__desc">{previewDesc(preview.description)}</span>
+      </div>
+    </div>
+  );
+}
+
+/** Both preview cards together (used by PageSeoPanel). */
+export function SeoPreview({ preview, origin, path, heading = "Draft preview", note }: { preview: PreviewSeo; origin: string; path: string; heading?: string; note?: string }) {
   return (
     <div className="seo-preview">
       <p className="seo-preview__label">{heading}{note ? <span className="admin__muted"> — {note}</span> : null}</p>
       <div className="seo-preview__cards">
-        <div>
-          <p className="admin__muted seo-preview__cap">Google result</p>
-          <div className="seo-serp">
-            <div className="seo-serp__crumbs">{crumb.split("/").filter(Boolean).join(" › ") || domain}</div>
-            <div className="seo-serp__title">{title}</div>
-            <div className="seo-serp__desc">{desc}</div>
-          </div>
-        </div>
-        <div>
-          <p className="admin__muted seo-preview__cap">Social share (OG)</p>
-          <div className="seo-og">
-            {/^https?:\/\//.test(preview.ogImage) ? (
-              /* eslint-disable-next-line @next/next/no-img-element */ <img className="seo-og__img" src={preview.ogImage} alt="" />
-            ) : <div className="seo-og__img seo-og__img--empty">No OG image — add one for rich link cards</div>}
-            <div className="seo-og__body">
-              <span className="seo-og__domain">{domain}</span>
-              <span className="seo-og__title">{title}</span>
-              <span className="seo-og__desc">{desc}</span>
-            </div>
-          </div>
-        </div>
+        <div><p className="admin__muted seo-preview__cap">Google result</p><SerpCard preview={preview} origin={origin} path={path} /></div>
+        <div><p className="admin__muted seo-preview__cap">Social share (OG)</p><SocialCard preview={preview} origin={origin} /></div>
       </div>
       <p className="cfg-hint">Search engines may rewrite titles and descriptions — this is a guide, not a guarantee.</p>
     </div>

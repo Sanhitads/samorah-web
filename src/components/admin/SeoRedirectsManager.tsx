@@ -4,10 +4,12 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { RedirectRow, SeoOverrideRow, SeoAnalysis, EffectiveSeo, EffectiveField, RedirectRowH } from "@/services/seoRedirectService";
 import { ENTITY_ROUTE, type EntityType, type LinkableEntities } from "@/services/navigationService";
-import { MediaPicker } from "./MediaPicker";
 import type { MediaOption } from "./SchemaForm";
 import { KebabMenu } from "./KebabMenu";
-import { parseRobots, buildRobots, titleGuidance, descriptionGuidance } from "@/lib/seo/seoValidation";
+import { postSeo } from "./seo/postSeo";
+import { RobotsControls, OgImageField, CharCount, SerpCard, SocialCard, ProvenanceBadge } from "./seo/SeoPrimitives";
+import { draftPreview } from "@/lib/seo/effectivePreview";
+import { isNoindex, isMajorRoute } from "@/lib/seo/seoValidation";
 import { setTabNotice, noticeFor, type TabNotices, type SeoTab } from "@/lib/seo/tabNotice";
 import { HEALTH_LABEL } from "@/lib/seo/redirectHealth";
 import { filterSortRedirects, type RedirectFilter, type RedirectSort } from "@/lib/seo/redirectFilter";
@@ -16,8 +18,6 @@ const EMPTY_R = { id: "", fromPath: "", toPath: "", code: 301, enabled: true };
 const EMPTY_S = { path: "", title: "", description: "", ogImage: "", robots: "", canonical: "", sitemapPriority: "", changeFreq: "" };
 type RedirectForm = typeof EMPTY_R;
 type SeoForm = typeof EMPTY_S;
-
-const PROV_LABEL: Record<string, string> = { overridden: "Overridden", "site-default": "Site default", "inherited-page": "Inherited from page/entity", "not-overridden": "Not overridden" };
 
 /** Pick a canonical storefront route (Homepage / Page / Product / Collection / Chapter) or a custom path. */
 function PathPicker({ entities, onPick, allowExternal }: { entities: LinkableEntities; onPick: (path: string) => void; allowExternal?: boolean }) {
@@ -43,11 +43,7 @@ function PathPicker({ entities, onPick, allowExternal }: { entities: LinkableEnt
   );
 }
 
-function ProvBadge({ f }: { f: EffectiveField }) {
-  return <span className={`seo-prov seo-prov--${f.provenance}`}>{PROV_LABEL[f.provenance]}</span>;
-}
-
-export function SeoRedirectsManager({ redirects, seo, entities, canPublish }: { redirects: RedirectRowH[]; seo: SeoOverrideRow[]; entities: LinkableEntities; media?: MediaOption[]; canPublish: boolean }) {
+export function SeoRedirectsManager({ redirects, seo, entities, canPublish, origin }: { redirects: RedirectRowH[]; seo: SeoOverrideRow[]; entities: LinkableEntities; media?: MediaOption[]; canPublish: boolean; origin: string }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [tab, setTab] = useState<SeoTab>("redirects");
@@ -60,26 +56,17 @@ export function SeoRedirectsManager({ redirects, seo, entities, canPublish }: { 
   const [ns, setNs] = useState<SeoForm>(EMPTY_S);
   const [rAnalysis, setRAnalysis] = useState<SeoAnalysis | null>(null);
   const [effective, setEffective] = useState<EffectiveSeo | null>(null);
-  const [mediaOpen, setMediaOpen] = useState(false);
 
   const notify = (t: SeoTab, notice: { tone: "ok" | "err" | "warn"; text: string } | null) => setNotices((s) => setTabNotice(s, t, notice));
 
-  /** POST with a built-in confirmation loop: strong warnings return needs-confirm; we ask, then retry. */
+  /** Mutate via the shared confirmation-loop client (same semantics as PageSeoPanel — one backend). */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async function api(body: Record<string, unknown>): Promise<{ ok: boolean; data: any }> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const send = (b: Record<string, unknown>) => fetch("/api/admin/seo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) }).then(async (r) => ({ r, d: await r.json() as any }));
     setBusy(true);
-    try {
-      let { r, d } = await send(body);
-      if ((!r.ok || d.ok === false) && d.analysis?.confirmations?.length) {
-        if (typeof window !== "undefined" && window.confirm(`${d.analysis.confirmations.join("\n\n")}\n\nProceed anyway?`)) ({ r, d } = await send({ ...body, confirmed: true }));
-        else { setBusy(false); return { ok: false, data: { cancelled: true } }; }
-      }
-      setBusy(false);
-      const ok = r.ok && d.ok !== false;
-      if (ok) startTransition(() => router.refresh());
-      return { ok, data: d };
-    } catch { setBusy(false); return { ok: false, data: { error: "Network error" } }; }
+    const res = await postSeo(body, (msgs) => typeof window !== "undefined" && window.confirm(`${msgs.join("\n\n")}\n\nProceed anyway?`));
+    setBusy(false);
+    if (res.ok) startTransition(() => router.refresh());
+    return res;
   }
 
   // ── Redirects ────────────────────────────────────────────────────────────────────────────────────
@@ -109,8 +96,6 @@ export function SeoRedirectsManager({ redirects, seo, entities, canPublish }: { 
   };
 
   // ── SEO overrides ──────────────────────────────────────────────────────────────────────────────────
-  const robots = parseRobots(ns.robots);
-  const setRobots = (patch: { index?: boolean; follow?: boolean }) => setNs({ ...ns, robots: buildRobots({ ...robots, ...patch }) });
   const loadEffective = async (path: string) => {
     if (!path) { setEffective(null); return; }
     try { const r = await fetch("/api/admin/seo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "seo.effective", path }) }); const d = await r.json(); setEffective(d.effective ?? null); } catch { /* ignore */ }
@@ -131,10 +116,16 @@ export function SeoRedirectsManager({ redirects, seo, entities, canPublish }: { 
   const resetField = (field: keyof SeoForm) => setNs({ ...ns, [field]: "" }); // reset one field to inherited; Save keeps the rest
 
   const note = noticeFor(notices, tab);
-  const titleG = titleGuidance(ns.title.length), descG = descriptionGuidance(ns.description.length);
+  const preview = draftPreview(effective, ns);
+  // Deterministic issue count for the summary — no SEO score. Redirect problems (broken/chain) +
+  // overrides that noindex a major route (a likely mistake). All from pure, already-computed data.
+  const issues = redirects.filter((r) => r.health === "broken" || r.health === "chain").length
+    + seo.filter((s) => isNoindex(s.robots) && isMajorRoute(s.path)).length;
+  const activeCount = redirects.filter((r) => r.enabled).length;
 
   return (
     <div className="cfg">
+      <p className="seo-summary">{activeCount} active redirect{activeCount === 1 ? "" : "s"} · {seo.length} SEO override{seo.length === 1 ? "" : "s"} · <span className={issues ? "seo-summary__issues" : ""}>{issues} issue{issues === 1 ? "" : "s"}</span></p>
       <nav className="ff-queues" aria-label="Section">
         <button type="button" className="ff-queue" data-active={tab === "redirects" ? "1" : "0"} onClick={() => setTab("redirects")}>Redirects</button>
         <button type="button" className="ff-queue" data-active={tab === "seo" ? "1" : "0"} onClick={() => setTab("seo")}>Meta overrides</button>
@@ -210,35 +201,58 @@ export function SeoRedirectsManager({ redirects, seo, entities, canPublish }: { 
           <p className="cfg-hint">Redirects apply within ~60s (cached in middleware) and run <strong>before</strong> the page renders. Loops and broken destinations are blocked; redirecting a live page asks for confirmation. Health is derived from the redirect graph — traffic metrics are deferred (post-launch).</p>
         </div>
       ) : (
-        <div>
-          <div className="cfg-grid">
-            <label className="cfg-field" data-wide="1"><span>Route</span>
+        <div className="seo-editor">
+          <section className="seo-group">
+            <h4 className="seo-group__title">Route</h4>
+            <label className="cfg-field" data-wide="1"><span>Which page is this SEO for?</span>
               <input value={ns.path} onChange={(e) => setNs({ ...ns, path: e.target.value })} onBlur={() => loadEffective(ns.path)} placeholder="/about" />
               <PathPicker entities={entities} onPick={(p) => { setNs({ ...ns, path: p }); loadEffective(p); }} />
             </label>
-            <label className="cfg-field" data-wide="1"><span>Meta title <span className="admin__muted">{ns.title.length} chars{titleG ? ` · ${titleG.text}` : ""}</span> {ns.title ? <button type="button" className="seo-reset" onClick={() => resetField("title")}>↺ inherited</button> : null}</span>
+          </section>
+
+          <section className="seo-group">
+            <h4 className="seo-group__title">Search appearance</h4>
+            <label className="cfg-field" data-wide="1"><span>Meta title <CharCount value={ns.title} kind="title" /> {ns.title ? <button type="button" className="seo-reset" onClick={() => resetField("title")}>↺ inherited</button> : null}</span>
               <input value={ns.title} onChange={(e) => setNs({ ...ns, title: e.target.value })} /></label>
-            <label className="cfg-field" data-wide="1"><span>Meta description <span className="admin__muted">{ns.description.length} chars{descG ? ` · ${descG.text}` : ""}</span> {ns.description ? <button type="button" className="seo-reset" onClick={() => resetField("description")}>↺ inherited</button> : null}</span>
+            <label className="cfg-field" data-wide="1"><span>Meta description <CharCount value={ns.description} kind="description" /> {ns.description ? <button type="button" className="seo-reset" onClick={() => resetField("description")}>↺ inherited</button> : null}</span>
               <textarea value={ns.description} onChange={(e) => setNs({ ...ns, description: e.target.value })} rows={2} /></label>
-            <label className="cfg-field" data-wide="1"><span>OG image {ns.ogImage ? <button type="button" className="seo-reset" onClick={() => resetField("ogImage")}>↺ inherited</button> : null}</span>
-              <div style={{ display: "flex", gap: 6 }}><input value={ns.ogImage} onChange={(e) => setNs({ ...ns, ogImage: e.target.value })} placeholder="https://… or pick" style={{ flex: 1 }} /><button type="button" className="ff-btn" onClick={() => setMediaOpen(true)}>Media…</button></div></label>
-            <fieldset className="cfg-field"><span>Search indexing</span>
-              <div className="seo-radio"><label><input type="radio" name="idx" checked={robots.index} onChange={() => setRobots({ index: true })} /> Index this page</label>
-              <label><input type="radio" name="idx" checked={!robots.index} onChange={() => setRobots({ index: false })} /> Do not index</label></div></fieldset>
-            <fieldset className="cfg-field"><span>Link crawling</span>
-              <div className="seo-radio"><label><input type="radio" name="fol" checked={robots.follow} onChange={() => setRobots({ follow: true })} /> Follow links</label>
-              <label><input type="radio" name="fol" checked={!robots.follow} onChange={() => setRobots({ follow: false })} /> Do not follow</label></div></fieldset>
+            <p className="seo-preview__cap admin__muted">Search preview</p>
+            <SerpCard preview={preview} origin={origin} path={ns.path} />
+            <p className="cfg-hint">Search engines may rewrite titles and descriptions — this is a guide, not a guarantee.</p>
+          </section>
+
+          <section className="seo-group">
+            <h4 className="seo-group__title">Indexing &amp; canonical</h4>
+            <RobotsControls value={ns.robots} onChange={(r) => setNs({ ...ns, robots: r })} />
             <label className="cfg-field" data-wide="1"><span>Canonical URL {ns.canonical ? <button type="button" className="seo-reset" onClick={() => resetField("canonical")}>↺ inherited</button> : null}</span>
               <input value={ns.canonical} onChange={(e) => setNs({ ...ns, canonical: e.target.value })} placeholder="Leave blank unless this page duplicates another URL" /></label>
-            <div className="cfg-field" data-wide="1"><span>Sitemap hints <span className="admin__muted">— not yet applied to the generated sitemap</span></span>
-              <div style={{ display: "flex", gap: 8, opacity: 0.7 }}>
-                <input value={ns.sitemapPriority} onChange={(e) => setNs({ ...ns, sitemapPriority: e.target.value })} placeholder="priority 0–1" title="Stored, but the sitemap does not read this yet (Phase 2)" />
-                <input value={ns.changeFreq} onChange={(e) => setNs({ ...ns, changeFreq: e.target.value })} placeholder="change frequency" title="Stored, but the sitemap does not read this yet (Phase 2)" />
-              </div></div>
-            <div style={{ display: "flex", alignItems: "flex-end", gap: 6 }}>
-              <button type="button" className="ff-btn ff-btn--primary" disabled={busy || !canPublish} onClick={saveSeo}>Save</button>
-              {ns.path ? <button type="button" className="ff-btn" disabled={busy} onClick={() => { setNs(EMPTY_S); setEffective(null); }}>Clear</button> : null}
+          </section>
+
+          <section className="seo-group">
+            <h4 className="seo-group__title">Social sharing</h4>
+            <div className="cfg-field" data-wide="1"><span>OG image {ns.ogImage ? <button type="button" className="seo-reset" onClick={() => resetField("ogImage")}>↺ inherited</button> : null}</span>
+              <OgImageField value={ns.ogImage} onChange={(url) => setNs({ ...ns, ogImage: url })} /></div>
+            <p className="seo-preview__cap admin__muted">Social preview</p>
+            <SocialCard preview={preview} origin={origin} />
+          </section>
+
+          <section className="seo-group">
+            <h4 className="seo-group__title">Advanced sitemap settings</h4>
+            <div className="cfg-field" data-wide="1"><span>These tune this route in the generated sitemap.xml.</span>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <input value={ns.sitemapPriority} onChange={(e) => setNs({ ...ns, sitemapPriority: e.target.value })} placeholder="priority (0–1)" aria-label="Sitemap priority" />
+                <select value={ns.changeFreq} onChange={(e) => setNs({ ...ns, changeFreq: e.target.value })} aria-label="Change frequency">
+                  <option value="">change frequency (default)</option>
+                  {["always", "hourly", "daily", "weekly", "monthly", "yearly", "never"].map((f) => <option key={f} value={f}>{f}</option>)}
+                </select>
+              </div>
+              {ns.sitemapPriority && (Number.isNaN(Number(ns.sitemapPriority)) || Number(ns.sitemapPriority) < 0 || Number(ns.sitemapPriority) > 1) ? <span className="cfg-msg cfg-msg--warn">Priority must be between 0 and 1 — an out-of-range value is ignored.</span> : null}
             </div>
+          </section>
+
+          <div className="cfg-actions">
+            <button type="button" className="ff-btn ff-btn--primary" disabled={busy || !canPublish} onClick={saveSeo}>Save</button>
+            {ns.path ? <button type="button" className="ff-btn" disabled={busy} onClick={() => { setNs(EMPTY_S); setEffective(null); }}>Clear</button> : null}
           </div>
 
           {effective ? (
@@ -248,28 +262,26 @@ export function SeoRedirectsManager({ redirects, seo, entities, canPublish }: { 
                 <div className="seo-eff-row" key={label}>
                   <span className="seo-eff-label">{label}</span>
                   <span className="seo-eff-value">{f.value ?? <em className="admin__muted">supplied by the page — not shown here</em>}</span>
-                  <ProvBadge f={f} />
+                  <ProvenanceBadge f={f} />
                 </div>
               ))}
-              <p className="cfg-hint">Values shown come from the same resolver the storefront uses (site defaults + this override). A value the page itself sets in code (e.g. an entity title) shows as “Inherited from page/entity”.</p>
+              <p className="cfg-hint">Values come from the same resolver the storefront uses (site defaults + this override). A value the page sets in code (e.g. an entity title) shows as “Inherited from page/entity”.</p>
             </div>
           ) : null}
 
           <table className="admin__table admin__table--board" style={{ marginTop: 10 }}>
-            <thead><tr><th>Route</th><th>Title</th><th>Robots</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Route</th><th>Title</th><th>Robots</th><th></th></tr></thead>
             <tbody>
               {seo.map((s) => (
                 <tr key={s.path}><td className="admin__mono">{s.path}</td><td>{s.title || <span className="admin__muted">—</span>}</td><td>{s.robots || <span className="admin__muted">index,follow</span>}</td>
-                  <td><button type="button" className="ff-btn ff-btn--sm" disabled={busy} onClick={() => editSeo(s)}>Edit</button> <button type="button" className="ff-btn ff-btn--danger ff-btn--sm" disabled={busy || !canPublish} onClick={() => deleteSeo(s)}>Delete</button></td></tr>
+                  <td><div className="rowactions"><button type="button" className="ff-btn ff-btn--sm" disabled={busy} onClick={() => editSeo(s)}>Edit</button>
+                    <KebabMenu items={[{ label: "Remove override", onClick: () => deleteSeo(s), danger: true, disabled: !canPublish }]} /></div></td></tr>
               ))}
               {!seo.length ? <tr><td colSpan={4} className="admin__empty">No per-route overrides — routes use the global SEO defaults (Settings).</td></tr> : null}
             </tbody>
           </table>
-          <p className="cfg-hint">Overrides layer over the global defaults (Settings), read by pages via getRouteSeo() in generateMetadata.</p>
         </div>
       )}
-
-      <MediaPicker open={mediaOpen} kind="image" onSelect={(url) => { setNs((s) => ({ ...s, ogImage: url })); setMediaOpen(false); }} onClose={() => setMediaOpen(false)} />
     </div>
   );
 }

@@ -19,18 +19,42 @@ persistence + resolution backend**: the `seo_overrides` table, `seoRedirectServi
 resolver, a second redirect engine, or a parallel persistence path.** Effective/preview metadata must
 always come from `getRouteSeo`/`getEffectiveSeo`, never a component-local re-computation.
 
-### Deferred Phase-2 candidates
-- **Sitemap priority / change-frequency integration** — `seo_overrides.sitemap_priority`/`change_freq`
-  are stored but `app/sitemap.ts` still uses hard-coded values. Wiring must have `sitemap.ts` read the
-  overrides table (single source). The Phase-1 UI marks these fields "not yet applied".
-- **Real redirect hit instrumentation** — the `hits` column exists but is never incremented; the
-  Phase-1 UI removed the misleading "0". Real tracking (middleware increment / RPC) is future work.
-- **Heterogeneous product/collection lifecycle audit** — `getShopProducts`/`getProducts`/
-  `getCollections` don't filter by status/visibility; there is no single "is `/shop/x` live?" service.
-  Separate audit; storefront services were **not** changed in SEO Phase 1.
-- **PageSeoPanel ↔ /admin/seo UI unification** — the two SEO editing surfaces share the backend but
-  differ in UX (PageSeoPanel has its own local SERP preview). A future pass may unify the UI **subject
-  to the invariant above** — reusing `getEffectiveSeo`, never a new resolver.
+### Phase 2 status
+**Done in Phase 2:** sitemap priority/changefreq wiring + exclusions (override-noindex / redirect
+sources / coming-soon chapters) via a single batch query; redirect edit identity (update-by-id);
+deterministic redirect health + search/filter/sort; shared SEO primitives + PageSeoPanel consistency
+(same backend/validation/confirmation + getEffectiveSeo baseline + draft-overlay preview); editorial
+Meta UX. The **PageSeoPanel ↔ /admin/seo consistency** item is therefore resolved — both share the
+backend AND the confirmation/effective/provenance semantics; JSON-LD stays PageSeoPanel-only by design.
+
+### Still deferred (confirmed post-launch)
+- **Real redirect hit instrumentation** — DEFERRED by decision. The audit established there is **no
+  reliable Edge non-blocking write** (middleware is Edge, no `waitUntil`, no atomic increment RPC, no
+  counter/flush), so building Edge→Node ingest→DB/cron plumbing solely for pre-launch counts is not
+  justified. `hits`/`Last hit`/`Most hits`/`Recently hit` and traffic-based health stay **hidden** (no
+  zero shown as measured traffic). When built: add `last_hit_at` (+ maybe `updated_at`) or a single
+  rollup table, a best-effort write path, and a flush/rollup cron — one hit store, never blocking the
+  301/302. `redirect_health` never becomes a delete recommendation.
+- **`redirects.updated_at`** — intentionally NOT added in Phase 2 (a "Recently updated" sort alone
+  didn't justify it; edit identity is handled by update-by-id). Add only if genuinely needed for
+  identity/audit semantics.
+
+### Lifecycle audit (read-only finding — do NOT change storefront services without approval)
+Matrix from Phase 2 analysis (recorded for a future, separately-approved pass):
+- **Products** — `getShopProducts` (anon/**RLS-only**, no explicit status filter, `status` not
+  selected). Visibility is RLS-implicit — fragile if any admin-client query reuses it.
+- **Collections/Chapters** — `getCollections` applies **no `is_coming_soon`/`is_active` filter**, so
+  coming-soon chapters would leak. Phase 2 fixed this **only locally in `sitemap.ts`** (storefront
+  services untouched).
+- **CMS pages / air volumes** — consistent (`isPageLive`; config `!isComingSoon`).
+- **SEO/Nav entity picker** — `listLinkableEntities` caps products at **`.limit(200)`** (scalability
+  note; not solved now).
+These are audit findings only — no storefront visibility/RLS/service change was made in Phase 2.
+
+### Known boundary (accepted, documented)
+A `noindex` set **only** inside a route's own `generateMetadata` (never written to the `seo_overrides`
+layer) is not centrally discoverable by the sitemap. We do **not** re-run every route's
+`generateMetadata` to find it; the override layer is the deterministic signal the sitemap acts on.
 
 ## Email
 
