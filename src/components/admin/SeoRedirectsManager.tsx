@@ -73,6 +73,7 @@ export function SeoRedirectsManager({ redirects, seo, entities, canPublish, orig
   const [ns, setNs] = useState<SeoForm>(EMPTY_S);
   const [rAnalysis, setRAnalysis] = useState<SeoAnalysis | null>(null);
   const [effective, setEffective] = useState<EffectiveSeo | null>(null);
+  const [advOpen, setAdvOpen] = useState(false); // Advanced sitemap disclosure — auto-opens when editing an override that already has values
 
   const notify = (t: SeoTab, notice: { tone: "ok" | "err" | "warn"; text: string } | null) => setNotices((s) => setTabNotice(s, t, notice));
 
@@ -117,7 +118,7 @@ export function SeoRedirectsManager({ redirects, seo, entities, canPublish, orig
     if (!path) { setEffective(null); return; }
     try { const r = await fetch("/api/admin/seo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "seo.effective", path }) }); const d = await r.json(); setEffective(d.effective ?? null); } catch { /* ignore */ }
   };
-  const editSeo = (s: SeoOverrideRow) => { setNs({ path: s.path, title: s.title, description: s.description, ogImage: s.ogImage, robots: s.robots, canonical: s.canonical, sitemapPriority: s.sitemapPriority, changeFreq: s.changeFreq }); loadEffective(s.path); };
+  const editSeo = (s: SeoOverrideRow) => { setNs({ path: s.path, title: s.title, description: s.description, ogImage: s.ogImage, robots: s.robots, canonical: s.canonical, sitemapPriority: s.sitemapPriority, changeFreq: s.changeFreq }); setAdvOpen(Boolean(s.sitemapPriority || s.changeFreq)); loadEffective(s.path); };
   const saveSeo = async () => {
     const { ok, data } = await api({ action: "seo.save", seo: ns });
     if (ok) { const warn = data.analysis?.warnings?.[0]; notify("seo", warn ? { tone: "warn", text: `Saved. Note: ${warn}` } : { tone: "ok", text: "SEO override saved." }); loadEffective(ns.path); }
@@ -164,13 +165,13 @@ export function SeoRedirectsManager({ redirects, seo, entities, canPublish, orig
                 <option value={301}>301 — Permanent redirect</option>
                 <option value={302}>302 — Temporary redirect</option>
               </select>
+              <span className="cfg-hint">{nr.code === 302 ? "Temporary — use when the move is temporary." : "Permanent — use when the old URL has permanently moved."}</span>
             </label>
             <div style={{ display: "flex", alignItems: "flex-end", gap: 6 }}>
               <button type="button" className="ff-btn ff-btn--primary" disabled={busy || !canPublish} onClick={saveRedirect}>{nr.id ? "Update redirect" : "Add redirect"}</button>
               {nr.id ? <button type="button" className="ff-btn" disabled={busy} onClick={() => { setNr(EMPTY_R); setRAnalysis(null); }}>Cancel</button> : null}
             </div>
           </div>
-          <p className="cfg-hint">Permanent (301) = the old URL has moved for good. Temporary (302) = the move is short-lived.</p>
 
           {rAnalysis && (rAnalysis.errors.length || rAnalysis.warnings.length || rAnalysis.confirmations.length || rAnalysis.finalDestination) ? (
             <div className="cfg-validation">
@@ -212,7 +213,7 @@ export function SeoRedirectsManager({ redirects, seo, entities, canPublish, orig
                 </tr>
               ))}
               {redirects.length && !shownRedirects.length ? <tr><td colSpan={5} className="admin__empty">No redirects match.</td></tr> : null}
-              {!redirects.length ? <tr><td colSpan={5} className="admin__empty">No redirects yet.</td></tr> : null}
+              {!redirects.length ? <tr><td colSpan={5}><div className="seo-empty"><strong>No redirects yet</strong><span>Redirect old URLs when a page moves or its URL changes. This helps visitors and search engines reach the correct page.</span></div></td></tr> : null}
             </tbody>
           </table>
           <p className="cfg-hint">Redirects apply within ~60s (cached in middleware) and run <strong>before</strong> the page renders. Loops and broken destinations are blocked; redirecting a live page asks for confirmation. Health is derived from the redirect graph — traffic metrics are deferred (post-launch).</p>
@@ -240,8 +241,10 @@ export function SeoRedirectsManager({ redirects, seo, entities, canPublish, orig
           <section className="seo-group">
             <h4 className="seo-group__title">Indexing &amp; canonical</h4>
             <RobotsControls value={ns.robots} onChange={(r) => setNs({ ...ns, robots: r })} />
+            <p className="cfg-hint">Most storefront pages should stay Index + Follow.</p>
             <label className="cfg-field" data-wide="1"><span>Canonical URL {ns.canonical ? <button type="button" className="seo-reset" onClick={() => resetField("canonical")}>↺ inherited</button> : null}</span>
-              <input value={ns.canonical} onChange={(e) => setNs({ ...ns, canonical: e.target.value })} placeholder="Leave blank unless this page duplicates another URL" /></label>
+              <input value={ns.canonical} onChange={(e) => setNs({ ...ns, canonical: e.target.value })} placeholder="https://samorahstudio.com/…" />
+              <span className="cfg-hint">Leave blank for normal pages. Set a canonical only when this page duplicates or closely matches another URL.</span></label>
           </section>
 
           <section className="seo-group">
@@ -252,8 +255,8 @@ export function SeoRedirectsManager({ redirects, seo, entities, canPublish, orig
             <SocialCard preview={preview} origin={origin} />
           </section>
 
-          <section className="seo-group">
-            <h4 className="seo-group__title">Advanced sitemap settings</h4>
+          <details className="seo-group seo-details" open={advOpen} onToggle={(e) => setAdvOpen((e.target as HTMLDetailsElement).open)}>
+            <summary className="seo-group__title">Advanced sitemap settings</summary>
             <div className="cfg-field" data-wide="1"><span>These tune this route in the generated sitemap.xml.</span>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <input value={ns.sitemapPriority} onChange={(e) => setNs({ ...ns, sitemapPriority: e.target.value })} placeholder="priority (0–1)" aria-label="Sitemap priority" />
@@ -264,24 +267,24 @@ export function SeoRedirectsManager({ redirects, seo, entities, canPublish, orig
               </div>
               {ns.sitemapPriority && (Number.isNaN(Number(ns.sitemapPriority)) || Number(ns.sitemapPriority) < 0 || Number(ns.sitemapPriority) > 1) ? <span className="cfg-msg cfg-msg--warn">Priority must be between 0 and 1 — an out-of-range value is ignored.</span> : null}
             </div>
-          </section>
+          </details>
 
           <div className="cfg-actions">
             <button type="button" className="ff-btn ff-btn--primary" disabled={busy || !canPublish} onClick={saveSeo}>Save</button>
-            {ns.path ? <button type="button" className="ff-btn ff-btn--ghost" disabled={busy} onClick={() => { setNs(EMPTY_S); setEffective(null); }}>Discard changes</button> : null}
+            {ns.path ? <button type="button" className="ff-btn ff-btn--ghost" disabled={busy} onClick={() => { setNs(EMPTY_S); setEffective(null); setAdvOpen(false); }}>Discard changes</button> : null}
           </div>
 
           {effective ? (
             <div className="seo-effective">
-              <h3>Resolved SEO &amp; inheritance <span className="admin__muted">— what the storefront resolver returns for {ns.path || "this route"}</span></h3>
+              <h3>Effective storefront SEO <span className="admin__muted">— what the storefront currently resolves for {ns.path || "this route"}</span></h3>
               {([["Title", effective.title], ["Description", effective.description], ["Canonical", effective.canonical], ["Robots", effective.robots], ["OG image", effective.ogImage]] as [string, EffectiveField][]).map(([label, f]) => (
                 <div className="seo-eff-row" key={label}>
                   <span className="seo-eff-label">{label}</span>
-                  <span className="seo-eff-value">{f.value ?? <em className="admin__muted">supplied by the page — not shown here</em>}</span>
+                  <span className="seo-eff-value">{f.value ?? <em className="admin__muted">Inherited from page/entity</em>}</span>
                   <ProvenanceBadge f={f} />
                 </div>
               ))}
-              <p className="cfg-hint">Values come from the same resolver the storefront uses (site defaults + this override). A value the page sets in code (e.g. an entity title) shows as “Inherited from page/entity”.</p>
+              <p className="cfg-hint">From the same resolver the storefront uses (site defaults + this override). A value the page sets in code (e.g. an entity title) is shown honestly as “Inherited from page/entity”, not fabricated.</p>
             </div>
           ) : null}
 
