@@ -9,10 +9,13 @@ interface RedirectRule { to: string; code: number }
 let cache: { at: number; map: Map<string, RedirectRule> } | null = null;
 const TTL_MS = 60_000;
 
-function normalize(p: string): string {
+/** Canonical redirect-path normalization — the SAME rule middleware matches on (trailing-slash- and
+ *  case-insensitive). Exported so admin-side graph/loop validation matches runtime behaviour exactly. */
+export function normalizePath(p: string): string {
   if (p.length > 1 && p.endsWith("/")) p = p.slice(0, -1);
   return p.toLowerCase();
 }
+const normalize = normalizePath;
 
 export async function getRedirectMap(): Promise<Map<string, RedirectRule>> {
   const now = Date.now();
