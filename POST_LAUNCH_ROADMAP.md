@@ -273,8 +273,30 @@ separate future decision, none gates any release):
    `apply_stock_movement` the sole mutation choke point. No warehouse-management system and no parallel
    stock engine unless a future operational requirement explicitly justifies (and re-approves) one.
 
-### Phase 1B-2 — RTO receiving (analysis-approved; not yet built)
+### Phase 1B-2 — RTO receiving (shipment-anchored closure; built)
 RTO physical receiving reuses the SAME frozen foundation: `inventory_receipts(source_type='rto',
-source_id=shipments.id)` → `commit_receipt` → `apply_stock_movement` (`rto_restock`, key
-`rto_receipt_item:<id>`). No RTO-specific stock engine. Return closure triggers/columns are scoped to
-`source_type='return'` and must not be repurposed; any RTO closure boundary is a separate additive design.
+source_id=shipments.id)` → `commit_rto_receipt` → `commit_receipt` → `apply_stock_movement` (`rto_restock`,
+key `rto_receipt_item:<id>`). No RTO-specific stock engine. Closure is shipment-anchored
+(`shipments.rto_receiving_closed_at/by`, `close_rto_receiving`, `commit_rto_receipt`, two
+`source_type='rto'` guard triggers) in additive migration `20260821120000` — the frozen
+`source_type='return'` closure (…20) is untouched and its triggers return early for RTO. `shipments.status`
+stays terminal `'rto'`; receiving/closure is a separate inventory-accounting concern. RTO issues no
+refund/payment/invoice — financial handling stays independent.
+
+#### 🔒 Architectural dependency — RTO expected-quantity authority (one shipment per order)
+**RTO expected-quantity authority currently depends on one shipment per order. Before
+multi-box/multiple-shipment support is introduced, shipment-level item allocation must become the
+expected-quantity authority for RTO receiving.** Today `commit_receipt`'s RTO branch derives expected
+= `SUM(order_items.quantity by variant)` via `shipment → order_id`, correct ONLY because
+`shipments.order_id` is `UNIQUE` (one parcel per order). A future multi-box slice that drops that
+constraint MUST first introduce a `shipment_items` allocation table and migrate RTO expected-quantity
+derivation from order-level to shipment-level, or each parcel's RTO would over-expect the whole order.
+An invariant test (`rtoReceiving.integration.test.ts` req1) guards the current assumption.
+
+#### Prepaid-RTO refund automation — future Orders/Refunds concern (NOT coupled to receiving)
+An RTO parcel that bounces back means a prepaid customer may be owed a refund, but that is a
+**business-policy / Orders + Refunds** decision, handled today by the existing manual refund route. It
+**must never be coupled to inventory receiving**: RTO receive/commit/close deliberately mutate no
+refund/payment/order-financial state (proven by `rtoReceiving.integration.test.ts` req4 + closure V1). Any
+future prepaid-RTO auto-refund lives in the Orders/Refunds domain and reuses the canonical refund service —
+it does not belong in the receiving service or RPCs.

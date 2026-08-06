@@ -4,6 +4,7 @@ import { redirect, notFound } from "next/navigation";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { hasCapability } from "@/lib/auth/capabilities";
 import { getShipmentDetail } from "@/services/shipmentService";
+import { getShipmentRtoReceiving } from "@/services/rtoReceivingService";
 import { getShipmentTimeline } from "@/services/auditService";
 import { getOrderNotifications } from "@/services/notificationService";
 import { ShipmentTimelineFilter } from "@/components/admin/ShipmentTimelineFilter";
@@ -12,6 +13,7 @@ import { ShipmentNote } from "@/components/admin/ShipmentNote";
 import { ShipmentCostEditor } from "@/components/admin/ShipmentCostEditor";
 import { CopyButton } from "@/components/admin/CopyButton";
 import { ShipmentProgress } from "@/components/admin/ShipmentProgress";
+import { ShipmentRtoReceiving } from "@/components/admin/ShipmentRtoReceiving";
 import { nextShipmentStates, toCustomerStatus, CUSTOMER_STATUS_LABEL, type ShipmentStatus, type CustomerShipmentStatus } from "@/lib/shipment/state";
 import { shipmentStatusIcon, shipmentStatusLabel, providerBrand, shipmentPriorityBadge, isManualProvider, damageRisk, courierSupport } from "@/lib/shipment/display";
 import { shipmentSla, shipmentSettled, shipmentEta, shipmentAgeDays, shipmentMovement } from "@/lib/shipment/sla";
@@ -45,6 +47,7 @@ export default async function ShipmentDetailPage({ params }: { params: Promise<{
   const { sh, order, events } = detail;
   const [timeline, notifications] = await Promise.all([getShipmentTimeline(id), getOrderNotifications(sh.order_id)]);
   const canOperate = hasCapability(staff.role, "fulfillment.operate");
+  const rtoReceiving = sh.status === "rto" ? await getShipmentRtoReceiving(id) : null;
 
   const status = sh.status as ShipmentStatus;
   const sla = shipmentSla(sh.created_at, status, sh.delivered_at ?? null);
@@ -220,6 +223,17 @@ export default async function ShipmentDetailPage({ params }: { params: Promise<{
           ) : <p className="admin__muted">No exceptions recorded.</p>}
         </section>
       </details>
+
+      {/* RTO Receiving & Inspection — receipt-driven physical intake (Phase 1B-2) */}
+      {rtoReceiving ? (
+        <details className="od-group" open>
+          <summary className="od-group__sum">
+            RTO Receiving &amp; Inspection
+            {rtoReceiving.closed ? <span className="count-badge">closed</span> : rtoReceiving.canReceive ? <span className="count-badge">open</span> : null}
+          </summary>
+          <ShipmentRtoReceiving model={rtoReceiving} canOperate={canOperate} />
+        </details>
+      ) : null}
 
       {/* Cost / weight breakdown quick facts */}
       <details className="od-group">
