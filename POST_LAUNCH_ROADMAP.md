@@ -300,3 +300,157 @@ An RTO parcel that bounces back means a prepaid customer may be owed a refund, b
 refund/payment/order-financial state (proven by `rtoReceiving.integration.test.ts` req4 + closure V1). Any
 future prepaid-RTO auto-refund lives in the Orders/Refunds domain and reuses the canonical refund service —
 it does not belong in the receiving service or RPCs.
+
+---
+
+## Inventory — Phase 1B CLOSED · Phase 2+ Roadmap (classified)
+
+**Inventory Phase 0 → 1B-2 is complete and FROZEN.** Commits: `e035fd3` (P0 ledger) · `48f0c3b` (1A authority)
+· `9e2db46` (1B-0a payment/reservation) · `0f22575` (1B-0b receipt foundation) · `c581afc` (1B-1 Returns) ·
+`484cc6d` (1B-2 RTO). Migrations `20260816120000 … 20260821120000` are **immutable** — any correction is a
+**later additive migration only**. This section is the agreed post-launch roadmap: **documentation, not a
+work order.** Nothing below is approved to build; each item carries an explicit trigger. Priorities are
+relative importance, **not** a schedule (no dates).
+
+### A. Frozen Inventory architecture (the permanent authority model)
+
+Every stock change in the system flows through exactly one choke point. This is the invariant all future
+work inherits:
+
+```
+Manual corrections   → adjust_inventory        → apply_stock_movement → manual_adjustment
+Sales                → order finalization       → apply_stock_movement → sale
+Order cancellation   → cancel_order             → apply_stock_movement → cancel_restock
+Return receiving     → commit_return_receipt    → commit_receipt → apply_stock_movement → return_restock
+RTO receiving        → commit_rto_receipt       → commit_receipt → apply_stock_movement → rto_restock
+New-variant opening  → variants opening trigger → apply_stock_movement → opening_balance
+```
+
+- **`apply_stock_movement` is the ONLY writer of `variants.stock`** (Phase-1A column-privilege revoke; the
+  ledger functions are `SECURITY DEFINER`). `inventory_movements` is the **immutable append-only ledger** and
+  the single source of stock-movement truth. `commit_receipt` is the **shared inbound receiving authority**
+  (Returns + RTO); receiving RBAC is `returns.operate` (Returns) / `fulfillment.operate` (RTO), never
+  `inventory.adjust`.
+
+**🔒 Hard non-goals — no Phase 2+ feature may EVER introduce:** direct `variants.stock` mutations · a second
+inventory ledger · a second receiving engine · a parallel adjustment engine · raw ±stock controls inside the
+Returns/RTO workflows · duplicated/denormalized stock balances. All analytics and reports **derive** from the
+canonical ledger — they never become a second inventory truth.
+
+### B. Phase 2A — operational improvements (post-launch candidates)
+
+All read/report or reuse the canonical adjustment path; none introduces a new stock authority.
+
+- **Inventory snapshot CSV export** — On Hand / Reserved / Available per variant.
+  · Priority **P2** · Trigger: ops asks to work stock offline / share with finance · Dependency: none ·
+  Reuses: `inventoryService` read model (ledger-derived) · Non-goals: no editable import-back, no stock mutation.
+- **Movement-history CSV export** — export `inventory_movements` rows.
+  · Priority **P2** · Trigger: audit/finance needs an exportable ledger · Dependency: none · Reuses:
+  `inventory_movements` ledger · Non-goals: not a second ledger store; export is a projection only.
+- **Rich ledger filtering/search** — by date, SKU/product, movement type, source/reference, actor.
+  · Priority **P2** · Trigger: ledger volume makes the flat list hard to navigate · Dependency: none ·
+  Reuses: `inventory_movements` + existing indexes · Non-goals: no derived balances stored; filter is read-only.
+- **Physical-count / reconciliation workflow** — count sheet → variance → apply corrections.
+  · Priority **P2** · Trigger: first real cycle-count need · Dependency: none · Reuses: **`adjust_inventory`**
+  (`manual_adjustment`) exclusively for every correction · Non-goals: no direct stock write, no bulk bypass of
+  the reservation-safe floor, no separate count-ledger authority.
+- **Low-stock-threshold management / bulk editing** — edit `low_stock_threshold` across variants.
+  · Priority **P3** · Trigger: catalog grows enough that per-variant editing is tedious · Dependency: none ·
+  Reuses: existing variant column-grant rules (threshold is editable; `stock` is not) · Non-goals: never grant
+  `UPDATE(stock)`; thresholds don't move stock.
+- **Modest operational Inventory dashboard** — low/out-of-stock, recent adjustments/receipts, receiving exceptions.
+  · Priority **P3** · Trigger: ops wants an at-a-glance operational view · Dependency: ledger + receipts ·
+  Reuses: ledger/receipt read models · Non-goals: not analytics/valuation; no new truth; purely a projection.
+- **Ledger reconciliation MONITOR** — read-only check that `opening_balance + Σ movement deltas == current On Hand`
+  per variant; **alerts/reports** discrepancies.
+  · Priority **P2** · Trigger: desire for continuous integrity assurance post-launch · Dependency: none ·
+  Reuses: `inventory_movements` + `variants.stock` (read only) · **Non-goals: NEVER auto-repairs inventory** —
+  it reports drift for human investigation; it must not write stock or movements.
+
+### C. Phase 2B — build only when operational volume justifies it
+
+- **Inventory valuation** — **BLOCKED** until a canonical unit-cost/cost authority exists.
+  · Priority **P3 (blocked)** · Trigger: a real cost source + finance requirement · Dependency: **cost authority
+  must be defined first** · Reuses: (future) cost authority + ledger quantities · **Non-goals: never use selling
+  price as inventory cost; no valuation inferred from `price`.**
+- **COGS support** — only after cost authority + accounting semantics are approved.
+  · Priority **P3 (blocked)** · Trigger: approved accounting model · Dependency: valuation/cost authority ·
+  Reuses: ledger movements + cost authority · Non-goals: no COGS math on price; not an inventory-owned decision.
+- **Supplier / Purchase Order / Goods-Received workflow** — inbound procurement.
+  · Priority **P3** · Trigger: **manual replenishment becomes operationally insufficient** · Dependency: none
+  technical (business process trigger) · Reuses: the receipt foundation pattern (`commit_receipt` family) for GRN
+  restock, a NEW source_type if built · Non-goals: **do not build procurement/ERP merely because a ledger now
+  exists**; no PO engine before real supplier volume.
+- **Inventory movement analytics** — trends/velocity derived from `inventory_movements`.
+  · Priority **P3** · Trigger: enough sales history to be meaningful · Dependency: sales history · Reuses:
+  `inventory_movements` (derive only) · Non-goals: no second inventory truth; analytics is a projection.
+
+### D. Scale-triggered architecture — NOT normal Phase 2 (build only when the trigger is real)
+
+- **Multi-shipment / multi-box** — one order → multiple parcels.
+  · Priority **P3 (scale)** · **Trigger: an order genuinely needs >1 shipment** · Dependency: introduce
+  `shipment_items` (or equivalent) shipment-level allocation FIRST · Reuses: `commit_receipt` · **Non-goal /
+  required migration:** RTO expected-quantity must then derive from the **shipment allocation, not all
+  `order_items`**; today `shipments.order_id` is `UNIQUE` and the RTO expected authority depends on it (guarded
+  by `rtoReceiving.integration.test.ts` req1). Dropping that 1:1 without shipment-level allocation is forbidden.
+- **Multi-location inventory** — independently stocked warehouses/3PLs.
+  · Priority **P3 (scale)** · **Trigger: Samorah actually operates >1 independently stocked location** ·
+  Dependency: location model · Reuses: ledger pattern extended per-location · **Non-goal: do not change the
+  current variant-level single-stock authority until real multi-location operation exists.**
+- **Batch / lot tracking** — per-batch identity/expiry/QC.
+  · Priority **P3 (scale)** · Trigger: production/QC/traceability/regulatory requirement · Dependency:
+  batch model · Reuses: ledger movements tagged by batch · Non-goal: not added speculatively.
+- **WMS** — bin locations, putaway, pick waves, transfers, scanning.
+  · Priority **P3 (scale)** · Trigger: warehouse operational scale demands it · Dependency: multi-location/volume
+  · Reuses: ledger as system-of-record · **Non-goal: explicitly out of scope until scale requires it; the
+  receiving UI is NOT a WMS.**
+
+### E. Cross-module dependencies — NOT owned by Inventory
+
+Inventory provides stock **primitives/data**; it must **not** become the policy authority for these:
+
+- **Prepaid-RTO refund automation** → **Orders/Refunds** (reuses the canonical refund service; decoupled from
+  receiving — proven by 1B-2 req4/V1). · Priority P3 · Trigger: refund-policy decision.
+- **Replacement/exchange OUTBOUND stock workflow** → **Returns/Orders/Fulfillment** (a real replacement
+  order/shipment that debits stock via the ledger `sale` path). · Priority **P2** · Trigger: stop silent stock
+  leakage on `replacement_shipped` · Dependency: outbound order creation · Reuses: canonical `sale` path ·
+  Non-goal: not solved inside the Returns receiving service.
+- **Payment/refund policy** → **Payments/Refunds**. · Non-goal: Inventory never decides money.
+- **Demand forecasting / reorder recommendations** → **future analytics** after sufficient real sales history.
+  · Priority P3 · Trigger: enough sales history · Dependency: sales data · Non-goal: no forecasting before data.
+
+### F. Engineering / test hygiene
+
+- **Sequential integration-test execution (shared local DB).** The inventory integration suites
+  (`inventoryLedger` · `paymentReservationHardening` · `inboundReceipts` · `returnReceiving` · `rtoReceiving`)
+  share ONE local Postgres and use broad `afterAll` cleanups; under Vitest's default parallel file workers those
+  cleanups can race across files (a broad `DELETE … WHERE status='rto'` in one suite can delete another suite's
+  in-flight rows). **They must be run sequentially — `vitest run --no-file-parallelism`** — or one file at a time.
+  **Current state (verified this pass): NOT encoded** — `package.json` `test` is plain `vitest run`,
+  `vitest.config.ts` sets no pool/parallelism options, and there is no CI workflow. The suites are env-gated
+  (`INV_TEST_*`), so plain `npm test` skips them and never flakes; the race only appears when a developer runs
+  several integration files together with the env set.
+  · Priority **P2 (engineering hygiene)** · Trigger: before these suites run in any automated/CI pipeline, or
+  when a dev hits the flake · Dependency: none · Reuses: existing suites · **Non-goal (this pass): do not
+  redesign the tests now.** Future fix options: a dedicated `test:integration` script pinning
+  `--no-file-parallelism`, a project in `vitest.config.ts` scoping `*.integration.test.ts` to a single
+  fork/thread, or per-suite tag-scoped cleanup — pick one so determinism doesn't rely on developer memory.
+
+### G. Launch deployment — a launch-readiness task, NOT Phase 2 product work
+
+**The frozen local migrations `20260816120000 … 20260821120000` have NOT yet been applied to the hosted
+production database** (all Inventory work to date is local-only; hosted was never mutated). Their **controlled
+production deployment, migration verification, post-deployment inventory reconciliation, and smoke testing** are
+**launch/deployment tasks** — they are **not** deferred product functionality and must not be listed as Phase 2
+enhancements. (Note also the standing GA4/WIF post-deploy wiring reminder is a separate launch task.) This
+roadmap section is about *future features*; shipping the already-built, already-frozen ledger to production is
+part of *launching what exists*.
+
+### H. Classification key
+
+Every item above carries: **Priority** (P1 launch-critical / P2 near-term post-launch / P3 later or
+scale-gated) · **Trigger** (the real condition that should cause it to be built) · **Dependency** · **Canonical
+authority it must reuse** · **Explicit non-goals**. No item is dated. **P1 items: none remain in Inventory
+product scope** — Phase 1B closed the launch-critical inventory work; the only launch-blocking Inventory item is
+the deployment task in (G), which is launch-readiness, not a feature. Deviating from a listed canonical authority
+or non-goal requires a new, explicitly-approved architecture decision — not an incremental change.
