@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireCapability } from "@/lib/auth/requireStaff";
 import { getOrderByNumber } from "@/services/orderService";
-import { issueRefund } from "@/services/refundService";
+import { issueRefund, findRecoverableLatePaymentRefund } from "@/services/refundService";
 
 /**
  * POST /api/admin/orders/refund — a standalone refund (SLP principle 8), separate
@@ -33,9 +33,25 @@ export async function POST(request: Request) {
     total_amount: number;
     refund_amount: number | null;
     razorpay_payment_id: string | null;
+    razorpay_order_id: string | null;
   };
 
   if (o.payment_status === "pending" || o.payment_status === "failed") {
+    // Late-payment recovery (1B-0a): a capture that landed AFTER cancellation is refundable ONLY through
+    // its specific failed late-payment compensation obligation — never merely because the order is 'failed'.
+    // Same route, same order.refund RBAC, same canonical issueRefund; the obligation's original amount +
+    // payment id are preserved (not recomputed). Ordinary failed/cancelled-unpaid orders (no such
+    // obligation) still get the 409.
+    const recoverable = await findRecoverableLatePaymentRefund(o.id, o.razorpay_order_id);
+    if (recoverable) {
+      const retry = await issueRefund({
+        orderId: o.id, amount: recoverable.amount, paymentId: recoverable.paymentId, latePayment: true,
+        refundType: "late_payment_auto", reason: body.reason ?? "Retry late-payment auto-refund",
+        internalNote: body.internalNote, actorId: staff.userId ?? undefined,
+      });
+      if (!retry.ok) return NextResponse.json({ error: retry.reason ?? "Refund failed." }, { status: 422 });
+      return NextResponse.json(retry);
+    }
     return NextResponse.json({ error: "Order has no captured payment to refund." }, { status: 409 });
   }
 

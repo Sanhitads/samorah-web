@@ -19,6 +19,7 @@ import { signOrderToken } from "@/lib/orderToken";
 import { logEvent } from "@/services/auditService";
 import { consumeCoupon, releaseCoupon } from "@/services/couponRedemptionService";
 import { notifyLowStockForVariants } from "@/services/inventoryService";
+import { issueRefund } from "@/services/refundService";
 import { trackServerPurchase } from "@/lib/analytics/server";
 import type { RepriceResult } from "@/lib/repricing";
 import { notifyOps } from "@/lib/notifications/opsEngine";
@@ -62,9 +63,10 @@ export async function releaseExpiredReservations(): Promise<number> {
   return callRpc<number>("release_expired_reservations", {});
 }
 
-/** Cron: cancel unpaid pending orders older than `minutes` + free their holds. */
-export async function expireStalePendingOrders(minutes = 30): Promise<number> {
-  return callRpc<number>("expire_stale_pending_orders", { p_minutes: minutes });
+/** Cron: cancel unpaid pending orders past the canonical payable window + free their holds.
+ *  Pass no argument so the DB uses payable_window_minutes() — the single source of truth (1B-0a). */
+export async function expireStalePendingOrders(minutes?: number): Promise<number> {
+  return callRpc<number>("expire_stale_pending_orders", { p_minutes: minutes ?? null });
 }
 
 /** Queue post-commit side-effects. Idempotent — safe to call from verify + webhook. */
@@ -313,6 +315,8 @@ export async function persistOrder(input: {
     found: boolean;
     created?: boolean;
     amount_mismatch?: boolean;
+    terminal?: boolean;
+    status?: string;
     order_id?: string;
     order_number?: string;
     invoice_number?: string | null;
@@ -335,6 +339,35 @@ export async function persistOrder(input: {
       errorDescription: "amount mismatch",
     });
     return { found: true, created: false, mismatch: true, reason: "amount mismatch", orderNumber: data.order_number };
+  }
+
+  // Late capture on a TERMINAL (cancelled) order — the finalize guard refused to resurrect it (no invoice,
+  // no stock, no fulfilment). Deterministic compensation: record the real capture, initiate an auto-refund
+  // through the canonical refund service (idempotent per payment id), and audit it. A gateway-refund failure
+  // persists as a `refunds` row status='failed' + refund.failed alert → actionable in the Command Center /
+  // order refunds retry (never log-only). We do NOT finalize, invoice, decrement stock or enqueue fulfilment.
+  if (data.terminal) {
+    const capturedRupees = check.amountPaise != null ? Number(toRupees(check.amountPaise).toFixed(2)) : undefined;
+    await recordPaymentAttempt({
+      razorpayOrderId: input.razorpayOrderId, paymentId: input.paymentId, status: "paid",
+      amount: capturedRupees, currency: COMMERCE.currency, source: input.source,
+    });
+    let refundOk = false, refundStatus: string | null = null, refundReason: string | null = null;
+    if (data.order_id && capturedRupees) {
+      const refund = await issueRefund({
+        orderId: data.order_id, amount: capturedRupees, paymentId: input.paymentId, latePayment: true,
+        refundType: "late_payment_auto", reason: "Payment captured after order was cancelled — auto-refund",
+      });
+      refundOk = refund.ok; refundStatus = refund.status ?? null; refundReason = refund.reason ?? null;
+    }
+    await logEvent({
+      // Truthful terminology: the gateway refund is INITIATED here (async), not confirmed settled.
+      orderId: data.order_id, entityType: "order", entityId: data.order_id, event: "order.late_payment_refund_initiated",
+      actorType: input.source === "webhook" ? "webhook" : "system",
+      notes: `Late capture on ${data.status ?? "terminal"} order — ${refundOk ? `auto-refund ${refundStatus}` : "auto-refund FAILED, recover via order refunds"}`,
+      metadata: { paymentId: input.paymentId, capturedRupees, refundOk, refundStatus, refundReason, status: data.status ?? null },
+    });
+    return { found: true, created: false, orderId: data.order_id, orderNumber: data.order_number, source: input.source };
   }
 
   if (data.found) {

@@ -201,3 +201,27 @@ no-op). Harden later: per-provider signature verification (a real Shiprocket ada
 provider event id for true webhook dedup. **RTO stock must remain inspection-driven and is NEVER
 webhook-restocked**, so this hardening does not gate RTO inventory correctness — it is provider-integrity
 polish.
+
+### Late-payment (post-cancellation) — observability + state-semantics review
+**Status: post-launch — optional. The 1B-0a compensation is correct and tested without these.**
+
+Phase 1B-0a makes a capture landing after order cancellation refuse resurrection (finalize terminal guard)
+and auto-refund the captured amount via the canonical refund service. Deferred refinements:
+- **Observability:** an optional dedicated operational event / dashboard metric for SUCCESSFULLY
+  auto-compensated late payments (today: audit `order.late_payment_refund_initiated` + the refund
+  service's own `refund.initiated`/`refund.failed`; the failed case is the loud, actionable one).
+- **Payment-state semantics:** a captured-then-refunded-after-cancellation order is recorded as
+  `payment_status='failed'` (never legitimately paid in our system), with the money truth in the
+  `refunds` + `payment_attempts` ledgers. If future payment flows grow more complex, review whether
+  order-level `payment_status` should distinguish this from an ordinary failed payment. Do NOT add a
+  status now — no consumer defect requires it. **Known cosmetic classification (deferred, not 1B-0a):**
+  such an order is counted as a *failed payment* in reporting (e.g. `customerAdminService` failed-payment
+  tally) even though it was captured-then-refunded — a future payment-lifecycle/reporting refinement.
+- **Payment-attempt dedup semantics:** `payment_attempts.razorpay_payment_id` is UNIQUE with
+  `on conflict do nothing`, so a gateway/webhook retry of the same capture yields ONE canonical record
+  (verified). Documented as intended behaviour (unique capture, not append-only event history).
+
+### Phase 1B-0b — inbound receipt concurrency (build-time requirement, not deferred)
+When 1B-0b lands the header+items inbound-receipt model, the restock-commit MUST enforce, under the
+variant/receipt lock, that Σ received_qty across all receipt-items for a (source, variant) can never
+exceed expected_qty — a **simultaneous-partial-receipts** test is required. Recorded here so it is not lost.

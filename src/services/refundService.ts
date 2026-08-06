@@ -30,6 +30,7 @@ export interface IssueRefundInput {
   refundType?: string; // full | partial | shipping (for analytics)
   actorId?: string;
   paymentId?: string | null; // razorpay_payment_id; null → manual refund
+  latePayment?: boolean; // compensating a real gateway capture on an order we already cancelled (1B-0a)
 }
 
 export interface IssueRefundResult {
@@ -38,6 +39,30 @@ export interface IssueRefundResult {
   status?: "processing" | "processed" | "failed";
   method?: "gateway" | "manual";
   reason?: string; // failure reason when ok=false
+}
+
+/**
+ * Recover a FAILED late-payment compensation obligation for an order our system marked failed/cancelled.
+ * Anchored on the obligation itself (the refunds ledger is refund-truth): a `failed` refund carrying a
+ * `razorpay_payment_id` on a non-paid order can ONLY exist via late_payment mode (begin_refund's not_paid
+ * guard blocks every normal refund on a non-paid order), so it IS a late-payment obligation. We additionally
+ * cross-check that payment id against the canonical captured `payment_attempts` record for the SAME order
+ * (matched by razorpay_order_id). Returns the obligation's ORIGINAL amount + original payment id — never
+ * recomputed, never an arbitrary captured payment. null if there is no verified recoverable obligation.
+ */
+export async function findRecoverableLatePaymentRefund(orderId: string, razorpayOrderId: string | null): Promise<{ amount: number; paymentId: string } | null> {
+  if (!razorpayOrderId) return null;
+  const db = createAdminClient() as unknown as { from: (t: string) => any }; // eslint-disable-line @typescript-eslint/no-explicit-any
+  const { data: obligations } = await db.from("refunds")
+    .select("amount, razorpay_payment_id, status, created_at")
+    .eq("order_id", orderId).eq("status", "failed").not("razorpay_payment_id", "is", null)
+    .order("created_at", { ascending: false }).limit(1);
+  const ob = (obligations ?? [])[0]; // eslint-disable-line @typescript-eslint/no-explicit-any
+  if (!ob?.razorpay_payment_id) return null;
+  const { data: caps } = await db.from("payment_attempts")
+    .select("id").eq("razorpay_order_id", razorpayOrderId).eq("razorpay_payment_id", ob.razorpay_payment_id).eq("status", "paid").limit(1);
+  if (!((caps ?? []).length)) return null; // no verified capture for this payment on this order
+  return { amount: Number(ob.amount), paymentId: ob.razorpay_payment_id as string };
 }
 
 export async function issueRefund(input: IssueRefundInput): Promise<IssueRefundResult> {
@@ -57,6 +82,7 @@ export async function issueRefund(input: IssueRefundInput): Promise<IssueRefundR
         actor_id: input.actorId ?? null,
         payment_id: input.paymentId ?? null,
         method,
+        late_payment: input.latePayment ?? false,
       },
     },
   );

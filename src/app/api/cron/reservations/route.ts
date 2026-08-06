@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   }
   try {
     const releasedHolds = await releaseExpiredReservations();
-    const expiredOrders = await expireStalePendingOrders(30);
+    const expiredOrders = await expireStalePendingOrders(); // canonical payable window (payable_window_minutes)
     return NextResponse.json({ releasedHolds, expiredOrders });
   } catch (e) {
     console.error("reservations cron failed", e);
