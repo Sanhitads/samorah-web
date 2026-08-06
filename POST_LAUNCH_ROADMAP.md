@@ -178,3 +178,26 @@ as the table owner and so bypass the grant. Enforced in
 product/admin saves of that column will be refused. **`variants.stock` must remain excluded from direct
 `UPDATE` permanently** — it may change only through the inventory-ledger functions. This is a developer
 migration rule, not a feature.
+
+### Replacement / exchange — outbound inventory orchestration (Phase 2)
+**Status: real remaining inventory workflow gap — deferred from Phase 1B (decision D6).**
+
+A return with `return_type`/`resolution` of `replacement`/`exchange` reships goods but currently creates
+**no outbound inventory consequence**: `advanceReturn`'s `replacement_shipped` transition performs no
+order/shipment/stock decrement (`returnService.ts`). The replacement units are never debited from
+`variants.stock`. Phase 1B (returns/RTO **inbound** physical disposition) deliberately does NOT build
+this — it is an outbound order-creation concern, not inbound disposition. **Phase 2 must add canonical
+outbound inventory for replacements/exchanges** (a real replacement order/shipment that decrements stock
+through the ledger `sale`/canonical path), so a replacement is not silent stock leakage.
+
+### Shipping webhook authenticity + provider-event-id dedup (hardening)
+**Status: hardening — do NOT expand Phase 1B into rebuilding the shipping integration.**
+
+`/api/webhooks/shipping/[provider]` authenticates with a single shared secret
+(`SHIPPING_WEBHOOK_SECRET`), with **no per-provider HMAC/signature verification** and **no
+provider-event-id dedup** (no stored event id / raw payload). Idempotency today rests only on the
+shipment state-machine transition guard (a repeated terminal event is a benign illegal-transition
+no-op). Harden later: per-provider signature verification (a real Shiprocket adapter) + a stored
+provider event id for true webhook dedup. **RTO stock must remain inspection-driven and is NEVER
+webhook-restocked**, so this hardening does not gate RTO inventory correctness — it is provider-integrity
+polish.
