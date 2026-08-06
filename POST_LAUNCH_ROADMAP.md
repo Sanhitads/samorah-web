@@ -243,3 +243,38 @@ the **Returns** workflow onto it, these are non-negotiable:
   `fulfillment.operate`), **never `inventory.adjust`**. Restock movements remain system/domain movements.
 - **R5 — No new stock engine.** 1B-1 only creates/manages receipts + calls the frozen `commit_receipt`;
   no direct `variants.stock` write, no separate Return inventory-mutation implementation.
+
+### Phase 1B-1 — Returns receiving CLOSED & FROZEN (commit `c581afc`, migration `20260820120000`)
+Delivered: `requiresPhysicalReturn` authority, receipt-driven restock, atomic removal of the
+`restock_return_items` caller (function left callerless), return-row-lock commit-vs-close serialization,
+DB closure triggers (`source_type='return'` only), open-draft protection, per-variant derived missing,
+legacy-restock guard, `returns.operate` RBAC. **Do not rewrite `20260820120000`; corrections are later
+additive migrations only.** The following remain **independent, still-open inventory items** (each is a
+separate future decision, none gates any release):
+
+1. **Replacement/exchange OUTBOUND inventory decrement authority** — unchanged and still open (see
+   "Replacement / exchange — outbound inventory orchestration" above). 1B-1 covered inbound only; a
+   `replacement_shipped` transition still performs no stock decrement. A future canonical outbound
+   order/shipment must debit `variants.stock` through the ledger `sale` path.
+2. **Inventory valuation / COGS** — deferred until a canonical **cost authority** exists. No unit COGS,
+   reverse-logistics cost, or cost/loss analytics is tracked (the Return finance card says so). Do not
+   infer valuation from price; build only atop a real cost source.
+3. **Returns receiving recovery model — intentional VOID-AND-RESUBMIT (accepted, do not change).**
+   `receiveReturnGoods` is atomic create+commit: a commit that fails authoritatively (over-receipt,
+   concurrent outstanding change, closed boundary) **voids** the just-created receipt — zero movement, no
+   stranded draft — and the operator corrects the **retained form values** and submits a **fresh** receipt.
+   This is the canonical recovery semantics; **do not convert it to persistent editable failed drafts.**
+4. **Missing / shortage stays DERIVED per variant** — `final_missing = canonical_expected − cumulative
+   committed received`, computed per variant at/after closure from immutable receipt history. Only
+   `receiving_closed_at`/`receiving_closed_by` are persisted. **No scalar `receiving_shortage`/`missing_qty`
+   column** is to be introduced for convenience; a structured per-variant breakdown lives in the
+   `return.receiving_closed` audit event.
+5. **No WMS / no new stock engine** — `commit_receipt` remains the shared receiving authority and
+   `apply_stock_movement` the sole mutation choke point. No warehouse-management system and no parallel
+   stock engine unless a future operational requirement explicitly justifies (and re-approves) one.
+
+### Phase 1B-2 — RTO receiving (analysis-approved; not yet built)
+RTO physical receiving reuses the SAME frozen foundation: `inventory_receipts(source_type='rto',
+source_id=shipments.id)` → `commit_receipt` → `apply_stock_movement` (`rto_restock`, key
+`rto_receipt_item:<id>`). No RTO-specific stock engine. Return closure triggers/columns are scoped to
+`source_type='return'` and must not be repurposed; any RTO closure boundary is a separate additive design.

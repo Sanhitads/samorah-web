@@ -214,7 +214,13 @@ export interface ReceiveResult {
 /**
  * Record and commit ONE physical receipt for a return. Gated on canonical physical-return semantics —
  * NOT on workflow history. Creates a draft receipt + items (snapshotting identity), then commits via the
- * authoritative wrapper. A failed commit voids the just-created draft so no stranded draft is left behind.
+ * authoritative wrapper.
+ *
+ * RECOVERY MODEL — intentional VOID-AND-RESUBMIT (accepted design, do NOT change to persistent editable
+ * failed drafts): this is atomic create+commit. A commit that fails authoritatively (over-receipt,
+ * concurrent outstanding change, closed boundary) VOIDS the just-created receipt — zero stock movement,
+ * no stranded draft (so it can never block close's open_receipts rule). The operator corrects the retained
+ * form values in the UI and submits a FRESH receipt; the voided attempt is filtered from receipt history.
  */
 export async function receiveReturnGoods(
   returnId: string,
