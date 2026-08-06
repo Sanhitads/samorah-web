@@ -139,3 +139,42 @@ and deep-links to the stored order/return, and documents that retry is owned by 
 If a first-class link is ever wanted, the correct fix is a **stored** reference: add a nullable
 `fulfillment_job_id` (or a shared correlation id) written at dispatch time on the send path. That is a
 send-path + schema change — deferred, and must not weaken the transactional fallback.
+
+## Inventory
+
+Inventory **Phase 0 (canonical ledger + reservation-safe adjustment) and Phase 1A (operations UI +
+authority switch) are closed**. The items below are deferred and must **not** reopen Phase 0/1A
+invariants (single stock authority, append-only ledger, lifecycle-protected adjustment floor).
+
+### Idempotent adjustment replay — echo the canonical persisted result
+**Status: non-blocking · post-launch P3 · technical-correctness polish. NOT a stock-integrity blocker.**
+
+Current safety: a concurrent/retried `adjust_inventory` call with the **same** idempotency key mutates
+`variants.stock` **exactly once** and writes **exactly one** `inventory_movements` row (variant row-lock
++ unique partial index on `idempotency_key`). Proven by the concurrent same-key local-DB integration test
+(final On Hand correct, one movement).
+
+Known cosmetic limitation: the *second* concurrent duplicate operation returns its **pre-empted target**
+(the `on_hand` it computed from its own pre-lock read) rather than the already-persisted canonical result
+for that key. The **database state is correct and single-applied**; the admin UI refresh resolves to
+canonical stock. This is a response-shape nuance, not a correctness or stock-integrity issue.
+
+Future enhancement: on an idempotency-key hit, re-read and return the **already-persisted** movement/result
+for that key so a duplicate replay echoes canonical state. **Do NOT modify the Phase-0
+`adjust_inventory`/`apply_stock_movement` RPCs solely for this** until it is explicitly scheduled.
+
+### `variants` column-privilege migration rule (permanent developer rule)
+**Status: standing architectural rule — applies to EVERY future migration touching `public.variants`.**
+
+Phase 1A intentionally revoked direct `UPDATE(stock)` on `public.variants` from the API/service role: the
+table-level `UPDATE` was dropped and re-granted per-column for every column **except `stock`**. Physical
+On Hand therefore mutates **only** through the canonical ledger functions (`apply_stock_movement`, called
+by `adjust_inventory`/`finalize_order`/`cancel_order`/`restock_return_items`), which run `SECURITY DEFINER`
+as the table owner and so bypass the grant. Enforced in
+`supabase/migrations/20260817120000_inventory_authority.sql`.
+
+**Rule:** any future migration that ADDS an editable column to `public.variants` MUST issue an explicit
+`GRANT UPDATE(<col>) ON public.variants TO service_role` (or re-run the dynamic all-but-`stock` grant), or
+product/admin saves of that column will be refused. **`variants.stock` must remain excluded from direct
+`UPDATE` permanently** — it may change only through the inventory-ledger functions. This is a developer
+migration rule, not a feature.
