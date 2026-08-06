@@ -47,6 +47,32 @@ export function resolutionWaivesReturn(resolution: string | null | undefined): b
   return !!resolution && resolution !== "return_required";
 }
 
+/**
+ * Canonical physical-return authority for the receiving subsystem. The ONLY resolution that requires
+ * goods to physically come back is `return_required` — every other outcome (waive / refund-only /
+ * partial-refund / replacement / exchange / reject) either keeps the product with the customer or
+ * sends goods OUT, never inbound (corroborated by computeReturnFinance's sendsGoods/owesRefund).
+ * The refund_processing guard and the receiving gate consume THIS, never workflow (`from`) history.
+ * `null`/unset is treated as "no physical return required" (non-blocking) — goods are expected back
+ * only when an operator EXPLICITLY sets `return_required`.
+ */
+export function requiresPhysicalReturn(resolution: string | null | undefined): boolean {
+  return resolution === "return_required";
+}
+
+/**
+ * Surfaces an inconsistent state instead of masking it: a Return whose resolution does NOT require a
+ * physical return, yet which has entered a physical receiving state (received/inspection). We never
+ * silently reinterpret such a Return as a physical-return workflow — callers report/reject it.
+ */
+export function isReceivingInconsistent(
+  resolution: string | null | undefined,
+  status: string | null | undefined,
+): boolean {
+  const physicalState = status === "received" || status === "inspection";
+  return physicalState && resolution != null && !requiresPhysicalReturn(resolution);
+}
+
 export function labelOf(list: Opt[], value: string | null | undefined): string {
   if (!value) return "—";
   return list.find((x) => x.value === value)?.label ?? value;

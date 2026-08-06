@@ -8,9 +8,10 @@ import { ReturnActions } from "@/components/admin/ReturnActions";
 import { NewReturn } from "@/components/admin/NewReturn";
 
 /**
- * Returns — `/admin/returns`. The integrative module: RMA lifecycle that restocks
- * inventory and issues refunds as it settles (SLP review point 9). Operational
- * transitions need returns.operate; approve/reject/refund need returns.approve.
+ * Returns — `/admin/returns`. The integrative module: RMA lifecycle that issues refunds
+ * as it settles and restores inventory through receipt-driven receiving & inspection
+ * (SLP review point 9; Phase 1B-1). Operational transitions + receiving need
+ * returns.operate; approve/reject/refund need returns.approve.
  */
 export const metadata: Metadata = { title: "Returns", robots: { index: false } };
 export const dynamic = "force-dynamic";

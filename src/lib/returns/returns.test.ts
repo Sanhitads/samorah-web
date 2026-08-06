@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { canTransitionReturn, assertReturnTransition, isTerminalReturn } from "@/lib/returns/state";
 import { canTransitionException, assertExceptionTransition, isTerminalException, isValidExceptionType } from "@/lib/exceptions/state";
+import { requiresPhysicalReturn, isReceivingInconsistent, resolutionWaivesReturn, RESOLUTIONS } from "@/lib/returns/resolution";
 
 describe("returns state machine (§8 — Resolution Center)", () => {
   it("walks the physical-return path requested → … → refunded → closed", () => {
@@ -30,6 +31,56 @@ describe("returns state machine (§8 — Resolution Center)", () => {
     expect(() => assertReturnTransition("requested", "closed")).toThrow(/Illegal return transition/);
     expect(isTerminalReturn("closed")).toBe(true);
     expect(isTerminalReturn("rejected")).toBe(true);
+  });
+});
+
+describe("resolution → physical-return authority (Phase 1B-1)", () => {
+  // The COMPLETE mapping, pinned. Only return_required needs goods back; the rest keep the product
+  // with the customer or send goods OUT. Derived from resolutionWaivesReturn + computeReturnFinance.
+  const MAP: Record<string, boolean> = {
+    return_required: true,
+    return_waived: false,
+    refund_only: false,
+    replacement_only: false,
+    exchange: false,
+    partial_refund: false,
+    reject_claim: false,
+  };
+
+  it("every supported resolution has a pinned YES/NO (case 27)", () => {
+    // guard against silent drift: the catalog and the map must stay in lockstep
+    expect(new Set(RESOLUTIONS.map((r) => r.value))).toEqual(new Set(Object.keys(MAP)));
+    for (const [resolution, expected] of Object.entries(MAP)) {
+      expect(requiresPhysicalReturn(resolution)).toBe(expected);
+    }
+  });
+
+  it("only return_required requires a physical return", () => {
+    expect(requiresPhysicalReturn("return_required")).toBe(true);
+    expect(requiresPhysicalReturn("return_waived")).toBe(false);
+    expect(requiresPhysicalReturn("refund_only")).toBe(false);
+  });
+
+  it("null/unset resolution is non-blocking (goods expected back only on explicit return_required)", () => {
+    expect(requiresPhysicalReturn(null)).toBe(false);
+    expect(requiresPhysicalReturn(undefined)).toBe(false);
+  });
+
+  it("is the exact positive complement of resolutionWaivesReturn for every enumerated value", () => {
+    for (const { value } of RESOLUTIONS) {
+      expect(requiresPhysicalReturn(value)).toBe(!resolutionWaivesReturn(value));
+    }
+  });
+
+  it("flags an inconsistent lifecycle: no-return resolution in a physical receiving state (case 28)", () => {
+    expect(isReceivingInconsistent("return_waived", "received")).toBe(true);
+    expect(isReceivingInconsistent("refund_only", "inspection")).toBe(true);
+    // consistent: return_required in a physical state is expected, not flagged
+    expect(isReceivingInconsistent("return_required", "received")).toBe(false);
+    // consistent: no-return resolution in a non-physical state
+    expect(isReceivingInconsistent("return_waived", "approved")).toBe(false);
+    // unset resolution is undetermined, not an inconsistency to report
+    expect(isReceivingInconsistent(null, "received")).toBe(false);
   });
 });
 

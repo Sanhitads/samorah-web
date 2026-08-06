@@ -4,10 +4,12 @@ import { redirect, notFound } from "next/navigation";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { hasCapability } from "@/lib/auth/capabilities";
 import { getReturnDetail } from "@/services/returnService";
+import { getReturnReceiving } from "@/services/returnReceivingService";
 import { getReturnTimeline } from "@/services/auditService";
 import { Timeline } from "@/components/admin/Timeline";
 import { ReturnActions } from "@/components/admin/ReturnActions";
 import { ReturnManage } from "@/components/admin/ReturnManage";
+import { ReturnReceiving } from "@/components/admin/ReturnReceiving";
 import { ReturnEvidence } from "@/components/admin/ReturnEvidence";
 import { RetryRefundButton } from "@/components/admin/RetryRefundButton";
 import { nextReturnStates, isResolutionLocked, type ReturnStatus } from "@/lib/returns/state";
@@ -55,6 +57,7 @@ export default async function ReturnDetailPage({ params }: { params: Promise<{ i
   const detail = await getReturnDetail(id);
   if (!detail) notFound();
   const { ret, items, attachments, finance } = detail;
+  const receiving = await getReturnReceiving(id);
   const timeline = await getReturnTimeline(id);
   const canOperate = hasCapability(staff.role, "returns.operate");
   const canApprove = hasCapability(staff.role, "returns.approve");
@@ -160,6 +163,17 @@ export default async function ReturnDetailPage({ params }: { params: Promise<{ i
           </table>
         </div>
       </details>
+
+      {/* Receiving & Inspection — receipt-driven physical intake (Phase 1B-1) */}
+      {receiving ? (
+        <details className="od-group" open={receiving.requiresPhysicalReturn || receiving.inconsistent || receiving.legacyRestocked}>
+          <summary className="od-group__sum">
+            Receiving &amp; Inspection
+            {receiving.closed ? <span className="count-badge">closed</span> : receiving.canReceive ? <span className="count-badge">open</span> : null}
+          </summary>
+          <ReturnReceiving model={receiving} canOperate={canOperate} />
+        </details>
+      ) : null}
 
       {/* Inspection + warehouse */}
       <details className="od-group" open={hasInspOrWh}>

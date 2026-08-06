@@ -2,16 +2,17 @@
 /**
  * Returns service (review point 9) — the integrative module. A return moves through
  * its own state machine and, at the right transitions, reaches into the other
- * modules: it RESTOCKS inventory and issues a REFUND when it settles, writes to the
+ * modules: it issues a REFUND when it settles, restores inventory via receipt-driven
+ * RECEIVING (returnReceivingService, Phase 1B-1 — never inline here), writes to the
  * immutable AUDIT stream throughout, and (later) notifies the customer + schedules a
  * reverse SHIPMENT. Forward and reverse logistics stay separate state machines.
  */
 import { createAdminClient } from "@/lib/supabase/admin";
-import { callRpc } from "@/lib/supabase/rpc";
 import { getOrderByNumber } from "@/services/orderService";
 import { issueRefund, getOrderRefunds } from "@/services/refundService";
 import { logEvent } from "@/services/auditService";
 import { assertReturnTransition, isResolutionLocked, isTerminalReturn, nextReturnStates, type ReturnStatus, type ReturnReason } from "@/lib/returns/state";
+import { requiresPhysicalReturn } from "@/lib/returns/resolution";
 import type { NotificationEvent } from "@/lib/notifications/types";
 
 function loose() {
@@ -132,9 +133,11 @@ export async function createReturn(input: CreateReturnInput): Promise<{ ok: bool
 }
 
 /**
- * Advance a return through its state machine. On entry to `refund` it settles the
- * money side (issue refund for the RMA amount) and the inventory side (restock the
- * flagged lines) — exactly once, guarded by the existing refund_id.
+ * Advance a return through its state machine. On entry to `refund_processing` it settles the MONEY
+ * side (issue the refund for the RMA amount, once, guarded by the existing refund_id). Inventory is NO
+ * LONGER touched here (Phase 1B-1): physical stock is restored only through receipt-driven receiving
+ * (returnReceivingService → commit_receipt). A resolution that requires goods back must finish receiving
+ * (receiving closed) before this transition is allowed.
  */
 export async function advanceReturn(
   returnId: string,
@@ -144,7 +147,7 @@ export async function advanceReturn(
   const db = loose();
   const { data: ret } = await db
     .from("returns")
-    .select("id,order_id,status,reason,return_type,refund_amount,refund_id,rma_number")
+    .select("id,order_id,status,reason,return_type,refund_amount,refund_id,rma_number,resolution,receiving_closed_at")
     .eq("id", returnId)
     .maybeSingle();
   if (!ret) return { ok: false, reason: "return_not_found" };
@@ -152,14 +155,18 @@ export async function advanceReturn(
   const from = ret.status as ReturnStatus;
   assertReturnTransition(from, to);
 
+  // Phase 1B-1 authority cutover: physical restock is NO LONGER done here — it happens only through
+  // receipt-driven commit_receipt (returnReceivingService). A resolution that REQUIRES goods back must
+  // finish receiving (receiving_closed_at set) before money can settle. The decision comes purely from
+  // resolution semantics (requiresPhysicalReturn), never from workflow `from`-state.
+  if (to === "refund_processing" && requiresPhysicalReturn(ret.resolution) && ret.receiving_closed_at == null) {
+    return { ok: false, reason: "receiving_open" };
+  }
+
   let refundId: string | null = ret.refund_id ?? null;
-  let restocked = 0;
 
   if (to === "refund_processing") {
-    // Restock the sellable lines (inventory tie), once.
-    restocked = await callRpc<number>("restock_return_items", { p_return_id: returnId });
-
-    // Issue the refund (payments tie) for refund/exchange types, once.
+    // Issue the refund (payments tie) for refund/exchange types, once. (Inventory is NOT touched here.)
     if (!refundId && ret.return_type !== "replacement" && Number(ret.refund_amount ?? 0) > 0) {
       const { data: order } = await db.from("orders").select("razorpay_payment_id").eq("id", ret.order_id).maybeSingle();
       const r = await issueRefund({
@@ -189,7 +196,7 @@ export async function advanceReturn(
     previousState: from,
     newState: to,
     notes: ret.rma_number,
-    metadata: to === "refund_processing" ? { restocked, refundId } : undefined,
+    metadata: to === "refund_processing" ? { refundId } : undefined,
   });
 
   // Notify the customer on the meaningful transitions (fan-out via the engine).

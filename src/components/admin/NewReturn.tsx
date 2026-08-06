@@ -52,7 +52,7 @@ export function NewReturn() {
     <div className="om-modal" role="dialog" aria-modal="true" onClick={() => !busy && setOpen(false)}>
       <div className="om-modal__card" onClick={(e) => e.stopPropagation()}>
         <h2 className="om-modal__title">Open a return</h2>
-        <p className="om-modal__note">Creates a full return (RMA) for the order. Refund + restock happen when it settles.</p>
+        <p className="om-modal__note">Creates a full return (RMA) for the order. The refund settles at resolution; stock is restored only when goods are physically received &amp; inspected.</p>
         <label className="om-field"><span>Order number</span>
           <input value={orderNumber} onChange={(e) => setOrderNumber(e.target.value)} placeholder="SAM-2026-000007" />
         </label>
