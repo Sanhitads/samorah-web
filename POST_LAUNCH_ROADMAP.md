@@ -225,3 +225,21 @@ and auto-refund the captured amount via the canonical refund service. Deferred r
 When 1B-0b lands the header+items inbound-receipt model, the restock-commit MUST enforce, under the
 variant/receipt lock, that Σ received_qty across all receipt-items for a (source, variant) can never
 exceed expected_qty — a **simultaneous-partial-receipts** test is required. Recorded here so it is not lost.
+*(Delivered in `20260819120000_inbound_receipts.sql`.)*
+
+### Phase 1B-1 — Returns stock-authority cutover (MANDATORY requirements; not built in 0b)
+The inbound-receipt foundation (`commit_receipt`, migration `20260819120000`) is frozen. When 1B-1 wires
+the **Returns** workflow onto it, these are non-negotiable:
+- **R1 — Atomic authority switch.** The old `restock_return_items` / automatic Return restock and the new
+  receipt-driven restock must NEVER both be authoritative. Switch atomically in ONE release/change set:
+  old Return auto-restock OFF **and** receipt-driven ON, with regression proving **neither double-restock
+  nor missing-restock**.
+- **R2 — Historical / pre-cutover Returns.** Before cutover, inspect/classify existing Return records for
+  stock already restored; never let a receipt double-restock a historical return. If there are zero
+  applicable production returns, **prove/report** it rather than assume.
+- **R3 — Missing/shortage.** Keep 0b's no-mutable-`missing_qty` design; final shortage is determined only
+  at explicit Return receiving **closure**: `final_missing = canonical_expected − cumulative_received`.
+- **R4 — Domain RBAC.** Return receipt create/edit/commit gated by **`returns.operate`** (RTO:
+  `fulfillment.operate`), **never `inventory.adjust`**. Restock movements remain system/domain movements.
+- **R5 — No new stock engine.** 1B-1 only creates/manages receipts + calls the frozen `commit_receipt`;
+  no direct `variants.stock` write, no separate Return inventory-mutation implementation.
