@@ -18,6 +18,7 @@ import { validateRazorpayPayment } from "@/lib/razorpayApi";
 import { signOrderToken } from "@/lib/orderToken";
 import { logEvent } from "@/services/auditService";
 import { consumeCoupon, releaseCoupon } from "@/services/couponRedemptionService";
+import { notifyLowStockForVariants } from "@/services/inventoryService";
 import { trackServerPurchase } from "@/lib/analytics/server";
 import type { RepriceResult } from "@/lib/repricing";
 import { notifyOps } from "@/lib/notifications/opsEngine";
@@ -360,6 +361,15 @@ export async function persistOrder(input: {
       }
     }
     await enqueueFulfillment(data.order_id);
+    // Low-stock check on the SALE path (§2). On Hand dropped inside finalize_order ('sale' movements);
+    // reuse the canonical ledger-driven, crossing-based helper + existing ops engine. Non-blocking.
+    try {
+      const db = createAdminClient();
+      const { data: lines } = await db.from("order_items").select("variant_id").eq("order_id", data.order_id).not("variant_id", "is", null);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ids = [...new Set(((lines as any[]) ?? []).map((l) => l.variant_id).filter(Boolean))] as string[];
+      if (ids.length) await notifyLowStockForVariants(ids);
+    } catch (e) { console.error("low-stock check (sale) failed (non-fatal)", e); }
     // Coupon: mark the reservation (held since checkout) CONSUMED. Race-safe + idempotent + counted at
     // reserve time — so retries/webhooks never double-count and the limit can't be overrun (points 9/10).
     await consumeCoupon(data.order_id);

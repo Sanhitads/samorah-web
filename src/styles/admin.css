@@ -594,6 +594,23 @@
 .seo-redirect-form > * { min-width: 0; }
 @media (max-width: 860px) { .seo-redirect-form { grid-template-columns: 1fr; } }
 .seo-toolbar { flex-wrap: wrap; }
+
+/* ── Inventory (Phase 1A) ── */
+.admin__mono { font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; }
+.pe-readonly { font-family: var(--font-sans); font-size: 13px; padding: 8px 0; color: var(--smoke, #6b6259); }
+.pe-readonly a, .inv-readonly__link { color: var(--ad-gold, #c9a96e); text-decoration: none; }
+/* status badge — never colour-only: each carries a text label */
+.inv-badge { display: inline-block; font-size: 11px; letter-spacing: 0.03em; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--ad-hair); white-space: nowrap; }
+.inv-badge--in_stock { background: rgba(46, 125, 50, 0.10); border-color: rgba(46, 125, 50, 0.35); color: #2e7d32; }
+.inv-badge--low_stock { background: rgba(198, 124, 0, 0.10); border-color: rgba(198, 124, 0, 0.40); color: #b0700a; }
+.inv-badge--out_of_stock { background: rgba(176, 0, 32, 0.10); border-color: rgba(176, 0, 32, 0.40); color: #b00020; }
+.inv-badge--untracked { background: rgba(31, 26, 22, 0.05); color: var(--smoke, #6b6259); }
+tr[data-inactive="1"] { opacity: 0.55; }
+.inv-modal { position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-start; justify-content: center; padding: 6vh 16px; background: rgba(31, 26, 22, 0.42); overflow-y: auto; }
+.inv-modal__card { background: #fff; border-radius: 8px; padding: 22px 24px; width: 100%; max-width: 560px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.22); }
+.inv-modal__card--wide { max-width: 860px; }
+.inv-modal__title { font-family: var(--font-serif); font-size: 1.15rem; margin-bottom: 6px; }
+@media (prefers-color-scheme: dark) { .inv-modal__card { background: #241f1a; } }
 .seo-group { padding: 14px 0; border-top: 1px solid var(--ad-hair); }
 .seo-group:first-child { border-top: none; padding-top: 4px; }
 .seo-group__title { font-family: var(--font-sans); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ad-ink, #1f1a16); margin: 0 0 10px; }

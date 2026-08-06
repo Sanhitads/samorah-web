@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type FocusEvent, type TextareaHTMLAttributes } from "react";
 import type { VariantRow, NoteRow, ImageRow, VesselType, ProductStatus } from "@/services/productAdminService";
 import { LivePreviewPanel } from "@/components/admin/LivePreviewPanel";
+import { buildVariantSavePayload } from "@/lib/inventory/variantSavePayload";
 import { AIR_ACCORDION_DEFAULTS, AIR_SECTION_POSITIONS, type CustomSection } from "@/config/theHours";
 import { CANDLE_SECTION_POSITIONS } from "@/lib/productEditorial";
 
@@ -643,7 +644,9 @@ export function ProductEditor({ productId, collections, categories, allProducts 
 
   // Variants
   const saveVariant = async (v: VariantRow) => {
-    if (await post({ action: "variant.upsert", variant: { id: v.id || undefined, productId, sku: v.sku, variantName: v.variantName, vesselType: v.vesselType, sizeLabel: v.sizeLabel, price: v.price, salePrice: v.salePrice, costPrice: v.costPrice, stock: v.stock, isActive: v.isActive, sortOrder: v.sortOrder, barcode: v.barcode, weightGrams: v.weightGrams, lowStockThreshold: v.lowStockThreshold, shippingClass: v.shippingClass, packageLengthCm: v.packageLengthCm, packageWidthCm: v.packageWidthCm, packageHeightCm: v.packageHeightCm, supplierSku: v.supplierSku } })) { await load(); onSaved(); }
+    // Stock is ledger-owned: buildVariantSavePayload includes it ONLY for a new variant (initial
+    // opening balance). Editing an existing variant submits no stock — on-hand lives in /admin/inventory.
+    if (await post({ action: "variant.upsert", variant: buildVariantSavePayload(v, productId) })) { await load(); onSaved(); }
   };
   const delVariant = async (v: VariantRow) => { if (v.id && await post({ action: "variant.delete", id: v.id, productId })) { await load(); onSaved(); } };
   const setV = (i: number, patch: Partial<VariantRow>) => setVariants((vs) => vs.map((v, j) => (j === i ? { ...v, ...patch } : v)));
@@ -1342,7 +1345,9 @@ export function ProductEditor({ productId, collections, categories, allProducts 
                 <label className="cfg-field cfg-field--sm"><span>Vessel</span><select value={v.vesselType ?? ""} onChange={(e) => setV(i, { vesselType: (e.target.value || null) as VesselType | null })}><option value="">—</option>{VESSELS.map((x) => <option key={x} value={x}>{x}</option>)}</select></label>
                 <label className="cfg-field cfg-field--sm"><span>Price ₹</span><input type="number" value={v.price} onChange={(e) => setV(i, { price: Number(e.target.value) })} /></label>
                 <label className="cfg-field cfg-field--sm"><span>Cost ₹</span><input type="number" value={v.costPrice} onChange={(e) => setV(i, { costPrice: Number(e.target.value) })} /></label>
-                <label className="cfg-field cfg-field--sm"><span>Stock</span><input type="number" value={v.stock} onChange={(e) => setV(i, { stock: Number(e.target.value) })} /></label>
+                {v.id
+                  ? <label className="cfg-field cfg-field--sm"><span>Stock (on hand)</span><span className="pe-readonly">{v.stock} · <a href="/admin/inventory">Manage inventory →</a></span></label>
+                  : <label className="cfg-field cfg-field--sm"><span>Initial stock</span><input type="number" value={v.stock} onChange={(e) => setV(i, { stock: Number(e.target.value) })} /></label>}
                 <label className="cfg-field cfg-field--sm"><span>Barcode / EAN</span><input value={v.barcode ?? ""} onChange={(e) => setV(i, { barcode: e.target.value })} /></label>
                 <label className="cfg-field cfg-field--sm"><span>Weight (g)</span><input type="number" value={v.weightGrams ?? ""} onChange={(e) => setV(i, { weightGrams: e.target.value === "" ? null : Number(e.target.value) })} /></label>
                 <label className="cfg-field cfg-field--sm"><span>Low-stock alert</span><input type="number" value={v.lowStockThreshold ?? ""} onChange={(e) => setV(i, { lowStockThreshold: e.target.value === "" ? null : Number(e.target.value) })} /></label>

@@ -347,7 +347,7 @@ export async function upsertVariant(input: VariantInput, actorId?: string) {
   const row: Record<string, unknown> = {
     product_id: input.productId, sku: input.sku.trim().toUpperCase(), variant_name: input.variantName || null,
     vessel_type: input.vesselType || null, size_label: input.sizeLabel || null, price: input.price,
-    sale_price: input.salePrice ?? null, cost_price: input.costPrice ?? 0, stock: input.stock ?? 0, is_active: input.isActive ?? true,
+    sale_price: input.salePrice ?? null, cost_price: input.costPrice ?? 0, is_active: input.isActive ?? true,
     sort_order: input.sortOrder ?? 0, barcode: input.barcode || null, weight_grams: input.weightGrams ?? null,
     shipping_class: input.shippingClass || null, package_length_cm: input.packageLengthCm ?? null,
     package_width_cm: input.packageWidthCm ?? null, package_height_cm: input.packageHeightCm ?? null, supplier_sku: input.supplierSku || null,
@@ -356,7 +356,12 @@ export async function upsertVariant(input: VariantInput, actorId?: string) {
   // low_stock_threshold is NOT NULL (default 5) — only send it when set, so an unset value takes the
   // DB default on insert (a bare null would violate the constraint) and is left unchanged on update.
   if (input.lowStockThreshold != null) row.low_stock_threshold = input.lowStockThreshold;
-  const run = (r: Record<string, unknown>) => (input.id ? db.from("variants").update(r).eq("id", input.id) : db.from("variants").insert(r));
+  // Inventory authority (Phase 1A): on-hand is ledger-owned. On CREATE we seed the initial stock
+  // (the AFTER INSERT trigger records its opening_balance atomically); UPDATES NEVER touch stock —
+  // on-hand changes only via adjust_inventory. The DB also revokes UPDATE(stock), so an update that
+  // included stock would be refused outright — this is a hard authority switch, not a UI hide.
+  const run = (r: Record<string, unknown>) =>
+    input.id ? db.from("variants").update(r).eq("id", input.id) : db.from("variants").insert({ ...r, stock: input.stock ?? 0 });
   let { error } = await run(row);
   if (error && /could not find|does not exist|schema cache|PGRST204/i.test(error.message)) {
     const safe = { ...row }; for (const c of VARIANT_LOGISTICS_COLUMNS) delete safe[c];

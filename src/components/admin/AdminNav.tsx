@@ -44,7 +44,7 @@ const NAV: NavGroup[] = [
       { label: "Journal", href: "/admin/journal", icon: "✎" },
       { label: "Emails", href: "/admin/emails", icon: "✉" },
       { label: "SEO & Redirects", href: "/admin/seo", icon: "⇥" },
-      { label: "Inventory", icon: "▣" },
+      { label: "Inventory", href: "/admin/inventory", icon: "▣" },
     ],
   },
   {
