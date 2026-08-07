@@ -1,5 +1,5 @@
 import { createPublicClient } from "@/lib/supabase/public";
-import { primaryImage, type VariantLike, type ImageLike } from "@/lib/product";
+import { primaryImage, isInStock, type VariantLike, type ImageLike } from "@/lib/product";
 import { effectivePrice } from "@/lib/pricing";
 import { getEditionMap } from "@/services/collectionService";
 import { BUNDLE_SIZE_LABEL, CHAPTER_META, type BundleCandle, type BundleChapter } from "@/lib/bundle";
@@ -49,7 +49,7 @@ export async function getBundleCandles(): Promise<BundleCandle[]> {
           variantId: v.id,
           size: v.size_label as string,
           price: effectivePrice(v),
-          inStock: v.stock > 0,
+          inStock: isInStock(v), // canonical storefront authority (same helper the PDP uses)
         }));
       if (options.length === 0) return null; // no 100g variant → not eligible
       const img = primaryImage(p.product_images);

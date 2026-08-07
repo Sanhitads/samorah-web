@@ -1,72 +1,52 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { AssetImage } from "@/components/ui/AssetImage";
-import { useStore } from "@/hooks/useStore";
-import { useCartStore } from "@/store/useCartStore";
-import { useUIStore } from "@/store/useUIStore";
-import { useCompositionStore, type CompositionItem } from "@/store/useCompositionStore";
-import { trackBundleStarted, trackBundleCompleted, trackBundleAbandoned } from "@/lib/analytics/events";
-import { isGradientPlaceholder, gradientClass } from "@/lib/product";
 import {
   BUNDLE_SIZE,
-  BUNDLE_VESSELS,
+  BUNDLE_DISCOUNT_PCT,
   chapterLabelOf,
   composeComposition,
   optionFor,
   vesselLabel,
   type BundleCandle,
 } from "@/lib/bundle";
+import { applyBundleMerchandising, resolveVessels, resolveTokens, selectionAllAvailable, type BundleConfig } from "@/lib/bundleConfig";
+import type { BundleController } from "@/store/bundleController";
 
 /**
- * BundleBuilder (client) — the Discovery Composition. Choose a vessel (single-
- * vessel compositions), then compose exactly three 100g candles — filterable by
- * chapter, no duplicate fragrances. Backed by the shared composition store, so
- * the in-progress set persists across a refresh and is shared with the PDP's
- * "Add to Composition" action. A sticky panel tracks the vessel, progress, and
- * the automatic 15% discount, then adds the set to the cart.
+ * BundleBuilder (client) — the Discovery Composition composer. Rendering is now config-driven
+ * (editorial copy/vessel merchandising/product overrides from BundleConfig) and commerce goes through an
+ * injected controller, so the SAME component serves the live storefront and the future Admin preview.
+ * Availability uses the canonical storefront authority (option.inStock ← isInStock); OOS candles are
+ * disabled. The discount percentage is the canonical BUNDLE_DISCOUNT_PCT — never an independent literal.
  */
-/** Stable identity for the pre-hydration fallback: a fresh `[]` each render would change every
- *  downstream useMemo's deps on every render, quietly defeating the memo. */
-const NO_ITEMS: CompositionItem[] = [];
-
-export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
-  // Persisted composition state (BRD §24.1 / §7.1) — `composing` below branches the whole page on
-  // it, so it must not be read during SSR. Defaults match the empty server-rendered state.
-  const vessel = useStore(useCompositionStore, (s) => s.vessel) ?? null;
-  const items = useStore(useCompositionStore, (s) => s.items) ?? NO_ITEMS;
-  const editingId = useStore(useCompositionStore, (s) => s.editingId) ?? null;
-  const setVessel = useCompositionStore((s) => s.setVessel);
-  const addCandle = useCompositionStore((s) => s.addCandle);
-  const removeCandle = useCompositionStore((s) => s.removeCandle);
-  const clearComposition = useCompositionStore((s) => s.clear);
-
+export function BundleBuilder({
+  candles,
+  config,
+  controller,
+}: {
+  candles: BundleCandle[];
+  config: BundleConfig;
+  controller: BundleController;
+}) {
+  const { vessel, items, editingId } = controller;
   const [chapter, setChapter] = useState("All");
   const [added, setAdded] = useState(false);
-  // Was a vessel chosen on THIS page? A direct visit always starts at the vessel
-  // chooser; only an already-active composition (candles added, e.g. from a PDP)
-  // reveals the grid automatically.
   const [started, setStarted] = useState(false);
-  // A vessel switch the customer must confirm (it clears an in-progress set).
   const [pendingVessel, setPendingVessel] = useState<string | null>(null);
-
-  const addItem = useCartStore((s) => s.addItem);
-  // Persisted cart state — must go through the hydration-safe hook (BRD §24.1). Actions
-  // (addItem/removeItem) are stable references and safe to read directly.
-  const cartItems = useStore(useCartStore, (s) => s.items) ?? [];
-  const removeItem = useCartStore((s) => s.removeItem);
-  const openCart = useUIStore((s) => s.openCart);
   const reduce = useReducedMotion();
 
+  const vessels = useMemo(() => resolveVessels(config), [config]);
+  const resolved = useMemo(() => applyBundleMerchandising(candles, config), [candles, config]);
+
   const composing = items.length > 0 || started;
-  // Ignore a stale persisted vessel (kept for continuity) until the composition
-  // is actually being built, so the chooser shows nothing pre-selected.
   const activeVessel = composing ? vessel : null;
 
   const vesselCandles = useMemo(
-    () => (vessel ? candles.filter((c) => optionFor(c, vessel)) : []),
-    [candles, vessel],
+    () => (vessel ? resolved.filter((c) => optionFor(c, vessel)) : []),
+    [resolved, vessel],
   );
 
   const chapters = useMemo(() => {
@@ -85,39 +65,29 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
   const selectedIds = useMemo(() => new Set(items.map((i) => i.id)), [items]);
   const composition = composeComposition(items.map((i) => i.price));
   const isFull = items.length >= BUNDLE_SIZE;
-
-  // Bundle analytics (review point 7). started = first candle added; completed = added to
-  // bag; abandoned = navigated away with an in-progress-but-incomplete set (read live state).
-  const completedRef = useRef(false);
-  useEffect(() => {
-    return () => {
-      const remaining = useCompositionStore.getState().items;
-      if (!completedRef.current && remaining.length > 0 && remaining.length < BUNDLE_SIZE) {
-        trackBundleAbandoned(remaining.length);
-      }
-    };
-  }, []);
+  // V5 — a previously-selected candle that has since gone OOS/ineligible on refreshed canonical data
+  // must not remain a valid composition. Block add-to-bag (canonical isInStock authority).
+  const selectionAvailable = useMemo(() => selectionAllAvailable(items, resolved), [items, resolved]);
 
   const chooseVessel = (key: string) => {
     setAdded(false);
     if (key === vessel) {
-      setStarted(true); // re-selecting the current/stale vessel just reveals the grid
+      setStarted(true);
       return;
     }
-    // Switching away from an in-progress composition needs confirmation.
     if (items.length > 0) {
       setPendingVessel(key);
       return;
     }
     setStarted(true);
-    setVessel(key);
+    controller.setVessel(key);
     setChapter("All");
   };
 
   const confirmVesselSwitch = () => {
     if (!pendingVessel) return;
     setStarted(true);
-    setVessel(pendingVessel); // store clears items on a vessel switch (no mixing)
+    controller.setVessel(pendingVessel); // controller clears items on a vessel switch (no mixing)
     setChapter("All");
     setPendingVessel(null);
   };
@@ -125,13 +95,12 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
   const toggle = (candle: BundleCandle) => {
     if (!vessel) return;
     const option = optionFor(candle, vessel);
-    if (!option) return;
+    if (!option || !option.inStock) return; // canonical availability — OOS is never selectable
     setAdded(false);
     if (selectedIds.has(candle.id)) {
-      removeCandle(candle.id);
+      controller.removeCandle(candle.id);
     } else {
-      if (items.length === 0) trackBundleStarted(); // first candle → bundle started
-      addCandle({
+      controller.addCandle({
         id: candle.id,
         slug: candle.slug,
         name: candle.name,
@@ -146,49 +115,22 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
   };
 
   const addComposition = () => {
-    if (!composition.complete || !vessel) return;
-    completedRef.current = true;
-    trackBundleCompleted(items.reduce((s, i) => s + i.price, 0), items.length);
-    const material = vesselLabel(vessel);
-    // Editing → reuse the same compositionId and replace the existing cart lines
-    // in place (no duplicate bundle). New → a fresh id. The 15% stays a cart-level
-    // promotion recomputed from full prices (never baked into the line price).
-    const compositionId = editingId ?? `comp-${vessel}-${Date.now()}`;
-    if (editingId) {
-      cartItems.filter((i) => i.compositionId === editingId).forEach((i) => removeItem(i.key));
-    }
-    for (const it of items) {
-      addItem(
-        {
-          id: it.id,
-          slug: it.slug,
-          name: it.name,
-          price: it.price, // full price — discount applied in the cart
-          gradClass: isGradientPlaceholder(it.image) ? gradientClass(it.image) ?? undefined : undefined,
-          chapterName: it.chapterLabel,
-          edition: it.edition,
-          compositionId,
-        },
-        material,
-        it.size,
-      );
-    }
-    openCart();
+    if (!composition.complete || !vessel || !selectionAvailable) return;
+    controller.commitComposition();
     setAdded(true);
-    clearComposition();
     setTimeout(() => setAdded(false), 2500);
   };
 
-  const selectedVessel = vessel ? BUNDLE_VESSELS.find((v) => v.key === vessel) : null;
+  const selectedVessel = vessel ? vessels.find((v) => v.key === vessel) : null;
 
   return (
     <div className="composer">
       {/* ── Step 1 · Choose your vessel ── */}
       <section className="vessel-choose" aria-label="Choose your vessel">
-        <p className="vessel-choose__eyebrow">Step One</p>
-        <h2 className="vessel-choose__title">Choose Your Vessel</h2>
+        <p className="vessel-choose__eyebrow">{config.vesselSection.eyebrow}</p>
+        <h2 className="vessel-choose__title">{config.vesselSection.heading}</h2>
         <div className="vessel-grid" role="radiogroup" aria-label="Vessel">
-          {BUNDLE_VESSELS.map((v) => {
+          {vessels.map((v) => {
             const active = v.key === activeVessel;
             return (
               <button
@@ -228,16 +170,15 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
         ) : null}
       </section>
 
-      {/* ── Step 2 · Compose (revealed once a vessel is chosen here, or when a
-          composition is already in progress — e.g. started from a PDP) ── */}
+      {/* ── Step 2 · Compose ── */}
       {composing && vessel ? (
         <div className="bundle-split">
           <div className="bundle-left">
             <div className="compose-head">
               <p className="compose-head__eyebrow">{selectedVessel?.material} Collection</p>
-              <h2 className="compose-head__title">Choose Any Three</h2>
+              <h2 className="compose-head__title">{config.candleSection.heading}</h2>
               <p className="compose-status">
-                100g Signature Candles
+                {config.candleSection.sizeLine}
                 <span className="compose-status__sep" aria-hidden="true"> · </span>
                 {vesselCandles.length} Available
               </p>
@@ -282,7 +223,9 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
               >
                 {visible.map((candle) => {
                   const chosen = selectedIds.has(candle.id);
-                  const disabled = isFull && !chosen;
+                  const option = optionFor(candle, vessel);
+                  const oos = !option?.inStock; // canonical storefront availability
+                  const disabled = oos || (isFull && !chosen);
                   return (
                     <button
                       key={candle.id}
@@ -290,7 +233,9 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
                       className="bundle-card"
                       data-chosen={chosen}
                       data-disabled={disabled}
+                      data-oos={oos}
                       aria-pressed={chosen}
+                      aria-disabled={oos}
                       disabled={disabled}
                       onClick={() => toggle(candle)}
                     >
@@ -305,18 +250,17 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
                         <span className="bundle-card__mark" aria-hidden="true">
                           {chosen ? "✓" : "+"}
                         </span>
+                        {oos ? <span className="bundle-card__oos">Sold out</span> : null}
                       </span>
                       <span className="bundle-card__body">
                         {candle.chapter ? (
-                          <span className="bundle-card__chapter">
-                            {chapterLabelOf(candle.chapter)}
-                          </span>
+                          <span className="bundle-card__chapter">{chapterLabelOf(candle.chapter)}</span>
                         ) : null}
-                        {candle.edition ? (
-                          <span className="bundle-card__edition">{candle.edition}</span>
-                        ) : null}
+                        {candle.edition ? <span className="bundle-card__edition">{candle.edition}</span> : null}
                         <span className="bundle-card__name">{candle.name}</span>
-                        {candle.tagline ? <span className="bundle-card__notes">{candle.tagline}</span> : null}
+                        {candle.displayDescription ? (
+                          <span className="bundle-card__notes">{candle.displayDescription}</span>
+                        ) : null}
                       </span>
                     </button>
                   );
@@ -341,8 +285,8 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
 
               {composition.complete ? (
                 <div className="composition__complete" role="status">
-                  <span className="composition__complete-title">✓ Composition Complete</span>
-                  <span className="composition__complete-sub">15% Applied</span>
+                  <span className="composition__complete-title">✓ {config.flowCopy.completeLine}</span>
+                  <span className="composition__complete-sub">{BUNDLE_DISCOUNT_PCT}% Applied</span>
                 </div>
               ) : (
                 <p className="composition__status">
@@ -351,7 +295,7 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
               )}
 
               {items.length === 0 ? (
-                <p className="composition__empty">Choose your first candle to begin.</p>
+                <p className="composition__empty">{config.flowCopy.emptyHint}</p>
               ) : (
                 <ul className="composition__items">
                   {items.map((it) => (
@@ -374,7 +318,7 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
                       <button
                         type="button"
                         className="composition__remove"
-                        onClick={() => removeCandle(it.id)}
+                        onClick={() => controller.removeCandle(it.id)}
                         aria-label={`Remove ${it.name}`}
                       >
                         Remove
@@ -391,7 +335,7 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
                     <span>{composition.regularLabel}</span>
                   </div>
                   <div className="composition__row">
-                    <span>Composition Discount ({composition.savingPct || 15}%)</span>
+                    <span>Composition Discount ({composition.savingPct || BUNDLE_DISCOUNT_PCT}%)</span>
                     <span>−{composition.savingLabel}</span>
                   </div>
                   <div className="composition__row composition__row--main">
@@ -401,10 +345,16 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
                 </div>
               ) : null}
 
+              {composition.complete && !selectionAvailable ? (
+                <p className="composition__note composition__note--warn" role="alert">
+                  A candle in your composition is no longer available. Remove it to continue.
+                </p>
+              ) : null}
+
               <button
                 type="button"
                 className="composition__atc"
-                disabled={!composition.complete}
+                disabled={!composition.complete || !selectionAvailable}
                 data-added={added}
                 onClick={addComposition}
               >
@@ -420,11 +370,9 @@ export function BundleBuilder({ candles }: { candles: BundleCandle[] }) {
               </button>
 
               {editingId ? (
-                <p className="composition__note composition__note--editing">
-                  Editing this composition will update the version currently in your bag.
-                </p>
+                <p className="composition__note composition__note--editing">{config.flowCopy.editingNote}</p>
               ) : (
-                <p className="composition__note">Any three 100g candles · 15% composition discount.</p>
+                <p className="composition__note">{resolveTokens(config.flowCopy.footerLine)}</p>
               )}
             </div>
           </aside>

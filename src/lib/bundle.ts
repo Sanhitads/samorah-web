@@ -13,6 +13,9 @@ export const BUNDLE_SIZE_LABEL = "100g";
 export const BUNDLE_SIZE = 3;
 /** Automatic composition discount. */
 export const BUNDLE_DISCOUNT = 0.15; // 15%
+/** Canonical whole-percent for DISPLAY ONLY (label/copy/token) — derived from BUNDLE_DISCOUNT so the
+ *  shown percentage can never drift from the charged discount. Never store an independent numeric rate. */
+export const BUNDLE_DISCOUNT_PCT = Math.round(BUNDLE_DISCOUNT * 100); // 15
 
 /** A vessel offered at launch (glass, ceramic) plus the future terracotta. */
 export interface BundleVesselDef {

@@ -8,7 +8,7 @@
  */
 import { createAdminClient } from "@/lib/supabase/admin";
 
-export type CmsResourceType = "page" | "navigation" | "homepage" | "composed-page" | "blog" | "email";
+export type CmsResourceType = "page" | "navigation" | "homepage" | "composed-page" | "blog" | "email" | "bundle";
 
 export interface Revision { id: string; snapshot: any; label: string | null; actorId: string | null; createdAt: string }
 

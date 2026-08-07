@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { BUNDLE_DISCOUNT, BUNDLE_SIZE, bundleUnitPrice } from "@/lib/bundle";
+import { BUNDLE_DISCOUNT_PCT, BUNDLE_SIZE, bundleUnitPrice } from "@/lib/bundle";
 import { trackAddToCart, trackRemoveFromCart } from "@/lib/analytics/events";
 import { trackSectionConversion } from "@/lib/analytics/sectionTracking";
 import type { AnalyticsItem } from "@/lib/analytics/types";
@@ -176,8 +176,9 @@ export const selectCompositionDiscount = (s: CartState) => {
   return discount;
 };
 
-/** Whole-percent label for the composition promotion (for cart display). */
-export const COMPOSITION_DISCOUNT_PCT = Math.round(BUNDLE_DISCOUNT * 100);
+/** Whole-percent label for the composition promotion (for cart display).
+ *  Aliased to the single canonical BUNDLE_DISCOUNT_PCT so display can never drift from the charge. */
+export const COMPOSITION_DISCOUNT_PCT = BUNDLE_DISCOUNT_PCT;
 
 /** Cart total after promotions (subtotal − composition discount). */
 export const selectCartTotal = (s: CartState) =>

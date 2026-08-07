@@ -582,3 +582,12 @@
   .bundle-card__image,
   .bundle-card:hover .bundle-card__image { transition: none; transform: none; }
 }
+
+/* ── OOS candle card (Phase 0 availability correctness) ─────────────────────── */
+.bundle-card[data-oos="true"] { opacity: 0.5; cursor: not-allowed; }
+.bundle-card[data-oos="true"] .bundle-card__mark { display: none; }
+.bundle-card__oos {
+  position: absolute; inset-inline: 0; bottom: 0; text-align: center;
+  font-family: var(--font-sans); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 4px 0; background: rgba(20, 14, 10, 0.62); color: #f4efe8;
+}

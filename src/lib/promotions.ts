@@ -9,7 +9,7 @@
  * Discovery Composition is simply the first rule here. Coupons are discounts;
  * gift cards are payment (handled downstream). All amounts are in PAISE.
  */
-import { BUNDLE_SIZE, bundleUnitPrice } from "@/lib/bundle";
+import { BUNDLE_DISCOUNT_PCT, BUNDLE_SIZE, bundleUnitPrice } from "@/lib/bundle";
 import { toPaise } from "@/lib/money";
 
 export interface PromoLine {
@@ -63,7 +63,9 @@ export interface PromotionResult {
 // ── The evergreen Discovery Composition rule ──────────────────────────────────
 const COMPOSITION: PromotionMeta = {
   code: "DISCOVERY_COMPOSITION",
-  label: "Discovery Composition Savings (15%)",
+  // Percentage derived from the canonical BUNDLE_DISCOUNT (display-only; the charged amount below is
+  // computed independently via bundleUnitPrice). Same value as the retired literal "15" — canonicalization only.
+  label: `Discovery Composition Savings (${BUNDLE_DISCOUNT_PCT}%)`,
   campaign: "evergreen",
   version: "v1",
   priority: 10,
@@ -202,7 +204,7 @@ export function computePromotions(lines: PromoLine[], couponCode?: string, coupo
   if (compGroups.length) {
     candidates.push({
       meta: COMPOSITION,
-      rule: { kind: "composition", value: 15 },
+      rule: { kind: "composition", value: BUNDLE_DISCOUNT_PCT }, // display/label value; charge computed below via bundleUnitPrice
       apply: (byLine) => {
         let amount = 0;
         for (const g of compGroups)
