@@ -455,48 +455,39 @@ product scope** — Phase 1B closed the launch-critical inventory work; the only
 the deployment task in (G), which is launch-readiness, not a feature. Deviating from a listed canonical authority
 or non-goal requires a new, explicitly-approved architecture decision — not an incremental change.
 
-## Bundle CMS (Phase 1B — post-launch / Phase-2 items)
+## Bundle CMS
 
-Recorded during Bundle CMS P1B. None blocks launch. Each must preserve the frozen Bundle foundations:
-one `BundlePageView` renderer · `usePreviewBundleController` isolation (no cart/composition persistence,
-no analytics, no reservation) · Media authority (config stores media ids) · canonical
+Status of the Bundle Page CMS (`/admin/bundles` + `/bundles`). Frozen foundations every future increment
+MUST preserve: one `BundlePageView` renderer · `usePreviewBundleController` isolation (no cart/composition
+persistence, no analytics, no reservation) · Media authority (config stores media ids) · canonical
 identity/availability/pricing/SEO · shared `cms_revisions` · P1A server RBAC.
 
-### Phase 2 classification (approved)
+### Completed & frozen
+- **Phase 0** — `bundle_pages` DB + RLS, DEFAULT config parity with the hard-coded page, shared renderer + preview isolation, discount canonicalization, SEO/availability boundaries.
+- **Phase 1A** — canonical Admin actions (save/publish/reset/restore/restore.publish), strict submission validation, commercial-viability ERROR/WARNING health, publish-snapshot revisions.
+- **Phase 1B** — side-by-side editor + real in-DOM preview (the shared `BundlePageView` + preview controller), functional Media (id→url), three-state editor model, vessel-image V1 fix. Also delivered here (so it is NOT outstanding 2B work): per-field "referenced media missing" warnings, description-override reset (radio → product default), image-override reset (MediaField Remove → canonical), exclusion toggle (exclude/restore), ↑/↓ reorder, and the consolidated Publish-health panel.
+- **Phase 2A — frozen at `a2e02045`** — in-app unsaved-navigation guard (component-local capture-phase, keyed solely to `isDirty(st)`) + Restore+Publish confirmation (gates the existing canonical `restore.publish`; Cancel = zero call/zero mutation, Confirm = exactly one). `beforeunload` covers refresh/tab-close. **Back/Forward dirty-navigation protection is non-guaranteed by design; no history/router interception is required** and must not be introduced.
+- **Phase 2B-0** — preview-mode honesty: concise Admin wording stating Desktop is the primary in-editor preview, Tablet/Mobile are width-scaled previews without exact breakpoint guarantees, and the live storefront is authoritative for final responsive rendering. Copy-only — no renderer/preview-controller/BundleConfig/API/storefront change.
 
-The Phase-2 work is grouped as follows. **2A ships at launch**; everything else is post-launch. The
-detailed provenance bullets below remain the source notes for the individual items.
+**Phase 2B-0 completes the Bundle CMS launch baseline.** All remaining Bundle CMS 2B/2C items below are
+post-launch / non-blocking and **must not be started automatically** — each requires a new explicit
+approval before implementation.
 
-- **2A-1 — In-app unsaved-navigation guard** — **launch. DELIVERED (Phase 2A).** Component-local
-  capture-phase click guard in `BundleEditor`, driven solely by `isDirty(st)`; confirms before
-  client-side navigation discards an unsaved draft. `beforeunload` still covers refresh/tab-close.
-  Browser Back/Forward is **not** guaranteed by 2A (guarding it would require history interception,
-  which is explicitly out of scope). Reuses the PageBuilder pattern; no shared Admin-shell/router change.
-- **2A-2 — Restore+Publish confirmation** — **launch. DELIVERED (Phase 2A).** An explicit confirmation
-  (naming the revision by its existing timestamp) gates the existing canonical `restore.publish`; Cancel
-  performs zero API call and zero state mutation; Confirm invokes the action exactly once.
-- **2B-1 — Editor orientation / validation / focus** — post-launch. Collapsible sections, per-section
-  ERROR/WARNING markers, and editor→preview section focus (see the section-focus bullet below).
-- **2B-2 — Media-health / preview feedback** — post-launch. Missing-media health rollup and clearer
-  preview-mode feedback.
-- **2B-3 — Merchandising productivity** — post-launch. Override resets / reorder / exclusion ergonomics.
-- **2C — Revision preview / diff / change-summary** — post-launch. Revision preview + actor/time,
-  semantic draft/live/revision diff, and the pre-publish change summary.
-- **MediaPicker accessibility** — post-launch, **separate cross-cutting Admin/Media task** (see bullet below).
-- **Accurate responsive Bundle preview** — post-launch, **separate architecture approval** (see bullet below).
+### Post-launch — useful (each needs separate approval; default: 0 migrations, no new authority)
+- **Collapsible editor sections** — UI state only (component-local, optional per-operator `localStorage`); must NEVER become BundleConfig or DB content.
+- **Section-level ERROR/WARNING indicators** — map the existing `computeBundleHealth` + `validateBundleConfig` results onto editor sections; no second validation engine, canonical results stay authoritative.
+- **Missing-media health rollup** — aggregate the existing `resolveBundleMedia`/`collectBundleMediaIds` result (hero desktop/mobile, vessel, candle override); missing optional media = WARNING; nothing persisted, no new Media authority.
+- **Merchandising override/exclusion visual badges** — "overridden"/"excluded" state clarity only (the resets/reorder/exclude actions themselves already shipped in P1B).
+- **Phase 2C** — revision preview; actor/time improvements; semantic draft/live/revision diff; pre-publish change summary.
 
-- **Accurate responsive Bundle preview modes** — Priority **P2**. The Admin side-by-side preview renders
-  the real `BundlePageView` **in-DOM** (not an iframe), so the Tablet/Mobile device buttons scale the
-  preview *width* but cannot independently trigger the storefront's **window-level** media queries — only
-  the Desktop preview re-lays-out faithfully. Trigger: an operator needs pixel-accurate tablet/mobile
-  preview. Any solution MUST keep `BundlePageView` as the renderer + the isolated preview controller (e.g.
-  a same-origin preview route in a sized iframe rendering the SAME component + streamed draft) — **no
-  duplicate renderer, no real commerce**. Not a P1B blocker.
-- **Bundle CMS editor→preview section focus/navigation** — Priority **P2**. Selecting Hero / Vessel /
-  Candle / Merchandising in the editor does not yet scroll/focus the corresponding preview section. Must
-  reuse the existing renderer/controller seam (e.g. preview-only section anchors + a focus prop), not a
-  second preview/state system. Not a P1B blocker.
-- **Shared MediaPicker accessibility** — Priority **P2 (shared Admin/Media, not Bundle-specific)**. The
-  shared `MediaPicker` closes via its Close button but not the Escape key; verify focus-return-to-opener
-  and modal focus containment. A cross-cutting Admin/Media UX improvement — do not fork the shared picker
-  for Bundle. Not a P1B blocker.
+### Post-launch — separate architecture approval required
+- **Editor→preview focus/navigation** — selecting/editing a left-hand section brings the matching preview area into view. Must reuse `BundlePageView` + the isolated controller (no second preview/state system). NOTE: the always-rendered preview sections are Hero/Strip/Vessels; Candle/merchandising/flow render only after a vessel is chosen in the preview. **Adding `data-preview-section` (or equivalent) anchors to the frozen shared renderer is NOT authorized now** — any such proposal must be reviewed against the future HEAD before implementation. (Supersedes the earlier "editor→preview section focus/navigation — P2" note.)
+- **Accurate responsive / device preview** — the in-DOM preview scales width via `zoom` but cannot independently trigger the storefront's window-level media queries; only Desktop re-lays-out faithfully (the limitation Phase 2B-0 now discloses honestly). Any fix MUST keep `BundlePageView` + the isolated controller (e.g. a same-origin preview route in a sized iframe rendering the SAME component + streamed draft) — no duplicate renderer, no real commerce. (Supersedes the earlier "Accurate responsive Bundle preview modes — P2" note.)
+
+### Cross-cutting Admin/Media
+- **Shared MediaPicker accessibility** — Escape to close, modal focus containment, focus-return-to-opener. A shared Admin/Media task; do not fork the picker for Bundle.
+
+### Explicitly rejected / do-not-build
+- Duplicate description reset, duplicate image reset, duplicate exclude/restore, and duplicate reorder controls — all already delivered in P1B.
+- Bundle-specific drag-and-drop reorder framework — no existing project infra; unjustified for Bundle alone.
+- Bulk "use defaults" — only if a future operational requirement proves it necessary.

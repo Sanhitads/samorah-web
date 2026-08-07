@@ -187,3 +187,13 @@ describe("2A-2 — Restore+Publish confirmation", () => {
     expect(msg).toMatch(/Aug/);
   });
 });
+
+describe("2B-0 — preview-mode honesty note", () => {
+  it("states Desktop is faithful and Tablet/Mobile are width-scaled, storefront authoritative", () => {
+    renderEditor();
+    const note = screen.getByRole("note");
+    expect(note.textContent).toMatch(/Desktop provides the primary in-editor preview/i);
+    expect(note.textContent).toMatch(/width-scaled previews and may not reproduce exact responsive breakpoints/i);
+    expect(note.textContent).toMatch(/live storefront is authoritative for final responsive rendering/i);
+  });
+});

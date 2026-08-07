@@ -299,6 +299,10 @@ export function BundleEditor({
             </div>
             <span className="pe-live__hint">Live draft · not saved · preview interactions are isolated</span>
           </div>
+          <p className="admin__muted be-preview__modes" role="note">
+            Desktop provides the primary in-editor preview. Tablet and Mobile are width-scaled previews and may
+            not reproduce exact responsive breakpoints. The live storefront is authoritative for final responsive rendering.
+          </p>
           <div className="be-stage" ref={stageRef}>
             {/* zoom (not transform) so the scaled preview also drives layout height → the stage scrolls
                 naturally. Desktop width renders the true desktop bundle layout scaled to fit the column. */}
