@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getBundleCandles } from "@/services/bundleService";
-import { getPublishedBundleConfig } from "@/services/bundlePageService";
+import { getPublishedBundleConfig, resolveBundleMedia } from "@/services/bundlePageService";
 import { withRouteSeo } from "@/services/seoRedirectService";
 import { BundleStorefront } from "@/components/bundle/BundleStorefront";
 import { BUNDLE_DISCOUNT_PCT } from "@/lib/bundle";
@@ -30,5 +30,6 @@ export default async function BundleRoute() {
     getBundleCandles().catch(() => [] as Awaited<ReturnType<typeof getBundleCandles>>),
     getPublishedBundleConfig(),
   ]);
-  return <BundleStorefront config={config} candles={candles} />;
+  const mediaUrls = await resolveBundleMedia(config);
+  return <BundleStorefront config={config} candles={candles} mediaUrls={mediaUrls} />;
 }

@@ -29,15 +29,27 @@ export function BundlePageView({
   config,
   candles,
   controller,
+  mediaUrls = {},
 }: {
   config: BundleConfig;
   candles: BundleCandle[];
   controller: BundleController;
+  /** media.id → delivery URL (resolved server-side). Absent id → gradient/canonical fallback. */
+  mediaUrls?: Record<string, string>;
 }) {
+  const heroUrl = (config.hero.imageId && mediaUrls[config.hero.imageId]) || null;
+  const heroMobileUrl = (config.hero.imageMobileId && mediaUrls[config.hero.imageMobileId]) || heroUrl;
   return (
     <main className="bundle" data-theme="warm-ivory">
       <header className="bundle-hero">
-        <div className="bundle-hero__art img-fill grad-bundle" aria-hidden="true" />
+        {heroUrl ? (
+          <picture className="bundle-hero__art img-fill" aria-hidden="true">
+            {heroMobileUrl && heroMobileUrl !== heroUrl ? <source media="(max-width: 640px)" srcSet={heroMobileUrl} /> : null}
+            <img src={heroUrl} alt="" className="img-fill" style={{ objectFit: "cover", width: "100%", height: "100%" }} />
+          </picture>
+        ) : (
+          <div className="bundle-hero__art img-fill grad-bundle" aria-hidden="true" />
+        )}
         <div className="bundle-hero__scrim" aria-hidden="true" />
         <div className="bundle-hero__inner">
           <p className="bundle-hero__eyebrow">{config.hero.eyebrow}</p>
@@ -62,7 +74,7 @@ export function BundlePageView({
       </p>
 
       {candles.length >= 3 ? (
-        <BundleBuilder candles={candles} config={config} controller={controller} />
+        <BundleBuilder candles={candles} config={config} controller={controller} mediaUrls={mediaUrls} />
       ) : (
         <p className="bundle-empty">
           Our candles are being restocked. Please check back soon to compose your set.

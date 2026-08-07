@@ -9,7 +9,7 @@ import type { BundleCandle } from "@/lib/bundle";
  * BundlePageView. This is the only place the live route wires commerce; the preview wrapper (Phase 2)
  * injects the ephemeral controller into the same view.
  */
-export function BundleStorefront({ config, candles }: { config: BundleConfig; candles: BundleCandle[] }) {
+export function BundleStorefront({ config, candles, mediaUrls }: { config: BundleConfig; candles: BundleCandle[]; mediaUrls?: Record<string, string> }) {
   const controller = useStorefrontBundleController();
-  return <BundlePageView config={config} candles={candles} controller={controller} />;
+  return <BundlePageView config={config} candles={candles} controller={controller} mediaUrls={mediaUrls} />;
 }

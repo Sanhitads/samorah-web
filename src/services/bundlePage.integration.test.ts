@@ -53,6 +53,23 @@ d("bundle_pages — DB + RLS (Phase 0)", () => {
   });
 });
 
+d("V2 — published media stale-reference safety (resolveBundleMedia)", () => {
+  it("resolves an existing media id to its url; a deleted/missing id is simply absent (renderer falls back)", async () => {
+    const { resolveBundleMedia } = await import("@/services/bundlePageService");
+    const { DEFAULT_BUNDLE_CONFIG: DEF } = await import("@/lib/bundleConfig");
+    const m = await fetch(rest(`/media`), { method: "POST", headers: { ...H, Prefer: "return=representation" }, body: JSON.stringify({ kind: "image", provider: "external", url: "https://cdn/x.jpg", status: "published" }) });
+    const media = (await m.json())[0];
+    const cfg = { ...DEF, hero: { ...DEF.hero, imageId: media.id } };
+    // present → resolves to the url (storefront would render it)
+    expect((await resolveBundleMedia(cfg))[media.id]).toBe("https://cdn/x.jpg");
+    // delete the media → the id is absent from the map → renderer gradient/canonical fallback (no url leaks)
+    await fetch(rest(`/media?id=eq.${media.id}`), { method: "DELETE", headers: H });
+    const after = await resolveBundleMedia(cfg);
+    expect(after[media.id]).toBeUndefined();
+    expect(Object.keys(after)).toHaveLength(0);
+  });
+});
+
 d("V3 — default/live fallback boundaries (getPublishedBundleConfig)", () => {
   beforeEach(async () => {
     await del();

@@ -454,3 +454,26 @@ authority it must reuse** · **Explicit non-goals**. No item is dated. **P1 item
 product scope** — Phase 1B closed the launch-critical inventory work; the only launch-blocking Inventory item is
 the deployment task in (G), which is launch-readiness, not a feature. Deviating from a listed canonical authority
 or non-goal requires a new, explicitly-approved architecture decision — not an incremental change.
+
+## Bundle CMS (Phase 1B — post-launch / Phase-2 items)
+
+Recorded during Bundle CMS P1B. None blocks launch. Each must preserve the frozen Bundle foundations:
+one `BundlePageView` renderer · `usePreviewBundleController` isolation (no cart/composition persistence,
+no analytics, no reservation) · Media authority (config stores media ids) · canonical
+identity/availability/pricing/SEO · shared `cms_revisions` · P1A server RBAC.
+
+- **Accurate responsive Bundle preview modes** — Priority **P2**. The Admin side-by-side preview renders
+  the real `BundlePageView` **in-DOM** (not an iframe), so the Tablet/Mobile device buttons scale the
+  preview *width* but cannot independently trigger the storefront's **window-level** media queries — only
+  the Desktop preview re-lays-out faithfully. Trigger: an operator needs pixel-accurate tablet/mobile
+  preview. Any solution MUST keep `BundlePageView` as the renderer + the isolated preview controller (e.g.
+  a same-origin preview route in a sized iframe rendering the SAME component + streamed draft) — **no
+  duplicate renderer, no real commerce**. Not a P1B blocker.
+- **Bundle CMS editor→preview section focus/navigation** — Priority **P2**. Selecting Hero / Vessel /
+  Candle / Merchandising in the editor does not yet scroll/focus the corresponding preview section. Must
+  reuse the existing renderer/controller seam (e.g. preview-only section anchors + a focus prop), not a
+  second preview/state system. Not a P1B blocker.
+- **Shared MediaPicker accessibility** — Priority **P2 (shared Admin/Media, not Bundle-specific)**. The
+  shared `MediaPicker` closes via its Close button but not the Escape key; verify focus-return-to-opener
+  and modal focus containment. A cross-cutting Admin/Media UX improvement — do not fork the shared picker
+  for Bundle. Not a P1B blocker.

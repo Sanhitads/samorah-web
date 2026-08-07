@@ -26,10 +26,12 @@ export function BundleBuilder({
   candles,
   config,
   controller,
+  mediaUrls = {},
 }: {
   candles: BundleCandle[];
   config: BundleConfig;
   controller: BundleController;
+  mediaUrls?: Record<string, string>;
 }) {
   const { vessel, items, editingId } = controller;
   const [chapter, setChapter] = useState("All");
@@ -132,6 +134,7 @@ export function BundleBuilder({
         <div className="vessel-grid" role="radiogroup" aria-label="Vessel">
           {vessels.map((v) => {
             const active = v.key === activeVessel;
+            const vImg = (v.imageId && mediaUrls[v.imageId]) || null; // merchandising image → else no image (current look)
             return (
               <button
                 key={v.key}
@@ -141,9 +144,11 @@ export function BundleBuilder({
                 className="vessel-card"
                 data-active={active}
                 data-coming={v.comingSoon}
+                data-has-img={vImg ? "1" : "0"}
                 disabled={v.comingSoon}
                 onClick={() => chooseVessel(v.key)}
               >
+                {vImg ? <img src={vImg} alt="" className="vessel-card__img" /> : null}
                 <span className="vessel-card__mark" aria-hidden="true" />
                 <span className="vessel-card__name">{v.name}</span>
                 <span className="vessel-card__blurb">{v.blurb}</span>
@@ -241,7 +246,7 @@ export function BundleBuilder({
                     >
                       <span className="bundle-card__media">
                         <AssetImage
-                          asset={candle.image.url}
+                          asset={(candle.overrideImageId && mediaUrls[candle.overrideImageId]) || candle.image.url}
                           alt={candle.image.alt}
                           role="lifestyle"
                           sizes="(max-width: 640px) 45vw, 220px"
