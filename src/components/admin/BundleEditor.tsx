@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MediaPicker } from "@/components/admin/MediaPicker";
 import { BundlePreview } from "@/components/bundle/BundlePreview";
 import { computeBundleHealth } from "@/lib/bundleHealth";
+import { shouldGuardNavigation } from "@/lib/bundleNavGuard";
 import { resolveTokens, type BundleConfig, type BundleVesselConfig } from "@/lib/bundleConfig";
 import { BUNDLE_DISCOUNT_PCT, type BundleCandle } from "@/lib/bundle";
 import {
@@ -15,6 +16,8 @@ type Device = "desktop" | "tablet" | "mobile";
 type Rev = { id: string; label: string | null; actorId: string | null; createdAt: string };
 const DEVICE_W: Record<Device, number> = { desktop: 1280, tablet: 834, mobile: 390 };
 const clone = (c: BundleConfig): BundleConfig => JSON.parse(JSON.stringify(c));
+// Admin revision timestamp format (shared by the revision list and the Restore+Publish confirmation).
+const fmtRevTime = (iso: string) => new Date(iso).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 
 export function BundleEditor({
   initial,
@@ -44,12 +47,35 @@ export function BundleEditor({
   const health = useMemo(() => computeBundleHealth(draft, candles), [draft, candles]);
   const canPub = canPublish && health.errors.length === 0 && !busy;
 
-  // Warn before leaving with unsaved edits.
+  // Warn before leaving with unsaved edits (browser refresh / tab close).
   useEffect(() => {
     const h = (e: BeforeUnloadEvent) => { if (dirty) { e.preventDefault(); e.returnValue = ""; } };
     window.addEventListener("beforeunload", h);
     return () => window.removeEventListener("beforeunload", h);
   }, [dirty]);
+
+  // In-app navigation guard (Phase 2A-1): confirm before an unsaved draft is discarded by client-side
+  // navigation to another admin page. Component-local capture-phase click listener (the established
+  // PageBuilder pattern) — beats the Next <Link> handler; no router/history monkey-patching, no shell
+  // change. Dirty is read from a ref so the once-installed listener always sees the current unsaved
+  // state (isDirty(st) is the sole authority). Browser Back/Forward is out of scope here (covered, if
+  // at all, by beforeunload) — guarding it would require history interception, which we deliberately avoid.
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
+  useEffect(() => {
+    const onDocClick = (e: MouseEvent) => {
+      if (!dirtyRef.current) return;
+      const a = (e.target as HTMLElement)?.closest?.("a") as HTMLAnchorElement | null;
+      if (!a) return;
+      const guard = shouldGuardNavigation(
+        { button: e.button, modified: e.metaKey || e.ctrlKey || e.shiftKey || e.altKey, rawHref: a.getAttribute("href"), absoluteHref: a.href, target: a.target || null, download: a.hasAttribute("download") },
+        { origin: window.location.origin, pathname: window.location.pathname },
+      );
+      if (guard && !window.confirm("You have unsaved Bundle changes. Leave without saving?")) { e.preventDefault(); e.stopPropagation(); }
+    };
+    document.addEventListener("click", onDocClick, true);
+    return () => document.removeEventListener("click", onDocClick, true);
+  }, []);
 
   // ── immutable draft updates (afterEdit keeps the pure state-machine semantics) ──
   const update = useCallback((fn: (d: BundleConfig) => void) => setSt((prev) => { const n = clone(prev.draft); fn(n); return afterEdit(prev, n); }), []);
@@ -83,7 +109,16 @@ export function BundleEditor({
   };
   const loadRevs = async () => { const r = await api("revisions"); if (r.ok) setRevs(r.body.revisions ?? []); };
   const restoreDraft = async (id: string) => { const r = await api("restore", { revisionId: id }); if (r.ok) { const g = await api("load"); if (g.ok) setSt((prev) => afterRestoreToDraft(prev, g.body.draft)); setMsg({ tone: "ok", text: "Revision restored to draft (live unchanged)." }); } else setMsg({ tone: "err", text: r.body.error ?? "Restore failed." }); };
-  const restorePublish = async (id: string) => { const r = await api("restore.publish", { revisionId: id }); if (r.ok) { const g = await api("load"); if (g.ok) setSt((prev) => afterRestorePublish(prev, g.body.draft)); setMsg({ tone: "ok", text: "Revision restored and published live." }); } else setMsg({ tone: "err", text: (r.body.errors?.[0]) ?? r.body.error ?? "Restore+publish failed." }); };
+  const restorePublish = async (id: string) => {
+    // Phase 2A-2: an explicit confirmation gates the LIVE-changing action. Cancel → zero restore.publish
+    // request, zero editor/live-state mutation. Confirm → the existing canonical action, invoked once.
+    const rev = revs?.find((x) => x.id === id);
+    const when = rev ? fmtRevTime(rev.createdAt) : "the selected revision";
+    if (!window.confirm(`Restore the revision from ${when} and make it the LIVE Bundle page? This replaces the currently published configuration.`)) return;
+    const r = await api("restore.publish", { revisionId: id });
+    if (r.ok) { const g = await api("load"); if (g.ok) setSt((prev) => afterRestorePublish(prev, g.body.draft)); setMsg({ tone: "ok", text: "Revision restored and published live." }); }
+    else setMsg({ tone: "err", text: (r.body.errors?.[0]) ?? r.body.error ?? "Restore+publish failed." });
+  };
 
   const pickInto = (setId: (id: string | undefined) => void) => openPicker((url, assetId) => { setId(assetId); if (assetId) setMedia((m) => ({ ...m, [assetId]: url })); });
 
@@ -243,7 +278,7 @@ export function BundleEditor({
               <ul className="be-revs">
                 {revs.map((r) => (
                   <li key={r.id} className="be-row">
-                    <span className="admin__muted">{new Date(r.createdAt).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}{r.actorId ? " · staff" : ""}</span>
+                    <span className="admin__muted">{fmtRevTime(r.createdAt)}{r.actorId ? " · staff" : ""}</span>
                     <span className="be-spacer" />
                     <button className="ff-btn ff-btn--mini" onClick={() => restoreDraft(r.id)} disabled={busy}>Restore to draft</button>
                     {canPublish ? <button className="ff-btn ff-btn--mini" onClick={() => restorePublish(r.id)} disabled={busy}>Restore + publish</button> : null}

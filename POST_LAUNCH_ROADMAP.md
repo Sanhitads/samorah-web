@@ -462,6 +462,29 @@ one `BundlePageView` renderer · `usePreviewBundleController` isolation (no cart
 no analytics, no reservation) · Media authority (config stores media ids) · canonical
 identity/availability/pricing/SEO · shared `cms_revisions` · P1A server RBAC.
 
+### Phase 2 classification (approved)
+
+The Phase-2 work is grouped as follows. **2A ships at launch**; everything else is post-launch. The
+detailed provenance bullets below remain the source notes for the individual items.
+
+- **2A-1 — In-app unsaved-navigation guard** — **launch. DELIVERED (Phase 2A).** Component-local
+  capture-phase click guard in `BundleEditor`, driven solely by `isDirty(st)`; confirms before
+  client-side navigation discards an unsaved draft. `beforeunload` still covers refresh/tab-close.
+  Browser Back/Forward is **not** guaranteed by 2A (guarding it would require history interception,
+  which is explicitly out of scope). Reuses the PageBuilder pattern; no shared Admin-shell/router change.
+- **2A-2 — Restore+Publish confirmation** — **launch. DELIVERED (Phase 2A).** An explicit confirmation
+  (naming the revision by its existing timestamp) gates the existing canonical `restore.publish`; Cancel
+  performs zero API call and zero state mutation; Confirm invokes the action exactly once.
+- **2B-1 — Editor orientation / validation / focus** — post-launch. Collapsible sections, per-section
+  ERROR/WARNING markers, and editor→preview section focus (see the section-focus bullet below).
+- **2B-2 — Media-health / preview feedback** — post-launch. Missing-media health rollup and clearer
+  preview-mode feedback.
+- **2B-3 — Merchandising productivity** — post-launch. Override resets / reorder / exclusion ergonomics.
+- **2C — Revision preview / diff / change-summary** — post-launch. Revision preview + actor/time,
+  semantic draft/live/revision diff, and the pre-publish change summary.
+- **MediaPicker accessibility** — post-launch, **separate cross-cutting Admin/Media task** (see bullet below).
+- **Accurate responsive Bundle preview** — post-launch, **separate architecture approval** (see bullet below).
+
 - **Accurate responsive Bundle preview modes** — Priority **P2**. The Admin side-by-side preview renders
   the real `BundlePageView` **in-DOM** (not an iframe), so the Tablet/Mobile device buttons scale the
   preview *width* but cannot independently trigger the storefront's **window-level** media queries — only
