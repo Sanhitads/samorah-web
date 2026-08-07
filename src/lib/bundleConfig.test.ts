@@ -8,6 +8,7 @@ import {
   resolveVessels,
   applyBundleMerchandising,
   selectionAllAvailable,
+  validateBundleSubmission,
   type BundleConfig,
 } from "@/lib/bundleConfig";
 import { BUNDLE_DISCOUNT_PCT, BUNDLE_VESSELS, type BundleCandle } from "@/lib/bundle";
@@ -165,6 +166,21 @@ describe("V5 — selection availability transition safety", () => {
     expect(selectionAllAvailable([{ id: "gone", vessel: "glass" }], live)).toBe(false);
     // selected for a vessel it no longer offers
     expect(selectionAllAvailable([{ id: "a", vessel: "ceramic" }], live)).toBe(false);
+  });
+});
+
+describe("validateBundleSubmission — strict Admin write boundary", () => {
+  it("accepts a well-formed submission (the default config)", () => {
+    expect(validateBundleSubmission(DEFAULT_BUNDLE_CONFIG).ok).toBe(true);
+  });
+  it("REJECTS malformed submissions (never coerced to DEFAULT)", () => {
+    expect(validateBundleSubmission({ garbage: true }).ok).toBe(false);
+    expect(validateBundleSubmission(null).ok).toBe(false);
+    expect(validateBundleSubmission("x").ok).toBe(false);
+    expect(validateBundleSubmission([]).ok).toBe(false);
+    expect(validateBundleSubmission({ ...DEFAULT_BUNDLE_CONFIG, hero: 123 }).ok).toBe(false);
+    expect(validateBundleSubmission({ ...DEFAULT_BUNDLE_CONFIG, vessels: "x" }).ok).toBe(false);
+    expect(validateBundleSubmission({ ...DEFAULT_BUNDLE_CONFIG, schemaVersion: 99 }).ok).toBe(false);
   });
 });
 

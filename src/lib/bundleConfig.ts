@@ -195,6 +195,29 @@ export function validateBundleConfig(cfg: BundleConfig): BundleValidation {
   return { errors, warnings };
 }
 
+/**
+ * STRICT Admin-submission validation (write boundary). Unlike normalizeBundleConfig (the STOREFRONT's
+ * defensive read fallback that coerces anything to a valid config), this REJECTS a genuinely malformed
+ * submitted payload so it can never be silently turned into DEFAULT and then published. A well-formed
+ * submission must carry the core editable structure; optional fields may still be filled by normalize.
+ */
+export function validateBundleSubmission(raw: unknown): { ok: boolean; errors: string[] } {
+  const errors: string[] = [];
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { ok: false, errors: ["Malformed configuration: expected a bundle config object."] };
+  const r = raw as Record<string, unknown>;
+  const isObj = (v: unknown) => !!v && typeof v === "object" && !Array.isArray(v);
+  const hero = r.hero as Record<string, unknown> | undefined;
+  const candle = r.candleSection as Record<string, unknown> | undefined;
+  if (!isObj(hero) || typeof hero!.heading !== "string") errors.push("Malformed configuration: hero.heading must be a string.");
+  if (!Array.isArray(r.strip)) errors.push("Malformed configuration: strip must be an array.");
+  if (!isObj(r.vesselSection)) errors.push("Malformed configuration: vesselSection is missing.");
+  if (!Array.isArray(r.vessels)) errors.push("Malformed configuration: vessels must be an array.");
+  if (!isObj(candle) || typeof candle!.heading !== "string") errors.push("Malformed configuration: candleSection.heading must be a string.");
+  if (!isObj(r.flowCopy)) errors.push("Malformed configuration: flowCopy is missing.");
+  if (r.schemaVersion !== undefined && r.schemaVersion !== BUNDLE_CONFIG_VERSION) errors.push(`Unsupported schema_version ${String(r.schemaVersion)}.`);
+  return { ok: errors.length === 0, errors };
+}
+
 // ── Pure resolvers (renderer + preview share these; fallback-safe) ───────────────
 
 export interface ResolvedVessel {
