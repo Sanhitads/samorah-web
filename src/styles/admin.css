@@ -2252,3 +2252,26 @@ a.adm-badge[data-b="incident"]:hover { background: rgba(168,68,58,0.22); }
 @media (prefers-reduced-motion: reduce) { .kpi__skel { animation: none; } }
 .ash-jump__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .ash-updated { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; }
+
+/* ── Analytics nav + data freshness (Stage 3) ── */
+.an-nav { position: sticky; top: 0; z-index: 20; background: var(--paper, #faf7f2); border-bottom: 1px solid var(--ad-hair); padding: 10px 0; margin: 0 0 16px; }
+.an-nav__row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.an-nav__dates { display: flex; gap: 6px; flex-wrap: wrap; }
+.an-date { cursor: pointer; }
+.an-nav__refresh { display: flex; align-items: center; gap: 10px; }
+.an-updated { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; }
+.an-auto { font-size: 11px; color: var(--smoke); display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.an-refresh-ic { display: inline-block; }
+.an-refresh-ic--spin { animation: an-spin 0.7s linear infinite; }
+@keyframes an-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .an-refresh-ic--spin { animation: none; } }
+.an-nav__jumps { display: flex; gap: 4px 14px; flex-wrap: wrap; margin-top: 8px; overflow-x: auto; }
+.an-jump { font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--smoke); text-decoration: none; white-space: nowrap; padding: 2px 0; border-bottom: 1px solid transparent; }
+.an-jump:hover, .an-jump:focus-visible { color: var(--ink); border-bottom-color: var(--ad-gold); }
+.ash-anchor { scroll-margin-top: 96px; }
+.an-fresh { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 14px; }
+.an-fresh__chip { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--smoke); border: 1px solid var(--ad-hair); border-radius: 999px; padding: 3px 10px; }
+.an-fresh__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--smoke); }
+.an-fresh__chip[data-status="healthy"] .an-fresh__dot { background: #2f6b3c; }
+.an-fresh__chip[data-status="stale"] .an-fresh__dot { background: #8a6d3b; }
+.an-fresh__chip[data-status="unavailable"] .an-fresh__dot { background: #8a3d2f; }

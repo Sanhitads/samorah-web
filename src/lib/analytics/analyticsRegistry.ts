@@ -103,3 +103,44 @@ export function isWidgetEnabled(key: string): boolean {
   if (!widget) return false;
   return resolveFlag(widget.featureFlag, widget.defaultEnabled);
 }
+
+/**
+ * Analytics SECTIONS — the single source of truth for the page's scrollable sections. Each has a STABLE
+ * `id` (matches the `<section id>` anchors + the jump-nav) plus `keywords` so a future command-palette /
+ * search can resolve a query to a section without a UI change here. No search UI is built in this stage.
+ */
+export interface AnalyticsSection {
+  id: string; // stable identifier — used for anchors, deep-links, and future search
+  label: string;
+  keywords: string[]; // future searchable terms
+}
+
+export const ANALYTICS_SECTIONS: AnalyticsSection[] = [
+  { id: "executive-summary", label: "Summary", keywords: ["executive", "kpi", "today", "overview", "glance"] },
+  { id: "business-overview", label: "Overview", keywords: ["business", "ceo", "orders", "revenue", "customers", "payment"] },
+  { id: "revenue", label: "Revenue", keywords: ["gross", "net", "refunds", "aov", "sales"] },
+  { id: "fulfillment", label: "Fulfilment", keywords: ["pick", "pack", "dispatch", "sla", "cycle"] },
+  { id: "delivery", label: "Delivery", keywords: ["logistics", "rto", "shipping", "exception", "delivery time"] },
+  { id: "returns", label: "Returns", keywords: ["refunds", "reasons", "return rate"] },
+  { id: "courier", label: "Couriers", keywords: ["shiprocket", "delivery", "performance", "carrier"] },
+  { id: "search", label: "Search", keywords: ["queries", "zero result", "search"] },
+  { id: "attribution", label: "Attribution", keywords: ["channel", "utm", "instagram", "google", "email", "organic"] },
+  { id: "campaigns", label: "Campaigns", keywords: ["utm", "campaign", "source", "medium"] },
+  { id: "clarity", label: "Behaviour", keywords: ["clarity", "rage click", "dead click", "scroll", "engagement"] },
+  { id: "ga4", label: "GA4", keywords: ["visitors", "sessions", "conversion", "live", "realtime"] },
+];
+
+const SECTION_BY_ID: Record<string, AnalyticsSection> = Object.fromEntries(ANALYTICS_SECTIONS.map((s) => [s.id, s]));
+
+export function getSection(id: string): AnalyticsSection | undefined {
+  return SECTION_BY_ID[id];
+}
+
+/** Sections whose id/label/keywords match a query — the seam a future search UI would call. */
+export function searchSections(query: string): AnalyticsSection[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  return ANALYTICS_SECTIONS.filter((s) =>
+    s.id.includes(q) || s.label.toLowerCase().includes(q) || s.keywords.some((k) => k.includes(q)),
+  );
+}

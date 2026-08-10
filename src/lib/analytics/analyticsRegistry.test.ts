@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { ANALYTICS_WIDGETS, getWidget, widgetsForStage, widgetsForDomain, isWidgetEnabled } from "@/lib/analytics/analyticsRegistry";
+import { ANALYTICS_WIDGETS, getWidget, widgetsForStage, widgetsForDomain, isWidgetEnabled, ANALYTICS_SECTIONS, getSection, searchSections } from "@/lib/analytics/analyticsRegistry";
 
 const DOMAINS = ["Business", "Operations", "Marketing", "Finance", "Customer", "Inventory", "System"];
 
@@ -47,6 +47,24 @@ describe("analyticsRegistry (single source of truth)", () => {
   it("widgetsForDomain groups by owner domain", () => {
     expect(widgetsForDomain("System").map((w) => w.key)).toEqual(["system.dataFreshness", "system.analyticsHealth"]);
     expect(widgetsForDomain("Finance").length).toBeGreaterThan(0);
+  });
+
+  it("ANALYTICS_SECTIONS: stable unique ids, labels + searchable keywords", () => {
+    const ids = ANALYTICS_SECTIONS.map((s) => s.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toContain("executive-summary");
+    for (const s of ANALYTICS_SECTIONS) {
+      expect(s.label).toBeTruthy();
+      expect(s.keywords.length).toBeGreaterThan(0);
+    }
+    expect(getSection("revenue")?.label).toBe("Revenue");
+    expect(getSection("nope")).toBeUndefined();
+  });
+
+  it("searchSections resolves a query to sections (future search seam)", () => {
+    expect(searchSections("rage click").map((s) => s.id)).toContain("clarity");
+    expect(searchSections("utm").map((s) => s.id)).toEqual(expect.arrayContaining(["attribution", "campaigns"]));
+    expect(searchSections("")).toEqual([]);
   });
 
   it("isWidgetEnabled defaults on, respects env disable/enable overrides, false for unknown", () => {

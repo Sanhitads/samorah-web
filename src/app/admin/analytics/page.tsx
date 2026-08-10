@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { AnalyticsNav } from "@/components/admin/AnalyticsNav";
+import { DataFreshnessBar } from "@/components/admin/DataFreshnessBar";
+import { ANALYTICS_SECTIONS } from "@/lib/analytics/analyticsRegistry";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { hasCapability } from "@/lib/auth/capabilities";
@@ -58,6 +60,11 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   ]);
   const windowLabel = win === "all" ? "all time" : `${win} days`;
   const ordersRange = win === "7" ? "7d" : win === "30" ? "30d" : null; // orders-page ?range value (90d/all → base list)
+  const freshnessSources = [
+    { label: "Orders", available: true, fetchedAtMs: kpi.freshness.fetchedAtMs, ttlMs: kpi.freshness.ttlMs },
+    { label: "GA4", available: ga4.available, fetchedAtMs: null },
+    { label: "Clarity", available: clarity.available, fetchedAtMs: null },
+  ];
   const maxReason = Math.max(1, ...a.returns.byReason.map((r) => r.count));
   const maxChannelRev = Math.max(1, ...channels.map((c) => c.revenue));
 
@@ -69,17 +76,15 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
         <p className="admin__count">{a.revenue.orders} paid orders in window</p>
       </header>
 
-      <nav className="ff-queues" aria-label="Time window">
-        {WINDOWS.map((w) => (
-          <Link key={w.k} href={`/admin/analytics?window=${w.k}`} className="ff-queue" data-active={win === w.k ? "1" : "0"}>{w.l}</Link>
-        ))}
-      </nav>
+      {/* ── Sticky nav + filters (Stage 3): date selector · refresh · jump links ── */}
+      <AnalyticsNav window={win} windows={WINDOWS} sections={ANALYTICS_SECTIONS} />
+      <DataFreshnessBar sources={freshnessSources} />
 
       {/* ── Executive summary — Stage 2 KPI strip (shared KpiCard; feature-flagged) ── */}
       <ExecutiveSummary kpi={kpi} overview={overview} ga4={ga4} revenueSpark={revSpark} windowLabel={windowLabel} ordersRange={ordersRange} />
 
       {/* ── Business overview — the CEO glance (review point 11) ── */}
-      <section className="ash-metrics">
+      <section className="ash-metrics ash-anchor" id="business-overview">
         <h2 className="ash-jump__title">Business overview</h2>
         <div className="ash-metrics__row" style={{ marginBottom: 10 }}>
           <Tile v={String(overview.today.orders)} l="Orders today" />
@@ -116,7 +121,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
         </div>
       </section>
 
-      <section className="ash-metrics">
+      <section className="ash-metrics ash-anchor" id="revenue">
         <h2 className="ash-jump__title">Revenue</h2>
         <div className="ash-metrics__row">
           <Tile v={inr(a.revenue.gross)} l="Gross revenue" />
@@ -127,7 +132,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
         </div>
       </section>
 
-      <section className="ash-metrics">
+      <section className="ash-metrics ash-anchor" id="fulfillment">
         <h2 className="ash-jump__title">Fulfillment</h2>
         <div className="ash-metrics__row">
           <Tile v={mins(a.fulfillment.avgPickMinutes)} l="Avg pick time" />
@@ -138,7 +143,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
         </div>
       </section>
 
-      <section className="ash-metrics">
+      <section className="ash-metrics ash-anchor" id="delivery">
         <h2 className="ash-jump__title">Delivery & logistics</h2>
         <div className="ash-metrics__row">
           <Tile v={hrs(a.delivery.avgDeliveryHours)} l="Avg delivery time" />
@@ -149,7 +154,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
         </div>
       </section>
 
-      <section className="ash-metrics">
+      <section className="ash-metrics ash-anchor" id="returns">
         <h2 className="ash-jump__title">Returns & refunds</h2>
         <div className="ash-metrics__row">
           <Tile v={String(a.returns.count)} l="Returns" />
@@ -171,7 +176,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
         ) : null}
       </section>
 
-      <section className="ash-metrics">
+      <section className="ash-metrics ash-anchor" id="courier">
         <h2 className="ash-jump__title">Courier performance</h2>
         <div className="admin__table-wrap">
           <table className="admin__table">
@@ -187,7 +192,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
       </section>
 
       {/* ── Search intelligence (review points 1, 18) ── */}
-      <section className="ash-metrics">
+      <section className="ash-metrics ash-anchor" id="search">
         <h2 className="ash-jump__title">Search intelligence</h2>
         <div className="ash-metrics__row" style={{ marginBottom: 14 }}>
           <Tile v={String(search.totalSearches)} l="Searches" />
@@ -214,7 +219,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
       </section>
 
       {/* ── Marketing attribution by channel (review point 19) ── */}
-      <section className="ash-metrics">
+      <section className="ash-metrics ash-anchor" id="attribution">
         <h2 className="ash-jump__title">Attribution by channel</h2>
         {channels.length ? (
           <div className="an-bars">
@@ -230,7 +235,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
       </section>
 
       {/* ── UTM campaigns (review points 13, 20) ── */}
-      <section className="ash-metrics">
+      <section className="ash-metrics ash-anchor" id="campaigns">
         <h2 className="ash-jump__title">UTM campaigns</h2>
         {campaigns.length ? (
           <p className="admin__muted" style={{ marginBottom: 8, fontSize: 12 }}>
@@ -252,7 +257,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
       </section>
 
       {/* ── Behavioural — Microsoft Clarity (Data Export API, last 3 days) ── */}
-      <section className="ash-metrics">
+      <section className="ash-metrics ash-anchor" id="clarity">
         <h2 className="ash-jump__title">Behavioural · Clarity <span className="admin__muted" style={{ fontSize: 12 }}>— last 3 days</span></h2>
         {clarity.available ? (
           <>
@@ -284,7 +289,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
       </section>
 
       {/* ── Live · GA4 Data API (real-time users + conversion) ── */}
-      <section className="ash-metrics">
+      <section className="ash-metrics ash-anchor" id="ga4">
         <h2 className="ash-jump__title">Live · GA4 {ga4.available ? <span className="admin__muted" style={{ fontSize: 12 }}>— realtime + 7d</span> : null}</h2>
         {ga4.available ? (
           <div className="ash-metrics__row">
