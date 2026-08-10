@@ -26,6 +26,57 @@ export type AnalyticsSource =
   | "search"
   | "derived";
 
+// ── Drill-down targets — the SINGLE source of truth for analytics navigation (routes + tooltips). ──
+// Executive Summary cards, charts, and lower KPI cards all resolve their destination from here; no
+// component defines a route string inline. Adding a destination = one entry here.
+export const ANALYTICS_DRILL_TARGETS = {
+  orders:          { route: "/admin/orders",                  tooltip: "View Orders",                     isExternal: false },
+  ordersAwaiting:  { route: "/admin/orders?awaiting=1",       tooltip: "View orders awaiting fulfilment", isExternal: false },
+  ordersCancelled: { route: "/admin/orders?status=cancelled", tooltip: "View cancelled orders",           isExternal: false },
+  inventory:       { route: "/admin/inventory",               tooltip: "Open Inventory",                  isExternal: false },
+  customers:       { route: "/admin/customers",               tooltip: "View Customers",                  isExternal: false },
+  returns:         { route: "/admin/returns",                 tooltip: "View Returns",                    isExternal: false },
+  products:        { route: "/admin/products",                tooltip: "View Products",                   isExternal: false },
+  shipments:       { route: "/admin/shipments",               tooltip: "Open Shipment board",             isExternal: false },
+  fulfillment:     { route: "/admin/fulfillment",             tooltip: "Open Fulfilment board",           isExternal: false },
+  reports:         { route: "/admin/reports",                 tooltip: "Open Reports",                    isExternal: false },
+  search:          { route: "/admin/search",                  tooltip: "Open Search",                     isExternal: false },
+} as const;
+
+/** Strongly-typed drill key — derived from the map so it can never drift from the routes. */
+export type DrillTargetKey = keyof typeof ANALYTICS_DRILL_TARGETS;
+
+export interface DrillResolution {
+  href: string;
+  tooltip: string;
+  isExternal: boolean; // future: external console link-outs (GA4/Clarity) — false for all Stage-5 targets
+  analyticsContext: Record<string, string>; // future: drill-event logging / passthrough — the params echoed
+}
+
+/**
+ * Resolve a drill target to a concrete link. `params` (contextual filters like the current window) are
+ * merged into the destination's query and echoed in `analyticsContext`. `isExternal` is reserved for
+ * future console link-outs (false today). Unknown key → null.
+ *
+ * @example
+ * resolveDrill("orders", { range: "30d" })
+ * // → {
+ * //   href: "/admin/orders?range=30d",
+ * //   tooltip: "View Orders",
+ * //   isExternal: false,
+ * //   analyticsContext: { range: "30d" },
+ * // }
+ */
+export function resolveDrill(key: DrillTargetKey, params?: Record<string, string>): DrillResolution | null {
+  const target = ANALYTICS_DRILL_TARGETS[key];
+  if (!target) return null;
+  const [path, existingQs = ""] = target.route.split("?");
+  const sp = new URLSearchParams(existingQs);
+  for (const [k, v] of Object.entries(params ?? {})) if (v) sp.set(k, v);
+  const qs = sp.toString();
+  return { href: qs ? `${path}?${qs}` : path, tooltip: target.tooltip, isExternal: target.isExternal, analyticsContext: { ...(params ?? {}) } };
+}
+
 export interface AnalyticsWidget {
   key: string; // unique id + default feature-flag name
   name: string; // display name
@@ -35,7 +86,9 @@ export interface AnalyticsWidget {
   defaultEnabled: boolean;
   permission: Capability;
   service: string; // owning existing service (reuse traceability)
-  route: string | null; // drill-down target
+  isDrillable: boolean; // does clicking navigate? (derived from drillTarget unless set explicitly)
+  drillTarget?: DrillTargetKey; // destination — resolved via resolveDrill (single source of truth)
+  drillDescription?: string; // optional tooltip override
   refreshIntervalMs: number | null; // null → manual refresh only
   dataSource: AnalyticsSource;
   visibility: WidgetVisibility;
@@ -50,9 +103,10 @@ export interface AnalyticsWidget {
   colorToken?: "gold" | "ink" | "green" | "smoke" | "red";
 }
 
-const w = (o: Omit<AnalyticsWidget, "featureFlag" | "defaultEnabled"> & { featureFlag?: string; defaultEnabled?: boolean }): AnalyticsWidget => ({
+const w = (o: Omit<AnalyticsWidget, "featureFlag" | "defaultEnabled" | "isDrillable"> & { featureFlag?: string; defaultEnabled?: boolean; isDrillable?: boolean }): AnalyticsWidget => ({
   featureFlag: o.featureFlag ?? o.key,
   defaultEnabled: o.defaultEnabled ?? true,
+  isDrillable: o.isDrillable ?? o.drillTarget != null, // drillable iff it declares a target
   ...o,
 });
 
@@ -60,33 +114,33 @@ const w = (o: Omit<AnalyticsWidget, "featureFlag" | "defaultEnabled"> & { featur
 export const ANALYTICS_WIDGETS: AnalyticsWidget[] = [
   // ── Stage 2 · Executive Summary ──
   // Order = founder scan order (revenue → orders → AOV → traffic → conversion → product → ops → risk).
-  w({ key: "exec.revenue", name: "Revenue Today", domain: "Finance", component: "KpiCard", permission: "analytics.view", service: "commandCenterService", route: "/admin/orders", refreshIntervalMs: 300_000, dataSource: "orders", visibility: "always", displayOrder: 1, defaultSize: "sm", stage: 2 }),
-  w({ key: "exec.orders", name: "Orders Today", domain: "Business", component: "KpiCard", permission: "analytics.view", service: "businessOverviewService", route: "/admin/orders", refreshIntervalMs: 300_000, dataSource: "orders", visibility: "always", displayOrder: 2, defaultSize: "sm", stage: 2 }),
-  w({ key: "exec.aov", name: "Average Order Value", domain: "Finance", component: "KpiCard", permission: "analytics.view", service: "businessOverviewService", route: "/admin/orders", refreshIntervalMs: 300_000, dataSource: "orders", visibility: "always", displayOrder: 3, defaultSize: "sm", stage: 2 }),
-  w({ key: "exec.visitors", name: "Visitors Today", domain: "Marketing", component: "KpiCard", permission: "analytics.view", service: "ga4DataService", route: null, refreshIntervalMs: 120_000, dataSource: "ga4", visibility: "whenAvailable", displayOrder: 4, defaultSize: "sm", stage: 2 }),
-  w({ key: "exec.conversion", name: "Conversion Rate", domain: "Marketing", component: "KpiCard", permission: "analytics.view", service: "ga4DataService", route: null, refreshIntervalMs: 120_000, dataSource: "ga4", visibility: "whenAvailable", displayOrder: 5, defaultSize: "sm", stage: 2 }),
-  w({ key: "exec.bestSeller", name: "Best Seller", domain: "Business", component: "KpiCard", permission: "analytics.view", service: "businessOverviewService", route: "/admin/products", refreshIntervalMs: 300_000, dataSource: "orders", visibility: "always", displayOrder: 6, defaultSize: "sm", stage: 2 }),
-  w({ key: "exec.pending", name: "Awaiting Fulfilment", domain: "Operations", component: "KpiCard", permission: "analytics.view", service: "businessOverviewService", route: "/admin/orders?awaiting=1", refreshIntervalMs: 300_000, dataSource: "orders", visibility: "always", displayOrder: 7, defaultSize: "sm", stage: 2 }),
-  w({ key: "exec.criticalAlerts", name: "Critical Alerts", domain: "Operations", component: "KpiCard", permission: "analytics.view", service: "commandCenterService", route: "/admin/inventory", refreshIntervalMs: 300_000, dataSource: "derived", visibility: "always", displayOrder: 8, defaultSize: "sm", stage: 2 }),
-  w({ key: "exec.lowStock", name: "Low Stock Count", domain: "Inventory", component: "KpiCard", permission: "analytics.view", service: "businessOverviewService", route: "/admin/inventory", refreshIntervalMs: 300_000, dataSource: "inventory", visibility: "always", displayOrder: 9, defaultSize: "sm", stage: 2 }),
+  w({ key: "exec.revenue", name: "Revenue Today", domain: "Finance", component: "KpiCard", permission: "analytics.view", service: "commandCenterService", drillTarget: "orders", refreshIntervalMs: 300_000, dataSource: "orders", visibility: "always", displayOrder: 1, defaultSize: "sm", stage: 2 }),
+  w({ key: "exec.orders", name: "Orders Today", domain: "Business", component: "KpiCard", permission: "analytics.view", service: "businessOverviewService", drillTarget: "orders", refreshIntervalMs: 300_000, dataSource: "orders", visibility: "always", displayOrder: 2, defaultSize: "sm", stage: 2 }),
+  w({ key: "exec.aov", name: "Average Order Value", domain: "Finance", component: "KpiCard", permission: "analytics.view", service: "businessOverviewService", drillTarget: "orders", refreshIntervalMs: 300_000, dataSource: "orders", visibility: "always", displayOrder: 3, defaultSize: "sm", stage: 2 }),
+  w({ key: "exec.visitors", name: "Visitors Today", domain: "Marketing", component: "KpiCard", permission: "analytics.view", service: "ga4DataService", refreshIntervalMs: 120_000, dataSource: "ga4", visibility: "whenAvailable", displayOrder: 4, defaultSize: "sm", stage: 2 }),
+  w({ key: "exec.conversion", name: "Conversion Rate", domain: "Marketing", component: "KpiCard", permission: "analytics.view", service: "ga4DataService", refreshIntervalMs: 120_000, dataSource: "ga4", visibility: "whenAvailable", displayOrder: 5, defaultSize: "sm", stage: 2 }),
+  w({ key: "exec.bestSeller", name: "Best Seller", domain: "Business", component: "KpiCard", permission: "analytics.view", service: "businessOverviewService", drillTarget: "products", refreshIntervalMs: 300_000, dataSource: "orders", visibility: "always", displayOrder: 6, defaultSize: "sm", stage: 2 }),
+  w({ key: "exec.pending", name: "Awaiting Fulfilment", domain: "Operations", component: "KpiCard", permission: "analytics.view", service: "businessOverviewService", drillTarget: "ordersAwaiting", refreshIntervalMs: 300_000, dataSource: "orders", visibility: "always", displayOrder: 7, defaultSize: "sm", stage: 2 }),
+  w({ key: "exec.criticalAlerts", name: "Critical Alerts", domain: "Operations", component: "KpiCard", permission: "analytics.view", service: "commandCenterService", drillTarget: "inventory", refreshIntervalMs: 300_000, dataSource: "derived", visibility: "always", displayOrder: 8, defaultSize: "sm", stage: 2 }),
+  w({ key: "exec.lowStock", name: "Low Stock Count", domain: "Inventory", component: "KpiCard", permission: "analytics.view", service: "businessOverviewService", drillTarget: "inventory", refreshIntervalMs: 300_000, dataSource: "inventory", visibility: "always", displayOrder: 9, defaultSize: "sm", stage: 2 }),
 
   // ── Stage 4 · Trend charts (SamorahChart) ──
-  w({ key: "chart.revenueTrend", name: "Revenue Trend", domain: "Finance", component: "SamorahChart", permission: "analytics.view", service: "analyticsService", route: "/admin/orders", refreshIntervalMs: null, dataSource: "orders", visibility: "always", displayOrder: 1, defaultSize: "lg", stage: 4, chartVariant: "area", defaultHeight: 220, showLegend: false, animationEnabled: true, colorToken: "gold" }),
-  w({ key: "chart.ordersTrend", name: "Orders Trend", domain: "Business", component: "SamorahChart", permission: "analytics.view", service: "analyticsService", route: "/admin/orders", refreshIntervalMs: null, dataSource: "orders", visibility: "always", displayOrder: 2, defaultSize: "lg", stage: 4, chartVariant: "bar", defaultHeight: 220, showLegend: false, animationEnabled: true, colorToken: "gold" }),
-  w({ key: "chart.customersTrend", name: "Customers Trend", domain: "Customer", component: "SamorahChart", permission: "analytics.view", service: "customerAdminService", route: "/admin/customers", refreshIntervalMs: null, dataSource: "customers", visibility: "always", displayOrder: 3, defaultSize: "lg", stage: 4, chartVariant: "line", defaultHeight: 220, showLegend: false, animationEnabled: true, colorToken: "gold" }),
-  w({ key: "chart.aovTrend", name: "Average Order Value Trend", domain: "Finance", component: "SamorahChart", permission: "analytics.view", service: "analyticsService", route: "/admin/orders", refreshIntervalMs: null, dataSource: "orders", visibility: "always", displayOrder: 4, defaultSize: "lg", stage: 4, chartVariant: "line", defaultHeight: 220, showLegend: false, animationEnabled: true, colorToken: "gold" }),
+  w({ key: "chart.revenueTrend", name: "Revenue Trend", domain: "Finance", component: "SamorahChart", permission: "analytics.view", service: "analyticsService", drillTarget: "orders", refreshIntervalMs: null, dataSource: "orders", visibility: "always", displayOrder: 1, defaultSize: "lg", stage: 4, chartVariant: "area", defaultHeight: 220, showLegend: false, animationEnabled: true, colorToken: "gold" }),
+  w({ key: "chart.ordersTrend", name: "Orders Trend", domain: "Business", component: "SamorahChart", permission: "analytics.view", service: "analyticsService", drillTarget: "orders", refreshIntervalMs: null, dataSource: "orders", visibility: "always", displayOrder: 2, defaultSize: "lg", stage: 4, chartVariant: "bar", defaultHeight: 220, showLegend: false, animationEnabled: true, colorToken: "gold" }),
+  w({ key: "chart.customersTrend", name: "Customers Trend", domain: "Customer", component: "SamorahChart", permission: "analytics.view", service: "customerAdminService", drillTarget: "customers", refreshIntervalMs: null, dataSource: "customers", visibility: "always", displayOrder: 3, defaultSize: "lg", stage: 4, chartVariant: "line", defaultHeight: 220, showLegend: false, animationEnabled: true, colorToken: "gold" }),
+  w({ key: "chart.aovTrend", name: "Average Order Value Trend", domain: "Finance", component: "SamorahChart", permission: "analytics.view", service: "analyticsService", drillTarget: "orders", refreshIntervalMs: null, dataSource: "orders", visibility: "always", displayOrder: 4, defaultSize: "lg", stage: 4, chartVariant: "line", defaultHeight: 220, showLegend: false, animationEnabled: true, colorToken: "gold" }),
 
   // ── Stage 6 · Exports ──
-  w({ key: "export.print", name: "Print Report", domain: "Business", component: "ExportButton", permission: "data.export", service: "analyticsService", route: null, refreshIntervalMs: null, dataSource: "derived", visibility: "always", displayOrder: 1, defaultSize: "sm", stage: 6 }),
-  w({ key: "export.excel", name: "Export Excel", domain: "Business", component: "ExportButton", permission: "data.export", service: "analyticsService", route: null, refreshIntervalMs: null, dataSource: "derived", visibility: "always", displayOrder: 2, defaultSize: "sm", stage: 6 }),
-  w({ key: "export.pdf", name: "Export PDF", domain: "Business", component: "ExportButton", permission: "data.export", service: "analyticsService", route: null, refreshIntervalMs: null, dataSource: "derived", visibility: "always", displayOrder: 3, defaultSize: "sm", stage: 6 }),
+  w({ key: "export.print", name: "Print Report", domain: "Business", component: "ExportButton", permission: "data.export", service: "analyticsService", refreshIntervalMs: null, dataSource: "derived", visibility: "always", displayOrder: 1, defaultSize: "sm", stage: 6 }),
+  w({ key: "export.excel", name: "Export Excel", domain: "Business", component: "ExportButton", permission: "data.export", service: "analyticsService", refreshIntervalMs: null, dataSource: "derived", visibility: "always", displayOrder: 2, defaultSize: "sm", stage: 6 }),
+  w({ key: "export.pdf", name: "Export PDF", domain: "Business", component: "ExportButton", permission: "data.export", service: "analyticsService", refreshIntervalMs: null, dataSource: "derived", visibility: "always", displayOrder: 3, defaultSize: "sm", stage: 6 }),
 
   // ── Stage 7 · Goals ──
-  w({ key: "goals.summary", name: "Business Goals", domain: "Business", component: "GoalProgress", permission: "analytics.view", service: "businessOverviewService", route: null, refreshIntervalMs: null, dataSource: "orders", visibility: "whenAvailable", displayOrder: 1, defaultSize: "md", stage: 7 }),
+  w({ key: "goals.summary", name: "Business Goals", domain: "Business", component: "GoalProgress", permission: "analytics.view", service: "businessOverviewService", refreshIntervalMs: null, dataSource: "orders", visibility: "whenAvailable", displayOrder: 1, defaultSize: "md", stage: 7 }),
 
   // ── System widgets (freshness + health) — foundation in Stage 1, surfaced in Stage 3 ──
-  w({ key: "system.dataFreshness", name: "Data Freshness", domain: "System", component: "DataFreshnessBar", permission: "analytics.view", service: "clarityService", route: null, refreshIntervalMs: null, dataSource: "derived", visibility: "always", displayOrder: 1, defaultSize: "full", stage: 3 }),
-  w({ key: "system.analyticsHealth", name: "Analytics Health", domain: "System", component: "AnalyticsHealth", permission: "analytics.view", service: "ga4DataService", route: null, refreshIntervalMs: null, dataSource: "derived", visibility: "always", displayOrder: 2, defaultSize: "full", stage: 3 }),
+  w({ key: "system.dataFreshness", name: "Data Freshness", domain: "System", component: "DataFreshnessBar", permission: "analytics.view", service: "clarityService", refreshIntervalMs: null, dataSource: "derived", visibility: "always", displayOrder: 1, defaultSize: "full", stage: 3 }),
+  w({ key: "system.analyticsHealth", name: "Analytics Health", domain: "System", component: "AnalyticsHealth", permission: "analytics.view", service: "ga4DataService", refreshIntervalMs: null, dataSource: "derived", visibility: "always", displayOrder: 2, defaultSize: "full", stage: 3 }),
 ];
 
 const BY_KEY: Record<string, AnalyticsWidget> = Object.fromEntries(ANALYTICS_WIDGETS.map((x) => [x.key, x]));

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { ANALYTICS_WIDGETS, getWidget, widgetsForStage, widgetsForDomain, isWidgetEnabled, ANALYTICS_SECTIONS, getSection, searchSections } from "@/lib/analytics/analyticsRegistry";
+import { ANALYTICS_WIDGETS, getWidget, widgetsForStage, widgetsForDomain, isWidgetEnabled, ANALYTICS_SECTIONS, getSection, searchSections, resolveDrill } from "@/lib/analytics/analyticsRegistry";
 
 const DOMAINS = ["Business", "Operations", "Marketing", "Finance", "Customer", "Inventory", "System"];
 
@@ -54,6 +54,38 @@ describe("analyticsRegistry (single source of truth)", () => {
       expect(typeof c.animationEnabled).toBe("boolean");
       expect(["gold", "ink", "green", "smoke", "red"]).toContain(c.colorToken);
     }
+  });
+
+  it("resolveDrill merges params, resolves route + tooltip, echoes analyticsContext", () => {
+    expect(resolveDrill("orders", { range: "30d" })).toEqual({
+      href: "/admin/orders?range=30d",
+      tooltip: "View Orders",
+      isExternal: false,
+      analyticsContext: { range: "30d" },
+    });
+    // merges into a route that already carries a query
+    expect(resolveDrill("ordersAwaiting")?.href).toBe("/admin/orders?awaiting=1");
+    expect(resolveDrill("inventory")).toMatchObject({ href: "/admin/inventory", tooltip: "Open Inventory" });
+  });
+
+  it("resolveDrill is deterministic — identical input yields identical output", () => {
+    expect(resolveDrill("orders", { range: "30d" })).toEqual(resolveDrill("orders", { range: "30d" }));
+    expect(resolveDrill("inventory")).toEqual(resolveDrill("inventory"));
+    expect(resolveDrill("ordersAwaiting", { range: "7d" })).toEqual(resolveDrill("ordersAwaiting", { range: "7d" }));
+  });
+
+  it("every drillable widget references a valid drill target (no broken routes)", () => {
+    for (const wd of ANALYTICS_WIDGETS) {
+      if (wd.isDrillable) {
+        expect(wd.drillTarget, `${wd.key} is drillable but has no target`).toBeTruthy();
+        expect(resolveDrill(wd.drillTarget!), `${wd.key} → invalid target`).not.toBeNull();
+      }
+    }
+    // non-drill widgets (GA4/exports/goals/system) must not be drillable
+    expect(getWidget("exec.visitors")?.isDrillable).toBe(false);
+    expect(getWidget("exec.conversion")?.isDrillable).toBe(false);
+    // and drillable ones are marked so
+    expect(getWidget("exec.revenue")?.isDrillable).toBe(true);
   });
 
   it("widgetsForDomain groups by owner domain", () => {

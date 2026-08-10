@@ -11,10 +11,30 @@ future customisation UI impossible.
 ## Decision
 A single manifest — `src/lib/analytics/analyticsRegistry.ts` — is the source of truth. Every widget
 declares: `key`, `name`, `domain` (Business / Operations / Marketing / Finance / Customer / Inventory /
-System), `component`, `featureFlag` + `defaultEnabled`, `permission`, `service`, `route`,
-`refreshIntervalMs`, `dataSource`, `visibility`, `displayOrder`, `defaultSize`, `stage`. Components and
-services are referenced by **string keys** so the manifest stays a pure, importable module with no React
-or DB dependencies. Feature-flag resolution (`isWidgetEnabled`) and env overrides live alongside.
+System), `component`, `featureFlag` + `defaultEnabled`, `permission`, `service`, `isDrillable` +
+`drillTarget`, `refreshIntervalMs`, `dataSource`, `visibility`, `displayOrder`, `defaultSize`, `stage`.
+Components and services are referenced by **string keys** so the manifest stays a pure, importable module
+with no React or DB dependencies. Feature-flag resolution (`isWidgetEnabled`) and env overrides live alongside.
+
+## Drill-down resolution (Stage 5)
+Navigation is centralized too: `ANALYTICS_DRILL_TARGETS` maps a named destination → `{ route, tooltip }`,
+and `resolveDrill(key, params)` produces the concrete link. Every surface resolves its destination from
+the registry — no inline route strings — so KPI cards, charts, and lower tiles stay consistent.
+
+```
+        analyticsRegistry
+  (ANALYTICS_DRILL_TARGETS + widget.drillTarget)
+                  │
+                  ▼
+   resolveDrill(key, params)
+   → { href, tooltip, isExternal, analyticsContext }
+                  │
+      ┌───────────┼────────────────┐
+      ▼           ▼                ▼
+ Executive     Charts          KpiCards
+  Summary    (SamorahChart)   (page tiles)
+ (KpiCards)
+```
 
 ## Consequences
 - One place to add, group (`widgetsForStage` / `widgetsForDomain`), flag, and RBAC-gate widgets.

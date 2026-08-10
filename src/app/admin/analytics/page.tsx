@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { AnalyticsNav } from "@/components/admin/AnalyticsNav";
 import { DataFreshnessBar } from "@/components/admin/DataFreshnessBar";
-import { ANALYTICS_SECTIONS } from "@/lib/analytics/analyticsRegistry";
+import { ANALYTICS_SECTIONS, resolveDrill, type DrillTargetKey } from "@/lib/analytics/analyticsRegistry";
+import { KpiCard } from "@/components/admin/KpiCard";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { hasCapability } from "@/lib/auth/capabilities";
@@ -29,8 +30,12 @@ const hrs = (n: number | null) => (n == null ? "—" : n < 48 ? `${n}h` : `${Mat
 const mins = (n: number | null) => (n == null ? "—" : n < 60 ? `${n}m` : `${Math.round((n / 60) * 10) / 10}h`);
 const pct = (n: number) => `${n}%`;
 
-function Tile({ v, l, tone }: { v: string; l: string; tone?: string }) {
-  return <div className="ash-metric"><span className="ash-metric__v" data-tone={tone ?? "plain"}>{v}</span><span className="ash-metric__l">{l}</span></div>;
+// Tile now delegates to the shared KpiCard (value-only). When a drill target `to` is given, it resolves
+// the destination + tooltip from the registry (single source of truth) and becomes a drill-down link;
+// otherwise it renders exactly as before. Non-drill metrics (rates/ratios, GA4, Clarity) omit `to`.
+function Tile({ v, l, tone, to, params }: { v: string; l: string; tone?: "plain" | "warn" | "gold"; to?: DrillTargetKey; params?: Record<string, string> }) {
+  const d = to ? resolveDrill(to, params) : null;
+  return <KpiCard label={l} value={v} tone={tone ?? "plain"} href={d?.href} tooltip={d?.tooltip} />;
 }
 
 export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<{ window?: string }> }) {
@@ -62,6 +67,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   ]);
   const windowLabel = win === "all" ? "all time" : `${win} days`;
   const ordersRange = win === "7" ? "7d" : win === "30" ? "30d" : null; // orders-page ?range value (90d/all → base list)
+  const winParams = ordersRange ? { range: ordersRange } : undefined; // contextual drill filter for the window
   const freshnessSources = [
     { label: "Orders", available: true, fetchedAtMs: kpi.freshness.fetchedAtMs, ttlMs: kpi.freshness.ttlMs },
     { label: "GA4", available: ga4.available, fetchedAtMs: null },
@@ -89,23 +95,23 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
       <section className="ash-metrics ash-anchor" id="business-overview">
         <h2 className="ash-jump__title">Business overview</h2>
         <div className="ash-metrics__row" style={{ marginBottom: 10 }}>
-          <Tile v={String(overview.today.orders)} l="Orders today" />
-          <Tile v={inr(overview.today.revenue)} l="Revenue today" />
-          <Tile v={inr(overview.window.revenue)} l={`Revenue (${win === "all" ? "all" : win + "d"})`} />
-          <Tile v={inr(overview.window.avgBasket)} l="Average basket" />
-          <Tile v={pct(overview.customers.repeatRate)} l="Repeat customers" />
+          <Tile v={String(overview.today.orders)} l="Orders today" to="orders" params={{ range: "today" }} />
+          <Tile v={inr(overview.today.revenue)} l="Revenue today" to="orders" params={{ range: "today" }} />
+          <Tile v={inr(overview.window.revenue)} l={`Revenue (${win === "all" ? "all" : win + "d"})`} to="orders" params={winParams} />
+          <Tile v={inr(overview.window.avgBasket)} l="Average basket" to="orders" params={winParams} />
+          <Tile v={pct(overview.customers.repeatRate)} l="Repeat customers" to="customers" />
         </div>
         <div className="ash-metrics__row" style={{ marginBottom: 10 }}>
-          <Tile v={String(overview.window.pending)} l="Pending orders" tone={overview.window.pending ? "warn" : "plain"} />
-          <Tile v={String(overview.window.cancelled)} l="Cancelled" />
-          <Tile v={String(overview.window.refunded)} l="Refunded" />
+          <Tile v={String(overview.window.pending)} l="Pending orders" tone={overview.window.pending ? "warn" : "plain"} to="ordersAwaiting" />
+          <Tile v={String(overview.window.cancelled)} l="Cancelled" to="ordersCancelled" />
+          <Tile v={String(overview.window.refunded)} l="Refunded" to="returns" />
           <Tile v={pct(overview.payment.codShare)} l="COD share" />
           <Tile v={pct(overview.payment.prepaidShare)} l="Prepaid share" />
         </div>
         <div className="ash-metrics__row">
-          <Tile v={String(overview.inventory.outOfStock)} l="Out of stock" tone={overview.inventory.outOfStock ? "warn" : "plain"} />
-          <Tile v={String(overview.inventory.lowStock)} l="Low stock" tone={overview.inventory.lowStock ? "warn" : "plain"} />
-          <Tile v={String(overview.customers.total)} l="Total customers" />
+          <Tile v={String(overview.inventory.outOfStock)} l="Out of stock" tone={overview.inventory.outOfStock ? "warn" : "plain"} to="inventory" />
+          <Tile v={String(overview.inventory.lowStock)} l="Low stock" tone={overview.inventory.lowStock ? "warn" : "plain"} to="inventory" />
+          <Tile v={String(overview.customers.total)} l="Total customers" to="customers" />
         </div>
         <div className="od-grid" style={{ marginTop: 12 }}>
           <div className="od-card">
@@ -126,11 +132,11 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
       <section className="ash-metrics ash-anchor" id="revenue">
         <h2 className="ash-jump__title">Revenue</h2>
         <div className="ash-metrics__row">
-          <Tile v={inr(a.revenue.gross)} l="Gross revenue" />
-          <Tile v={inr(a.revenue.net)} l="Net (after refunds)" />
-          <Tile v={String(a.revenue.orders)} l="Paid orders" />
-          <Tile v={inr(a.revenue.aov)} l="Avg order value" />
-          <Tile v={String(a.revenue.units)} l="Units sold" />
+          <Tile v={inr(a.revenue.gross)} l="Gross revenue" to="orders" params={winParams} />
+          <Tile v={inr(a.revenue.net)} l="Net (after refunds)" to="orders" params={winParams} />
+          <Tile v={String(a.revenue.orders)} l="Paid orders" to="orders" params={winParams} />
+          <Tile v={inr(a.revenue.aov)} l="Avg order value" to="orders" params={winParams} />
+          <Tile v={String(a.revenue.units)} l="Units sold" to="orders" params={winParams} />
         </div>
       </section>
 
@@ -143,8 +149,8 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
           <Tile v={mins(a.fulfillment.avgPickMinutes)} l="Avg pick time" />
           <Tile v={mins(a.fulfillment.avgPackMinutes)} l="Avg pack time" />
           <Tile v={hrs(a.fulfillment.avgCycleHours)} l="Order→dispatch" />
-          <Tile v={String(a.fulfillment.shipped)} l="Shipped" />
-          <Tile v={String(a.fulfillment.delivered)} l="Delivered" />
+          <Tile v={String(a.fulfillment.shipped)} l="Shipped" to="shipments" />
+          <Tile v={String(a.fulfillment.delivered)} l="Delivered" to="shipments" />
         </div>
       </section>
 
@@ -154,7 +160,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
           <Tile v={hrs(a.delivery.avgDeliveryHours)} l="Avg delivery time" />
           <Tile v={pct(a.delivery.rtoRate)} l="RTO rate" tone={a.delivery.rtoRate >= 10 ? "warn" : "plain"} />
           <Tile v={pct(a.delivery.exceptionRate)} l="Exception rate" tone={a.delivery.exceptionRate >= 10 ? "warn" : "plain"} />
-          <Tile v={inr(a.logistics.shippingCostTotal)} l="Shipping cost" />
+          <Tile v={inr(a.logistics.shippingCostTotal)} l="Shipping cost" to="shipments" />
           <Tile v={inr(a.logistics.revenueAfterShipping)} l="Revenue after shipping" />
         </div>
       </section>
@@ -162,10 +168,10 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
       <section className="ash-metrics ash-anchor" id="returns">
         <h2 className="ash-jump__title">Returns & refunds</h2>
         <div className="ash-metrics__row">
-          <Tile v={String(a.returns.count)} l="Returns" />
+          <Tile v={String(a.returns.count)} l="Returns" to="returns" />
           <Tile v={pct(a.returns.rate)} l="Return rate" tone={a.returns.rate >= 10 ? "warn" : "plain"} />
-          <Tile v={String(a.refunds.count)} l="Refunds" />
-          <Tile v={inr(a.refunds.total)} l="Refund total" />
+          <Tile v={String(a.refunds.count)} l="Refunds" to="returns" />
+          <Tile v={inr(a.refunds.total)} l="Refund total" to="returns" />
           <Tile v={pct(a.refunds.rate)} l="Refund rate" tone={a.refunds.rate >= 10 ? "warn" : "plain"} />
         </div>
         {a.returns.byReason.length ? (
