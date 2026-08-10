@@ -8,10 +8,30 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSiteSettings } from "@/services/siteSettingsService";
 import { channelOf, type Channel } from "@/lib/marketing/channel";
+import { computeFinancials, type FinancialSummary } from "@/lib/reports/financialEngine";
 
 const PAID = ["paid", "partially_refunded", "refunded"];
 const r1 = (n: number) => Math.round(n * 10) / 10;
 const r0 = (n: number) => Math.round(n);
+
+/**
+ * Row-safe pagination (R1A correctness). PostgREST caps a single response (default 1000 rows), which would
+ * silently UNDERCOUNT financial totals over large / all-time windows — unacceptable for a filing/P&L report.
+ * We page with a stable `id` order until a short page proves the set is exhausted. This is a correctness
+ * guarantee, not a performance optimisation (caching is R1B); for a small window it is a single round-trip.
+ */
+const PAGE = 1000;
+async function fetchAllOrders(makeQuery: () => any): Promise<any[]> {
+  const out: any[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await makeQuery().order("id", { ascending: true }).range(from, from + PAGE - 1);
+    if (error) throw error;
+    const rows = (data ?? []) as any[];
+    out.push(...rows);
+    if (rows.length < PAGE) break;
+  }
+  return out;
+}
 
 export interface GstByState { state: string; orders: number; taxable: number; cgst: number; sgst: number; igst: number; total: number }
 export interface Reports {
@@ -27,10 +47,11 @@ export async function getReports(windowDays: number | null = 30): Promise<Report
   const db = createAdminClient() as any;
   const cutoff = windowDays ? new Date(Date.now() - windowDays * 86400000).toISOString() : null;
 
-  let oq = db.from("orders").select("id,email,user_id,ship_state,coupon_code,total_amount,discount_amount,taxable_amount,cgst_amount,sgst_amount,igst_amount,placed_at,order_items(product_name,quantity,line_total)").in("payment_status", PAID);
-  if (cutoff) oq = oq.gte("placed_at", cutoff);
-  const { data } = await oq;
-  const orders = (data ?? []) as any[];
+  const orders = await fetchAllOrders(() => {
+    let q = db.from("orders").select("id,email,user_id,ship_state,coupon_code,total_amount,discount_amount,taxable_amount,cgst_amount,sgst_amount,igst_amount,placed_at,order_items(product_name,quantity,line_total)").in("payment_status", PAID);
+    if (cutoff) q = q.gte("placed_at", cutoff);
+    return q;
+  });
 
   // GST totals + by state
   const gst = { taxable: 0, cgst: 0, sgst: 0, igst: 0, total: 0, byState: [] as GstByState[] };
@@ -79,29 +100,22 @@ export async function getReports(windowDays: number | null = 30): Promise<Report
   return { windowDays, gst, topProducts, coupons, customers, ordersByState };
 }
 
-// ── Profit report (R10) ──────────────────────────────────────────────────────
-export interface ProfitReport {
-  windowDays: number | null;
-  orders: number;
-  goodsRevenue: number;      // Σ taxable_amount — goods, ex-GST, post-discount (the true top line)
-  shippingCollected: number; // Σ shipping charged to customers (income)
-  gstCollected: number;      // pass-through — collected & remitted, not profit (shown as a memo)
-  cogs: number;              // Σ variant cost × qty
-  packaging: number;         // orders × packagingPerOrder
-  shippingCost: number;      // orders × shippingCostPerOrder (what we pay couriers)
-  paymentFees: number;       // grossCollected × paymentFeePercent%
-  profit: number;            // goodsRevenue + shippingCollected − cogs − packaging − shippingCost − paymentFees
-  margin: number;            // profit / goodsRevenue %
-  variantsMissingCost: number; // sold variants with cost 0 → profit is optimistic until filled
-}
+// ── Profit report (R10) — now a thin adapter over the canonical Financial Engine (R1A) ────────────────
+/** P&L for a window = the canonical `FinancialSummary` plus the window it covers. */
+export type ProfitReport = { windowDays: number | null } & FinancialSummary;
 
 /**
- * P&L for a window. Revenue + shipping-collected are income; COGS (from per-variant
- * cost) + packaging + courier cost + payment-gateway fee are expenses; GST is a
- * pass-through memo, not profit. Cost inputs that orders can't tell us (packaging,
- * payment fee %, courier cost) come from editable site settings. Variants sold with
- * a zero cost are counted so the founder knows the profit is optimistic until costs
- * are entered — we never silently overstate margin.
+ * P&L for a window, computed by the single canonical Financial Engine (`lib/reports/financialEngine`). This
+ * service only fetches (row-safe) and SUMS the raw components; every derivation — Revenue After Refunds,
+ * Operating Profit, Margin — comes from the engine so no other surface re-derives a financial number.
+ *
+ * R1A correctness notes vs the previous implementation:
+ *   • Net Revenue is Σ taxable_amount, which ALREADY includes shipping's ex-GST portion. Shipping is no
+ *     longer added a second time via shipping_amount (that double-counted shipping and overstated profit).
+ *   • Refunds (Σ refund_amount) are subtracted → Revenue After Refunds. We never knowingly overstate.
+ *   • Row-safe pagination guarantees large / all-time windows are not undercounted by the PostgREST cap.
+ * Cost inputs orders can't tell us (packaging, payment-fee %, courier cost) come from editable site
+ * settings; variants sold with a zero cost are counted so profit is flagged optimistic, never overstated.
  */
 export async function getProfitReport(windowDays: number | null = 30): Promise<ProfitReport> {
   const db = createAdminClient() as any;
@@ -109,10 +123,11 @@ export async function getProfitReport(windowDays: number | null = 30): Promise<P
   const settings = await getSiteSettings();
   const { packagingPerOrder, paymentFeePercent, shippingCostPerOrder } = settings.costs;
 
-  let oq = db.from("orders").select("id,total_amount,taxable_amount,shipping_amount,cgst_amount,sgst_amount,igst_amount,placed_at,order_items(variant_id,quantity)").in("payment_status", PAID);
-  if (cutoff) oq = oq.gte("placed_at", cutoff);
-  const { data } = await oq;
-  const orders = (data ?? []) as any[];
+  const orders = await fetchAllOrders(() => {
+    let q = db.from("orders").select("id,subtotal,total_amount,taxable_amount,shipping_amount,discount_amount,cgst_amount,sgst_amount,igst_amount,refund_amount,placed_at,order_items(variant_id,quantity)").in("payment_status", PAID);
+    if (cutoff) q = q.gte("placed_at", cutoff);
+    return q;
+  });
 
   // Cost lookup for every variant that sold in the window.
   const variantIds = [...new Set(orders.flatMap((o) => (o.order_items ?? []).map((it: any) => it.variant_id).filter(Boolean)))];
@@ -122,13 +137,17 @@ export async function getProfitReport(windowDays: number | null = 30): Promise<P
     for (const v of vs ?? []) costMap.set(v.id, Number(v.cost_price ?? 0));
   }
 
-  let goodsRevenue = 0, shippingCollected = 0, gstCollected = 0, grossCollected = 0, cogs = 0;
+  // Sum the raw components; the engine owns every derivation.
+  let grossSales = 0, discounts = 0, shippingCollected = 0, gstCollected = 0, grossCollected = 0, netRevenue = 0, refunds = 0, cogs = 0;
   const missing = new Set<string>();
   for (const o of orders) {
-    goodsRevenue += Number(o.taxable_amount ?? 0);
+    grossSales += Number(o.subtotal ?? 0);
+    discounts += Number(o.discount_amount ?? 0);
     shippingCollected += Number(o.shipping_amount ?? 0);
     gstCollected += Number(o.cgst_amount ?? 0) + Number(o.sgst_amount ?? 0) + Number(o.igst_amount ?? 0);
     grossCollected += Number(o.total_amount ?? 0);
+    netRevenue += Number(o.taxable_amount ?? 0);
+    refunds += Number(o.refund_amount ?? 0);
     for (const it of o.order_items ?? []) {
       if (!it.variant_id) continue;
       const c = costMap.get(it.variant_id);
@@ -138,18 +157,16 @@ export async function getProfitReport(windowDays: number | null = 30): Promise<P
   }
 
   const n = orders.length;
-  const packaging = n * packagingPerOrder;
-  const shippingCost = n * shippingCostPerOrder;
-  const paymentFees = grossCollected * (paymentFeePercent / 100);
-  const profit = goodsRevenue + shippingCollected - cogs - packaging - shippingCost - paymentFees;
-  const margin = goodsRevenue > 0 ? r1((profit / goodsRevenue) * 100) : 0;
+  const summary = computeFinancials({
+    orders: n,
+    grossSales, discounts, shippingCollected, gstCollected, grossCollected, netRevenue, refunds, cogs,
+    packaging: n * packagingPerOrder,
+    shippingCost: n * shippingCostPerOrder,
+    gatewayFees: grossCollected * (paymentFeePercent / 100),
+    variantsMissingCost: missing.size,
+  });
 
-  return {
-    windowDays, orders: n,
-    goodsRevenue: r0(goodsRevenue), shippingCollected: r0(shippingCollected), gstCollected: r0(gstCollected),
-    cogs: r0(cogs), packaging: r0(packaging), shippingCost: r0(shippingCost), paymentFees: r0(paymentFees),
-    profit: r0(profit), margin, variantsMissingCost: missing.size,
-  };
+  return { windowDays, ...summary };
 }
 
 // ── Fragrance report (R12) ───────────────────────────────────────────────────

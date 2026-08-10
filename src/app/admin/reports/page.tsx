@@ -26,11 +26,20 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const sp = await searchParams;
   const win = ["30", "90", "365", "all"].includes(sp.window ?? "") ? (sp.window as string) : "30";
   const windowDays = win === "all" ? null : Number(win);
-  const [r, profit, fragrances, cohorts, channels] = await Promise.all([
+
+  // Resilient foundation (R1A): each report degrades independently — one failing aggregation renders a
+  // scoped fallback for that section instead of blanking the whole financial report.
+  const settled = await Promise.allSettled([
     getReports(windowDays), getProfitReport(windowDays), getFragranceReport(windowDays), getCohortReport(6), getChannelReport(windowDays),
   ]);
+  for (const s of settled) if (s.status === "rejected") console.error("[reports] a section failed to calculate:", s.reason);
+  const val = <T,>(res: PromiseSettledResult<T>): T | null => (res.status === "fulfilled" ? res.value : null);
+  const [rRes, profitRes, fragRes, cohortRes, channelRes] = settled;
+  const r = val(rRes), profit = val(profitRes), fragrances = val(fragRes), cohorts = val(cohortRes), channels = val(channelRes);
+
   const canExport = hasCapability(staff.role, "data.export");
-  const bestFrag = fragrances[0]; const worstFrag = fragrances.length > 1 ? fragrances[fragrances.length - 1] : undefined;
+  const bestFrag = fragrances?.[0]; const worstFrag = fragrances && fragrances.length > 1 ? fragrances[fragrances.length - 1] : undefined;
+  const sectionError = <p className="admin__empty">This section couldn’t be calculated right now — the rest of the report is unaffected.</p>;
 
   return (
     <main className="admin">
@@ -43,34 +52,46 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         {WINDOWS.map((w) => <Link key={w.k} href={`/admin/reports?window=${w.k}`} className="ff-queue" data-active={win === w.k ? "1" : "0"}>{w.l}</Link>)}
       </nav>
 
-      {/* Profit / P&L (R10) */}
+      {/* Profit / P&L (R10) — canonical Financial Engine (R1A: ex-GST, refund-adjusted, no shipping double-count) */}
+      {profit ? (
       <section className="ash-metrics">
         <div className="ash-activity__head">
           <h2 className="ash-jump__title">Profit &amp; loss</h2>
-          <span className="admin__muted">{profit.orders} paid orders · margin on goods revenue</span>
+          <span className="admin__muted">{profit.orders} paid orders · ex-GST · refund-adjusted</span>
         </div>
         <div className="ash-metrics__row" style={{ marginBottom: 12 }}>
-          <div className="ash-metric"><span className="ash-metric__v">{inr(profit.profit)}</span><span className="ash-metric__l">Operating profit</span></div>
+          <div className="ash-metric"><span className="ash-metric__v">{inr(profit.operatingProfit)}</span><span className="ash-metric__l">Operating profit</span></div>
           <div className="ash-metric"><span className="ash-metric__v">{profit.margin}%</span><span className="ash-metric__l">Margin</span></div>
-          <div className="ash-metric"><span className="ash-metric__v">{inr(profit.goodsRevenue)}</span><span className="ash-metric__l">Goods revenue (ex-GST)</span></div>
+          <div className="ash-metric"><span className="ash-metric__v">{inr(profit.revenue)}</span><span className="ash-metric__l">Revenue (after refunds)</span></div>
           <div className="ash-metric"><span className="ash-metric__v">{inr(profit.cogs)}</span><span className="ash-metric__l">COGS</span></div>
         </div>
         <div className="admin__table-wrap">
           <table className="admin__table">
             <tbody>
-              <tr><td>Goods revenue (ex-GST, post-discount)</td><td className="admin__mono">{inr(profit.goodsRevenue)}</td></tr>
-              <tr><td>+ Shipping collected</td><td className="admin__mono">{inr(profit.shippingCollected)}</td></tr>
+              <tr><td>Net revenue (ex-GST, post-discount)</td><td className="admin__mono">{inr(profit.netRevenue)}</td></tr>
+              <tr><td>− Refunds (revenue reversed)</td><td className="admin__mono">−{inr(profit.refunds)}</td></tr>
+              <tr style={{ fontWeight: 600 }}><td>= Revenue after refunds</td><td className="admin__mono">{inr(profit.revenue)}</td></tr>
               <tr><td>− COGS (unit cost × qty)</td><td className="admin__mono">−{inr(profit.cogs)}</td></tr>
               <tr><td>− Packaging</td><td className="admin__mono">−{inr(profit.packaging)}</td></tr>
               <tr><td>− Shipping cost (courier)</td><td className="admin__mono">−{inr(profit.shippingCost)}</td></tr>
-              <tr><td>− Payment gateway fees</td><td className="admin__mono">−{inr(profit.paymentFees)}</td></tr>
-              <tr style={{ fontWeight: 600 }}><td>= Operating profit</td><td className="admin__mono">{inr(profit.profit)}</td></tr>
+              <tr><td>− Payment gateway fees</td><td className="admin__mono">−{inr(profit.gatewayFees)}</td></tr>
+              <tr style={{ fontWeight: 600 }}><td>= Operating profit</td><td className="admin__mono">{inr(profit.operatingProfit)}</td></tr>
               <tr><td className="admin__muted">GST collected (pass-through, remitted — not profit)</td><td className="admin__mono admin__muted">{inr(profit.gstCollected)}</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div className="admin__table-wrap" style={{ marginTop: 8 }}>
+          <table className="admin__table">
+            <tbody>
+              <tr><td className="admin__muted">Gross sales (incl. GST, pre-discount)</td><td className="admin__mono admin__muted">{inr(profit.grossSales)}</td></tr>
+              <tr><td className="admin__muted">Discounts</td><td className="admin__mono admin__muted">−{inr(profit.discounts)}</td></tr>
+              <tr><td className="admin__muted">Shipping collected (incl. GST — already within net revenue)</td><td className="admin__mono admin__muted">{inr(profit.shippingCollected)}</td></tr>
             </tbody>
           </table>
         </div>
         {profit.variantsMissingCost > 0 ? <p className="cfg-hint">⚠ {profit.variantsMissingCost} sold variant{profit.variantsMissingCost === 1 ? " has" : "s have"} no cost set — profit is optimistic until cost is entered on those variants (Products → edit → variant “cost ₹”). Packaging, courier cost and payment-fee % come from Settings → Operating costs.</p> : <p className="cfg-hint">Packaging, courier cost and payment-fee % come from Settings → Operating costs.</p>}
       </section>
+      ) : <section className="ash-metrics"><div className="ash-activity__head"><h2 className="ash-jump__title">Profit &amp; loss</h2></div>{sectionError}</section>}
 
       {/* GST report */}
       <section className="ash-metrics">
@@ -78,6 +99,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           <h2 className="ash-jump__title">GST report</h2>
           {canExport ? <a className="text-link" href={`/api/admin/reports/gst?window=${win}`}>Export CSV</a> : null}
         </div>
+        {r ? (<>
         <div className="ash-metrics__row" style={{ marginBottom: 12 }}>
           <div className="ash-metric"><span className="ash-metric__v">{inr(r.gst.taxable)}</span><span className="ash-metric__l">Taxable value</span></div>
           <div className="ash-metric"><span className="ash-metric__v">{inr(r.gst.cgst)}</span><span className="ash-metric__l">CGST</span></div>
@@ -96,8 +118,10 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
             </tbody>
           </table>
         </div>
+        </>) : sectionError}
       </section>
 
+      {r ? (<>
       <div className="od-grid">
         {/* Top products */}
         <section className="od-card">
@@ -135,11 +159,12 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           )) : <p className="admin__muted">No orders in window.</p>}
         </section>
       </div>
+      </>) : null}
 
       {/* Fragrance performance (R12) */}
       <section className="ash-metrics">
         <div className="ash-activity__head"><h2 className="ash-jump__title">Fragrance performance</h2><span className="admin__muted">by revenue · units · return rate</span></div>
-        {fragrances.length ? (
+        {fragrances == null ? sectionError : fragrances.length ? (
           <>
             <div className="ash-metrics__row" style={{ marginBottom: 12 }}>
               {bestFrag ? <div className="ash-metric"><span className="ash-metric__v">{bestFrag.family}</span><span className="ash-metric__l">Best seller · {inr(bestFrag.revenue)}</span></div> : null}
@@ -162,7 +187,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       {/* Acquisition channels */}
       <section className="ash-metrics">
         <div className="ash-activity__head"><h2 className="ash-jump__title">Acquisition channels</h2><span className="admin__muted">revenue by normalised UTM channel</span></div>
-        {channels.length ? (
+        {channels == null ? sectionError : channels.length ? (
           <div className="admin__table-wrap">
             <table className="admin__table">
               <thead><tr><th>Channel</th><th>Orders</th><th>Revenue</th><th>AOV</th><th>Share</th></tr></thead>
@@ -180,7 +205,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       {/* Retention cohorts (R11) */}
       <section className="ash-metrics">
         <div className="ash-activity__head"><h2 className="ash-jump__title">Retention cohorts</h2><span className="admin__muted">% of each acquisition month that ordered again, by months since</span></div>
-        {cohorts.cohorts.length ? (
+        {cohorts == null ? sectionError : cohorts.cohorts.length ? (
           <div className="admin__table-wrap">
             <table className="admin__table">
               <thead><tr><th>Cohort</th><th>Buyers</th>{Array.from({ length: cohorts.months + 1 }, (_, k) => <th key={k}>M{k}</th>)}</tr></thead>
