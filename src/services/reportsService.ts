@@ -5,10 +5,13 @@
  * state, for filing), top products by revenue, coupon usage, repeat-customer rate,
  * and orders-by-state. All derived from paid orders in a window.
  */
+import { unstable_cache } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSiteSettings } from "@/services/siteSettingsService";
 import { channelOf, type Channel } from "@/lib/marketing/channel";
 import { computeFinancials, type FinancialSummary } from "@/lib/reports/financialEngine";
+import { cacheSeconds, cacheMs } from "@/lib/analytics/cacheConfig";
+import { makeFreshness, type DataFreshness } from "@/lib/analytics/dataFreshness";
 
 const PAID = ["paid", "partially_refunded", "refunded"];
 const r1 = (n: number) => Math.round(n * 10) / 10;
@@ -33,6 +36,29 @@ async function fetchAllOrders(makeQuery: () => any): Promise<any[]> {
   return out;
 }
 
+/**
+ * Caching & freshness model (R1B) — ARCHITECTURAL REFERENCE (documents current behaviour; adds no logic).
+ *
+ * CACHE INVALIDATION — when a cached report is expected to become stale:
+ *   • Cache TTL expiry — the ONLY active mechanism today. Every reader revalidates after
+ *     `cacheSeconds("reports")` (5 min default, `ANALYTICS_CACHE_REPORTS_MS`-overridable), so a financial
+ *     report is never more than one TTL behind the underlying orders.
+ *   • Event-driven invalidation — a SEAM, not yet wired: every reader is tagged `["reports"]`, so a future
+ *     `revalidateTag("reports")` can force-refresh precisely on the events that change the numbers — a new
+ *     PAID ORDER, a PROCESSED REFUND, or an ORDER CANCELLATION. No such call exists yet; wiring it is
+ *     intentionally out of R1B scope (this is documentation only).
+ *   • Manual refresh — a user-triggered refresh control is a later-stage (R2/R3) concern; none exists today.
+ *   Net: today staleness is bounded solely by the 5-minute TTL; the tag is the hook for exact event-based
+ *   invalidation later without touching any call site.
+ *
+ * FRESHNESS MODEL — what the `freshness` field on Reports/ProfitReport represents: CACHED DATA, not a live
+ * computation. `fetchedAtMs` is stamped INSIDE the cached function, so it is frozen at the moment the
+ * snapshot was (re)computed and returned unchanged on cache hits — i.e. "age since last recomputation".
+ * `source` is `"orders"` (first-party order snapshots — our own DB, no external provider); `ttlMs` is the
+ * reports TTL (non-null ⇒ cached). A later stage renders "Based on order snapshots · updated Xm ago" from
+ * these fields; R1B only exposes them, changing no UI or business logic.
+ */
+
 export interface GstByState { state: string; orders: number; taxable: number; cgst: number; sgst: number; igst: number; total: number }
 export interface Reports {
   windowDays: number | null;
@@ -41,9 +67,21 @@ export interface Reports {
   coupons: { code: string; redemptions: number; discountGiven: number }[];
   customers: { total: number; returning: number; newCustomers: number; repeatRate: number };
   ordersByState: { state: string; orders: number; revenue: number }[];
+  /** R1B freshness — epoch ms when this snapshot was computed (frozen inside the cache entry). */
+  freshness: DataFreshness;
 }
 
+/** Cached reader (R1B). Output is byte-identical to `computeReports` — `unstable_cache` is a pass-through;
+ *  only the compute time is memoised. Keyed by window; TTL from the central `reports` cache config. */
 export async function getReports(windowDays: number | null = 30): Promise<Reports> {
+  return unstable_cache(
+    () => computeReports(windowDays),
+    ["reports-summary", String(windowDays ?? "all")],
+    { revalidate: cacheSeconds("reports"), tags: ["reports"] },
+  )();
+}
+
+async function computeReports(windowDays: number | null = 30): Promise<Reports> {
   const db = createAdminClient() as any;
   const cutoff = windowDays ? new Date(Date.now() - windowDays * 86400000).toISOString() : null;
 
@@ -97,12 +135,22 @@ export async function getReports(windowDays: number | null = 30): Promise<Report
 
   const ordersByState = [...revByState.entries()].map(([state, v]) => ({ state, orders: v.orders, revenue: r1(v.revenue) })).sort((a, b) => b.revenue - a.revenue);
 
-  return { windowDays, gst, topProducts, coupons, customers, ordersByState };
+  const freshness = makeFreshness("orders", { fetchedAtMs: Date.now(), ttlMs: cacheMs("reports"), available: true });
+  return { windowDays, gst, topProducts, coupons, customers, ordersByState, freshness };
 }
 
 // ── Profit report (R10) — now a thin adapter over the canonical Financial Engine (R1A) ────────────────
-/** P&L for a window = the canonical `FinancialSummary` plus the window it covers. */
-export type ProfitReport = { windowDays: number | null } & FinancialSummary;
+/** P&L for a window = the canonical `FinancialSummary` plus the window it covers and a freshness stamp. */
+export type ProfitReport = { windowDays: number | null; freshness: DataFreshness } & FinancialSummary;
+
+/** Cached reader (R1B). Byte-identical to `computeProfitReport`; only compute time is memoised. */
+export async function getProfitReport(windowDays: number | null = 30): Promise<ProfitReport> {
+  return unstable_cache(
+    () => computeProfitReport(windowDays),
+    ["reports-profit", String(windowDays ?? "all")],
+    { revalidate: cacheSeconds("reports"), tags: ["reports"] },
+  )();
+}
 
 /**
  * P&L for a window, computed by the single canonical Financial Engine (`lib/reports/financialEngine`). This
@@ -117,7 +165,7 @@ export type ProfitReport = { windowDays: number | null } & FinancialSummary;
  * Cost inputs orders can't tell us (packaging, payment-fee %, courier cost) come from editable site
  * settings; variants sold with a zero cost are counted so profit is flagged optimistic, never overstated.
  */
-export async function getProfitReport(windowDays: number | null = 30): Promise<ProfitReport> {
+async function computeProfitReport(windowDays: number | null = 30): Promise<ProfitReport> {
   const db = createAdminClient() as any;
   const cutoff = windowDays ? new Date(Date.now() - windowDays * 86400000).toISOString() : null;
   const settings = await getSiteSettings();
@@ -166,7 +214,8 @@ export async function getProfitReport(windowDays: number | null = 30): Promise<P
     variantsMissingCost: missing.size,
   });
 
-  return { windowDays, ...summary };
+  const freshness = makeFreshness("orders", { fetchedAtMs: Date.now(), ttlMs: cacheMs("reports"), available: true });
+  return { windowDays, freshness, ...summary };
 }
 
 // ── Fragrance report (R12) ───────────────────────────────────────────────────
@@ -179,6 +228,14 @@ export interface FragranceRow { family: string; units: number; revenue: number; 
  * family fall under "Unclassified" rather than being dropped.
  */
 export async function getFragranceReport(windowDays: number | null = 90): Promise<FragranceRow[]> {
+  return unstable_cache(
+    () => computeFragranceReport(windowDays),
+    ["reports-fragrance", String(windowDays ?? "all")],
+    { revalidate: cacheSeconds("reports"), tags: ["reports"] },
+  )();
+}
+
+async function computeFragranceReport(windowDays: number | null = 90): Promise<FragranceRow[]> {
   const db = createAdminClient() as any;
   const cutoff = windowDays ? new Date(Date.now() - windowDays * 86400000).toISOString() : null;
 
@@ -229,6 +286,14 @@ export interface ChannelRow { channel: Channel; orders: number; revenue: number;
  * "where is money actually coming from?" `share` is % of window revenue.
  */
 export async function getChannelReport(windowDays: number | null = 90): Promise<ChannelRow[]> {
+  return unstable_cache(
+    () => computeChannelReport(windowDays),
+    ["reports-channels", String(windowDays ?? "all")],
+    { revalidate: cacheSeconds("reports"), tags: ["reports"] },
+  )();
+}
+
+async function computeChannelReport(windowDays: number | null = 90): Promise<ChannelRow[]> {
   const db = createAdminClient() as any;
   const cutoff = windowDays ? new Date(Date.now() - windowDays * 86400000).toISOString() : null;
   let q = db.from("orders").select("total_amount,utm_source,utm_medium,placed_at").in("payment_status", PAID);
@@ -263,6 +328,14 @@ export interface CohortReport { months: number; cohorts: CohortRow[] }
  * historical); `months` bounds how many follow-up columns to show.
  */
 export async function getCohortReport(months = 6): Promise<CohortReport> {
+  return unstable_cache(
+    () => computeCohortReport(months),
+    ["reports-cohorts", String(months)],
+    { revalidate: cacheSeconds("reports"), tags: ["reports"] },
+  )();
+}
+
+async function computeCohortReport(months = 6): Promise<CohortReport> {
   const db = createAdminClient() as any;
   const { data } = await db.from("orders").select("user_id,email,placed_at").in("payment_status", PAID).order("placed_at");
   const orders = (data ?? []) as any[];

@@ -43,6 +43,20 @@
  * ─────────────────────────────────────────────────────────────────────────────────────────────────────
  */
 
+/**
+ * ─────────────────────────────────────────────────────────────────────────────────────────────────────
+ * Calculation Assumptions (REPORTS_CALC_VERSION v1)
+ *
+ *   • taxable_amount already includes shipping taxable value.
+ *   • shipping_amount is reported for information only and is never added to revenue.
+ *   • refund_amount is GST-inclusive.
+ *   • gateway fee is calculated from paid order value.
+ *   • COGS is not reversed on refunds.
+ *   • Packaging cost is applied once per fulfilled order.
+ *   • Shipping cost represents courier expense.
+ * ─────────────────────────────────────────────────────────────────────────────────────────────────────
+ */
+
 /** Bump this when the frozen financial definitions above change intentionally. Displayed in R2's banner and
  *  used to stamp historical exports. */
 export const REPORTS_CALC_VERSION = "v1";
