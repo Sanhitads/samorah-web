@@ -18,15 +18,16 @@ explicit approval.
 - Tests for every calculation, transformation, RPC, and KPI.
 
 ## Milestone 2 — Analytics Polish (ACTIVE) — fixed stage order
-1. **Foundation** — shared `KpiCard`; SQL aggregation / RPCs / materialized views; previous-period
-   calculations; caching; pagination; performance optimisation; the central `analyticsRegistry`, feature
-   flags, data-freshness, source-specific empty states, event logging + analytics-health foundations.
-   *Everything after Stage 1 consumes this optimized data layer.*
-2. **Executive Dashboard** — Executive Summary using optimized services; every KPI shows current /
-   previous / difference / % / trend arrow / tooltip / optional mini-sparkline / date range; graceful empty states.
-3. **Navigation & Filters** — sticky nav + sticky date selector; smooth scrolling; section jump links;
-   remember last range; refresh controls + last-updated; data-freshness indicators; Saved-Filter
-   *architecture only* (no DB for saved views this milestone).
+1. **Foundation** — ✅ **COMPLETED** (`899a828`) — shared `KpiCard`; SQL aggregation / RPCs / materialized
+   views; previous-period calculations; caching; pagination; performance optimisation; the central
+   `analyticsRegistry`, feature flags, data-freshness, source-specific empty states, ops-log +
+   analytics-health foundations. *Everything after Stage 1 consumes this optimized data layer.*
+2. **Executive Dashboard** — ✅ **COMPLETED** (`11ce139`) — Executive Summary using optimized services;
+   every KPI shows current / previous / difference / % / trend arrow / tooltip / optional mini-sparkline /
+   date range; graceful source-specific empty states; context-preserving drill-downs.
+3. **Navigation & Filters** — ⭐ **NEXT** — sticky nav + sticky date selector; smooth scrolling; section
+   jump links; remember last range; refresh controls + last-updated; data-freshness indicators;
+   Saved-Filter *architecture only* (no DB for saved views this milestone).
 4. **Charts** — `SamorahChart` only (variants: line, area, bar, stackedBar, donut; wraps Recharts, never
    exposed). Revenue / Orders / Customers / AOV; ranges 7 / 30 / 90 / 365 / custom. Minimal, elegant.
 5. **Drill-downs** — every KPI navigates to the existing admin page (normal / middle / ctrl-click).
