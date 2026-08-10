@@ -42,6 +42,12 @@ export interface AnalyticsWidget {
   displayOrder: number;
   defaultSize: WidgetSize;
   stage: 1 | 2 | 3 | 4 | 5 | 6 | 7; // Milestone-2 stage that delivers it
+  // ── Chart-widget metadata (Stage 4) — optional; only chart.* widgets declare these. Metadata only. ──
+  chartVariant?: "line" | "area" | "bar" | "stackedBar" | "donut";
+  defaultHeight?: number;
+  showLegend?: boolean;
+  animationEnabled?: boolean;
+  colorToken?: "gold" | "ink" | "green" | "smoke" | "red";
 }
 
 const w = (o: Omit<AnalyticsWidget, "featureFlag" | "defaultEnabled"> & { featureFlag?: string; defaultEnabled?: boolean }): AnalyticsWidget => ({
@@ -65,10 +71,10 @@ export const ANALYTICS_WIDGETS: AnalyticsWidget[] = [
   w({ key: "exec.lowStock", name: "Low Stock Count", domain: "Inventory", component: "KpiCard", permission: "analytics.view", service: "businessOverviewService", route: "/admin/inventory", refreshIntervalMs: 300_000, dataSource: "inventory", visibility: "always", displayOrder: 9, defaultSize: "sm", stage: 2 }),
 
   // ── Stage 4 · Trend charts (SamorahChart) ──
-  w({ key: "chart.revenueTrend", name: "Revenue Trend", domain: "Finance", component: "SamorahChart", permission: "analytics.view", service: "analyticsService", route: "/admin/orders", refreshIntervalMs: null, dataSource: "orders", visibility: "always", displayOrder: 1, defaultSize: "lg", stage: 4 }),
-  w({ key: "chart.ordersTrend", name: "Orders Trend", domain: "Business", component: "SamorahChart", permission: "analytics.view", service: "analyticsService", route: "/admin/orders", refreshIntervalMs: null, dataSource: "orders", visibility: "always", displayOrder: 2, defaultSize: "lg", stage: 4 }),
-  w({ key: "chart.customersTrend", name: "Customers Trend", domain: "Customer", component: "SamorahChart", permission: "analytics.view", service: "customerAdminService", route: "/admin/customers", refreshIntervalMs: null, dataSource: "customers", visibility: "always", displayOrder: 3, defaultSize: "lg", stage: 4 }),
-  w({ key: "chart.aovTrend", name: "Average Order Value Trend", domain: "Finance", component: "SamorahChart", permission: "analytics.view", service: "analyticsService", route: "/admin/orders", refreshIntervalMs: null, dataSource: "orders", visibility: "always", displayOrder: 4, defaultSize: "lg", stage: 4 }),
+  w({ key: "chart.revenueTrend", name: "Revenue Trend", domain: "Finance", component: "SamorahChart", permission: "analytics.view", service: "analyticsService", route: "/admin/orders", refreshIntervalMs: null, dataSource: "orders", visibility: "always", displayOrder: 1, defaultSize: "lg", stage: 4, chartVariant: "area", defaultHeight: 220, showLegend: false, animationEnabled: true, colorToken: "gold" }),
+  w({ key: "chart.ordersTrend", name: "Orders Trend", domain: "Business", component: "SamorahChart", permission: "analytics.view", service: "analyticsService", route: "/admin/orders", refreshIntervalMs: null, dataSource: "orders", visibility: "always", displayOrder: 2, defaultSize: "lg", stage: 4, chartVariant: "bar", defaultHeight: 220, showLegend: false, animationEnabled: true, colorToken: "gold" }),
+  w({ key: "chart.customersTrend", name: "Customers Trend", domain: "Customer", component: "SamorahChart", permission: "analytics.view", service: "customerAdminService", route: "/admin/customers", refreshIntervalMs: null, dataSource: "customers", visibility: "always", displayOrder: 3, defaultSize: "lg", stage: 4, chartVariant: "line", defaultHeight: 220, showLegend: false, animationEnabled: true, colorToken: "gold" }),
+  w({ key: "chart.aovTrend", name: "Average Order Value Trend", domain: "Finance", component: "SamorahChart", permission: "analytics.view", service: "analyticsService", route: "/admin/orders", refreshIntervalMs: null, dataSource: "orders", visibility: "always", displayOrder: 4, defaultSize: "lg", stage: 4, chartVariant: "line", defaultHeight: 220, showLegend: false, animationEnabled: true, colorToken: "gold" }),
 
   // ── Stage 6 · Exports ──
   w({ key: "export.print", name: "Print Report", domain: "Business", component: "ExportButton", permission: "data.export", service: "analyticsService", route: null, refreshIntervalMs: null, dataSource: "derived", visibility: "always", displayOrder: 1, defaultSize: "sm", stage: 6 }),
@@ -119,6 +125,7 @@ export const ANALYTICS_SECTIONS: AnalyticsSection[] = [
   { id: "executive-summary", label: "Summary", keywords: ["executive", "kpi", "today", "overview", "glance"] },
   { id: "business-overview", label: "Overview", keywords: ["business", "ceo", "orders", "revenue", "customers", "payment"] },
   { id: "revenue", label: "Revenue", keywords: ["gross", "net", "refunds", "aov", "sales"] },
+  { id: "trends", label: "Trends", keywords: ["chart", "trend", "graph", "revenue", "orders", "customers", "aov"] },
   { id: "fulfillment", label: "Fulfilment", keywords: ["pick", "pack", "dispatch", "sla", "cycle"] },
   { id: "delivery", label: "Delivery", keywords: ["logistics", "rto", "shipping", "exception", "delivery time"] },
   { id: "returns", label: "Returns", keywords: ["refunds", "reasons", "return rate"] },

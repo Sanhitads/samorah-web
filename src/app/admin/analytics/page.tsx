@@ -8,10 +8,11 @@ import { hasCapability } from "@/lib/auth/capabilities";
 import { getAnalytics } from "@/services/analyticsService";
 import { getChannelReport } from "@/services/reportsService";
 import { getSearchInsights, getCampaignReport } from "@/services/marketingAnalyticsService";
-import { getBusinessOverview, getKpiSnapshot, getRevenueSparkline } from "@/services/businessOverviewService";
+import { getBusinessOverview, getKpiSnapshot, getRevenueSparkline, getAnalyticsSeries } from "@/services/businessOverviewService";
 import { getClarityInsights } from "@/services/clarityService";
 import { getGa4Insights } from "@/services/ga4DataService";
 import { ExecutiveSummary } from "@/components/admin/ExecutiveSummary";
+import { SalesTrends } from "@/components/admin/SalesTrends";
 
 /**
  * Analytics — `/admin/analytics`. The Insights module: read-only dashboards over
@@ -47,7 +48,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const { window } = await searchParams;
   const win = window === "7" || window === "90" || window === "all" ? window : "30";
   const winDays = win === "all" ? null : Number(win);
-  const [a, search, channels, campaigns, overview, clarity, ga4, kpi, revSpark] = await Promise.all([
+  const [a, search, channels, campaigns, overview, clarity, ga4, kpi, revSpark, series] = await Promise.all([
     getAnalytics(winDays),
     getSearchInsights(winDays ?? 3650),
     getChannelReport(winDays),
@@ -57,6 +58,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
     getGa4Insights(),
     getKpiSnapshot(winDays),
     getRevenueSparkline(14),
+    getAnalyticsSeries(winDays),
   ]);
   const windowLabel = win === "all" ? "all time" : `${win} days`;
   const ordersRange = win === "7" ? "7d" : win === "30" ? "30d" : null; // orders-page ?range value (90d/all → base list)
@@ -131,6 +133,9 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
           <Tile v={String(a.revenue.units)} l="Units sold" />
         </div>
       </section>
+
+      {/* ── Sales trends (Stage 4): charts directly below the Revenue KPIs ── */}
+      <SalesTrends series={series} windowLabel={windowLabel} ordersRange={ordersRange} />
 
       <section className="ash-metrics ash-anchor" id="fulfillment">
         <h2 className="ash-jump__title">Fulfillment</h2>

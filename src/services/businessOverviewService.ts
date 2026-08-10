@@ -153,3 +153,29 @@ export async function getRevenueSparkline(days = 14): Promise<number[]> {
     { revalidate: cacheSeconds("dailySeries"), tags: ["analytics-kpi"] },
   )();
 }
+
+// ── Stage 4 (Charts) — daily trend series (MV-backed, cached). Powers SamorahChart. ──────────────
+export type AnalyticsSeriesPoint = {
+  day: string;
+  orders: number;
+  revenue: number;
+  customers: number;
+  aov: number; // derived per day: revenue ÷ orders
+};
+
+/** Daily {orders, revenue, customers, aov} series for the window (analytics_daily_series_v2, MV-backed). */
+export async function getAnalyticsSeries(windowDays: number | null = 30): Promise<AnalyticsSeriesPoint[]> {
+  const days = windowDays ?? 365; // chart "all time" at daily granularity is capped to ~1 year of points
+  return unstable_cache(
+    async () => {
+      const { data, error } = await analyticsRpc().rpc("analytics_daily_series_v2", { p_window_days: days });
+      if (error || !data) return [];
+      return data.map((r) => {
+        const orders = nz(r.orders), revenue = nz(r.revenue);
+        return { day: r.day, orders, revenue, customers: nz(r.customers), aov: orders ? Math.round(revenue / orders) : 0 };
+      });
+    },
+    ["analytics-series-v2", String(days)],
+    { revalidate: cacheSeconds("dailySeries"), tags: ["analytics-kpi"] },
+  )();
+}

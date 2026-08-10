@@ -2275,3 +2275,18 @@ a.adm-badge[data-b="incident"]:hover { background: rgba(168,68,58,0.22); }
 .an-fresh__chip[data-status="healthy"] .an-fresh__dot { background: #2f6b3c; }
 .an-fresh__chip[data-status="stale"] .an-fresh__dot { background: #8a6d3b; }
 .an-fresh__chip[data-status="unavailable"] .an-fresh__dot { background: #8a3d2f; }
+
+/* ── Analytics charts · SamorahChart (Stage 4) ── */
+.an-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
+.an-chart { border: 1px solid var(--ad-hair); border-radius: 6px; background: #fbf9f5; padding: 14px 14px 8px; }
+.an-chart__head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.an-chart__title { font-family: var(--font-serif); font-size: 1rem; font-weight: 400; color: var(--ink); margin: 0; }
+.an-chart__link { text-decoration: none; color: var(--ad-gold); font-size: 15px; line-height: 1; }
+.an-chart__link:hover, .an-chart__link:focus-visible { color: var(--ink); }
+.an-chart__hint { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; margin: 2px 0 10px; }
+.an-chart__canvas { width: 100%; overflow-x: auto; } /* min-size guard: scroll rather than squash */
+.an-chart__canvas--link { cursor: pointer; }
+.an-chart__canvas--link:hover { background: color-mix(in srgb, var(--ad-gold, #c9a96e) 5%, transparent); }
+.an-chart__state { display: flex; align-items: center; justify-content: center; height: 200px; font-style: italic; font-size: 12px; text-align: center; }
+.an-chart__skel { border-radius: 4px; background: linear-gradient(90deg, rgba(0,0,0,0.04), rgba(0,0,0,0.08), rgba(0,0,0,0.04)); background-size: 200% 100%; animation: kpi-shimmer 1.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .an-chart__skel { animation: none; } }

@@ -44,6 +44,18 @@ describe("analyticsRegistry (single source of truth)", () => {
     expect(s2.map((w) => w.displayOrder)).toEqual([...s2.map((w) => w.displayOrder)].sort((a, b) => a - b));
   });
 
+  it("chart widgets declare chart metadata (variant/height/legend/animation/colour)", () => {
+    const charts = ANALYTICS_WIDGETS.filter((w) => w.component === "SamorahChart");
+    expect(charts.length).toBeGreaterThanOrEqual(4);
+    for (const c of charts) {
+      expect(["line", "area", "bar", "stackedBar", "donut"]).toContain(c.chartVariant);
+      expect(typeof c.defaultHeight).toBe("number");
+      expect(typeof c.showLegend).toBe("boolean");
+      expect(typeof c.animationEnabled).toBe("boolean");
+      expect(["gold", "ink", "green", "smoke", "red"]).toContain(c.colorToken);
+    }
+  });
+
   it("widgetsForDomain groups by owner domain", () => {
     expect(widgetsForDomain("System").map((w) => w.key)).toEqual(["system.dataFreshness", "system.analyticsHealth"]);
     expect(widgetsForDomain("Finance").length).toBeGreaterThan(0);

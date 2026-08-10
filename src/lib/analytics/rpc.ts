@@ -26,11 +26,16 @@ export interface AnalyticsDailyRow {
   revenue: string | number;
 }
 
+export interface AnalyticsDailyV2Row extends AnalyticsDailyRow {
+  customers: string | number;
+}
+
 type RpcResult<T> = Promise<{ data: T[] | null; error: { message: string } | null }>;
 
 interface AnalyticsRpcClient {
   rpc(fn: "analytics_kpi_snapshot_v1", args: { p_window_days: number }): RpcResult<AnalyticsKpiSnapshotRow>;
   rpc(fn: "analytics_daily_series_v1", args: { p_window_days: number }): RpcResult<AnalyticsDailyRow>;
+  rpc(fn: "analytics_daily_series_v2", args: { p_window_days: number }): RpcResult<AnalyticsDailyV2Row>;
 }
 
 /** Service-role client narrowed to the analytics RPC surface (server-only, no `any`). */
