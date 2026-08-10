@@ -572,6 +572,19 @@
 }
 @media (max-width: 620px) {
   .vessel-grid { grid-template-columns: 1fr; max-width: 360px; }
+  /* Chapter filter bar: on narrow phones the pills used to wrap into an uneven second row
+     (e.g. NATURE alone), breaking the segmented-control look. Keep them on one line and let
+     the bar scroll horizontally instead — works for any number of chapters. */
+  .bundle-filters {
+    display: flex;
+    flex-wrap: nowrap;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; /* Firefox: hide the scrollbar, keep the scroll */
+  }
+  .bundle-filters::-webkit-scrollbar { display: none; } /* WebKit */
+  .bundle-filter { flex: 0 0 auto; white-space: nowrap; padding-inline: 18px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
