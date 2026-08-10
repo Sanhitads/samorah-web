@@ -165,19 +165,41 @@ export async function getProfitReport(windowDays: number | null = 30): Promise<P
  * Cost inputs orders can't tell us (packaging, payment-fee %, courier cost) come from editable site
  * settings; variants sold with a zero cost are counted so profit is flagged optimistic, never overstated.
  */
-async function computeProfitReport(windowDays: number | null = 30): Promise<ProfitReport> {
+type OrderRange = { gte: string | null; lt: string | null };
+
+/** Date range for the current window, or the immediately-preceding equal window. All-time has no previous. */
+function rangeFor(windowDays: number | null, period: "current" | "previous"): OrderRange | null {
+  if (windowDays == null) return period === "current" ? { gte: null, lt: null } : null;
+  const day = 86400000, now = Date.now();
+  if (period === "current") return { gte: new Date(now - windowDays * day).toISOString(), lt: null };
+  return { gte: new Date(now - 2 * windowDays * day).toISOString(), lt: new Date(now - windowDays * day).toISOString() };
+}
+
+/** The single distinct-paid-buyer count used across Reports (keyed by user_id, else email). */
+function countBuyers(orders: any[]): number {
+  const set = new Set<string>();
+  for (const o of orders) { const key = o.user_id || o.email; if (key) set.add(key); }
+  return set.size;
+}
+
+/**
+ * Fetch (row-safe) + sum a window's financial components and run them through the canonical engine. Reused
+ * for BOTH the current and the previous period so period-comparison never introduces a second calculation
+ * path. Returns the engine summary plus the raw orders (so callers derive buyer counts without re-fetching).
+ */
+async function financialSummaryForRange(range: OrderRange): Promise<{ summary: FinancialSummary; orders: any[] }> {
   const db = createAdminClient() as any;
-  const cutoff = windowDays ? new Date(Date.now() - windowDays * 86400000).toISOString() : null;
   const settings = await getSiteSettings();
   const { packagingPerOrder, paymentFeePercent, shippingCostPerOrder } = settings.costs;
 
   const orders = await fetchAllOrders(() => {
-    let q = db.from("orders").select("id,subtotal,total_amount,taxable_amount,shipping_amount,discount_amount,cgst_amount,sgst_amount,igst_amount,refund_amount,placed_at,order_items(variant_id,quantity)").in("payment_status", PAID);
-    if (cutoff) q = q.gte("placed_at", cutoff);
+    let q = db.from("orders").select("id,subtotal,total_amount,taxable_amount,shipping_amount,discount_amount,cgst_amount,sgst_amount,igst_amount,refund_amount,user_id,email,placed_at,order_items(variant_id,quantity)").in("payment_status", PAID);
+    if (range.gte) q = q.gte("placed_at", range.gte);
+    if (range.lt) q = q.lt("placed_at", range.lt);
     return q;
   });
 
-  // Cost lookup for every variant that sold in the window.
+  // Cost lookup for every variant that sold in the range.
   const variantIds = [...new Set(orders.flatMap((o) => (o.order_items ?? []).map((it: any) => it.variant_id).filter(Boolean)))];
   const costMap = new Map<string, number>();
   if (variantIds.length) {
@@ -213,9 +235,52 @@ async function computeProfitReport(windowDays: number | null = 30): Promise<Prof
     gatewayFees: grossCollected * (paymentFeePercent / 100),
     variantsMissingCost: missing.size,
   });
+  return { summary, orders };
+}
 
+async function computeProfitReport(windowDays: number | null = 30): Promise<ProfitReport> {
+  const { summary } = await financialSummaryForRange(rangeFor(windowDays, "current")!);
   const freshness = makeFreshness("orders", { fetchedAtMs: Date.now(), ttlMs: cacheMs("reports"), available: true });
   return { windowDays, freshness, ...summary };
+}
+
+// ── Executive Summary (R2) — 5 founder-scan KPIs, current + previous period, ALL from the canonical engine.
+/** A KPI's current value and its comparable previous-period value (null when no comparison is meaningful). */
+export interface KpiPair { current: number; previous: number | null }
+export interface ExecutiveSummary {
+  windowDays: number | null;
+  freshness: DataFreshness;
+  revenue: KpiPair;          // financialEngine.revenue
+  operatingProfit: KpiPair;  // financialEngine.operatingProfit
+  margin: KpiPair;           // financialEngine.margin
+  orders: KpiPair;           // reportsService.orders (paid-order count)
+  customers: KpiPair;        // reportsService.customers (distinct buyers)
+}
+
+/** Cached Executive Summary reader — every financial value flows from `computeFinancials`; no recomputation. */
+export async function getExecutiveSummary(windowDays: number | null = 30): Promise<ExecutiveSummary> {
+  return unstable_cache(
+    () => computeExecutiveSummary(windowDays),
+    ["reports-exec", String(windowDays ?? "all")],
+    { revalidate: cacheSeconds("reports"), tags: ["reports"] },
+  )();
+}
+
+async function computeExecutiveSummary(windowDays: number | null = 30): Promise<ExecutiveSummary> {
+  const cur = await financialSummaryForRange(rangeFor(windowDays, "current")!);
+  const prevRange = rangeFor(windowDays, "previous");
+  const prev = prevRange ? await financialSummaryForRange(prevRange) : null;
+  const s = cur.summary, ps = prev?.summary ?? null;
+  const pair = (c: number, p: number | null): KpiPair => ({ current: c, previous: p });
+  const freshness = makeFreshness("orders", { fetchedAtMs: Date.now(), ttlMs: cacheMs("reports"), available: true });
+  return {
+    windowDays, freshness,
+    revenue: pair(s.revenue, ps?.revenue ?? null),
+    operatingProfit: pair(s.operatingProfit, ps?.operatingProfit ?? null),
+    margin: pair(s.margin, ps?.margin ?? null),
+    orders: pair(s.orders, ps?.orders ?? null),
+    customers: pair(countBuyers(cur.orders), prev ? countBuyers(prev.orders) : null),
+  };
 }
 
 // ── Fragrance report (R12) ───────────────────────────────────────────────────

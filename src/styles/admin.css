@@ -2276,6 +2276,18 @@ a.adm-badge[data-b="incident"]:hover { background: rgba(168,68,58,0.22); }
 .an-fresh__chip[data-status="stale"] .an-fresh__dot { background: #8a6d3b; }
 .an-fresh__chip[data-status="unavailable"] .an-fresh__dot { background: #8a3d2f; }
 
+/* ── Reports · Report Status + Financial Health banners (R2) — reuse existing chips + colour tokens ── */
+.rep-status { margin-bottom: 10px; }
+.rep-health { border: 1px solid var(--ad-hair); border-left-width: 3px; border-radius: 6px; background: #fff; padding: 12px 14px; margin: 0 0 14px; }
+.rep-health[data-severity="healthy"] { border-left-color: #2f6b3c; }
+.rep-health[data-severity="warning"] { border-left-color: #8a6d3b; }
+.rep-health[data-severity="attention"] { border-left-color: #8a3d2f; }
+.rep-health__badge { font-family: var(--font-sans); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink, #1f1a16); }
+.rep-health__items { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.rep-health__items li { font-family: var(--font-sans); font-size: 12px; color: var(--smoke, #6b6259); }
+.rep-health__items li[data-sev="warning"] { color: #8a6d3b; }
+.rep-health__items li[data-sev="attention"] { color: #8a3d2f; }
+
 /* ── Analytics charts · SamorahChart (Stage 4) ── */
 .an-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
 .an-chart { border: 1px solid var(--ad-hair); border-radius: 6px; background: #fbf9f5; padding: 14px 14px 8px; }

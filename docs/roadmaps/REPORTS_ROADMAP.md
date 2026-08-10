@@ -160,21 +160,58 @@ component recomputes any financial number.**
   - **Executive Summary — intentionally minimal (5 KPIs only):** **Revenue** (refund-adjusted, per R1A),
     **Operating Profit**, **Margin**, **Orders**, **Customers**. **GST is NOT surfaced in the top strip.**
   - **Period comparison + trend arrows** on those KPIs via `KpiCard` + `compareKpi`.
+  - **Financial KPI Provenance (architectural metadata — never displayed).** Every Executive Summary KPI's
+    registry entry declares a `source` naming its canonical calculation origin, so any displayed number is
+    always traceable to where it is computed. No presentation surface recomputes — all consume the R1A
+    engine / service output. Canonical sources (v1):
+
+    | KPI | `source` | Origin |
+    |---|---|---|
+    | Revenue | `financialEngine.revenue` | `ProfitReport.revenue` (engine, refund-adjusted) |
+    | Operating Profit | `financialEngine.operatingProfit` | `ProfitReport.operatingProfit` |
+    | Margin | `financialEngine.margin` | `ProfitReport.margin` |
+    | Orders | `reportsService.orders` | `ProfitReport.orders` (paid-order count — a count, not a derivation) |
+    | Customers | `reportsService.customers` | `getReports().customers.total` (buyer count) |
+
+    Registry entry shape (metadata only — the code doesn't need `owner`/`source` at runtime; they answer
+    "who maintains this?" and "where does this number come from?" for a future reader/auditor):
+    ```
+    {
+      id: "reports.revenue",
+      owner: "financialEngine",        // module responsible for maintaining the KPI (maintainability/audit)
+      source: "financialEngine.revenue",
+      drillTarget: "orders",
+      permission: "analytics.view",    // reuse EXISTING reports RBAC — see note below
+    }
+    ```
+    `owner` names the responsible module (`financialEngine` for Revenue/Profit/Margin, `reportsService` for
+    Orders/Customers); `source` names the exact canonical field. Both are architectural metadata, never
+    displayed.
+    > **RBAC note:** the illustrative `permission: "reports.view"` is recorded here as the *existing*
+    > `"analytics.view"` (the capability `/admin/reports` already gates on, + `"data.export"` for CSV).
+    > Introducing a distinct `reports.view` capability would be an RBAC change and is **out of scope** for
+    > R2 (rule: preserve RBAC). Flag for a separate decision if a dedicated capability is ever wanted.
 - **Components reused:** `KpiCard`; `DataFreshnessBar`; existing banner/`cfg-hint` design classes for the two
   banners (no new visual language).
 - **Services reused:** `businessOverviewService.getKpiSnapshot` (Orders previous-period for free);
   `reportsService` run for the previous window to supply Revenue/Profit/Margin/Customers previous-period —
   **reuse the same functions, no duplicate delta logic**.
-- **Registry reuse:** `rep.*` widgets mirroring the `exec.*` philosophy; `kpi.ts` for all delta math.
+- **Registry:** a **dedicated Reports registry / governance structure** is created here (per the agreed
+  sequencing — governance lands *with* the widgets it governs, not before). Each entry mirrors the analytics
+  registry philosophy (id / feature flag / permission / drillTarget) **plus** the `source` provenance field
+  above. `kpi.ts` supplies all delta math. Analytics registry invariants are untouched.
 - **DB changes:** none.
 - **Dependencies:** none.
 - **Complexity:** Low–Medium.
 - **Testing:** Report Status banner shows all fields incl. data-source basis + Calculation Version; Financial
   Health banner maps conditions to the correct severity (Healthy / Warning / Attention Required) and hides
-  when clean; 5-KPI strip contains no GST; deltas correct; no Analytics data duplicated.
+  when clean; 5-KPI strip contains no GST; deltas correct; no Analytics data duplicated; **every KPI's
+  registry `source` resolves to a real field on the canonical engine/service output** (provenance test).
 - **Rollback:** flags off → prior inline metric rows.
 - **Verification gate:** minimal 5-KPI strip; Report Status banner (incl. data-source basis + Calculation
-  Version); severity-aware Financial Health banner; correct deltas; GST absent from strip.
+  Version); severity-aware Financial Health banner; correct deltas; GST absent from strip; **every Executive
+  Summary KPI resolves from its documented canonical `source`, every KPI `owner` references a real module,
+  and no presentation layer performs an independent financial calculation** (provenance verified).
 
 > **Calculation Version** is defined as a single constant in the R1A calculation layer (e.g.
 > `REPORTS_CALC_VERSION = "v1"`) and merely *displayed* here — so future accounting-logic changes bump one

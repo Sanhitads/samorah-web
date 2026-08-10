@@ -3,7 +3,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { hasCapability } from "@/lib/auth/capabilities";
-import { getReports, getProfitReport, getFragranceReport, getCohortReport, getChannelReport } from "@/services/reportsService";
+import { getReports, getProfitReport, getFragranceReport, getCohortReport, getChannelReport, getExecutiveSummary } from "@/services/reportsService";
+import { getSiteSettings } from "@/services/siteSettingsService";
+import { assessFinancialHealth } from "@/lib/reports/financialHealth";
+import { ReportsExecutiveSummary } from "@/components/admin/ReportsExecutiveSummary";
+import { ReportStatusBanner } from "@/components/admin/ReportStatusBanner";
+import { FinancialHealthBanner } from "@/components/admin/FinancialHealthBanner";
 
 /**
  * Reports — `/admin/reports`. Business & filing reports (GST by state, top
@@ -31,15 +36,31 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   // scoped fallback for that section instead of blanking the whole financial report.
   const settled = await Promise.allSettled([
     getReports(windowDays), getProfitReport(windowDays), getFragranceReport(windowDays), getCohortReport(6), getChannelReport(windowDays),
+    getExecutiveSummary(windowDays), getSiteSettings(),
   ]);
   for (const s of settled) if (s.status === "rejected") console.error("[reports] a section failed to calculate:", s.reason);
   const val = <T,>(res: PromiseSettledResult<T>): T | null => (res.status === "fulfilled" ? res.value : null);
-  const [rRes, profitRes, fragRes, cohortRes, channelRes] = settled;
+  const [rRes, profitRes, fragRes, cohortRes, channelRes, execRes, settingsRes] = settled;
   const r = val(rRes), profit = val(profitRes), fragrances = val(fragRes), cohorts = val(cohortRes), channels = val(channelRes);
+  const exec = val(execRes), settings = val(settingsRes);
 
   const canExport = hasCapability(staff.role, "data.export");
   const bestFrag = fragrances?.[0]; const worstFrag = fragrances && fragrances.length > 1 ? fragrances[fragrances.length - 1] : undefined;
   const sectionError = <p className="admin__empty">This section couldn’t be calculated right now — the rest of the report is unaffected.</p>;
+
+  // R2 presentation helpers — all values consumed from the canonical engine/service output; nothing recomputed.
+  const windowLabel = WINDOWS.find((w) => w.k === win)?.l ?? "30 days";
+  const ordersRange = win === "all" ? null : `${win}d`;
+  const health = profit && settings
+    ? assessFinancialHealth({
+        variantsMissingCost: profit.variantsMissingCost,
+        revenue: profit.revenue,
+        gstCollected: profit.gstCollected,
+        refunds: profit.refunds,
+        shippingCostPerOrder: settings.costs.shippingCostPerOrder,
+        paymentFeePercent: settings.costs.paymentFeePercent,
+      })
+    : null;
 
   return (
     <main className="admin">
@@ -51,6 +72,13 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       <nav className="ff-queues" aria-label="Window">
         {WINDOWS.map((w) => <Link key={w.k} href={`/admin/reports?window=${w.k}`} className="ff-queue" data-active={win === w.k ? "1" : "0"}>{w.l}</Link>)}
       </nav>
+
+      {/* R2 — Report Status banner (always) + severity-aware Financial Health banner (integrity before figures) */}
+      {profit ? <ReportStatusBanner windowLabel={windowLabel} generatedAtMs={profit.freshness.fetchedAtMs} paidOrders={profit.orders} /> : null}
+      {health ? <FinancialHealthBanner health={health} /> : null}
+
+      {/* R2 — Executive Summary (5 KPIs; every value from the canonical engine via getExecutiveSummary) */}
+      {exec ? <ReportsExecutiveSummary data={exec} ordersRange={ordersRange} windowLabel={windowLabel} /> : null}
 
       {/* Profit / P&L (R10) — canonical Financial Engine (R1A: ex-GST, refund-adjusted, no shipping double-count) */}
       {profit ? (
