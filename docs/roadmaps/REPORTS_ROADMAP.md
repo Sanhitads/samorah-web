@@ -284,6 +284,28 @@ fragrance margin · profit-trend chart · HSN GST summary · LTV.
 
 ---
 
+## Financial Snapshot — the Report Status banner  *(architectural note; documentation only)*
+
+The **Report Status banner** (Stage R2) is, semantically, a **Financial Snapshot**: it records the financial
+state of the selected reporting window at the moment the report was generated. It captures:
+
+- **Selected reporting period** — the active window (30 / 90 / 365 days / all time).
+- **Generated timestamp** — when the underlying snapshot was (re)computed (`freshness.fetchedAtMs`).
+- **Order Snapshot data source** — first-party `orders` rows; no external provider.
+- **`REPORTS_CALC_VERSION`** — the frozen canonical accounting logic the figures were produced under.
+- **Financial state at time of generation** — paid orders included · GST basis · refund-adjustment status.
+
+> **Financial Snapshot** = the financial state of the selected reporting window, produced under
+> `REPORTS_CALC_VERSION` from **Order Snapshots**, as of **Generated At**.
+
+This is why the banner also exposes the non-visual `data-report-generated-from` = "Order Snapshots →
+Financial Engine v1": a snapshot should always be traceable to the data source + calculation version that
+produced it. When historical exports arrive (post-launch), each export is stamped with the same
+`REPORTS_CALC_VERSION`, so a saved report is a reproducible snapshot — future developers reading a stored
+figure know exactly which accounting logic produced it.
+
+---
+
 ## Financial Glossary  *(documentation only — must match the frozen v1 formulas governed by `REPORTS_CALC_VERSION`)*
 
 Every term below is computed **once** by the canonical financial engine (Stage R1A); the page only displays
