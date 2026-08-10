@@ -2250,3 +2250,5 @@ a.adm-badge[data-b="incident"]:hover { background: rgba(168,68,58,0.22); }
 .kpi__skel--l { width: 40%; height: 10px; }
 @keyframes kpi-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .kpi__skel { animation: none; } }
+.ash-jump__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.ash-updated { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; }

@@ -6,9 +6,10 @@ import { hasCapability } from "@/lib/auth/capabilities";
 import { getAnalytics } from "@/services/analyticsService";
 import { getChannelReport } from "@/services/reportsService";
 import { getSearchInsights, getCampaignReport } from "@/services/marketingAnalyticsService";
-import { getBusinessOverview } from "@/services/businessOverviewService";
+import { getBusinessOverview, getKpiSnapshot, getRevenueSparkline } from "@/services/businessOverviewService";
 import { getClarityInsights } from "@/services/clarityService";
 import { getGa4Insights } from "@/services/ga4DataService";
+import { ExecutiveSummary } from "@/components/admin/ExecutiveSummary";
 
 /**
  * Analytics — `/admin/analytics`. The Insights module: read-only dashboards over
@@ -44,7 +45,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const { window } = await searchParams;
   const win = window === "7" || window === "90" || window === "all" ? window : "30";
   const winDays = win === "all" ? null : Number(win);
-  const [a, search, channels, campaigns, overview, clarity, ga4] = await Promise.all([
+  const [a, search, channels, campaigns, overview, clarity, ga4, kpi, revSpark] = await Promise.all([
     getAnalytics(winDays),
     getSearchInsights(winDays ?? 3650),
     getChannelReport(winDays),
@@ -52,7 +53,11 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
     getBusinessOverview(winDays),
     getClarityInsights(),
     getGa4Insights(),
+    getKpiSnapshot(winDays),
+    getRevenueSparkline(14),
   ]);
+  const windowLabel = win === "all" ? "all time" : `${win} days`;
+  const ordersRange = win === "7" ? "7d" : win === "30" ? "30d" : null; // orders-page ?range value (90d/all → base list)
   const maxReason = Math.max(1, ...a.returns.byReason.map((r) => r.count));
   const maxChannelRev = Math.max(1, ...channels.map((c) => c.revenue));
 
@@ -69,6 +74,9 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
           <Link key={w.k} href={`/admin/analytics?window=${w.k}`} className="ff-queue" data-active={win === w.k ? "1" : "0"}>{w.l}</Link>
         ))}
       </nav>
+
+      {/* ── Executive summary — Stage 2 KPI strip (shared KpiCard; feature-flagged) ── */}
+      <ExecutiveSummary kpi={kpi} overview={overview} ga4={ga4} revenueSpark={revSpark} windowLabel={windowLabel} ordersRange={ordersRange} />
 
       {/* ── Business overview — the CEO glance (review point 11) ── */}
       <section className="ash-metrics">

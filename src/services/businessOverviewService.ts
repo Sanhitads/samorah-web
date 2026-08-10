@@ -140,3 +140,16 @@ export async function getKpiSnapshot(windowDays: number | null = 30): Promise<Kp
     { revalidate: cacheSeconds("kpi"), tags: ["analytics-kpi"] },
   )();
 }
+
+/** Daily revenue for the last N days (MV-backed) — a mini-sparkline series for the Revenue KPI card. */
+export async function getRevenueSparkline(days = 14): Promise<number[]> {
+  return unstable_cache(
+    async () => {
+      const { data, error } = await analyticsRpc().rpc("analytics_daily_series_v1", { p_window_days: days });
+      if (error || !data) return [];
+      return data.map((r) => Math.round(Number(r.revenue ?? 0)));
+    },
+    ["analytics-revenue-spark", String(days)],
+    { revalidate: cacheSeconds("dailySeries"), tags: ["analytics-kpi"] },
+  )();
+}
