@@ -10,6 +10,7 @@
  * { available:false } if the token/endpoint is unset or the call fails.
  */
 import { unstable_cache } from "next/cache";
+import { cacheSeconds } from "@/lib/analytics/cacheConfig";
 
 const DEFAULT_ENDPOINT = "https://www.clarity.ms/export-data/api/v1/project-live-insights";
 const NUM_DAYS = 3; // Clarity max
@@ -99,7 +100,7 @@ const fetchClarity = unstable_cache(
     }
   },
   ["clarity-live-insights"],
-  { revalidate: 21600, tags: ["clarity"] }, // 6h — stays well under Clarity's 10/day cap
+  { revalidate: cacheSeconds("clarity"), tags: ["clarity"] }, // 6h default — stays well under Clarity's 10/day cap
 );
 
 export function getClarityInsights(): Promise<ClarityInsights> {

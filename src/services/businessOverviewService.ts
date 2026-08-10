@@ -5,7 +5,11 @@
  * mix, payment mix (COD vs prepaid), returning/repeat customers, inventory alerts (out-of-stock
  * / low stock), average basket, and best/worst sellers. No GA4 needed — this is our own data.
  */
+import { unstable_cache } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { makeFreshness, type DataFreshness } from "@/lib/analytics/dataFreshness";
+import { analyticsRpc } from "@/lib/analytics/rpc";
+import { cacheMs, cacheSeconds } from "@/lib/analytics/cacheConfig";
 
 const db = () => createAdminClient() as any;
 const PAID = ["paid", "partially_refunded", "refunded"];
@@ -84,4 +88,55 @@ export async function getBusinessOverview(windowDays: number | null = 30): Promi
     bestSellers,
     worstSellers,
   };
+}
+
+// ── Stage 1 (Foundation) — optimized KPI snapshot ───────────────────────────────
+// Server-side SQL aggregation via the `analytics_kpi_snapshot` RPC: current window + previous window
+// (for % change) + today vs yesterday, in ONE query that scans only the last two windows. Replaces the
+// JS-side row-fetch-and-reduce path for the KPI grid. Cached (60s) and carries data-freshness. This does
+// NOT change getBusinessOverview (kept intact for the existing pages); it is an additive optimized reader.
+export interface KpiPoint {
+  current: number;
+  /** comparable previous-period value, or null when a comparison isn't meaningful (e.g. all-time). */
+  previous: number | null;
+}
+export interface KpiSnapshot {
+  windowDays: number | null;
+  revenue: KpiPoint; // window vs previous equal window
+  orders: KpiPoint;
+  avgBasket: KpiPoint;
+  revenueToday: KpiPoint; // today vs yesterday
+  ordersToday: KpiPoint;
+  freshness: DataFreshness;
+}
+
+const nz = (v: string | number | null | undefined) => Math.round(Number(v ?? 0));
+
+async function computeKpiSnapshot(windowDays: number | null): Promise<KpiSnapshot> {
+  const { data, error } = await analyticsRpc().rpc("analytics_kpi_snapshot_v1", { p_window_days: windowDays ?? 3650 });
+  if (error) throw new Error(error.message);
+  const row = data?.[0];
+  const allTime = windowDays == null;
+  const curOrders = nz(row?.cur_orders), curRev = nz(row?.cur_revenue);
+  const prevOrders = nz(row?.prev_orders), prevRev = nz(row?.prev_revenue);
+  const aovCur = curOrders ? Math.round(curRev / curOrders) : 0;
+  const aovPrev = prevOrders ? Math.round(prevRev / prevOrders) : null;
+  return {
+    windowDays,
+    revenue: { current: curRev, previous: allTime ? null : prevRev },
+    orders: { current: curOrders, previous: allTime ? null : prevOrders },
+    avgBasket: { current: aovCur, previous: allTime ? null : aovPrev },
+    revenueToday: { current: nz(row?.today_revenue), previous: nz(row?.yday_revenue) },
+    ordersToday: { current: nz(row?.today_orders), previous: nz(row?.yday_orders) },
+    freshness: makeFreshness("orders", { fetchedAtMs: Date.now(), ttlMs: cacheMs("kpi"), available: true }),
+  };
+}
+
+/** Optimized current+previous KPI snapshot (RPC-backed, cached). Reused by the Executive Summary grid. */
+export async function getKpiSnapshot(windowDays: number | null = 30): Promise<KpiSnapshot> {
+  return unstable_cache(
+    () => computeKpiSnapshot(windowDays),
+    ["analytics-kpi-snapshot", String(windowDays ?? "all")],
+    { revalidate: cacheSeconds("kpi"), tags: ["analytics-kpi"] },
+  )();
 }

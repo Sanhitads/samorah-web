@@ -20,6 +20,7 @@
  */
 import crypto from "node:crypto";
 import { headers } from "next/headers";
+import { cacheMs } from "@/lib/analytics/cacheConfig";
 
 export interface Ga4Insights {
   available: boolean;
@@ -167,7 +168,7 @@ async function fetchGa4(): Promise<Ga4Insights> {
 // the per-request `x-vercel-oidc-token` header, which is unavailable in a cached scope.
 // Module cache is per-instance/ephemeral on Vercel, which is fine for realtime metrics.
 let cache: { at: number; data: Ga4Insights } | null = null;
-const TTL_MS = 120_000;
+const TTL_MS = cacheMs("ga4"); // centralized (default 120s; override via ANALYTICS_CACHE_GA4_MS)
 
 export async function getGa4Insights(): Promise<Ga4Insights> {
   if (cache && Date.now() - cache.at < TTL_MS) return cache.data;

@@ -7,6 +7,7 @@
  */
 import { unstable_cache } from "next/cache";
 import { RAZORPAY } from "@/config/commerce";
+import { cacheSeconds } from "@/lib/analytics/cacheConfig";
 
 export interface SettlementSummary {
   available: boolean;
@@ -50,7 +51,7 @@ const fetchSettlements = unstable_cache(
     }
   },
   ["razorpay-settlements"],
-  { revalidate: 3600, tags: ["settlements"] },
+  { revalidate: cacheSeconds("razorpay"), tags: ["settlements"] },
 );
 
 export function getSettlementSummary(): Promise<SettlementSummary> {
