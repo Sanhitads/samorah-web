@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireCapability } from "@/lib/auth/requireStaff";
 import { updateSiteSettings, type SiteSettings } from "@/services/siteSettingsService";
 import { validateCosts } from "@/lib/settings/costValidation";
+import { validateDispatch } from "@/lib/settings/dispatchValidation";
 
 /** POST /api/admin/settings/site { patch } — general site settings. shipping.configure. */
 export const runtime = "nodejs";
@@ -26,6 +27,13 @@ export async function POST(request: Request) {
       shippingCostPerOrder: Number(c.shippingCostPerOrder),
       paymentFeePercent: Number(c.paymentFeePercent),
     });
+    if (errors.length) return NextResponse.json({ error: errors[0].message, fieldErrors: errors }, { status: 422 });
+  }
+
+  // Server-side dispatch validation (S2A; same corrective rules as the client).
+  if (body.patch.dispatch) {
+    const d = body.patch.dispatch;
+    const errors = validateDispatch({ cutoffTime: String(d.cutoffTime), slaHours: Number(d.slaHours) });
     if (errors.length) return NextResponse.json({ error: errors[0].message, fieldErrors: errors }, { status: 422 });
   }
 

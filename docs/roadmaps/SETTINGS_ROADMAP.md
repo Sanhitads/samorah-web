@@ -1,8 +1,8 @@
 # Samorah Admin Settings — Refinement Roadmap
 
-**Status: S1A + S1B APPROVED, COMMITTED & FROZEN. Next: Phase S2 (awaiting go-ahead).** Governance is final;
-structural changes to the governance/registry require an `INTEGRATION_REGISTRY_VERSION` increment and explicit
-roadmap approval.
+**Status: S1A + S1B + S2A APPROVED, COMMITTED & FROZEN. Next: Phase S2B.** Governance is final; structural
+changes to the governance/registry require an `INTEGRATION_REGISTRY_VERSION` increment and explicit roadmap
+approval.
 
 Goal: make `/admin/settings` **launch-ready** by adding operational visibility (integration status/health) and
 usability (validation, save feedback, unsaved-guard, audit) — **reusing existing services**, additive only, no
@@ -14,11 +14,12 @@ S2 (Operational Enhancements). A verification report + approval gate after **eac
 ## Settings Module Status
 | Phase | Status | Commit |
 |---|---|---|
-| **S1A — Integration Status & Operational Health** | **Approved · Committed · Frozen** | `7caefe7` (tag `settings-s1a-baseline`) |
-| **S1B — Editable Settings Improvements** | **Approved · Committed · Frozen** | `bee6fc5` |
-| **S2 — Operational Enhancements** | Next (awaiting go-ahead) | — |
+| **S1A — Integration Status & Operational Health** | **Approved · Frozen** | `7caefe7` (tag `settings-s1a-baseline`) |
+| **S1B — Editable Settings Improvements** | **Approved · Frozen** | `bee6fc5` |
+| **S2A — Dispatch Configuration (cutoff + SLA)** | **Approved · Frozen** | (tag `settings-s2a-baseline`) |
+| **S2B — Operational Enhancements** (business address · provider testing) | Next | — |
 
-**The Settings module is currently considered LAUNCH-READY for its approved scope (S1A + S1B).**
+**The Settings module is LAUNCH-READY for its approved scope (S1A + S1B); S2A adds operational metadata.**
 
 ## Launch Scope Boundary *(governance — documentation only)*
 - **S1A and S1B constitute the approved launch scope** for the Settings module.
@@ -137,6 +138,61 @@ require **explicit roadmap approval**:
 - [x] Browser verification completed (authenticated, local Supabase)
 - [x] Tests passing
 - [x] Build passing
+
+---
+
+## Dispatch Configuration — S2A *(persisted · validated · audited; not yet consumed)*
+
+### Cutoff Time — timezone interpretation *(documentation only)*
+The configured **Cutoff Time** (`site_settings.dispatch.cutoffTime`, 24-hour `HH:MM`) is interpreted in the
+**store's operating timezone** (the registered business timezone, IST) — a wall-clock time, **not UTC**. No
+timezone conversion is implemented in S2A; this documents the intended operational interpretation.
+
+### Dispatch SLA — canonical definition *(FROZEN)*
+**Dispatch SLA** (`site_settings.dispatch.slaHours`) represents **elapsed clock hours**, measured **from
+successful order placement**, **until expected dispatch**. This definition is **frozen** — any change requires
+explicit roadmap approval.
+
+### Configuration status
+Dispatch configuration is currently **persisted · validated · audited**, but **NOT yet consumed by any
+production workflow**. **Future shipping features must reuse this configuration** (`site_settings.dispatch`)
+rather than introducing duplicate dispatch/cutoff settings.
+
+### Operational ownership
+- **Intended operational owner:** **Fulfillment Operations.**
+- **Expected future consumers:** Operations dashboard · Dispatch planning · Shipping communications.
+
+> **Dispatch configuration is OPERATIONAL METADATA ONLY.** It does **not** influence checkout, payment,
+> shipping calculations, or customer promises until a future **approved shipping project** consumes it.
+
+---
+
+## Phase S2A — FROZEN (Dispatch Configuration)
+
+Phase S2A is **complete, verified, and frozen**. The following are now **frozen**; future structural changes
+require **explicit roadmap approval**:
+- **Dispatch validation contract** — cutoff = 24-hour `HH:MM`; SLA = whole hours 0–240; corrective messages
+  (`lib/settings/dispatchValidation.ts`), client + server (route 422). Same pattern as the S1B cost validator.
+- **Dispatch configuration contract** — `site_settings.dispatch = { cutoffTime: string; slaHours: number }`,
+  persisted via `siteSettingsService`.
+- **Timezone interpretation** — store operating timezone (IST) wall-clock, **not UTC**.
+- **SLA definition** — elapsed clock hours, from successful order placement, until expected dispatch.
+- **Operational ownership** — Fulfillment Operations.
+
+## Phase S2A — Acceptance
+
+- **Owner:** Founder.
+- **Status:** **Approved and Frozen.**
+
+**Acceptance checklist**
+- [x] Validation
+- [x] Persistence
+- [x] Reload
+- [x] Audit
+- [x] Accessibility
+- [x] Boundary values (00:00 · 23:59 · SLA 0 · SLA 240)
+- [x] Tests
+- [x] Build
 
 ## The architectural insight (drives the whole plan)
 Analytics, Payment, Email, and Notification integrations are **environment-managed** — their runtime reads

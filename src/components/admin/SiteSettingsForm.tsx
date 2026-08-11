@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { SiteSettings } from "@/services/siteSettingsService";
 import { validateCosts, type CostValidationError } from "@/lib/settings/costValidation";
+import { validateDispatch, type DispatchValidationError } from "@/lib/settings/dispatchValidation";
 import { shouldGuardNavigation } from "@/lib/bundleNavGuard";
 
 const FEATURE_LABELS: Record<string, string> = {
@@ -19,7 +20,7 @@ export function SiteSettingsForm({ settings }: { settings: SiteSettings }) {
   const [msg, setMsg] = useState<{ tone: string; text: string } | null>(null);
   const [s, setS] = useState<SiteSettings>(settings);
   const [baseline, setBaseline] = useState<SiteSettings>(settings); // last-saved snapshot (dirty authority)
-  const [fieldErrors, setFieldErrors] = useState<Partial<Record<CostValidationError["field"], string>>>({});
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const dirty = JSON.stringify(s) !== JSON.stringify(baseline);
 
@@ -50,10 +51,10 @@ export function SiteSettingsForm({ settings }: { settings: SiteSettings }) {
 
   const save = async () => {
     // Client-side corrective validation first (server re-checks — defense-in-depth).
-    const errs = validateCosts(s.costs);
+    const errs: (CostValidationError | DispatchValidationError)[] = [...validateCosts(s.costs), ...validateDispatch(s.dispatch)];
     if (errs.length) {
       setFieldErrors(Object.fromEntries(errs.map((e) => [e.field, e.message])));
-      setMsg({ tone: "err", text: `Please correct ${errs.length} operating-cost field${errs.length > 1 ? "s" : ""} below before saving.` });
+      setMsg({ tone: "err", text: `Please correct ${errs.length} field${errs.length > 1 ? "s" : ""} below before saving.` });
       return;
     }
     setFieldErrors({}); setBusy(true); setMsg(null);
@@ -62,7 +63,7 @@ export function SiteSettingsForm({ settings }: { settings: SiteSettings }) {
       const d = await res.json();
       setBusy(false);
       if (!res.ok) {
-        if (Array.isArray(d.fieldErrors)) setFieldErrors(Object.fromEntries(d.fieldErrors.map((e: CostValidationError) => [e.field, e.message])));
+        if (Array.isArray(d.fieldErrors)) setFieldErrors(Object.fromEntries(d.fieldErrors.map((e: { field: string; message: string }) => [e.field, e.message])));
         setMsg({ tone: "err", text: d.error ?? "Could not save." });
         return;
       }
@@ -127,6 +128,13 @@ export function SiteSettingsForm({ settings }: { settings: SiteSettings }) {
         <label className="cfg-field"><span>Payment gateway fee (%)</span><input type="number" step="0.1" min="0" max="100" aria-invalid={!!fieldErrors.paymentFeePercent} value={s.costs.paymentFeePercent} onChange={(e) => setS((p) => ({ ...p, costs: { ...p.costs, paymentFeePercent: Number(e.target.value) } }))} />{fieldErrors.paymentFeePercent ? <span className="ff-err" role="alert">{fieldErrors.paymentFeePercent}</span> : null}</label>
       </div>
       <p className="cfg-hint">Per-unit product cost (COGS) is set on each variant under Products; these are the flat per-order and gateway costs the orders can’t tell us.</p>
+
+      <p className="cfg-sub">Dispatch &amp; cutoff</p>
+      <div className="cfg-grid">
+        <label className="cfg-field"><span>Same-day cutoff time (HH:MM)</span><input type="time" aria-invalid={!!fieldErrors.cutoffTime} value={s.dispatch.cutoffTime} onChange={(e) => setS((p) => ({ ...p, dispatch: { ...p.dispatch, cutoffTime: e.target.value } }))} />{fieldErrors.cutoffTime ? <span className="ff-err" role="alert">{fieldErrors.cutoffTime}</span> : null}</label>
+        <label className="cfg-field"><span>Dispatch SLA (hours)</span><input type="number" min="0" max="240" aria-invalid={!!fieldErrors.slaHours} value={s.dispatch.slaHours} onChange={(e) => setS((p) => ({ ...p, dispatch: { ...p.dispatch, slaHours: Number(e.target.value) } }))} />{fieldErrors.slaHours ? <span className="ff-err" role="alert">{fieldErrors.slaHours}</span> : null}</label>
+      </div>
+      <p className="cfg-hint">Orders placed before the cutoff dispatch same day; the SLA is the promised dispatch window, in hours.</p>
 
       <p className="cfg-sub">Announcement bar</p>
       <label className="cfg-field"><span>Text</span><input value={s.announcement.text} onChange={(e) => g("announcement", "text", e.target.value)} placeholder="Complimentary shipping over ₹1,499" /></label>

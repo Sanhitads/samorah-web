@@ -26,6 +26,8 @@ export interface SiteSettings {
   // Operating costs (R10) — inputs the Profit report needs but that aren't
   // derivable from orders. Editable here so margin config lives in the CMS, not code.
   costs: { packagingPerOrder: number; paymentFeePercent: number; shippingCostPerOrder: number };
+  // Dispatch operations (S2A) — same-day cutoff time + dispatch SLA. Operational config, editable here.
+  dispatch: { cutoffTime: string; slaHours: number };
 }
 
 function defaults(): SiteSettings {
@@ -40,6 +42,7 @@ function defaults(): SiteSettings {
     maintenance: { enabled: false, message: "We're making a few improvements. Back very soon." },
     storeNotice: { text: "", active: false },
     costs: { packagingPerOrder: 0, paymentFeePercent: 2, shippingCostPerOrder: 0 },
+    dispatch: { cutoffTime: "14:00", slaHours: 24 },
   };
 }
 
@@ -61,6 +64,7 @@ export async function getSiteSettings(): Promise<SiteSettings> {
       maintenance: { ...d.maintenance, ...s.maintenance },
       storeNotice: { ...d.storeNotice, ...s.storeNotice },
       costs: { ...d.costs, ...s.costs },
+      dispatch: { ...d.dispatch, ...s.dispatch },
     };
   } catch {
     return d;
