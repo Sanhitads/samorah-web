@@ -27,6 +27,42 @@ S2 (Operational Enhancements). A verification report + approval gate after **eac
   `INTEGRATION_REGISTRY_VERSION` increment).
 - **Post-launch enhancements remain roadmap-controlled** — no ad-hoc additions; each requires an approved phase.
 
+## Settings Module Dependencies *(reference — documentation only)*
+
+**Module OWNS**
+- Site settings (the `site_settings` singleton via `siteSettingsService`)
+- Operating-cost configuration (`site_settings.costs`)
+- Business configuration (brand / support / social / SEO / announcement, etc.)
+- Integration Status **presentation** (the read-only panels + registry + aggregator)
+
+**Module CONSUMES** *(reads existing outputs — never owns their truth)*
+- `healthService` (Payments / Webhooks / Email / deliverability)
+- `auditService` (Updated By · At · Changed Groups)
+- `analyticsConfig` (GA4 / GTM / Clarity / Meta flags)
+- Notification services (`opsEngine.getChannelHealth`, the existing test endpoint)
+- Payment health (`RAZORPAY`, `webhook_logs`, `razorpaySettlementService`)
+- Email provider (`emailConfigured` / `emailFrom` / `emailReplyTo` / delivery health)
+- Environment variables (integration config + `VERCEL_ENV` / `VERCEL_GIT_COMMIT_SHA`)
+
+**Module does NOT OWN** *(these live in their own systems; Settings only reflects them)*
+- Payment processing
+- Checkout calculations
+- Shipping calculations
+- Analytics
+- Notification delivery
+
+## Operational Verification *(performed AFTER production deployment)*
+
+A post-deployment smoke check against production:
+- [ ] **Settings save** — an edit saves and persists (reload reads it back)
+- [ ] **Audit summary** — Updated By · At · Changed Groups reflects the save
+- [ ] **Integration Status** — panels show correct severities + diagnostics + provenance
+- [ ] **Notification Test** — the test action fires and shows per-channel results
+- [ ] **Launch Readiness** — reflects the live integration health
+- [ ] **Environment display** — shows the correct environment (+ build metadata if present)
+
+- **Status:** _Pending_ → **Verified** (recorded here once confirmed in production).
+
 ## Governance philosophy — shares the ADR-0006 model
 The Integration Registry follows the **same governance philosophy as ADR 0006 — Registry-driven Navigation**
 (`docs/adr/0006-registry-driven-navigation.md`): **single source of truth · registry-driven composition ·
