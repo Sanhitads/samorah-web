@@ -2336,6 +2336,10 @@ a.adm-badge[data-b="incident"]:hover { background: rgba(168,68,58,0.22); }
 .int-test__results li { font-family: var(--font-sans); font-size: 11px; border: 1px solid var(--ad-hair); border-radius: 999px; padding: 2px 8px; color: var(--smoke, #6b6259); }
 .int-test__results li[data-r="sent"] { color: #2f6b3c; }
 .int-test__results li[data-r="failed"] { color: #8a3d2f; }
+.int-conn { font-family: var(--font-sans); font-size: 12px; color: var(--smoke, #6b6259); }
+.int-conn[data-sev="healthy"] { color: #2f6b3c; }
+.int-conn[data-sev="warning"] { color: #8a6d3b; }
+.int-conn[data-sev="critical"] { color: #8a3d2f; }
 
 /* ── Analytics charts · SamorahChart (Stage 4) ── */
 .an-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }

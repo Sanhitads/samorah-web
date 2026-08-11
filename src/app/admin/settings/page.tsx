@@ -9,6 +9,7 @@ import { cacheAgeLabel } from "@/lib/analytics/dataFreshness";
 import { ShippingSettingsForm } from "@/components/admin/ShippingSettingsForm";
 import { SiteSettingsForm } from "@/components/admin/SiteSettingsForm";
 import { IntegrationStatusSection } from "@/components/admin/IntegrationStatusSection";
+import { ProviderConnectionTest } from "@/components/admin/ProviderConnectionTest";
 import { COMMERCE } from "@/config/commerce";
 
 /**
@@ -40,6 +41,16 @@ export default async function SettingsPage() {
 
       {/* S1A — read-only integration status & operational health (never blocks editing below). */}
       <IntegrationStatusSection />
+
+      {/* S2B — read-only Razorpay connection test (reuses razorpaySettlementService; no side effects). */}
+      <section className="cfg-section">
+        <div className="ash-jump__head">
+          <h2 className="cfg-section__title">Provider connection tests</h2>
+          <span className="admin__muted">Read-only · Managed by Environment Variables</span>
+        </div>
+        <p className="cfg-hint">Verify Razorpay credentials reach the gateway — read-only (no payment, order, settlement, or webhook side effects). Email test-send is intentionally deferred; notifications use the Test action in Integration status above.</p>
+        <ProviderConnectionTest />
+      </section>
 
       {canConfigure ? (
         <section className="cfg-section">

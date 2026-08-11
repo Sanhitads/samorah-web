@@ -1,8 +1,8 @@
 # Samorah Admin Settings — Refinement Roadmap
 
-**Status: S1A + S1B + S2A APPROVED, COMMITTED & FROZEN. Next: Phase S2B.** Governance is final; structural
-changes to the governance/registry require an `INTEGRATION_REGISTRY_VERSION` increment and explicit roadmap
-approval.
+**Status: SETTINGS MODULE COMPLETE FOR LAUNCH — S1A + S1B + S2A + S2B APPROVED, COMMITTED & FROZEN.** No
+further Settings work is planned; future changes require explicit roadmap approval (governance/registry
+changes also require an `INTEGRATION_REGISTRY_VERSION` increment).
 
 Goal: make `/admin/settings` **launch-ready** by adding operational visibility (integration status/health) and
 usability (validation, save feedback, unsaved-guard, audit) — **reusing existing services**, additive only, no
@@ -17,9 +17,10 @@ S2 (Operational Enhancements). A verification report + approval gate after **eac
 | **S1A — Integration Status & Operational Health** | **Approved · Frozen** | `7caefe7` (tag `settings-s1a-baseline`) |
 | **S1B — Editable Settings Improvements** | **Approved · Frozen** | `bee6fc5` |
 | **S2A — Dispatch Configuration (cutoff + SLA)** | **Approved · Frozen** | (tag `settings-s2a-baseline`) |
-| **S2B — Operational Enhancements** (business address · provider testing) | Next | — |
+| **S2B — Read-only Razorpay Connection Test** | **Approved · Frozen** | (tag `settings-s2b-baseline`) |
 
-**The Settings module is LAUNCH-READY for its approved scope (S1A + S1B); S2A adds operational metadata.**
+**The Settings module is COMPLETE FOR LAUNCH.** *(Deferred / out of scope: business-address editing, email
+test-send, free-shipping-threshold editing — each requires a new approved phase.)*
 
 ## Launch Scope Boundary *(governance — documentation only)*
 - **S1A and S1B constitute the approved launch scope** for the Settings module.
@@ -193,6 +194,62 @@ require **explicit roadmap approval**:
 - [x] Boundary values (00:00 · 23:59 · SLA 0 · SLA 240)
 - [x] Tests
 - [x] Build
+
+---
+
+## Phase S2B — FROZEN (Read-only Razorpay Connection Test)
+
+Phase S2B is **complete, verified, and frozen**. It adds a **read-only** Razorpay "Test connection" action
+(reusing `razorpaySettlementService` + the frozen S1A integration model). Business address and email test-send
+are **not** part of this increment (deferred).
+
+### Provider Test Contract v1 *(FROZEN)*
+Every provider connection test:
+- **is read-only**
+- **never creates external records**
+- **never mutates provider state**
+- **never creates payments**
+- **never creates shipments**
+- **never sends emails**
+- **never sends SMS**
+- **never dispatches notifications**
+- **never replaces end-to-end production verification**
+
+**Future provider tests must conform to this contract.** Changing it requires explicit roadmap approval.
+
+### Verification scope
+A successful Razorpay connection test verifies **only**:
+- API connectivity
+- authentication
+- authorization
+- provider availability
+
+It does **NOT** verify:
+- checkout
+- payment capture
+- webhook processing
+- refunds
+- settlement lifecycle
+- signature verification
+- production payment flow
+
+(This prevents future misunderstanding — the test is an operational diagnostic, not a transaction-flow check.)
+
+### Ownership
+- **Owner:** Commerce Infrastructure.
+- **Purpose:** Operational diagnostics — **not** transaction verification.
+
+### Known limitation
+`getSettlementSummary` is `unstable_cache`-wrapped (1 h); the test reflects the most recent settlements read
+within the TTL (the cold-cache first call is fresh). A truly-live per-click re-check would require bypassing
+the cache, deliberately avoided to prevent a parallel Razorpay call.
+
+## Phase S2B — Acceptance
+- **Owner:** Founder.
+- **Status:** **Approved and Frozen.**
+- **Checklist:** Read-only contract ✔ · 5-state UI (Connected / Auth failed / Config missing / Provider
+  unavailable / Timeout) ✔ · reuse of frozen integration model ✔ · no editable keys ✔ · Tests ✔ · Build ✔ ·
+  Live QA ✔.
 
 ## The architectural insight (drives the whole plan)
 Analytics, Payment, Email, and Notification integrations are **environment-managed** — their runtime reads
