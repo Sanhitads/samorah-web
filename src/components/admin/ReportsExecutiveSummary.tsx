@@ -15,6 +15,18 @@ const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 const fmt = (format: "inr" | "percent" | "number", v: number) =>
   format === "inr" ? inr(v) : format === "percent" ? `${v}%` : String(Math.round(v));
 
+/** Descriptive tooltips (presentation only — not registry). Combined with the drill destination for parity
+ *  with the Analytics KPI tooltips ("what it means · where it goes"). */
+const DESCRIPTIONS: Record<string, string> = {
+  "reports.revenue": "Net revenue after refunds (ex-GST) for the selected window",
+  "reports.operatingProfit": "Revenue − COGS − packaging − courier − gateway fees",
+  "reports.margin": "Operating profit ÷ revenue",
+  "reports.orders": "Paid orders in the selected window",
+  "reports.customers": "Distinct paying customers in the selected window",
+};
+const tip = (desc: string | undefined, drill: { tooltip: string } | null): string | undefined =>
+  desc ? (drill ? `${desc} · ${drill.tooltip}` : desc) : drill?.tooltip;
+
 export function ReportsExecutiveSummary({
   data,
   ordersRange,
@@ -49,7 +61,7 @@ export function ReportsExecutiveSummary({
         higherIsBetter={w.higherIsBetter}
         periodLabel={pair.previous != null ? vsWindow : undefined}
         href={drill?.href}
-        tooltip={drill?.tooltip}
+        tooltip={tip(DESCRIPTIONS[w.id], drill)}
       />
     );
   }).filter(Boolean);

@@ -59,6 +59,10 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   // /admin/orders has no state filter and those rows have no real per-row destination.
   const dOrders = resolveDrill("orders", ordersRange ? { range: ordersRange } : undefined);
   const dCustomers = resolveDrill("customers");
+  // R4 tooltip consistency — descriptive tooltip + destination (parity with the Executive Summary / Analytics).
+  const revTip = dOrders ? `Revenue after refunds (ex-GST) · ${dOrders.tooltip}` : "Revenue after refunds (ex-GST)";
+  const profitTip = dOrders ? `Operating profit — revenue − expenses · ${dOrders.tooltip}` : "Operating profit — revenue − expenses";
+  const buyersTip = dCustomers ? `Distinct paying customers · ${dCustomers.tooltip}` : "Distinct paying customers";
   const health = profit && settings
     ? assessFinancialHealth({
         variantsMissingCost: profit.variantsMissingCost,
@@ -83,7 +87,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
       {/* R2 — Report Status banner (always) + severity-aware Financial Health banner (integrity before figures) */}
       {profit ? <ReportStatusBanner windowLabel={windowLabel} generatedAtMs={profit.freshness.fetchedAtMs} paidOrders={profit.orders} /> : null}
-      {health ? <FinancialHealthBanner health={health} /> : null}
+      {/* R4: suppress health warnings on an empty report — config notes read as noise with zero paid orders. */}
+      {health && profit && profit.orders > 0 ? <FinancialHealthBanner health={health} /> : null}
 
       {/* R2 — Executive Summary (5 KPIs; every value from the canonical engine via getExecutiveSummary) */}
       {exec ? <ReportsExecutiveSummary data={exec} ordersRange={ordersRange} windowLabel={windowLabel} /> : null}
@@ -96,10 +101,10 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           <span className="admin__muted">{profit.orders} paid orders · ex-GST · refund-adjusted</span>
         </div>
         <div className="ash-metrics__row" style={{ marginBottom: 12 }}>
-          <KpiCard label="Operating profit" value={inr(profit.operatingProfit)} href={dOrders?.href} tooltip={dOrders?.tooltip} />
-          <KpiCard label="Margin" value={`${profit.margin}%`} />
-          <KpiCard label="Revenue (after refunds)" value={inr(profit.revenue)} href={dOrders?.href} tooltip={dOrders?.tooltip} />
-          <KpiCard label="COGS" value={inr(profit.cogs)} />
+          <KpiCard label="Operating profit" value={inr(profit.operatingProfit)} href={dOrders?.href} tooltip={profitTip} />
+          <KpiCard label="Margin" value={`${profit.margin}%`} tooltip="Operating profit ÷ revenue" />
+          <KpiCard label="Revenue (after refunds)" value={inr(profit.revenue)} href={dOrders?.href} tooltip={revTip} />
+          <KpiCard label="COGS" value={inr(profit.cogs)} tooltip="Cost of goods sold — unit cost × quantity" />
         </div>
         <div className="admin__table-wrap">
           <table className="admin__table">
@@ -181,9 +186,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         <section className="od-card">
           <h2 className="od-card__title">Customers</h2>
           <div className="ash-metrics__row">
-            <KpiCard label="Buyers" value={String(r.customers.total)} href={dCustomers?.href} tooltip={dCustomers?.tooltip} />
-            <KpiCard label="Returning" value={String(r.customers.returning)} />
-            <KpiCard label="Repeat rate" value={`${r.customers.repeatRate}%`} />
+            <KpiCard label="Buyers" value={String(r.customers.total)} href={dCustomers?.href} tooltip={buyersTip} />
+            <KpiCard label="Returning" value={String(r.customers.returning)} tooltip="Customers with 2+ paid orders (lifetime)" />
+            <KpiCard label="Repeat rate" value={`${r.customers.repeatRate}%`} tooltip="Returning ÷ total buyers" />
           </div>
         </section>
 

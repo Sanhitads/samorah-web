@@ -293,6 +293,63 @@ The navigation architecture (why it is registry-driven, shared between Reports a
 - **Rollback:** additive.
 - **Verification gate:** polish only, zero redesign.
 
+> **Stage R4 introduced zero business logic changes. All financial calculations remain identical to Stage R3.**
+> Verified by diff: `financialEngine`, `financialHealth`, `reportsRegistry`, `analyticsRegistry`,
+> `reportsService`, the GST CSV route, and the banner components have **zero** changes in R4; only tooltip
+> `title` attributes, a render-gate for the health banner at zero orders, a print-only `@media` block, and a
+> route loading skeleton were added. Every displayed `value` is byte-identical to R3.
+
+#### Definition of Done — Visual Regression Checklist *(every R4 change must satisfy all)*
+
+- [ ] **No layout regressions** — element positions/structure unchanged unless intentionally updated.
+- [ ] **No spacing regressions** — margins/padding/gaps preserved.
+- [ ] **No typography regressions** — fonts/sizes/weights/letter-spacing preserved.
+- [ ] **Responsive verification** — **desktop · tablet · mobile** all correct, no horizontal overflow.
+- [ ] **Keyboard navigation preserved** — all interactive elements reachable/operable via keyboard.
+- [ ] **Focus-visible states preserved** — visible focus ring on every focusable element.
+- [ ] **Existing accessibility labels preserved** — `aria-label` / roles / `title` unchanged or improved.
+- [ ] **Empty states remain truthful** — zero-data messaging still accurate (no fabricated content).
+- [ ] **Skeleton loading does not change layout height** — skeletons occupy the same box as loaded content (no jump).
+- [ ] **Tooltips never cover critical content** — tooltips are supplementary; they never obscure values/actions.
+- [ ] **Browser print preview verified** — printed report is clean and readable.
+- [ ] **No CLS / layout shift introduced** — no cumulative layout shift from skeletons/tooltips/print styles.
+- [ ] **Existing screenshots remain valid** unless a change is an *intentional* visual update (then re-capture).
+
+#### Accessibility Verification *(verify only — do NOT redesign accessibility)*
+
+Confirm, without changing the accessibility model:
+
+- [ ] **Keyboard navigation** works across the whole page.
+- [ ] **Focus order** is logical (matches visual/reading order).
+- [ ] **Screen-reader labels** present and meaningful (KPI cards, banners, tables, drill links).
+- [ ] **Print stylesheet readability** — content legible and well-ordered in print.
+- [ ] **Severity indicators are not colour-only** — the Financial Health banner already pairs colour with a
+      text label ("Financial integrity · Warning/Attention required/Healthy") and an icon; verify this holds
+      for every state so severity is perceivable without colour.
+
+#### Screenshot Baseline Verification *(manual before/after — no new tooling)*
+
+For each R4 change, capture **before** and **after** screenshots at **desktop · tablet · mobile** and compare
+manually. **Only intentional visual differences may exist** — the purpose is to catch accidental **spacing,
+alignment, or typography** regressions. (Reuses the existing local-Supabase Playwright screenshot harness; no
+new dependency or visual-diff tool is introduced.)
+
+- [ ] Desktop before/after captured and compared.
+- [ ] Tablet before/after captured and compared.
+- [ ] Mobile before/after captured and compared.
+- [ ] Every diff is an *intentional* change; no accidental spacing/alignment/typography drift.
+
+#### Print Verification Checklist *(verification only — no redesign)*
+
+With the R4 print stylesheet applied, verify the browser print preview:
+
+- [ ] **No clipped content** — nothing cut off at page edges.
+- [ ] **No overlapping elements** — no element prints over another (e.g. cookie banner / sidebar removed).
+- [ ] **KPI cards do not split awkwardly** across a page break.
+- [ ] **Tables paginate naturally** — rows break cleanly between pages.
+- [ ] **Important headers remain visible where possible** (section titles not orphaned from their content).
+- [ ] **Readable in grayscale** — severity/emphasis survive a black-and-white print (not colour-dependent).
+
 ### Milestone — Finance Sign-off  *(after R4 — business approval, not just technical completion)*
 
 Since Reports now drives business decisions, the module is not "done" until it is **business-approved**, not

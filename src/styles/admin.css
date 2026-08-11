@@ -2288,6 +2288,24 @@ a.adm-badge[data-b="incident"]:hover { background: rgba(168,68,58,0.22); }
 .rep-health__items li[data-sev="warning"] { color: #8a6d3b; }
 .rep-health__items li[data-sev="attention"] { color: #8a3d2f; }
 
+/* ── Reports print (R4) — clean report: hide nav chrome, full width, natural pagination. Print-only. ── */
+@media print {
+  .ash { display: block; }
+  .ash__sidebar, .consent, .ff-queues { display: none !important; } /* sidebar nav · cookie banner · window pills */
+  .ash__main { width: 100%; }
+  main.admin { padding: 0; }
+  /* KPI cards / cards / banners never split across a page break */
+  .kpi, .ash-metric, .od-card, .rep-health, .rep-status, .ash-metrics__row { break-inside: avoid; }
+  /* keep section titles with their content */
+  .admin__head, .ash-jump__title, .od-card__title, .ash-activity__head { break-after: avoid; }
+  /* tables paginate naturally, headers repeat on each page, rows don't split */
+  .admin__table thead { display: table-header-group; }
+  .admin__table tr { break-inside: avoid; }
+  a[href] { color: inherit; text-decoration: none; } /* no link colour/underline noise in print */
+  /* severity accents survive (also conveyed by label + icon, so grayscale-readable) */
+  .rep-health { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
 /* ── Analytics charts · SamorahChart (Stage 4) ── */
 .an-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
 .an-chart { border: 1px solid var(--ad-hair); border-radius: 6px; background: #fbf9f5; padding: 14px 14px 8px; }
