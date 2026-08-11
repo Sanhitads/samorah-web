@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { SiteSettings } from "@/services/siteSettingsService";
+import { validateCosts, type CostValidationError } from "@/lib/settings/costValidation";
+import { shouldGuardNavigation } from "@/lib/bundleNavGuard";
 
 const FEATURE_LABELS: Record<string, string> = {
   reviews: "Reviews", wishlist: "Wishlist", rewards: "Rewards / Loyalty", blog: "Journal / Blog",
@@ -16,20 +18,58 @@ export function SiteSettingsForm({ settings }: { settings: SiteSettings }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: string; text: string } | null>(null);
   const [s, setS] = useState<SiteSettings>(settings);
+  const [baseline, setBaseline] = useState<SiteSettings>(settings); // last-saved snapshot (dirty authority)
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<CostValidationError["field"], string>>>({});
+
+  const dirty = JSON.stringify(s) !== JSON.stringify(baseline);
 
   const g = <K extends keyof SiteSettings>(group: K, key: keyof SiteSettings[K], v: string | boolean) =>
     setS((p) => ({ ...p, [group]: { ...p[group], [key]: v } }));
 
+  // Unsaved-changes warning — reuse the Bundle-CMS guard (browser close/refresh + in-app navigation).
+  useEffect(() => {
+    const h = (e: BeforeUnloadEvent) => { if (dirty) { e.preventDefault(); e.returnValue = ""; } };
+    window.addEventListener("beforeunload", h);
+    return () => window.removeEventListener("beforeunload", h);
+  }, [dirty]);
+  const dirtyRef = useRef(dirty); dirtyRef.current = dirty;
+  useEffect(() => {
+    const onDocClick = (e: MouseEvent) => {
+      if (!dirtyRef.current) return;
+      const a = (e.target as HTMLElement)?.closest?.("a") as HTMLAnchorElement | null;
+      if (!a) return;
+      const guard = shouldGuardNavigation(
+        { button: e.button, modified: e.metaKey || e.ctrlKey || e.shiftKey || e.altKey, rawHref: a.getAttribute("href"), absoluteHref: a.href, target: a.target || null, download: a.hasAttribute("download") },
+        { origin: window.location.origin, pathname: window.location.pathname },
+      );
+      if (guard && !window.confirm("You have unsaved Settings changes. Leave without saving?")) { e.preventDefault(); e.stopPropagation(); }
+    };
+    document.addEventListener("click", onDocClick, true);
+    return () => document.removeEventListener("click", onDocClick, true);
+  }, []);
+
   const save = async () => {
-    setBusy(true); setMsg(null);
+    // Client-side corrective validation first (server re-checks — defense-in-depth).
+    const errs = validateCosts(s.costs);
+    if (errs.length) {
+      setFieldErrors(Object.fromEntries(errs.map((e) => [e.field, e.message])));
+      setMsg({ tone: "err", text: `Please correct ${errs.length} operating-cost field${errs.length > 1 ? "s" : ""} below before saving.` });
+      return;
+    }
+    setFieldErrors({}); setBusy(true); setMsg(null);
     try {
       const res = await fetch("/api/admin/settings/site", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ patch: s }) });
       const d = await res.json();
       setBusy(false);
-      if (!res.ok) { setMsg({ tone: "err", text: d.error ?? "Failed" }); return; }
+      if (!res.ok) {
+        if (Array.isArray(d.fieldErrors)) setFieldErrors(Object.fromEntries(d.fieldErrors.map((e: CostValidationError) => [e.field, e.message])));
+        setMsg({ tone: "err", text: d.error ?? "Could not save." });
+        return;
+      }
+      setBaseline(s); // now clean at the saved snapshot
       setMsg({ tone: "ok", text: "Saved." });
       startTransition(() => router.refresh());
-    } catch { setBusy(false); setMsg({ tone: "err", text: "Network error" }); }
+    } catch { setBusy(false); setMsg({ tone: "err", text: "Network error — check your connection and try again." }); }
   };
 
   return (
@@ -82,9 +122,9 @@ export function SiteSettingsForm({ settings }: { settings: SiteSettings }) {
 
       <p className="cfg-sub">Operating costs (feed the Profit report)</p>
       <div className="cfg-grid">
-        <label className="cfg-field"><span>Packaging cost / order (₹)</span><input type="number" value={s.costs.packagingPerOrder} onChange={(e) => setS((p) => ({ ...p, costs: { ...p.costs, packagingPerOrder: Number(e.target.value) } }))} /></label>
-        <label className="cfg-field"><span>Courier cost / order (₹)</span><input type="number" value={s.costs.shippingCostPerOrder} onChange={(e) => setS((p) => ({ ...p, costs: { ...p.costs, shippingCostPerOrder: Number(e.target.value) } }))} /></label>
-        <label className="cfg-field"><span>Payment gateway fee (%)</span><input type="number" step="0.1" value={s.costs.paymentFeePercent} onChange={(e) => setS((p) => ({ ...p, costs: { ...p.costs, paymentFeePercent: Number(e.target.value) } }))} /></label>
+        <label className="cfg-field"><span>Packaging cost / order (₹)</span><input type="number" min="0" aria-invalid={!!fieldErrors.packagingPerOrder} value={s.costs.packagingPerOrder} onChange={(e) => setS((p) => ({ ...p, costs: { ...p.costs, packagingPerOrder: Number(e.target.value) } }))} />{fieldErrors.packagingPerOrder ? <span className="ff-err" role="alert">{fieldErrors.packagingPerOrder}</span> : null}</label>
+        <label className="cfg-field"><span>Courier cost / order (₹)</span><input type="number" min="0" aria-invalid={!!fieldErrors.shippingCostPerOrder} value={s.costs.shippingCostPerOrder} onChange={(e) => setS((p) => ({ ...p, costs: { ...p.costs, shippingCostPerOrder: Number(e.target.value) } }))} />{fieldErrors.shippingCostPerOrder ? <span className="ff-err" role="alert">{fieldErrors.shippingCostPerOrder}</span> : null}</label>
+        <label className="cfg-field"><span>Payment gateway fee (%)</span><input type="number" step="0.1" min="0" max="100" aria-invalid={!!fieldErrors.paymentFeePercent} value={s.costs.paymentFeePercent} onChange={(e) => setS((p) => ({ ...p, costs: { ...p.costs, paymentFeePercent: Number(e.target.value) } }))} />{fieldErrors.paymentFeePercent ? <span className="ff-err" role="alert">{fieldErrors.paymentFeePercent}</span> : null}</label>
       </div>
       <p className="cfg-hint">Per-unit product cost (COGS) is set on each variant under Products; these are the flat per-order and gateway costs the orders can’t tell us.</p>
 
@@ -97,7 +137,8 @@ export function SiteSettingsForm({ settings }: { settings: SiteSettings }) {
 
       <div className="cfg-actions">
         <button type="button" className="ff-btn ff-btn--primary" disabled={busy || pending} onClick={save}>{busy ? "Saving…" : "Save settings"}</button>
-        {msg ? <span className={`cfg-msg cfg-msg--${msg.tone}`}>{msg.text}</span> : null}
+        {msg ? <span className={`cfg-msg cfg-msg--${msg.tone}`} role={msg.tone === "err" ? "alert" : undefined}>{msg.text}</span> : null}
+        {dirty && !busy ? <span className="cfg-msg admin__muted" aria-live="polite">Unsaved changes</span> : null}
       </div>
     </div>
   );

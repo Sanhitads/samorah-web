@@ -4,6 +4,8 @@ import { requireStaff } from "@/lib/auth/requireStaff";
 import { hasCapability } from "@/lib/auth/capabilities";
 import { getSettingsAdminView } from "@/services/settingsService";
 import { getSiteSettings } from "@/services/siteSettingsService";
+import { getRecentAuditEvents } from "@/services/auditService";
+import { cacheAgeLabel } from "@/lib/analytics/dataFreshness";
 import { ShippingSettingsForm } from "@/components/admin/ShippingSettingsForm";
 import { SiteSettingsForm } from "@/components/admin/SiteSettingsForm";
 import { IntegrationStatusSection } from "@/components/admin/IntegrationStatusSection";
@@ -22,7 +24,11 @@ export default async function SettingsPage() {
   if (!staff.ok) redirect("/login");
   const canConfigure = hasCapability(staff.role, "shipping.configure");
 
-  const [{ settings, providers, warehouses }, site] = await Promise.all([getSettingsAdminView(), getSiteSettings()]);
+  const [{ settings, providers, warehouses }, site, auditEvents] = await Promise.all([
+    getSettingsAdminView(), getSiteSettings(),
+    getRecentAuditEvents({ entityType: "settings", limit: 1 }).catch(() => []),
+  ]);
+  const lastAudit = auditEvents[0]; // Updated By · At · Changed Groups (reuse auditService — no new tracking)
 
   return (
     <main className="admin">
@@ -37,7 +43,12 @@ export default async function SettingsPage() {
 
       {canConfigure ? (
         <section className="cfg-section">
-          <h2 className="cfg-section__title">General</h2>
+          <div className="ash-jump__head">
+            <h2 className="cfg-section__title">General</h2>
+            {lastAudit ? (
+              <span className="admin__muted">Last updated {cacheAgeLabel(Date.parse(lastAudit.created_at))} by {lastAudit.actorName ?? "system"}{lastAudit.notes ? ` · changed: ${lastAudit.notes}` : ""}</span>
+            ) : null}
+          </div>
           <SiteSettingsForm settings={site} />
         </section>
       ) : null}

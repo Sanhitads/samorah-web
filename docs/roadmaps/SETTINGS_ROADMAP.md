@@ -1,8 +1,8 @@
 # Samorah Admin Settings — Refinement Roadmap
 
-**Status: S1A APPROVED, COMMITTED & FROZEN (Settings module baseline). Next: Phase S1B (awaiting go-ahead).**
-Governance is final; structural changes to the governance/registry require an `INTEGRATION_REGISTRY_VERSION`
-increment and explicit roadmap approval.
+**Status: S1A + S1B APPROVED, COMMITTED & FROZEN. Next: Phase S2 (awaiting go-ahead).** Governance is final;
+structural changes to the governance/registry require an `INTEGRATION_REGISTRY_VERSION` increment and explicit
+roadmap approval.
 
 Goal: make `/admin/settings` **launch-ready** by adding operational visibility (integration status/health) and
 usability (validation, save feedback, unsaved-guard, audit) — **reusing existing services**, additive only, no
@@ -50,6 +50,41 @@ The following are now **frozen**; future architectural changes require **explici
 - **Timeout behaviour is bounded** (per-source time bound; invalid/missing config → documented default).
 - **Health never blocks editing** (integration status is informational, fails closed).
 - **Registry integrity prevents drift** (structural + authority tests fail on any bypass or half-declaration).
+
+---
+
+## Phase S1B — FROZEN (Editable Settings Improvements)
+
+Phase S1B is **complete, verified, and frozen**. The following are now **frozen**; future structural changes
+require **explicit roadmap approval**:
+- **Validation contract** — the operating-cost rules (packaging ≥ 0, courier ≥ 0, gateway 0–100; NaN/blank
+  invalid) and their **corrective** messages (`lib/settings/costValidation.ts`).
+- **Client validation** — blocks save on error, per-field `ff-err` + `aria-invalid`, in `SiteSettingsForm`.
+- **Server validation** — the site route re-checks `patch.costs`, returns **422** with `fieldErrors`
+  (defense-in-depth; mirrors the client rules).
+- **Unsaved-changes guard** — reuses `shouldGuardNavigation` + `beforeunload` with a baseline-snapshot dirty
+  authority and an "Unsaved changes" indicator.
+- **Save feedback** — clear success/error (`role="alert"` on error), no false "Saved" on failure, retry-safe.
+- **Audit summary** — Updated By · At · Changed Groups via `auditService.getRecentAuditEvents({ entityType:
+  "settings" })`. **No new tracking/services.** ("Changed Groups" reflects the full submitted payload — correct
+  behaviour; a diff-only PATCH is a possible future optimisation, not a fix.)
+
+## Phase S1B — Acceptance
+
+- **Owner:** Founder.
+- **Status:** **Approved and Frozen.**
+
+**Acceptance checklist**
+- [x] Validation verified
+- [x] Server validation verified
+- [x] Persistence verified (packaging/courier/gateway change → save → reload → read back; DB-confirmed)
+- [x] Save failure verified (graceful, no false "Saved", error shown, indicator remains, retry succeeds)
+- [x] Unsaved-changes verified (indicator + nav confirm; dismiss stays, accept leaves)
+- [x] Audit summary verified (Updated By · At · Changed Groups)
+- [x] Accessibility verified (`aria-invalid`, `role="alert"`, `aria-live`)
+- [x] Browser verification completed (authenticated, local Supabase)
+- [x] Tests passing
+- [x] Build passing
 
 ## The architectural insight (drives the whole plan)
 Analytics, Payment, Email, and Notification integrations are **environment-managed** — their runtime reads
