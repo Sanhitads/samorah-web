@@ -23,6 +23,8 @@ export interface CmsPage {
   status: PageStatus;
   publishAt?: string | null;
   unpublishAt?: string | null;
+  updatedAt?: string | null; // last save time (DB rows only) — powers the "Last updated" line
+  createdAt?: string | null; // first-created (DB rows only) — the effective-date fallback
   source: "db" | "config";
 }
 
@@ -42,7 +44,7 @@ function mapRow(data: any): CmsPage {
   return {
     slug: data.slug, title: data.title, eyebrow: data.eyebrow ?? "", intro: data.intro ?? "",
     sections: Array.isArray(data.sections) ? data.sections : [], seo: data.seo ?? {}, status: data.status,
-    publishAt: data.publish_at ?? null, unpublishAt: data.unpublish_at ?? null, source: "db",
+    publishAt: data.publish_at ?? null, unpublishAt: data.unpublish_at ?? null, updatedAt: data.updated_at ?? null, createdAt: data.created_at ?? null, source: "db",
   };
 }
 

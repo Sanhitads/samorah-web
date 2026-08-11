@@ -5020,6 +5020,23 @@ video.asset-image {
 .legal__section { margin-top: 36px; }
 .legal__section-title { font-family: var(--font-serif, Georgia, serif); font-size: 1.35rem; font-weight: 400; margin: 0 0 12px; color: var(--ink, #1f1a16); }
 .legal__p { font-family: var(--font-sans, sans-serif); font-size: 15px; line-height: 1.8; color: var(--ink, #1f1a16); margin: 0 0 12px; opacity: 0.86; }
+/* Dual-tone policy hero (opt-in via LegalPage heroBand) — a full-width tinted band
+   for the title + tagline, sitting above an ivory reading column. */
+.legal--band { max-width: none; margin: 0; padding: 0; background: var(--ivory, #FAF7F2); }
+.legal-hero { background: var(--soft-beige, #F0EBE3); border-bottom: 1px solid rgba(42,42,42,0.06); padding: clamp(48px, 9vh, 110px) clamp(16px, 5vw, 40px) clamp(40px, 7vh, 72px); }
+.legal-hero__inner { max-width: var(--container-narrow, 720px); margin-inline: auto; text-align: center; }
+.legal-hero__inner .legal__intro { margin-inline: auto; }
+.legal__body { max-width: var(--container-narrow, 720px); margin-inline: auto; padding: clamp(32px, 6vh, 64px) clamp(16px, 5vw, 40px) 100px; }
+.legal__body .legal__section:first-child { margin-top: 0; }
+
+/* Page metadata (Effective / Last updated) — quiet policy header line, from CMS metadata. */
+.legal__meta { font-family: var(--font-sans, sans-serif); font-size: 12px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--smoke, #6B6B6B); margin: 0 0 4px; }
+/* Closing statement — the page's quiet editorial signature (no card, border, or marks). */
+.legal__closing { max-width: 32ch; margin: clamp(56px, 8vh, 72px) auto 0; text-align: center; font-family: var(--font-serif, Georgia, serif); font-style: italic; font-weight: 400; font-size: clamp(1.1rem, 2.4vw, 1.4rem); line-height: 1.6; color: var(--deep-charcoal, #1A1A1A); }
+
+.legal__list { list-style: none; margin: 0 0 12px; padding: 0; }
+.legal__list-item { position: relative; font-family: var(--font-sans, sans-serif); font-size: 15px; line-height: 1.8; color: var(--ink, #1f1a16); opacity: 0.86; padding-left: 20px; margin: 0 0 6px; }
+.legal__list-item::before { content: "—"; position: absolute; left: 0; color: var(--gold, #c9a96e); }
 .legal__foot { font-family: var(--font-sans, sans-serif); font-size: 12px; color: var(--smoke, #6b6259); font-style: italic; margin-top: 44px; padding-top: 16px; border-top: 1px solid rgba(31,26,22,0.12); }
 .legal__contact { display: flex; flex-direction: column; gap: 22px; margin-top: 30px; }
 .legal__contact-label { font-family: var(--font-sans, sans-serif); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--smoke, #6b6259); margin: 0 0 4px; }

@@ -53,15 +53,107 @@ export const LEGAL: Record<string, { eyebrow: string; title: string; intro?: str
     ],
   },
   privacy: {
-    eyebrow: "Legal",
+    // Hero shows only Title + Subtitle (no eyebrow, no hero image) — the editorial policy layout.
+    eyebrow: "",
     title: "Privacy Policy",
-    intro: "How we handle your information.",
+    intro: "A quiet understanding of how your information is handled.",
+    // Ordered sections. Body lines beginning with "- " render as a semantic bullet list;
+    // the Contact section uses the {{supportEmail}} token, resolved from Site Settings at render
+    // time (never hard-coded). The final, heading-less section is the closing statement.
     sections: [
-      { heading: "What we collect", body: ["We collect the details you provide to place and fulfil an order (name, contact, delivery address) and basic usage data to improve the store."] },
-      { heading: "How we use it", body: ["To process orders, provide support, send transactional emails, and — only with consent — occasional letters from the studio."] },
-      { heading: "Your rights", body: ["You may request access to, correction of, or deletion of your personal data. Contact us to exercise these rights."] },
+      { heading: "Introduction", body: [
+        "Your privacy matters to us.",
+        "We collect only what is necessary to serve you better — and we handle it with care, discretion, and respect.",
+      ] },
+      { heading: "Information We Collect", body: [
+        "We may collect:",
+        "- Personal details such as name, email, phone number, and address",
+        "- Order and transaction details",
+        "- Information shared when you contact us",
+      ] },
+      { heading: "How We Use Your Information", body: [
+        "We use your information to:",
+        "- Process and deliver your orders",
+        "- Communicate updates and support",
+        "- Improve our website and experience",
+        "We do not use your data beyond what is necessary.",
+      ] },
+      { heading: "Website Usage & Responsibility", body: [
+        "By using our website, you agree:",
+        "- To provide accurate information",
+        "- Not to misuse or disrupt the platform",
+        "- To use the website for lawful purposes only",
+      ] },
+      { heading: "Sharing of Information", body: [
+        "We do not sell or trade your personal information.",
+        "Your data may only be shared with trusted partners involved in:",
+        "- Payment processing",
+        "- Order delivery",
+        "Information may also be shared with trusted technology, hosting and analytics providers, only where required to operate the website or fulfil our services.",
+      ] },
+      { heading: "Payment Information", body: [
+        "Payments are securely processed through our authorised payment partners (such as Razorpay).",
+        "Samorah never stores your complete credit card, debit card or banking credentials.",
+      ] },
+      { heading: "Cookies & Tracking", body: [
+        "We use cookies to:",
+        "- Improve website functionality",
+        "- Understand user behaviour",
+        "- Enhance your browsing experience",
+        "- Remember your preferences",
+        "- Maintain your shopping cart and session",
+        "- Improve website performance",
+        "You may disable cookies through your browser settings.",
+      ] },
+      { heading: "Data Security", body: [
+        "We take reasonable steps to protect your information.",
+        "Access to customer information is limited to authorised personnel and trusted service providers, only where required.",
+        "However, no method of transmission over the internet is completely secure.",
+      ] },
+      { heading: "Data Retention", body: [
+        "We retain order and customer information only for as long as reasonably necessary to:",
+        "- Fulfil orders",
+        "- Comply with legal obligations",
+        "- Resolve disputes",
+        "- Maintain business records",
+      ] },
+      { heading: "Marketing Communications", body: [
+        "If you subscribe to updates or newsletters, you may unsubscribe at any time using the unsubscribe link or by contacting us.",
+        "Unsubscribing from marketing communications does not affect order confirmations or essential service emails.",
+      ] },
+      { heading: "Your Rights", body: [
+        "You may:",
+        "- Request access to your data",
+        "- Ask for corrections",
+        "- Request deletion (where applicable)",
+        "You may also withdraw consent where applicable, subject to legal or contractual obligations.",
+      ] },
+      { heading: "Children's Privacy", body: [
+        "Our website is not intended for children under the applicable legal age.",
+        "We do not knowingly collect personal information from children.",
+      ] },
+      { heading: "Third-Party Links", body: [
+        "Our website may contain links to external websites.",
+        "We are not responsible for their privacy practices.",
+      ] },
+      { heading: "Changes to Policy", body: [
+        "We may update this policy from time to time.",
+        "Changes will be reflected on this page.",
+      ] },
+      { heading: "Governing Law", body: [
+        "This Privacy Policy shall be governed by the laws of India.",
+        "Any disputes shall be subject to the jurisdiction of the appropriate courts.",
+      ] },
+      { heading: "Contact", body: [
+        "For any privacy-related concerns:",
+        "Email: {{supportEmail}}",
+        "We aim to respond to privacy-related enquiries within 5–7 business days.",
+      ] },
+      // Closing statement — heading-less, rendered as the quiet sign-off.
+      { body: [
+        "We believe privacy, like scent, should never overwhelm — only support the experience.",
+      ] },
     ],
-    footNote: REVIEW,
   },
   terms: {
     eyebrow: "Legal",

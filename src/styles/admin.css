@@ -1149,6 +1149,33 @@ a.adm-badge[data-b="incident"]:hover { background: rgba(168,68,58,0.22); }
 .om-pay[data-tone="gold"] { background: rgba(201,169,110,0.24); color: #8a6d3b; }
 .cms-section { border: 1px solid var(--ad-hair); border-radius: 5px; padding: 12px; margin-bottom: 8px; display: flex; flex-direction: column; gap: 8px; }
 .cms-section input, .cms-section textarea { width: 100%; padding: 8px 10px; font-family: var(--font-sans); font-size: 13px; border: 1px solid var(--ad-hair); border-radius: 3px; box-sizing: border-box; }
+.cms-section__bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cms-section__foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cfg-count { font-family: var(--font-sans); font-size: 11px; }
+
+/* Side-by-side content editor: form on the left, live public-renderer preview on the right.
+   The preview is the same <LegalPage> the storefront uses, driven by unsaved form state. */
+.om-modal__card--wide.cms-edit-card { max-width: min(1180px, 96vw); }
+.cms-edit { display: flex; gap: 20px; align-items: flex-start; }
+.cms-edit__form { flex: 1 1 480px; min-width: 0; }
+.cms-edit__preview { flex: 1 1 440px; min-width: 0; position: sticky; top: 0; align-self: flex-start; }
+.cms-edit__preview-label { font-family: var(--font-sans); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--smoke, #6b6259); margin: 0 0 8px; }
+.cms-edit__preview-frame { border: 1px solid var(--ad-hair); border-radius: 6px; overflow: auto; max-height: 72vh; background: var(--ivory, #FAF7F2); }
+.cms-edit__preview-frame .legal, .cms-edit__preview-frame .legal--band { padding: 0; max-width: none; margin: 0; }
+.cms-edit__preview-frame .legal__head { padding: 22px 22px 0; }
+.cms-edit__preview-frame .legal-hero { padding: 26px 22px; }
+.cms-edit__preview-frame .legal__body { padding: 18px 22px 28px; }
+.cms-edit__preview-frame .legal__title { font-size: 1.5rem; }
+.cms-edit__preview-frame .legal__intro { font-size: 0.95rem; margin-top: 10px; }
+.cms-edit__preview-frame .legal__section { margin-top: 18px; }
+.cms-edit__preview-frame .legal__section-title { font-size: 1.05rem; }
+.cms-edit__preview-frame .legal__p, .cms-edit__preview-frame .legal__list-item { font-size: 13px; line-height: 1.6; }
+.cms-edit__preview-frame .legal__closing { margin-top: 28px; font-size: 1.05rem; }
+@media (max-width: 900px) {
+  .cms-edit { flex-direction: column; }
+  .cms-edit__preview { position: static; width: 100%; }
+  .cms-edit__preview-frame { max-height: 55vh; }
+}
 
 /* ── Global search ── */
 .ash-search { margin: 0 10px 8px; }

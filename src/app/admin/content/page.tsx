@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { hasCapability } from "@/lib/auth/capabilities";
 import { listPagesAdmin } from "@/services/cmsService";
+import { getSiteSettings } from "@/services/siteSettingsService";
 import { ContentManager } from "@/components/admin/ContentManager";
 
 /**
@@ -18,7 +19,7 @@ export default async function ContentPage() {
   if (!staff.ok) redirect("/login");
   const canManage = hasCapability(staff.role, "catalog.manage");
 
-  const pages = await listPagesAdmin();
+  const [pages, site] = await Promise.all([listPagesAdmin(), getSiteSettings()]);
 
   return (
     <main className="admin">
@@ -28,7 +29,7 @@ export default async function ContentPage() {
         <p className="admin__count">{pages.length} pages{canManage ? "" : " · read-only (needs catalog.manage)"}</p>
       </header>
       {canManage ? (
-        <ContentManager pages={pages} />
+        <ContentManager pages={pages} supportEmail={site.support.email} />
       ) : (
         <div className="admin__table-wrap">
           <table className="admin__table admin__table--board">

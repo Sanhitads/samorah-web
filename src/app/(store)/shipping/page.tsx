@@ -14,5 +14,5 @@ export const dynamic = "force-dynamic";
 export default async function Page() {
   const p = await getPage(SLUG);
   if (!p) notFound();
-  return <LegalPage eyebrow={p.eyebrow} title={p.title} intro={p.intro} sections={p.sections} footNote={p.source === "config" ? undefined : undefined} />;
+  return <LegalPage eyebrow={p.eyebrow} title={p.title} intro={p.intro} sections={p.sections} heroBand />;
 }

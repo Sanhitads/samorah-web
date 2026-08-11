@@ -37,6 +37,7 @@ const NAV: NavGroup[] = [
       { label: "Categories", href: "/admin/categories", icon: "❈" },
       { label: "Coupons", href: "/admin/coupons", icon: "%" },
       { label: "Content", href: "/admin/content", icon: "❡" },
+      { label: "Privacy Policy", href: "/admin/content/privacy", icon: "⚖" },
       { label: "Media", href: "/admin/media", icon: "▨" },
       { label: "Navigation", href: "/admin/navigation", icon: "❰" },
       { label: "Homepage", href: "/admin/homepage", icon: "⌗" },
