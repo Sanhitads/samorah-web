@@ -69,7 +69,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const ordersRange = win === "7" ? "7d" : win === "30" ? "30d" : null; // orders-page ?range value (90d/all → base list)
   const winParams = ordersRange ? { range: ordersRange } : undefined; // contextual drill filter for the window
   const freshnessSources = [
-    { label: "Orders", available: true, fetchedAtMs: kpi.freshness.fetchedAtMs, ttlMs: kpi.freshness.ttlMs },
+    { label: "Orders", available: kpi.freshness.available, fetchedAtMs: kpi.freshness.fetchedAtMs, ttlMs: kpi.freshness.ttlMs },
     { label: "GA4", available: ga4.available, fetchedAtMs: null },
     { label: "Clarity", available: clarity.available, fetchedAtMs: null },
   ];

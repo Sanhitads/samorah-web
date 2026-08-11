@@ -112,6 +112,23 @@ export interface KpiSnapshot {
 
 const nz = (v: string | number | null | undefined) => Math.round(Number(v ?? 0));
 
+/**
+ * Safe zeroed snapshot for when the KPI RPC is unavailable (e.g. the
+ * analytics_kpi_snapshot_v1 function hasn't been migrated yet, or PostgREST's schema
+ * cache is stale). `available: false` lets the freshness bar report the gap honestly.
+ * Degrading here — rather than throwing — keeps one optional reader from taking down
+ * the whole Analytics page, matching the daily-series readers below.
+ */
+function emptyKpiSnapshot(windowDays: number | null): KpiSnapshot {
+  const zero = { current: 0, previous: null as number | null };
+  return {
+    windowDays,
+    revenue: { ...zero }, orders: { ...zero }, avgBasket: { ...zero },
+    revenueToday: { current: 0, previous: 0 }, ordersToday: { current: 0, previous: 0 },
+    freshness: makeFreshness("orders", { fetchedAtMs: Date.now(), ttlMs: cacheMs("kpi"), available: false }),
+  };
+}
+
 async function computeKpiSnapshot(windowDays: number | null): Promise<KpiSnapshot> {
   const { data, error } = await analyticsRpc().rpc("analytics_kpi_snapshot_v1", { p_window_days: windowDays ?? 3650 });
   if (error) throw new Error(error.message);
@@ -132,13 +149,20 @@ async function computeKpiSnapshot(windowDays: number | null): Promise<KpiSnapsho
   };
 }
 
-/** Optimized current+previous KPI snapshot (RPC-backed, cached). Reused by the Executive Summary grid. */
+/** Optimized current+previous KPI snapshot (RPC-backed, cached). Reused by the Executive Summary grid.
+ *  Never throws: if the RPC fails or isn't migrated, it degrades to a zeroed snapshot so the Analytics
+ *  page still renders. The catch is OUTSIDE unstable_cache, so failures aren't cached (they retry each
+ *  request) while successful snapshots still cache for the TTL. */
 export async function getKpiSnapshot(windowDays: number | null = 30): Promise<KpiSnapshot> {
-  return unstable_cache(
-    () => computeKpiSnapshot(windowDays),
-    ["analytics-kpi-snapshot", String(windowDays ?? "all")],
-    { revalidate: cacheSeconds("kpi"), tags: ["analytics-kpi"] },
-  )();
+  try {
+    return await unstable_cache(
+      () => computeKpiSnapshot(windowDays),
+      ["analytics-kpi-snapshot", String(windowDays ?? "all")],
+      { revalidate: cacheSeconds("kpi"), tags: ["analytics-kpi"] },
+    )();
+  } catch {
+    return emptyKpiSnapshot(windowDays);
+  }
 }
 
 /** Daily revenue for the last N days (MV-backed) — a mini-sparkline series for the Revenue KPI card. */
