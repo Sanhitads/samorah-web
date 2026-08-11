@@ -11,6 +11,22 @@ redesign. Sequenced correctness/visibility → usability → optional enhancemen
 **Approved phasing:** S1A (Integration Status & Operational Health) → S1B (Editable Settings Improvements) →
 S2 (Operational Enhancements). A verification report + approval gate after **each** phase.
 
+## Settings Module Status
+| Phase | Status | Commit |
+|---|---|---|
+| **S1A — Integration Status & Operational Health** | **Approved · Committed · Frozen** | `7caefe7` (tag `settings-s1a-baseline`) |
+| **S1B — Editable Settings Improvements** | **Approved · Committed · Frozen** | `bee6fc5` |
+| **S2 — Operational Enhancements** | Next (awaiting go-ahead) | — |
+
+**The Settings module is currently considered LAUNCH-READY for its approved scope (S1A + S1B).**
+
+## Launch Scope Boundary *(governance — documentation only)*
+- **S1A and S1B constitute the approved launch scope** for the Settings module.
+- **S2 consists of operational enhancements, not launch blockers** — the module can launch without S2.
+- **Future structural changes require explicit roadmap approval** (governance/registry changes also require an
+  `INTEGRATION_REGISTRY_VERSION` increment).
+- **Post-launch enhancements remain roadmap-controlled** — no ad-hoc additions; each requires an approved phase.
+
 ## Governance philosophy — shares the ADR-0006 model
 The Integration Registry follows the **same governance philosophy as ADR 0006 — Registry-driven Navigation**
 (`docs/adr/0006-registry-driven-navigation.md`): **single source of truth · registry-driven composition ·
