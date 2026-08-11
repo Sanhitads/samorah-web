@@ -494,3 +494,183 @@ Any of these becoming in-scope requires an explicitly approved new phase.
   `.admin__table-wrap` (one line). Tracked separately, not part of S1A.
 - **CookieConsent overlays `/admin/*`** — the storefront consent banner renders on admin routes (also on the
   Reports platform backlog). Fix = hide `CookieConsent` on `/admin/*`. Tracked separately.
+
+---
+---
+
+# POST-LAUNCH SETTINGS ROADMAP
+
+> **Status:** Documentation only. Nothing below is a launch blocker. The Settings module is
+> **COMPLETE FOR LAUNCH** on the S1A + S1B + S2A + S2B baseline (see above). This roadmap records the
+> agreed *post-launch* direction so the launch scope stays frozen and future work has an approved home.
+> Each item here is a **candidate** — it becomes real only through an explicitly approved phase that
+> honours the Governing Principles at the end of this document.
+
+## Overview
+
+| Track | Theme | When |
+|---|---|---|
+| **Launch Scope** | S1A · S1B · S2A · S2B | **Done — frozen baseline** |
+| **Version 1.1** | Operational Improvements | Post-launch · *not launch blockers* |
+| **Version 1.2** | Business Improvements | Future operational enhancements |
+| **Future** | Enterprise Features | Far future |
+
+---
+
+## 1. Launch Scope (Completed)
+
+The frozen launch baseline. No further change without a new approved phase.
+
+| Phase | Scope | Baseline |
+|---|---|---|
+| **S1A** | Read-only Integration Status & Operational Health (registry-driven, panel-isolated, timeout-guarded) | `7caefe7` · tag `settings-s1a-baseline` |
+| **S1B** | Editable Settings Improvements (corrective validation, save feedback, unsaved-changes guard, audit summary) | `bee6fc5` |
+| **S2A** | Dispatch Configuration — shipping cutoff time + dispatch SLA (operational metadata; validated · audited) | `0339848` · tag `settings-s2a-baseline` |
+| **S2B** | Read-only Razorpay Connection Test (Provider Test Contract v1; reuses `razorpaySettlementService`) | `bae6a54` · tag `settings-s2b-baseline` |
+
+**These four phases are the launch line.** Everything in Versions 1.1 / 1.2 / Future is post-launch.
+
+---
+
+## 2. Version 1.1 — Operational Improvements
+
+*These improve day-to-day operations but are **not launch blockers**. Post-launch.*
+
+### Provider Testing Expansion
+Extend the S2B read-only connection-test pattern to the remaining integrations — each **read-only**,
+conforming to **Provider Test Contract v1**, registered through the Integration Registry:
+- **Shiprocket** connection test
+- **SMTP** connection test
+- **WhatsApp Business** connection test
+- **Slack** connection test
+- **Google Analytics** connection test
+
+### Better Audit History — "Settings History"
+Replace the single **Last Updated** line with a **Settings History** timeline built from the existing
+audit trail (`auditService`), e.g.:
+
+```
+Settings History
+  Yesterday   Changed by Founder
+  3 Aug       Gateway Fee changed
+  12 Jul      Business Hours changed
+```
+
+### Diff-only PATCH optimization
+Today the form posts the **full payload**, so the audit "Changed Groups" reflects everything, not just what
+moved. Later, send **only changed fields** → cleaner, more precise audits. (Server stays authoritative;
+validation unchanged.)
+
+### Provider Response Time
+Surface latency alongside severity, e.g. **`Razorpay — Healthy · 142 ms`** instead of just `Healthy`.
+Derived from the existing read-only health/test calls; no new provider side effects.
+
+### Manual Integration Refresh
+A **Refresh Integration Status** button so operators re-fetch on demand instead of waiting for the cache TTL
+(currently read-only status reflects the last read within the TTL).
+
+### Integration / Connection History
+A short per-integration history of recent status reads, e.g.:
+
+```
+Healthy    3 hours ago
+Healthy    Yesterday
+Failed     4 days ago
+```
+
+**All Version 1.1 items: Post-launch · Not launch blockers.**
+
+---
+
+## 3. Version 1.2 — Business Improvements
+
+*Future operational enhancements — they help operations; none are launch-critical.*
+
+### Business Address enhancements
+- **Multiple warehouses** (regional addresses)
+- **GST branch address** per location
+
+### Multiple Warehouse Support
+First-class multi-warehouse configuration (surfacing/editing beyond today's single-origin model).
+
+### Holiday Calendar UI
+Replace raw date entry (e.g. `2026-10-02`) with a **calendar UI**.
+
+### Business Hours improvements
+Separate, structured working hours for **Customer Support · Warehouse · Dispatch · Production**, each
+**timezone-aware**, **holiday-aware**, with **half-day** support.
+
+### Shipping Holiday automation
+Automatically **adjust expected dispatch** around configured shipping holidays (builds on S2A dispatch
+cutoff/SLA — reuses `site_settings.dispatch`; still operational metadata).
+
+### Provider Priority ordering
+Replace a single manual default (e.g. "Shiprocket") with an **ordered fallback list**, e.g.:
+
+```
+1  Shiprocket
+2  Delhivery
+3  Blue Dart
+```
+
+### Maintenance Scheduling
+Replace the on/off checkbox with a **scheduled** maintenance window: **Start · End · Banner · Reason**.
+
+### Announcement Scheduling
+**Future-publish** announcements with **expiry** and **preview**.
+
+**All Version 1.2 items: Future operational enhancements.**
+
+---
+
+## 4. Future Enterprise Features
+
+*Far future. Structural — each would require its own architecture review and approved phase.*
+
+- **Multi-brand** — multiple brands under one platform (e.g. Samorah · Brand B · Brand C)
+- **Multi-warehouse** — enterprise-grade regional fulfilment
+- **Regional GST** — per-region tax handling
+- **Multi-currency**
+- **Regional shipping rules** — per-region rate/eligibility logic
+- **Advanced feature-flag management** — beyond simple toggles: staged **rollouts**, **percent rollout**,
+  **role-based rollout**
+- **Secrets management** — **API-key rotation**, connection history, **key expiry**
+  *(remains environment-managed / externally owned — Settings never owns credentials; see Non-Goals)*
+
+---
+
+## SETTINGS MODULE GOVERNING PRINCIPLES
+
+*Permanent architectural rules. They hold across every phase, present and future. A proposal that
+violates any of these is out of scope for the Settings module by definition.*
+
+1. **Settings owns business configuration.**
+2. **Settings never owns business logic.**
+3. **Settings never owns financial calculations.**
+4. **Settings never owns provider credentials.**
+5. **Settings consumes health/system information — it never computes health.**
+6. **All integrations register through the Integration Registry.**
+7. **Provider testing is always read-only** (Provider Test Contract v1).
+8. **Structural changes require roadmap approval.**
+
+---
+
+## Explicit Non-Goals
+
+The Settings module will **never** edit the following. These remain **environment-managed** (owned outside
+Settings, injected via environment variables / secret storage):
+
+- **Razorpay API keys**
+- **SMTP credentials**
+- **Supabase credentials**
+- **Analytics secrets**
+- **Environment variables** (generally)
+
+Settings may **display read-only status** for env-managed integrations and **run read-only connection tests**
+against them — but it never surfaces an editable field for a secret, and never writes one.
+
+---
+
+*Post-launch roadmap frozen as documentation. The launch scope (S1A–S2B) remains complete and frozen;
+each post-launch item becomes real only through a separately approved phase honouring the Governing
+Principles above.*
