@@ -217,36 +217,98 @@ component recomputes any financial number.**
 > `REPORTS_CALC_VERSION = "v1"`) and merely *displayed* here — so future accounting-logic changes bump one
 > value that also stamps historical exports.
 
-### Stage R3 — Drill-downs + Customer Depth
+### Stage R3 — Drill-downs  *(pure navigation — no new calculations / SQL / services)*
 
-*(Revenue After Refunds is NO LONGER here — moved to R1A.)*
+*(Revenue After Refunds is NO LONGER here — moved to R1A. Customer depth — revenue-per-customer / top
+customers / LTV — is DEFERRED post-launch: it would require new calculations/services, out of R3 scope.)*
 
-- **Features:** registry-driven drills — Revenue / Operating Profit / Orders → `orders` (+ `range`),
-  Customers → `customers`, Top product → `products`; Orders-by-state → `orders?state=…` **only if**
-  `/admin/orders` supports a state filter (otherwise value-only — no fake destinations). Customer depth:
-  revenue-per-customer; **Top customers via `customerAdminService`** (reuse). LTV deferred unless
-  `customerAdminService` already exposes lifetime spend.
-- **Components reused:** `KpiCard` / table rows as links.
-- **Services reused:** `customerAdminService` (no duplication); no new refund work (done in R1A).
-- **Registry reuse:** `resolveDrill` + `ANALYTICS_DRILL_TARGETS` (extend only for a genuinely real destination).
-- **DB changes:** none expected.
-- **Dependencies:** none.
-- **Complexity:** Medium.
-- **Testing:** drill resolution parity; top-customers reuse (no dup query).
-- **Rollback:** flags.
-- **Verification gate:** every drill lands on a real destination; no fabricated links.
+- **Features:** registry-driven drills on the report's lower tiles/rows, **consistent with the Executive
+  Summary routes** — Top products rows → `products`; Customers (Buyers) tile → `customers`; Orders-by-state
+  rows → `orders?state=…` **only if** `/admin/orders` supports a state filter (otherwise value-only — no
+  fake destinations). The Executive Summary KPI drills already ship (R2); R3 makes the rest of the page drill
+  the same way. **No duplicate routing** (every destination via `resolveDrill`), no redesign.
+- **Components reused:** `KpiCard` / existing table rows as `next/link`s (native middle/ctrl-click).
+- **Services reused:** none. **No new calculations, no new SQL, no new services.**
+- **Registry reuse:** `resolveDrill` + `ANALYTICS_DRILL_TARGETS` (extend the map ONLY for a genuinely real,
+  new destination). Architectural consistency with Analytics preserved.
+- **DB changes:** none. **Dependencies:** none. **Complexity:** Low.
+- **Testing:** every drill target resolves through the registry; every route matches the Executive Summary;
+  no broken links; keyboard navigation intact; middle-click and Ctrl/Cmd-click work.
+- **Rollback:** additive (links only) — trivially removable.
+- **Verification gate:** every drill lands on a real registry destination; no fabricated links; keyboard +
+  middle/ctrl-click navigation intact.
+
+#### Future Drill Candidates *(documentation only — NOT implemented; mirrors `REPORTS_NON_DRILLABLE` metadata)*
+
+Every section intentionally left value-only today, and the capability that would unlock a real drill later:
+
+| Section | Why value-only now | Capability that would unlock a drill |
+|---|---|---|
+| Orders by State | `/admin/orders` has no `ship_state` filter | Orders page **state filter** |
+| Top Products | rows carry only a name, no id/slug | **Product-details routing** (per-product page) |
+| GST | no transaction-level GST destination | **GST transaction view** |
+| Fragrance | fragrance family is not an addressable page | **Fragrance analytics page** |
+| Coupons | no per-coupon detail destination | **Coupon detail page** |
+| Acquisition | no campaign-level destination | **Campaign reporting** |
+| Retention | no cohort-drill destination | **Cohort explorer** |
+
+These are captured in code as `REPORTS_NON_DRILLABLE` (architectural metadata: `isDrillable: false` + `reason`
++ `futureRequirement`; never rendered, no runtime effect). No fake destination is ever shipped in the interim.
+
+#### Drill-target lifecycle & completeness *(governance — metadata + integrity test only)*
+
+Every entry in the shared `ANALYTICS_DRILL_TARGETS` carries a lifecycle **status** (`DRILL_TARGET_STATUS`,
+architectural metadata — never rendered, never affects routing):
+
+- **active** — currently used by ≥1 widget (Analytics and/or Reports): `orders`, `ordersAwaiting`,
+  `inventory`, `customers`, `products`.
+- **reserved** — intentionally defined for a future capability, not yet wired to a widget (each carries a
+  reason): `ordersCancelled`, `returns`, `shipments`, `fulfillment`, `reports`, `search`.
+- **deprecated** — retained temporarily for backwards compatibility: _(none today)_.
+
+A **registry-completeness test** guarantees every drill target is either **referenced by a widget** or
+**explicitly reserved/deprecated** — so dead routes can never accumulate silently, and a newly-added target
+must declare its lifecycle status (enforced at compile time by the `Record<DrillTargetKey, …>` type).
+
+The navigation architecture (why it is registry-driven, shared between Reports and Analytics, resolved through
+`resolveDrill`, lifecycle-governed, and protected by completeness + route-parity tests) is recorded in
+**ADR 0006 — Registry-driven navigation** (`docs/adr/0006-registry-driven-navigation.md`).
 
 ### Stage R4 — UX Polish  *(final; was R6 — error boundary already moved to R1A)*
 
 - **Features:** loading skeletons (`KpiCard`); tooltips; mobile table horizontal-scroll verification (the
   Analytics fix pattern); hover/focus consistency; empty-state consistency.
+  - **[Functional-review finding · Resolved Later · Not Launch Blocking]** Add a **print stylesheet for
+    Reports** (`@media print`): hide the admin sidebar / window pills / cookie banner, full-width content,
+    `break-inside: avoid` on `.ash-metrics` / `.od-card` / tables — so a printed report is clean.
+  - **[Functional-review finding · Resolved Later · Not Launch Blocking]** **Suppress (or neutralize) the
+    Financial Health banner when there are zero paid orders** (`paidOrders === 0`) — config warnings read as
+    noise on an empty report.
 - **Components reused:** `KpiCard` states; `admin__table-wrap`.
 - **Services reused:** none.
 - **Registry reuse:** existing flags.
 - **DB changes:** none. **Dependencies:** none. **Complexity:** Low.
-- **Testing:** live local-Supabase authenticated QA (never hosted DB) + responsive check.
+- **Testing:** live local-Supabase authenticated QA (never hosted DB) + responsive check; **print-preview
+  check**; zero-orders empty-state check.
 - **Rollback:** additive.
 - **Verification gate:** polish only, zero redesign.
+
+### Milestone — Finance Sign-off  *(after R4 — business approval, not just technical completion)*
+
+Since Reports now drives business decisions, the module is not "done" until it is **business-approved**, not
+only technically complete.
+
+- **Owner:** Founder.
+- **Checklist:** Revenue · GST · Profit · Margin · Refunds · CSV.
+- **Status:** _Pending_ → **Approved** (founder sign-off recorded here once each figure is confirmed against
+  the books for a real period).
+
+---
+
+## Platform Backlog  *(surfaced during the Reports functional review — not Reports-scoped)*
+
+- **[Resolved Later · Not Launch Blocking]** Hide the storefront `CookieConsent` on `/admin/*` routes — it
+  currently overlays admin pages (pre-existing; observed overlapping the Reports content during QA).
 
 ---
 

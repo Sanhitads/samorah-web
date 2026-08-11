@@ -46,6 +46,31 @@ export const ANALYTICS_DRILL_TARGETS = {
 /** Strongly-typed drill key — derived from the map so it can never drift from the routes. */
 export type DrillTargetKey = keyof typeof ANALYTICS_DRILL_TARGETS;
 
+/**
+ * Lifecycle status for each drill destination — ARCHITECTURAL METADATA ONLY. Never rendered, never affects
+ * routing (`resolveDrill` ignores it). It prevents dead routes: a target unreferenced by any widget must be
+ * explicitly `reserved` (defined for a future capability) or `deprecated` (kept temporarily for back-compat),
+ * never silently orphaned. The `Record<DrillTargetKey, …>` type forces every target to declare a status at
+ * compile time, so a newly-added destination can never skip this governance.
+ *   active     — currently used by ≥1 widget (Analytics and/or Reports)
+ *   reserved   — intentionally defined for a future capability, not yet wired to a widget
+ *   deprecated — retained temporarily for backwards compatibility
+ */
+export type DrillTargetStatus = "active" | "reserved" | "deprecated";
+export const DRILL_TARGET_STATUS: Record<DrillTargetKey, { status: DrillTargetStatus; reason?: string }> = {
+  orders:          { status: "active" },
+  ordersAwaiting:  { status: "active" },
+  inventory:       { status: "active" },
+  customers:       { status: "active" },
+  products:        { status: "active" },
+  ordersCancelled: { status: "reserved", reason: "Cancelled-orders drill; defined but not yet wired to a widget." },
+  returns:         { status: "reserved", reason: "Returns board destination; not yet referenced by a widget." },
+  shipments:       { status: "reserved", reason: "Shipment board destination; not yet referenced by a widget." },
+  fulfillment:     { status: "reserved", reason: "Fulfilment board destination; not yet referenced by a widget." },
+  reports:         { status: "reserved", reason: "Reports page link-out; not a widget drill target." },
+  search:          { status: "reserved", reason: "Search destination; not yet referenced by a widget." },
+};
+
 export interface DrillResolution {
   href: string;
   tooltip: string;

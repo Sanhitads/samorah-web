@@ -9,6 +9,8 @@ import { assessFinancialHealth } from "@/lib/reports/financialHealth";
 import { ReportsExecutiveSummary } from "@/components/admin/ReportsExecutiveSummary";
 import { ReportStatusBanner } from "@/components/admin/ReportStatusBanner";
 import { FinancialHealthBanner } from "@/components/admin/FinancialHealthBanner";
+import { KpiCard } from "@/components/admin/KpiCard";
+import { resolveDrill } from "@/lib/analytics/analyticsRegistry";
 
 /**
  * Reports — `/admin/reports`. Business & filing reports (GST by state, top
@@ -51,6 +53,12 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   // R2 presentation helpers — all values consumed from the canonical engine/service output; nothing recomputed.
   const windowLabel = WINDOWS.find((w) => w.k === win)?.l ?? "30 days";
   const ordersRange = win === "all" ? null : `${win}d`;
+
+  // R3 drill-downs — registry-driven, routes IDENTICAL to the Executive Summary (orders / customers).
+  // No fake destinations: Orders-by-state / GST / fragrance / channels / cohorts stay value-only because
+  // /admin/orders has no state filter and those rows have no real per-row destination.
+  const dOrders = resolveDrill("orders", ordersRange ? { range: ordersRange } : undefined);
+  const dCustomers = resolveDrill("customers");
   const health = profit && settings
     ? assessFinancialHealth({
         variantsMissingCost: profit.variantsMissingCost,
@@ -88,10 +96,10 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           <span className="admin__muted">{profit.orders} paid orders · ex-GST · refund-adjusted</span>
         </div>
         <div className="ash-metrics__row" style={{ marginBottom: 12 }}>
-          <div className="ash-metric"><span className="ash-metric__v">{inr(profit.operatingProfit)}</span><span className="ash-metric__l">Operating profit</span></div>
-          <div className="ash-metric"><span className="ash-metric__v">{profit.margin}%</span><span className="ash-metric__l">Margin</span></div>
-          <div className="ash-metric"><span className="ash-metric__v">{inr(profit.revenue)}</span><span className="ash-metric__l">Revenue (after refunds)</span></div>
-          <div className="ash-metric"><span className="ash-metric__v">{inr(profit.cogs)}</span><span className="ash-metric__l">COGS</span></div>
+          <KpiCard label="Operating profit" value={inr(profit.operatingProfit)} href={dOrders?.href} tooltip={dOrders?.tooltip} />
+          <KpiCard label="Margin" value={`${profit.margin}%`} />
+          <KpiCard label="Revenue (after refunds)" value={inr(profit.revenue)} href={dOrders?.href} tooltip={dOrders?.tooltip} />
+          <KpiCard label="COGS" value={inr(profit.cogs)} />
         </div>
         <div className="admin__table-wrap">
           <table className="admin__table">
@@ -173,9 +181,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         <section className="od-card">
           <h2 className="od-card__title">Customers</h2>
           <div className="ash-metrics__row">
-            <div className="ash-metric"><span className="ash-metric__v">{r.customers.total}</span><span className="ash-metric__l">Buyers</span></div>
-            <div className="ash-metric"><span className="ash-metric__v">{r.customers.returning}</span><span className="ash-metric__l">Returning</span></div>
-            <div className="ash-metric"><span className="ash-metric__v">{r.customers.repeatRate}%</span><span className="ash-metric__l">Repeat rate</span></div>
+            <KpiCard label="Buyers" value={String(r.customers.total)} href={dCustomers?.href} tooltip={dCustomers?.tooltip} />
+            <KpiCard label="Returning" value={String(r.customers.returning)} />
+            <KpiCard label="Repeat rate" value={`${r.customers.repeatRate}%`} />
           </div>
         </section>
 

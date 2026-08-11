@@ -54,6 +54,29 @@ export const REPORTS_EXEC_KPIS: ReportsKpiWidget[] = [
   k({ id: "reports.customers",       label: "Customers",        owner: "reportsService",  source: "reportsService.customers",        format: "number",  higherIsBetter: true, drillTarget: "customers", permission: "analytics.view" }),
 ];
 
+/**
+ * Intentionally NON-drillable report sections — ARCHITECTURAL METADATA ONLY (never rendered, no runtime
+ * effect). Documents WHY each has no drill today and WHAT capability would unlock one, so a future developer
+ * doesn't mistake the absence of a link for an oversight. No fake destinations are ever shipped.
+ */
+export interface NonDrillableMetric {
+  id: string;
+  label: string;
+  isDrillable: false;
+  reason: string;            // why there is no meaningful destination today
+  futureRequirement: string; // the capability that would make it drillable later (roadmap only)
+}
+
+export const REPORTS_NON_DRILLABLE: NonDrillableMetric[] = [
+  { id: "report.ordersByState", label: "Orders by state", isDrillable: false, reason: "No meaningful filtered destination exists — /admin/orders has no ship_state filter, so a drill would land on unfiltered orders.", futureRequirement: "Requires an Orders page state (ship_state) filter." },
+  { id: "report.topProducts",   label: "Top products",    isDrillable: false, reason: "No per-product destination — report rows carry only a product name, not an id/slug to route to.",                                       futureRequirement: "Requires product-details routing (per-product page)." },
+  { id: "report.gst",           label: "GST report",      isDrillable: false, reason: "No transaction-level GST destination exists to drill into.",                                                                                 futureRequirement: "Requires a GST transaction view." },
+  { id: "report.fragrance",     label: "Fragrance performance", isDrillable: false, reason: "Fragrance family is not an addressable page.",                                                                                          futureRequirement: "Requires a fragrance analytics page." },
+  { id: "report.coupons",       label: "Coupon usage",    isDrillable: false, reason: "No per-coupon detail destination exists.",                                                                                                   futureRequirement: "Requires a coupon detail page." },
+  { id: "report.acquisition",   label: "Acquisition channels", isDrillable: false, reason: "No campaign-level destination exists.",                                                                                                  futureRequirement: "Requires campaign reporting." },
+  { id: "report.retention",     label: "Retention cohorts", isDrillable: false, reason: "No cohort-drill destination exists.",                                                                                                      futureRequirement: "Requires a cohort explorer." },
+];
+
 const BY_ID: Record<string, ReportsKpiWidget> = Object.fromEntries(REPORTS_EXEC_KPIS.map((x) => [x.id, x]));
 
 export function getReportsKpi(id: string): ReportsKpiWidget | undefined {

@@ -1,8 +1,13 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { REPORTS_EXEC_KPIS, getReportsKpi, isReportsKpiEnabled } from "@/lib/reports/reportsRegistry";
+import { REPORTS_EXEC_KPIS, getReportsKpi, isReportsKpiEnabled, REPORTS_NON_DRILLABLE } from "@/lib/reports/reportsRegistry";
 import { computeFinancials } from "@/lib/reports/financialEngine";
 import * as reportsService from "@/services/reportsService";
-import { resolveDrill, type DrillTargetKey } from "@/lib/analytics/analyticsRegistry";
+import { resolveDrill, ANALYTICS_DRILL_TARGETS, DRILL_TARGET_STATUS, ANALYTICS_WIDGETS, type DrillTargetKey } from "@/lib/analytics/analyticsRegistry";
+
+// Every drill destination referenced by ANY widget (Analytics widgets + Reports KPIs).
+const referencedTargets = new Set<string>();
+for (const w of ANALYTICS_WIDGETS) if (w.drillTarget) referencedTargets.add(w.drillTarget);
+for (const w of REPORTS_EXEC_KPIS) if (w.drillTarget) referencedTargets.add(w.drillTarget);
 
 /**
  * Stage R2 provenance verification: every Executive Summary KPI resolves from its documented canonical
@@ -70,6 +75,81 @@ describe("reportsRegistry — Executive Summary provenance (R2)", () => {
     }
     // Margin intentionally has no drill (no meaningful destination).
     expect(getReportsKpi("reports.margin")?.drillTarget).toBeUndefined();
+  });
+
+  it("navigation consistency — every Reports drillTarget resolves through resolveDrill()", () => {
+    for (const w of REPORTS_EXEC_KPIS) {
+      if (!w.drillTarget) continue;
+      expect(resolveDrill(w.drillTarget as DrillTargetKey), `${w.id} → ${w.drillTarget}`).not.toBeNull();
+    }
+  });
+
+  it("navigation consistency — NO route drift between Reports and Analytics", () => {
+    // Every Reports drillTarget is a key of the SHARED ANALYTICS_DRILL_TARGETS map, and Reports resolves to
+    // the EXACT route Analytics defines — so Reports and Analytics can never drift apart.
+    for (const w of REPORTS_EXEC_KPIS) {
+      if (!w.drillTarget) continue;
+      expect(Object.keys(ANALYTICS_DRILL_TARGETS), `${w.drillTarget} not a shared target`).toContain(w.drillTarget);
+      const base = resolveDrill(w.drillTarget as DrillTargetKey)?.href;
+      expect(base, `${w.drillTarget} drift`).toBe(ANALYTICS_DRILL_TARGETS[w.drillTarget as DrillTargetKey].route);
+    }
+  });
+
+  it("navigation consistency — shared destinations (Revenue/Orders/Customers) match the Executive Summary exactly", () => {
+    // Revenue, Operating Profit and Orders KPIs share the `orders` destination; Customers shares `customers`.
+    expect(getReportsKpi("reports.revenue")?.drillTarget).toBe("orders");
+    expect(getReportsKpi("reports.operatingProfit")?.drillTarget).toBe("orders");
+    expect(getReportsKpi("reports.orders")?.drillTarget).toBe("orders");
+    expect(getReportsKpi("reports.customers")?.drillTarget).toBe("customers");
+
+    // The lower report tiles (P&L Revenue/Operating profit, Customers Buyers) use these same targets, so they
+    // resolve IDENTICALLY to the Executive Summary KPIs — no divergent/duplicate routing, no broken links.
+    const ordersHref = resolveDrill("orders", { range: "30d" })?.href;
+    expect(ordersHref).toBe("/admin/orders?range=30d");
+    expect(resolveDrill(getReportsKpi("reports.revenue")!.drillTarget!, { range: "30d" })?.href).toBe(ordersHref);
+    expect(resolveDrill(getReportsKpi("reports.orders")!.drillTarget!, { range: "30d" })?.href).toBe(ordersHref);
+    expect(resolveDrill("customers")?.href).toBe("/admin/customers");
+    expect(resolveDrill(getReportsKpi("reports.customers")!.drillTarget!)?.href).toBe("/admin/customers");
+  });
+
+  it("registry completeness — every drill target is referenced by a widget OR documented reserved/deprecated (no dead routes)", () => {
+    for (const key of Object.keys(ANALYTICS_DRILL_TARGETS)) {
+      const referenced = referencedTargets.has(key);
+      const status = DRILL_TARGET_STATUS[key as DrillTargetKey]?.status;
+      expect(
+        referenced || status === "reserved" || status === "deprecated",
+        `${key}: dead route — unreferenced by any widget and not marked reserved/deprecated`,
+      ).toBe(true);
+    }
+  });
+
+  it("drill-target lifecycle metadata is complete and consistent with actual usage", () => {
+    // Every target declares a status (the Record<DrillTargetKey> type also enforces this at compile time).
+    for (const key of Object.keys(ANALYTICS_DRILL_TARGETS)) {
+      expect(DRILL_TARGET_STATUS[key as DrillTargetKey], `${key} missing lifecycle status`).toBeTruthy();
+    }
+    for (const [key, meta] of Object.entries(DRILL_TARGET_STATUS)) {
+      if (meta.status === "active") {
+        expect(referencedTargets.has(key), `${key} marked active but referenced by no widget`).toBe(true);
+      } else {
+        // reserved / deprecated must justify themselves and must NOT be silently in use.
+        expect((meta.reason ?? "").length, `${key} (${meta.status}) needs a reason`).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("non-drillable metrics carry honest architectural metadata (no fake destinations, no id overlap)", () => {
+    const drillableIds = new Set(REPORTS_EXEC_KPIS.map((w) => w.id));
+    for (const m of REPORTS_NON_DRILLABLE) {
+      expect(m.isDrillable).toBe(false);
+      expect(m.reason.length, `${m.id} needs a reason`).toBeGreaterThan(0);
+      expect(m.futureRequirement.length, `${m.id} needs a future requirement`).toBeGreaterThan(0);
+      expect(drillableIds.has(m.id), `${m.id} cannot be both drillable and non-drillable`).toBe(false);
+    }
+    // The sections we intentionally left value-only are all documented.
+    expect(REPORTS_NON_DRILLABLE.map((m) => m.id)).toEqual(
+      expect.arrayContaining(["report.ordersByState", "report.topProducts", "report.gst", "report.fragrance", "report.coupons", "report.acquisition", "report.retention"]),
+    );
   });
 
   it("feature flags are unique and default on, and respect env overrides", () => {
