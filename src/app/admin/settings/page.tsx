@@ -6,6 +6,7 @@ import { getSettingsAdminView } from "@/services/settingsService";
 import { getSiteSettings } from "@/services/siteSettingsService";
 import { ShippingSettingsForm } from "@/components/admin/ShippingSettingsForm";
 import { SiteSettingsForm } from "@/components/admin/SiteSettingsForm";
+import { IntegrationStatusSection } from "@/components/admin/IntegrationStatusSection";
 import { COMMERCE } from "@/config/commerce";
 
 /**
@@ -30,6 +31,9 @@ export default async function SettingsPage() {
         <h1 className="admin__title">Settings</h1>
         <p className="admin__count">Brand, support, SEO & logistics {canConfigure ? "" : "· read-only (needs shipping.configure)"}</p>
       </header>
+
+      {/* S1A — read-only integration status & operational health (never blocks editing below). */}
+      <IntegrationStatusSection />
 
       {canConfigure ? (
         <section className="cfg-section">

@@ -1,8 +1,8 @@
 # Samorah Admin Settings — Refinement Roadmap
 
-**Status: APPROVED & FROZEN — Phase S1A in implementation. Governance is final; from here the work is
-implementation quality + verification, not additional planning.** Structural changes to the governance/registry
-require an `INTEGRATION_REGISTRY_VERSION` increment.
+**Status: S1A APPROVED, COMMITTED & FROZEN (Settings module baseline). Next: Phase S1B (awaiting go-ahead).**
+Governance is final; structural changes to the governance/registry require an `INTEGRATION_REGISTRY_VERSION`
+increment and explicit roadmap approval.
 
 Goal: make `/admin/settings` **launch-ready** by adding operational visibility (integration status/health) and
 usability (validation, save feedback, unsaved-guard, audit) — **reusing existing services**, additive only, no
@@ -17,6 +17,39 @@ The Integration Registry follows the **same governance philosophy as ADR 0006 �
 compile-time governance · structural integrity tests · centralized ownership.** The **domains differ**
 (navigation destinations vs. operational integrations), but the **governance model is intentionally shared** —
 one consistent, registry-driven, test-enforced pattern across the admin.
+
+---
+
+## Phase S1A — FROZEN (Settings module baseline)
+
+Phase S1A is **complete, verified, and frozen** — the baseline for the Settings module.
+
+### Integration Registry Freeze *(mirrors the `REPORTS_CALC_VERSION` governance)*
+- **`INTEGRATION_REGISTRY_VERSION` is frozen at `v1`.**
+- **Structural registry changes require a version increment** (like `REPORTS_CALC_VERSION` for accounting logic).
+- **Stable integration IDs must never be renamed** — an integration may only be *deprecated*, never re-identified.
+- **Diagnostic codes remain frozen** — recommended actions reference codes, not free text; wording may change,
+  codes may not (they are the future audit/export/monitoring keys).
+
+### Architecture Freeze *(S1A)*
+The following are now **frozen**; future architectural changes require **explicit roadmap approval**:
+- Integration Registry
+- Aggregator Contract
+- Registry Authority
+- Severity Mapping
+- Recommended Action Registry
+- Timestamp Provenance
+- Registry Integrity Tests
+
+### Operational Guarantees *(verified in S1A)*
+- **No integration blocks Settings.**
+- **Unknown is always handled gracefully** (neutral operational state, never an error).
+- **The Registry remains the only authority** (rendered panels == registry, enforced by the authority test).
+- **No duplicate health logic exists** (the aggregator only composes existing service outputs).
+- **Aggregation is concurrent** (single `Promise.allSettled` fan-out ≈ slowest source, not the sum).
+- **Timeout behaviour is bounded** (per-source time bound; invalid/missing config → documented default).
+- **Health never blocks editing** (integration status is informational, fails closed).
+- **Registry integrity prevents drift** (structural + authority tests fail on any bypass or half-declaration).
 
 ## The architectural insight (drives the whole plan)
 Analytics, Payment, Email, and Notification integrations are **environment-managed** — their runtime reads
@@ -251,3 +284,13 @@ post-launch checkout/shipping configuration project** — not moved into editabl
 YouTube / X / LinkedIn social, Twitter Card SEO, delivery promise, backup dashboard, security enhancements —
 **plus Pinterest Tag & Search Console verification** (platform does not support them today; net-new, not reuse).
 Any of these becoming in-scope requires an explicitly approved new phase.
+
+---
+
+## Platform Backlog *(pre-existing, NOT S1A — surfaced during S1A verification; kept OUT of the S1A commit)*
+- **`/admin/settings` horizontal overflow on tablet/mobile** — the existing **Providers `admin__table`** is
+  rendered without `.admin__table-wrap` (overflow-x container). The S1A Integration Status section itself
+  stacks cleanly (verified); this is pre-existing page content. Fix = wrap the Providers table in
+  `.admin__table-wrap` (one line). Tracked separately, not part of S1A.
+- **CookieConsent overlays `/admin/*`** — the storefront consent banner renders on admin routes (also on the
+  Reports platform backlog). Fix = hide `CookieConsent` on `/admin/*`. Tracked separately.
