@@ -350,15 +350,74 @@ With the R4 print stylesheet applied, verify the browser print preview:
 - [ ] **Important headers remain visible where possible** (section titles not orphaned from their content).
 - [ ] **Readable in grayscale** — severity/emphasis survive a black-and-white print (not colour-dependent).
 
-### Milestone — Finance Sign-off  *(after R4 — business approval, not just technical completion)*
+### Milestone — Founder Finance Sign-off  *(after R4 — business approval, not just technical completion)*
 
 Since Reports now drives business decisions, the module is not "done" until it is **business-approved**, not
-only technically complete.
+only technically complete. **Owner: Founder.** Each item confirmed against the books for a real period.
 
-- **Owner:** Founder.
-- **Checklist:** Revenue · GST · Profit · Margin · Refunds · CSV.
-- **Status:** _Pending_ → **Approved** (founder sign-off recorded here once each figure is confirmed against
-  the books for a real period).
+**Founder Finance Sign-off Checklist**
+
+- [ ] Revenue verified
+- [ ] GST verified
+- [ ] Refund calculations verified
+- [ ] Operating Profit verified
+- [ ] Margin verified
+- [ ] Executive Summary verified
+- [ ] Report Status Banner verified
+- [ ] Financial Health Banner verified
+- [ ] GST CSV export verified
+- [ ] Empty database behaviour verified
+- [ ] Mobile layout verified
+- [ ] Print output verified
+- [ ] Drill-downs verified
+- [ ] Production sample order verified
+- [ ] Founder approval received
+
+- **Status:** _Pending_ → **Approved** (recorded here once the checklist is complete).
+
+---
+
+## Release Freeze  *(effective on Founder Finance Sign-off)*
+
+- **The Reports module is feature complete.**
+- **Only production bug fixes may be accepted** after sign-off.
+- **Any future feature work requires explicit roadmap approval** (a new, approved stage) — no ad-hoc additions.
+
+---
+
+## Launch Dependencies  *(assumptions required for Reports correctness)*
+
+Reports is a **reporting layer** — it **reads and reflects** the systems below to produce correct figures.
+It **consumes these systems; it does not replace them.** If an upstream input is wrong or unconfigured, the
+report faithfully reflects that (and the Financial Health banner flags the known cases).
+
+| Dependency | What Reports relies on | If missing/incorrect |
+|---|---|---|
+| **Orders** | paid `orders` rows (`taxable_amount`, `subtotal`, `discount_amount`, `shipping_amount`, `total_amount`, `placed_at`) | undercount/incorrect revenue — Reports reflects the order data as-is |
+| **Refunds** | `orders.refund_amount` (settled refunds) | revenue not refund-adjusted if refunds aren't recorded |
+| **Product Costs** | per-variant `cost_price` | COGS/profit optimistic — flagged via `variantsMissingCost` (Attention) |
+| **Shipping Costs** | Settings → Operating costs `shippingCostPerOrder` | courier expense excluded — flagged (Warning) |
+| **Gateway Fees** | Settings → Operating costs `paymentFeePercent` | estimated, not reconciled — flagged (info) |
+| **GST configuration** | per-order CGST/SGST/IGST tax snapshots | GST filing figures depend entirely on correct order-time tax config |
+
+Reports does not compute tax, take payments, issue refunds, or set costs — those live in their own systems;
+Reports only aggregates their outputs under the frozen `REPORTS_CALC_VERSION` logic.
+
+---
+
+## Milestone — Production Verification  *(after Founder Finance Sign-off — post-deployment)*
+
+After deployment, verify against **one real production order** and **one real production refund** that the
+report matches reality end-to-end. Confirm each of these equals the production values:
+
+- [ ] Revenue matches production
+- [ ] Operating Profit matches production
+- [ ] GST matches production
+- [ ] Margin matches production
+- [ ] Executive Summary matches production
+- [ ] CSV export matches production
+
+- **Status:** _Pending_ → **Verified** (recorded here once a real order + real refund reconcile in production).
 
 ---
 
