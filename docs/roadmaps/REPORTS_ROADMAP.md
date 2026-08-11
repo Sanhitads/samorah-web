@@ -421,6 +421,54 @@ report matches reality end-to-end. Confirm each of these equals the production v
 
 ---
 
+## Report Version History  *(permanent maintenance history — branch `replatform/nextjs`)*
+
+| Stage | Purpose | Commit |
+|---|---|---|
+| **R1A** | Canonical Financial Engine — refund-adjusted revenue, row-safe aggregation, frozen v1 formulas, resilience | `a1b33ea` |
+| **R1B** | Performance & freshness — `unstable_cache` readers + freshness stamps | `da9b557` |
+| **R2** | Executive Summary + Report Status & Financial Health banners (registry provenance) | `5d6f26b` |
+| *(docs)* | Report Status banner documented as a Financial Snapshot | `7c844f9` |
+| **R3** | Registry-driven drill-downs + navigation governance (lifecycle, completeness, ADR 0006) | `75fa9ef` |
+| **R4** | UX polish — print stylesheet, loading skeleton, tooltips, empty-state health suppression | `2ba6934` |
+| *(docs)* | Finance sign-off checklist · release freeze · launch dependencies · production verification | `826a5e7` |
+
+---
+
+## Known Launch Limitations  *(deliberate scope boundaries — NOT missing functionality)*
+
+These are intentional roadmap decisions to keep Reports **elegant, minimal, operational, founder-focused** —
+each was consciously excluded, not overlooked:
+
+- **No scheduled / emailed reports** — reports are viewed on demand.
+- **No PDF export** — deferred to the shared Analytics export framework (post-launch).
+- **No Excel export** — same; the existing **GST CSV** covers launch filing.
+- **No charts** — Reports is table-first by design (charts live in Analytics).
+- **No forecasting** — Reports reflects history, it does not project.
+- **No budget planning** — out of scope; Reports is a reporting layer, not a planning tool.
+- **No AI insights / narrative summaries** — not part of the founder-focused scope.
+- **No historical calculation-version switching** — a report is produced under the current
+  `REPORTS_CALC_VERSION`; there is no UI to re-run past periods under a different version (the version is
+  *stamped* for traceability, not *switchable*).
+
+Any of these becoming in-scope requires an explicit, approved new stage (see **Release Freeze**).
+
+---
+
+## Maintenance Rules  *(binding for all future changes)*
+
+- **Never duplicate financial calculations.** There is exactly one place money is computed.
+- **All financial values must come from the canonical Financial Engine** (`lib/reports/financialEngine`).
+- **UI components must never calculate money** — they format and display engine output only.
+- **Accounting-logic changes require a `REPORTS_CALC_VERSION` increment** (which also re-stamps exports).
+- **Financial-formula changes require invariant tests** (extend `financialEngine.test.ts`) proving the new
+  relationships hold.
+- **ADRs and the roadmap must stay synchronized** — a navigation/architecture change updates ADR 0006 and
+  this file together.
+- **Reports remains simpler than Analytics by design** — table-first, minimal charts, no scope creep.
+
+---
+
 ## Platform Backlog  *(surfaced during the Reports functional review — not Reports-scoped)*
 
 - **[Resolved Later · Not Launch Blocking]** Hide the storefront `CookieConsent` on `/admin/*` routes — it
