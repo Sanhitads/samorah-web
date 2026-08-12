@@ -38,7 +38,7 @@ function buildPreviewProps(edit: PageForm, supportEmail?: string) {
     sections,
     closing,
     // Policy routes render with the dual-tone hero band; mirror that in the preview.
-    heroBand: ["privacy", "terms", "shipping", "returns", "product-care", "faq"].includes(edit.slug),
+    heroBand: ["privacy", "terms", "returns-policy", "shipping", "product-care", "faq"].includes(edit.slug),
     effectiveDate: fmtLocalDate(edit.publishAt),
     lastUpdated: fmtLocalDate(new Date().toISOString()),
   };

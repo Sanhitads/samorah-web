@@ -20,17 +20,6 @@ export const LEGAL: Record<string, { eyebrow: string; title: string; intro?: str
     ],
     footNote: REVIEW,
   },
-  returns: {
-    eyebrow: "Support",
-    title: "Returns & Refunds",
-    intro: "If something isn't right, we'll make it right.",
-    sections: [
-      { heading: "Eligibility", body: ["Unused items in original packaging may be returned within the eligible window. Personalised or clearance items may be non-returnable.", "If an item arrives damaged or incorrect, contact us within 48 hours of delivery and we'll arrange a replacement or refund."] },
-      { heading: "How to start a return", body: ["Reply to your order confirmation email, or write to us with your order number, and our team will guide you through the process."] },
-      { heading: "Refunds", body: ["Approved refunds are issued to your original payment method and typically reach you within 5–7 business days of processing."] },
-    ],
-    footNote: REVIEW,
-  },
   "product-care": {
     eyebrow: "The Ritual",
     title: "Candle Care",
@@ -50,6 +39,105 @@ export const LEGAL: Record<string, { eyebrow: string; title: string; intro?: str
       { heading: "Do you ship across India?", body: ["Yes. See our Shipping page for timelines and rates."] },
       { heading: "Can I return an order?", body: ["Yes, within the eligible window — see Returns & Refunds."] },
       { heading: "How do I track my order?", body: ["Use the tracking link in your dispatch email, or sign in and open the order from Your Account."] },
+    ],
+  },
+  "returns-policy": {
+    // Hero shows only Title + Subtitle (no eyebrow, no hero image) — mirrors Privacy/Terms.
+    eyebrow: "",
+    title: "Returns & Refund Policy",
+    intro: "A thoughtful approach to returns, exchanges, and refunds.",
+    // "- " lines render as a semantic bullet list; the Contact section uses the
+    // {{supportEmail}} token (resolved from Site Settings, never hard-coded); the final
+    // heading-less section is the closing statement.
+    sections: [
+      { heading: "Introduction", body: [
+        "We want your experience with Samorah to feel seamless and reassuring.",
+        "If something isn't right with your order, we're here to help with care, clarity, and fairness.",
+      ] },
+      { heading: "Returns Eligibility", body: [
+        "You may request a return if:",
+        "- The product arrives damaged",
+        "- You receive the wrong product",
+        "- The product is defective",
+        "- The product remains unused, unopened, in its original packaging, and accompanied by all original accessories (where applicable)",
+        "Return requests must be submitted within 48 hours of delivery.",
+      ] },
+      { heading: "Non-Returnable Items", body: [
+        "For hygiene, safety, and product integrity, we cannot accept returns for:",
+        "- Opened candles",
+        "- Used room sprays",
+        "- Used fragrance products",
+        "- Products damaged through misuse, neglect, or improper storage",
+        "- Clearance or final-sale products (where clearly stated)",
+      ] },
+      { heading: "Return Request Process", body: [
+        "To begin a return request, please contact us with:",
+        "- Order number",
+        "- Clear photographs of the product, the packaging, and the shipping label (where applicable)",
+        "- Brief description of the issue",
+        "Our team will review every request individually before approving a return or replacement.",
+      ] },
+      { heading: "Refund Process", body: [
+        "Once your return is approved and received:",
+        "- Refunds are processed to the original payment method",
+        "- Refund processing usually takes 5–7 business days",
+        "- Your payment provider or bank may require additional processing time before the refund appears",
+        "- You'll receive confirmation once the refund has been initiated",
+      ] },
+      { heading: "Exchanges", body: [
+        "Where appropriate, we may offer a replacement instead of a refund.",
+        "Replacement depends on:",
+        "- Product availability",
+        "- Nature of the issue",
+        "- Verification of the reported damage or defect",
+        "Replacement products are subject to product availability.",
+      ] },
+      { heading: "Return Shipping", body: [
+        "If the return is approved because:",
+        "- Product arrived damaged",
+        "- Wrong product was shipped",
+        "- Manufacturing defect",
+        "Samorah will arrange or reimburse return shipping.",
+        "For any other approved return, original shipping charges may not be refundable unless required by law.",
+        "Please do not return products until instructed by our support team.",
+      ] },
+      { heading: "Order Cancellations", body: [
+        "Orders may be cancelled before dispatch.",
+        "Once an order has entered production or dispatch preparation, cancellation may no longer be possible.",
+        "Once an order has been shipped, cancellations are no longer possible and the order falls under this Returns & Refund Policy.",
+      ] },
+      { heading: "Damaged or Incorrect Orders", body: [
+        "If your order arrives damaged or incorrect:",
+        "Please contact us within 48 hours of delivery.",
+        "Include:",
+        "- Order number",
+        "- Clear photographs of the product, packaging, and shipping label (where applicable)",
+        "We will review the request promptly and work toward an appropriate resolution.",
+      ] },
+      { heading: "Refund Exceptions", body: [
+        "Refunds may be declined if:",
+        "- The returned product shows signs of use",
+        "- Required evidence cannot be provided",
+        "- Damage resulted from improper handling after delivery",
+        "- The return request falls outside the stated policy",
+        "- The return was sent without prior approval",
+      ] },
+      { heading: "Processing Time", body: [
+        "Approved replacements and refunds are processed as quickly as reasonably possible.",
+        "During high-volume periods, processing times may be slightly longer.",
+      ] },
+      { heading: "Policy Updates", body: [
+        "We may update this Returns & Refund Policy from time to time.",
+        "The latest version will always be available on this page.",
+      ] },
+      { heading: "Contact", body: [
+        "For any returns or refund-related questions:",
+        "Email: {{supportEmail}}",
+      ] },
+      // Closing statement — heading-less, rendered as the quiet sign-off.
+      { body: [
+        "We believe every experience should leave a lasting impression — including the support that follows it.",
+      ] },
     ],
   },
   privacy: {

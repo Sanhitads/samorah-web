@@ -25,6 +25,13 @@ const securityHeaders = [
 export default (phase: string): NextConfig => ({
   distDir: phase === PHASE_DEVELOPMENT_SERVER ? ".next-dev" : ".next",
   reactStrictMode: true,
+  async redirects() {
+    return [
+      // Returns consolidation — the old short /returns page is retired in favour of the
+      // full CMS-managed Returns & Refund Policy. 301 preserves any existing links/SEO.
+      { source: "/returns", destination: "/returns-policy", statusCode: 301 },
+    ];
+  },
   images: {
     // Cloudinary is the primary image CDN (BRD §2.3).
     remotePatterns: [{ protocol: "https", hostname: "res.cloudinary.com" }],

@@ -24,7 +24,7 @@ export function sanitizeLabel(s: unknown): string {
 }
 
 // Single-segment routes that exist without an entity (listing/system pages).
-const STATIC_ROUTES = new Set(["", "shop", "bundles", "collections", "chapters", "about", "contact", "account", "archive", "shipping", "returns", "terms", "privacy", "faq", "product-care", "login", "register", "journal", "wishlist", "cart", "search"]);
+const STATIC_ROUTES = new Set(["", "shop", "bundles", "collections", "chapters", "about", "contact", "account", "archive", "shipping", "returns-policy", "terms", "privacy", "faq", "product-care", "login", "register", "journal", "wishlist", "cart", "search"]);
 // Reverse of ENTITY_ROUTE: a path's leading segment → the entity whose slug follows it.
 const PREFIX_ENTITY: Record<string, EntityType> = { chapters: "chapter", collections: "collection", shop: "product" };
 

@@ -191,7 +191,7 @@ export const FOOTER_SECTIONS: FooterSection[] = [
     title: "Help",
     links: [
       { label: "Shipping Policy", href: "/shipping" },
-      { label: "Returns & Exchanges", href: "/returns" },
+      { label: "Returns & Refund Policy", href: "/returns-policy" },
       { label: "Terms & Conditions", href: "/terms" },
       { label: "Privacy Policy", href: "/privacy" },
       { label: "FAQ", href: "/faq" },
