@@ -102,14 +102,119 @@ export const LEGAL: Record<string, { eyebrow: string; title: string; intro?: str
       ] },
     ],
   },
+  // Product Care — a premium EDITORIAL page (rendered by ProductCareContent, edited at
+  // /admin/content/product-care). Named "Product Care" (not "Candle Care") so it holds candles,
+  // room sprays and future ranges. Sections carry editorial fields (step/label/image/layout/ratio)
+  // and — reusing the existing accordion mechanism — Q&A `items`. Layouts: left/right/center/wide
+  // place an image; "overlay" is an image break with centred text; a heading-only section is a
+  // movement divider; a heading-less body section is a quiet closing statement. Images are added in
+  // the CMS (this seed ships copy + structure; the alternating layout activates once images exist).
+  // Intro carries the hero line + subtitle on two lines.
   "product-care": {
-    eyebrow: "The Ritual",
-    title: "Candle Care",
-    intro: "A few small rituals to make each candle last, and burn beautifully.",
+    eyebrow: "",
+    title: "Product Care",
+    intro: "Every fragrance has its own rhythm.\nA little care allows every candle to burn more beautifully, every fragrance to linger more gracefully, and every ritual to feel complete.",
     sections: [
-      { heading: "The first burn", body: ["Let the wax melt fully to the edges on the first lighting — usually 2–3 hours. This sets an even memory and prevents tunnelling."] },
-      { heading: "Trim the wick", body: ["Trim the wick to about 5mm before every burn for a clean, steady flame and less soot."] },
-      { heading: "Burn safely", body: ["Never leave a burning candle unattended. Keep away from draughts, children and pets. Stop use when about 1cm of wax remains."] },
+      // Hero transition — a short editorial statement easing from the hero into the first ritual.
+      // Explicit statement variant + centred layout → understated centred intro (not a big closing).
+      { variant: "statement", layout: "center", body: [
+        "Every fragrance is made to be lived with — slowly, and with intention.",
+        "A few quiet rituals keep each one at its finest.",
+      ] },
+      // ── Movement I · Candles ──────────────────────────────────────────────
+      { heading: "The Ritual of Light", body: [] },
+      { step: "01", heading: "Prepare the Wick", layout: "left", ratio: "portrait", body: [
+        "Before every lighting, trim the wick to around a quarter of an inch.",
+        "A smaller flame burns more quietly, for a cleaner glow and a fragrance that unfolds in balance.",
+        "The smallest rituals often make the greatest difference.",
+      ] },
+      { step: "02", heading: "Allow the Wax to Bloom", layout: "right", ratio: "landscape", body: [
+        "On the first burn, let the melted wax reach the very edges of the vessel.",
+        "This sets an even wax memory, so every burn that follows stays true.",
+        "Some things simply shouldn't be rushed.",
+      ] },
+      { step: "03", heading: "Enjoy the Moment", layout: "left", ratio: "portrait", body: [
+        "Two to four hours is enough for the fragrance to reveal itself, while keeping the vessel comfortable.",
+        "The most memorable moments are rarely hurried.",
+      ] },
+      { step: "04", heading: "Keep the Flame Centred", layout: "right", ratio: "landscape", body: [
+        "Once extinguished, gently reposition the wick while the wax is still soft.",
+        "A centred wick encourages an even flame and a longer life.",
+      ] },
+      { step: "05", heading: "The Final Light", layout: "left", ratio: "portrait", body: [
+        "When about a centimetre of wax remains, let the candle complete its journey.",
+        "Many vessels find a second life — as small planters, keepsakes, or quiet objects around the home.",
+      ] },
+      // Image break with overlay text (a wide image once uploaded; a quiet band until then).
+      { layout: "overlay", ratio: "landscape", heading: "Luxury is often found in the way we tend to everyday rituals.", body: [] },
+      // Accordion — heading + lede (body[0]) + Q&A items. Reuses the FAQ accordion.
+      { heading: "Before You Light", body: [], items: [
+        { q: "Can I leave my candle unattended?", a: "Never leave a lit candle unattended. A flame is happiest with someone nearby, even quietly." },
+        { q: "Where should I place my candle?", a: "On a level, heat-resistant surface, away from draughts, curtains and anything that might catch the warmth." },
+        { q: "Why should I trim the wick?", a: "A trimmed wick burns lower and cleaner, with less soot and a steadier glow." },
+        { q: "Can I move the candle while it is burning?", a: "Let it rest while lit. Wait until the flame is out and the wax has firmed before moving it." },
+        { q: "What should I do if the flame becomes too high?", a: "Extinguish it, let it cool, and trim the wick before lighting again." },
+        { q: "How do I extinguish the candle properly?", a: "Use a snuffer, or gently dip the wick into the wax. Avoid blowing, which can unsettle the surface." },
+      ] },
+      { heading: "Our Materials", body: ["Care begins with what we choose to create."], items: [
+        { q: "What are Samorah candles made from?", a: "A considered blend of waxes chosen for a clean, even burn, with cotton wicks and carefully composed fragrance." },
+        { q: "Why do you use both natural and synthetic fragrance ingredients?", a: "Some notes exist beautifully in nature; others are recreated to protect rare or delicate sources. Together they allow a fuller, more lasting scent." },
+        { q: "Do your products contain phthalates or parabens?", a: "No. Our fragrances are composed without phthalates or parabens." },
+        { q: "Why don't you use artificial colourants?", a: "We prefer the honesty of the material. Fragrance and form lead; colour is never added for effect." },
+        { q: "Are your products safe around children and pets?", a: "Used thoughtfully and never left unattended, yes. Keep lit candles and sprays out of reach." },
+        { q: "Why do luxury fragrances sometimes smell softer than expected?", a: "A refined fragrance reveals itself gradually. It settles into a room rather than announcing itself at the door." },
+      ] },
+      { heading: "Living with Fragrance", layout: "center", body: [
+        "Fragrance should become part of a room, not compete with it.",
+        "Light a candle when you have time to enjoy it. Mist a room spray lightly, and let the scent settle into the space.",
+        "Rather than filling every corner, let fragrance appear gently, evolve quietly, and fade with grace.",
+        "The most memorable homes rarely smell stronger — they simply smell intentional.",
+      ] },
+      // Quiet closing statement for the candle movement (heading-less → statement styling).
+      { body: [
+        "Care is not simply how a product lasts longer.",
+        "It is how every moment with it becomes more meaningful.",
+      ] },
+      // ── Chapter transition · Candles → Room Fragrance ─────────────────────
+      // A full-width editorial break that resets the reading experience and opens the second
+      // chapter (an overlay renders a full-bleed image with its label; a quiet band until an
+      // image is uploaded), followed by a short editorial introduction.
+      { layout: "overlay", ratio: "landscape", heading: "Room Fragrance", body: [] },
+      { heading: "For spaces that evolve throughout the day.", layout: "center", body: [
+        "Unlike a candle, a room fragrance changes a space instantly.",
+        "It welcomes a new moment, refreshes familiar surroundings, and quietly fades once its purpose is complete.",
+      ] },
+      // ── Chapter II · Room Fragrance ───────────────────────────────────────
+      { heading: "The Ritual of Refreshing a Space", body: [] },
+      { step: "01", heading: "Prepare the Space", layout: "right", ratio: "landscape", body: [
+        "Hold the bottle twenty to thirty centimetres away and mist lightly into the air.",
+      ] },
+      { step: "02", heading: "Refresh Soft Surfaces", layout: "left", ratio: "portrait", body: [
+        "Lightly mist suitable linens, curtains, cushions or throws, and let the fragrance settle naturally.",
+        "Always test delicate fabrics first.",
+      ] },
+      { step: "03", heading: "Allow the Fragrance to Settle", layout: "right", ratio: "landscape", body: [
+        "Give the room a moment.",
+        "The fragrance gradually becomes part of the atmosphere rather than announcing itself.",
+      ] },
+      { step: "04", heading: "Refresh Whenever the Moment Calls", layout: "left", ratio: "portrait", body: [
+        "Morning light. Before guests arrive. After opening a window.",
+        "Or simply whenever your home asks for a quiet reset.",
+      ] },
+      { heading: "Room & Linen Care", body: [], items: [
+        { q: "How should I use a room spray?", a: "Mist lightly into the air, or over soft furnishings, and let it settle. A few considered sprays are enough." },
+        { q: "Can I spray directly onto fabric?", a: "On suitable fabrics, yes — always test a hidden area first. Avoid delicate or dry-clean-only pieces." },
+        { q: "How many sprays are recommended?", a: "Two or three to begin. Fragrance is easier to add than to take away." },
+        { q: "How long does the fragrance last?", a: "It varies with the space and the airflow, lingering gently rather than lasting all day. Refresh whenever you wish." },
+        { q: "Can I use it as a personal perfume?", a: "Our room sprays are made for spaces and linens, not for skin." },
+        { q: "How should I store the bottle?", a: "Somewhere cool and dry, away from direct sunlight, with the cap in place." },
+      ] },
+      // Final philosophy (heading-less → statement styling), closes the page.
+      { body: [
+        "We believe fragrance is more than scent.",
+        "It is atmosphere, memory and ritual.",
+        "A little care allows every experience to linger beautifully.",
+      ] },
     ],
   },
   faq: {

@@ -24,6 +24,46 @@
 | Shipping Policy | `/shipping` *(existing route)* | **Committed · Frozen** | `2b171fc` |
 | FAQ | `/faq` | **Committed · Frozen** | `fcaac8a` |
 | Contact | `/contact` | **Committed · Frozen** | `e13a6cf` |
+| Product Care | `/product-care` *(existing route)* | **Committed · Frozen** | this commit |
+
+---
+
+## Phase C2 — Product Care Editorial Experience
+
+**Status: Approved · Committed · Frozen. LAUNCH READY.**
+
+A premium editorial page (Trudon / Santa Maria Novella rhythm — alternating image/text, generous
+whitespace, large photography) on the **same Pages CMS** as the policy pages. No new CMS, editor
+framework, route, or database schema.
+
+### Includes
+- ✓ Editorial renderer (`ProductCareContent`) — hero, alternating **left / right / center / wide**
+  image blocks, **overlay** image breaks (with editorial fallback when no image), **accordions**
+  (reusing `FaqAccordion`), movement **dividers** and centred **statements**
+- ✓ Two chapters — Candle Care → a full-width chapter transition → Room Fragrance Care
+- ✓ CMS editor (`/admin/content/product-care`) — per-section **Type** (editorial / overlay / accordion
+  / statement / divider), step / small-heading / title / body, image (Media Library picker), alt,
+  caption, layout, ratio, overlay text-alignment, **move / duplicate / hide / delete**; side-by-side
+  live preview
+- ✓ Non-destructive type switching (explicit `variant`); hidden-section toggle
+- ✓ Images via the platform `AssetImage` atom — responsive Cloudinary `srcSet`, blur-up LQIP, lazy
+  loading, CLS-safe reserved aspect-ratio; **delete-protected** in the Media Library via the existing
+  `getMediaUsage` reverse lookup (references released on removal)
+- ✓ SEO (title / description / canonical / OG) + **Breadcrumb** JSON-LD; semantic headings; responsive
+
+### Additive section fields *(reference)*
+`step`, `label`, `image{mediaId,url,alt,caption,focal}`, `layout`, `ratio`, `variant`, `align`, `hidden`
+— all optional, stored in the existing `cms_pages.sections` JSONB (**no migration**). Text-only policy
+pages never set them and are unaffected.
+
+### Boundary
+Internally named **Product Care** (holds candles, room sprays and future ranges). No schema change, no
+migration, no new CMS system — the five section types render every composition.
+
+### Future Enhancements *(post-launch, roadmap-controlled)*
+- Care FAQ as a dedicated in-page chapter (optional)
+- Video overlays; per-breakpoint art-directed crops
+- Additional product-family chapters (wax melts, gift sets)
 
 ---
 

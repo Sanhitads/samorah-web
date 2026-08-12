@@ -10,14 +10,20 @@ import { logEvent } from "@/services/auditService";
 import { LEGAL } from "@/config/legalContent";
 import { isLive } from "@/lib/cms/publishable";
 import { snapshotRevision as snapshotCmsRevision, listRevisions as listCmsRevisions, getRevisionSnapshot } from "@/services/cms/revisions";
+import type { EditorialFields } from "@/lib/cms/sections";
+
+export type { SectionImage, SectionLayout, SectionRatio, SectionVariant, EditorialFields } from "@/lib/cms/sections";
 
 /** A single FAQ question/answer. Answers may contain "\n"-separated lines (rendered as
- *  paragraphs; "- " lines become bullets). Used only by the FAQ page — see PageSection.items. */
+ *  paragraphs; "- " lines become bullets). Used by the FAQ page AND by Product Care accordion
+ *  sections — see PageSection.items. */
 export interface FaqItem { q: string; a: string }
 /** A content section. For legal/policy pages: heading + body paragraphs. For the FAQ page a
- *  section is a CATEGORY: `heading` = category name, `items` = its questions (additive; other
- *  pages never set `items`, so they are unaffected — stored in the existing sections JSONB). */
-export interface PageSection { heading?: string; body: string[]; items?: FaqItem[] }
+ *  section is a CATEGORY: `heading` = category name, `items` = its questions. For editorial pages
+ *  (Product Care) a section may ALSO carry `EditorialFields` (step/label/image/layout/ratio/hidden).
+ *  All additions are optional — text-only pages never set them, so they are unaffected (stored in
+ *  the existing sections JSONB, no schema change). */
+export interface PageSection extends EditorialFields { heading?: string; body: string[]; items?: FaqItem[] }
 export type PageStatus = "draft" | "scheduled" | "published";
 export interface CmsPage {
   slug: string;
@@ -117,7 +123,7 @@ export async function upsertPage(input: PageInput, actorId?: string): Promise<{ 
   const db = createAdminClient() as any;
   const row = {
     slug: input.slug.trim(), title: input.title.trim(), eyebrow: input.eyebrow || null, intro: input.intro || null,
-    sections: (input.sections ?? []).filter((s) => s.body?.length || s.heading || s.items?.length), seo: input.seo ?? {},
+    sections: (input.sections ?? []).filter((s) => s.body?.length || s.heading || s.items?.length || s.image?.url), seo: input.seo ?? {},
     status: input.status ?? "published", publish_at: input.publishAt || null, unpublish_at: input.unpublishAt || null,
     form_config: input.form ?? {},
     updated_at: new Date().toISOString(),

@@ -7,9 +7,12 @@ import { injectSupportEmail, splitClosing, SUPPORT_EMAIL_TOKEN, SUPPORT_UNAVAILA
 import { FaqAccordion, type FaqCategory } from "@/components/faq/FaqAccordion";
 import { ContactContent, type ContactBlock } from "@/components/contact/ContactContent";
 import { CONTACT_FORM_DEFAULTS, type ContactFormConfig } from "@/lib/contact";
+import { ProductCareContent } from "@/components/product-care/ProductCareContent";
+import { MediaPicker } from "@/components/admin/MediaPicker";
+import type { SectionImage, SectionLayout, SectionRatio, SectionVariant } from "@/lib/cms/sections";
 
 type FaqItem = { q: string; a: string };
-type Section = { heading?: string; body: string[]; items?: FaqItem[] };
+type Section = { heading?: string; body: string[]; items?: FaqItem[]; step?: string; label?: string; image?: SectionImage; layout?: SectionLayout; ratio?: SectionRatio; variant?: SectionVariant; align?: "left" | "center" | "right"; hidden?: boolean };
 type Status = "draft" | "scheduled" | "published";
 type PageForm = { slug: string; title: string; eyebrow: string; intro: string; sections: Section[]; seo: { title?: string; description?: string; ogImage?: string }; status: Status; publishAt: string; unpublishAt: string; form: Record<string, unknown> };
 /** Site Settings the Contact preview needs (single source; passed by the contact admin route). */
@@ -86,8 +89,17 @@ export function ContentManager({ pages, initialSlug, supportEmail, contact }: { 
       sections: edit.sections.map((s) => ({
         heading: s.heading || undefined,
         body: (Array.isArray(s.body) ? s.body : String(s.body).split("\n")).map((x) => x.trim()).filter(Boolean),
-        // FAQ categories carry Q&A in `items` — preserve them (drop blank pairs). Non-FAQ pages have no items.
+        // FAQ / accordion categories carry Q&A in `items` — preserve them (drop blank pairs). Text pages have none.
         ...(s.items ? { items: s.items.filter((it) => (it.q || "").trim() || (it.a || "").trim()) } : {}),
+        // Editorial fields (Product Care) — additive; text-only pages never set them.
+        ...(s.step ? { step: s.step } : {}),
+        ...(s.label ? { label: s.label } : {}),
+        ...(s.image?.url ? { image: s.image } : {}),
+        ...(s.layout ? { layout: s.layout } : {}),
+        ...(s.ratio ? { ratio: s.ratio } : {}),
+        ...(s.variant ? { variant: s.variant } : {}),
+        ...(s.align ? { align: s.align } : {}),
+        ...(s.hidden ? { hidden: true } : {}),
       })),
       seo: edit.seo, status: edit.status, publishAt: fromLocal(edit.publishAt), unpublishAt: fromLocal(edit.unpublishAt),
       form: edit.form,
@@ -167,6 +179,66 @@ export function ContentManager({ pages, initialSlug, supportEmail, contact }: { 
   const setContactBlock = (i: number, patch: Partial<Section>) => rebuildContact(contactSectionBlocks().map((b, j) => (j === i ? { ...b, ...patch } : b)), contactClosingText());
   const setContactClosing = (text: string) => rebuildContact(contactSectionBlocks(), text);
 
+  // ── Product Care editor (the `product-care` slug): an EDITORIAL page. Each section is one of five
+  //    types, inferred from its shape and switchable via a Type select. Reuses the same sections
+  //    array + the Media Library picker + the accordion mechanism — no new CMS. ──
+  const isProductCare = !!edit && edit.slug === "product-care";
+  type PcType = "editorial" | "overlay" | "accordion" | "statement" | "divider";
+  const PC_TYPE_LABEL: Record<PcType, string> = { editorial: "Editorial (image + text)", overlay: "Image break (overlay)", accordion: "Accordion (Q&A)", statement: "Statement / text", divider: "Section divider" };
+  const PC_LAYOUTS: SectionLayout[] = ["left", "right", "center", "wide"];
+  const PC_RATIOS: SectionRatio[] = ["landscape", "portrait", "square"];
+  const pcHasBody = (s: Section) => (Array.isArray(s.body) ? s.body : [String(s.body)]).some((b) => (b ?? "").trim());
+  // The type is stored explicitly (variant) once the editor sets it; otherwise inferred from shape.
+  const pcType = (s: Section): PcType =>
+    (s.variant as PcType | undefined) ??
+    (Array.isArray(s.items) ? "accordion"
+      : s.layout === "overlay" ? "overlay"
+        : (s.layout === "left" || s.layout === "right" || s.layout === "center" || s.layout === "wide" || s.image?.url) ? "editorial"
+          : (s.heading && !pcHasBody(s)) ? "divider"
+            : "statement");
+  const [pcPicker, setPcPicker] = useState<number | null>(null); // section index whose image is being chosen
+  // Switch a section's type NON-DESTRUCTIVELY — record the chosen `variant` and only set the minimal
+  // fields that type needs to render. Body / heading / step / label / image are NEVER discarded, so
+  // switching back restores everything (the renderer keys off `variant`, ignoring unused fields).
+  const pcSetType = (i: number, t: PcType) => setSection(i, (() => {
+    const cur = edit!.sections[i];
+    switch (t) {
+      case "editorial": return { variant: t, layout: (cur.layout && cur.layout !== "overlay" ? cur.layout : "left") as SectionLayout, ratio: cur.ratio ?? "landscape" };
+      case "overlay": return { variant: t, layout: "overlay" as SectionLayout };
+      case "accordion": return { variant: t, items: cur.items ?? [] };
+      case "statement": return { variant: t };
+      case "divider": return { variant: t };
+    }
+  })());
+  const setPcImage = (i: number, patch: Partial<SectionImage>) => setSection(i, { image: { url: "", ...(edit!.sections[i].image ?? {}), ...patch } });
+  const pcDuplicate = (i: number) => { if (!edit) return; const next = [...edit.sections]; next.splice(i + 1, 0, JSON.parse(JSON.stringify(edit.sections[i]))); setEdit({ ...edit, sections: next }); };
+  const pcAddSection = () => edit && setEdit({ ...edit, sections: [...edit.sections, { heading: "", body: [""], layout: "left", ratio: "landscape" }] });
+  const pcToggleHidden = (i: number) => setSection(i, { hidden: !edit!.sections[i].hidden });
+  const pcAddQ = (i: number) => setSection(i, { items: [...(edit!.sections[i].items ?? []), { q: "", a: "" }] });
+  const pcDelQ = (i: number, qi: number) => setSection(i, { items: (edit!.sections[i].items ?? []).filter((_, k) => k !== qi) });
+  const pcSetQ = (i: number, qi: number, patch: Partial<FaqItem>) => setSection(i, { items: (edit!.sections[i].items ?? []).map((it, k) => (k === qi ? { ...it, ...patch } : it)) });
+  const pcMoveQ = (i: number, qi: number, dir: -1 | 1) => setSection(i, (() => { const its = [...(edit!.sections[i].items ?? [])]; const j = qi + dir; if (j < 0 || j >= its.length) return {}; [its[qi], its[j]] = [its[j], its[qi]]; return { items: its }; })());
+  const pcImageRow = (i: number, s: Section) => (
+    <div className="pcare-edit__media">
+      {s.image?.url
+        // eslint-disable-next-line @next/next/no-img-element
+        ? <img className="pcare-edit__thumb" src={s.image.url} alt="" />
+        : <div className="pcare-edit__thumb pcare-edit__thumb--empty">No image</div>}
+      <div className="pcare-edit__media-fields">
+        <div className="ff-actions">
+          <button type="button" className="ff-btn ff-btn--primary ff-btn--mini" onClick={() => setPcPicker(i)}>{s.image?.url ? "Replace image" : "Choose image"}</button>
+          {s.image?.url ? <button type="button" className="ff-btn ff-btn--mini" onClick={() => setSection(i, { image: undefined })}>Remove</button> : null}
+        </div>
+        {s.image?.url ? (
+          <>
+            <label className="cfg-field"><span>Alt text {!(s.image.alt ?? "").trim() ? <span className="sf-warn">⚠ describe for accessibility</span> : null}</span><input value={s.image.alt ?? ""} onChange={(e) => setPcImage(i, { alt: e.target.value })} placeholder="Describe the image" /></label>
+            <label className="cfg-field"><span>Caption <span className="admin__muted">· optional</span></span><input value={s.image.caption ?? ""} onChange={(e) => setPcImage(i, { caption: e.target.value })} /></label>
+          </>
+        ) : null}
+      </div>
+    </div>
+  );
+
   // Deep-link support (e.g. /admin/content/privacy) — open that page's editor once on mount.
   const autoOpened = useRef(false);
   useEffect(() => {
@@ -227,7 +299,11 @@ export function ContentManager({ pages, initialSlug, supportEmail, contact }: { 
               <label className="cfg-field"><span>Unpublish at (optional)</span><input type="datetime-local" value={edit.unpublishAt} onChange={(e) => setEdit({ ...edit, unpublishAt: e.target.value })} /></label>
             </div>
             <p className="cfg-hint">Scheduled pages go live automatically at “publish at” and hide at “unpublish at” — no manual step.</p>
-            <label className="cfg-field"><span>Intro</span><input value={edit.intro} onChange={(e) => setEdit({ ...edit, intro: e.target.value })} /></label>
+            {isProductCare ? (
+              <label className="cfg-field"><span>Hero intro <span className="admin__muted">· line 1 = hero line, line 2 = subtitle</span></span><textarea rows={2} value={edit.intro} onChange={(e) => setEdit({ ...edit, intro: e.target.value })} /></label>
+            ) : (
+              <label className="cfg-field"><span>Intro</span><input value={edit.intro} onChange={(e) => setEdit({ ...edit, intro: e.target.value })} /></label>
+            )}
 
             {isFaq ? (
               <>
@@ -287,6 +363,89 @@ export function ContentManager({ pages, initialSlug, supportEmail, contact }: { 
                   );
                 })}
                 <label className="cfg-field" style={{ marginTop: 12 }}><span>Closing quote</span><input value={contactClosingText()} onChange={(e) => setContactClosing(e.target.value)} placeholder="The finest conversations begin with curiosity…" /></label>
+              </>
+            ) : isProductCare ? (
+              <>
+                <p className="cfg-sub">Editorial sections <span className="admin__muted">· image + text, accordions, statements &amp; dividers</span></p>
+                {edit.sections.map((s, i) => {
+                  const t = pcType(s);
+                  const bodyText = Array.isArray(s.body) ? s.body.join("\n") : s.body;
+                  return (
+                    <div key={i} className={`cms-section pcare-edit${s.hidden ? " is-hidden" : ""}`}>
+                      <div className="cms-section__bar">
+                        <span className="admin__muted">Section {i + 1} · {PC_TYPE_LABEL[t]}{s.heading ? ` · ${s.heading}` : ""}{s.hidden ? " · hidden" : ""}</span>
+                        <div className="ff-actions">
+                          <button type="button" className="ff-btn" disabled={i === 0} aria-label="Move section up" onClick={() => moveSection(i, -1)}>↑</button>
+                          <button type="button" className="ff-btn" disabled={i === edit.sections.length - 1} aria-label="Move section down" onClick={() => moveSection(i, 1)}>↓</button>
+                          <button type="button" className="ff-btn" aria-label="Duplicate section" onClick={() => pcDuplicate(i)}>⧉</button>
+                          <button type="button" className="ff-btn" aria-pressed={!!s.hidden} onClick={() => pcToggleHidden(i)}>{s.hidden ? "Show" : "Hide"}</button>
+                          <button type="button" className="ff-btn ff-btn--danger" aria-label="Delete section" onClick={() => setEdit({ ...edit, sections: edit.sections.filter((_, j) => j !== i) })}>Delete</button>
+                        </div>
+                      </div>
+
+                      <div className="cfg-grid">
+                        <label className="cfg-field"><span>Type</span>
+                          <select value={t} onChange={(e) => pcSetType(i, e.target.value as PcType)}>
+                            {(Object.keys(PC_TYPE_LABEL) as PcType[]).map((k) => <option key={k} value={k}>{PC_TYPE_LABEL[k]}</option>)}
+                          </select>
+                        </label>
+                        {t === "editorial" ? <label className="cfg-field"><span>Step number <span className="admin__muted">· optional</span></span><input value={s.step ?? ""} onChange={(e) => setSection(i, { step: e.target.value })} placeholder="01" /></label> : null}
+                      </div>
+
+                      {t === "divider" ? (
+                        <input value={s.heading ?? ""} onChange={(e) => setSection(i, { heading: e.target.value })} placeholder="Divider title (e.g. The Ritual of Light)" />
+                      ) : t === "overlay" ? (
+                        <>
+                          <input value={s.heading ?? ""} onChange={(e) => setSection(i, { heading: e.target.value })} placeholder="Overlay text shown over the image" />
+                          {pcImageRow(i, s)}
+                          <div className="cfg-grid">
+                            <label className="cfg-field"><span>Image ratio</span><select value={s.ratio ?? "landscape"} onChange={(e) => setSection(i, { ratio: e.target.value as SectionRatio })}>{PC_RATIOS.map((r) => <option key={r} value={r}>{r}</option>)}</select></label>
+                            <label className="cfg-field"><span>Text alignment</span><select value={s.align ?? "center"} onChange={(e) => setSection(i, { align: e.target.value as "left" | "center" | "right" })}><option value="left">left</option><option value="center">center</option><option value="right">right</option></select></label>
+                          </div>
+                        </>
+                      ) : t === "accordion" ? (
+                        <>
+                          <input value={s.heading ?? ""} onChange={(e) => setSection(i, { heading: e.target.value })} placeholder="Accordion title (e.g. Before You Light)" />
+                          <textarea rows={2} value={bodyText} onChange={(e) => setSection(i, { body: e.target.value.split("\n") })} placeholder="Optional lede shown under the title" />
+                          <div className="cms-faq-qs">
+                            {(s.items ?? []).map((it, qi) => (
+                              <div key={qi} className="cms-faq-q">
+                                <div className="cms-section__bar">
+                                  <span className="admin__muted">Q{qi + 1}</span>
+                                  <div className="ff-actions">
+                                    <button type="button" className="ff-btn" disabled={qi === 0} aria-label="Move question up" onClick={() => pcMoveQ(i, qi, -1)}>↑</button>
+                                    <button type="button" className="ff-btn" disabled={qi === (s.items?.length ?? 0) - 1} aria-label="Move question down" onClick={() => pcMoveQ(i, qi, 1)}>↓</button>
+                                    <button type="button" className="ff-btn ff-btn--danger" onClick={() => pcDelQ(i, qi)}>Remove</button>
+                                  </div>
+                                </div>
+                                <input value={it.q} onChange={(e) => pcSetQ(i, qi, { q: e.target.value })} placeholder="Question" />
+                                <textarea rows={2} value={it.a} onChange={(e) => pcSetQ(i, qi, { a: e.target.value })} placeholder="Answer — one line per paragraph; “- ” for a bullet" />
+                              </div>
+                            ))}
+                            <button type="button" className="ff-btn" onClick={() => pcAddQ(i)}>+ question</button>
+                          </div>
+                        </>
+                      ) : t === "statement" ? (
+                        <>
+                          <input value={s.heading ?? ""} onChange={(e) => setSection(i, { heading: e.target.value })} placeholder="Title (optional — leave blank for a closing statement)" />
+                          <textarea rows={3} value={bodyText} onChange={(e) => setSection(i, { body: e.target.value.split("\n") })} placeholder="One paragraph per line" />
+                        </>
+                      ) : (
+                        <>
+                          <input value={s.label ?? ""} onChange={(e) => setSection(i, { label: e.target.value })} placeholder="Small heading (e.g. FIRST BURN) — optional" />
+                          <input value={s.heading ?? ""} onChange={(e) => setSection(i, { heading: e.target.value })} placeholder="Title (e.g. Prepare the Wick)" />
+                          <textarea rows={3} value={bodyText} onChange={(e) => setSection(i, { body: e.target.value.split("\n") })} placeholder="Two or three short paragraphs — one per line; “- ” for a bullet" />
+                          {pcImageRow(i, s)}
+                          <div className="cfg-grid">
+                            <label className="cfg-field"><span>Image position</span><select value={s.layout ?? "left"} onChange={(e) => setSection(i, { layout: e.target.value as SectionLayout })}>{PC_LAYOUTS.map((l) => <option key={l} value={l}>{l}</option>)}</select></label>
+                            <label className="cfg-field"><span>Image ratio</span><select value={s.ratio ?? "landscape"} onChange={(e) => setSection(i, { ratio: e.target.value as SectionRatio })}>{PC_RATIOS.map((r) => <option key={r} value={r}>{r}</option>)}</select></label>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+                <button type="button" className="ff-btn" onClick={pcAddSection}>+ section</button>
               </>
             ) : (
               <>
@@ -363,7 +522,9 @@ export function ContentManager({ pages, initialSlug, supportEmail, contact }: { 
                         social={contact?.social ?? {}} formConfig={formCfg} />
                     </LegalPage>
                   );
-                })() : (
+                })() : isProductCare ? (
+                  <ProductCareContent eyebrow={edit.eyebrow} title={edit.title || "Product Care"} intro={edit.intro} sections={edit.sections} />
+                ) : (
                   <LegalPage {...buildPreviewProps(edit, supportEmail)} />
                 )}
               </div>
@@ -392,6 +553,15 @@ export function ContentManager({ pages, initialSlug, supportEmail, contact }: { 
             <div className="om-modal__actions"><button type="button" className="ff-btn" onClick={() => setRevs(null)}>Close</button></div>
           </div>
         </div>
+      ) : null}
+
+      {pcPicker !== null ? (
+        <MediaPicker
+          open
+          kind="image"
+          onSelect={(url, focal, _fm, _mu, assetId) => { if (pcPicker !== null) setPcImage(pcPicker, { url, mediaId: assetId, focal }); }}
+          onClose={() => setPcPicker(null)}
+        />
       ) : null}
     </div>
   );

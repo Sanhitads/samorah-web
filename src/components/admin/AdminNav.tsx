@@ -44,6 +44,7 @@ const NAV: NavGroup[] = [
       { label: "Shipping Policy", href: "/admin/content/shipping", icon: "➜" },
       { label: "FAQ", href: "/admin/content/faq", icon: "❓" },
       { label: "Contact", href: "/admin/content/contact", icon: "✎" },
+      { label: "Product Care", href: "/admin/content/product-care", icon: "✿" },
       { label: "Media", href: "/admin/media", icon: "▨" },
       { label: "Navigation", href: "/admin/navigation", icon: "❰" },
       { label: "Homepage", href: "/admin/homepage", icon: "⌗" },

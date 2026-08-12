@@ -5053,6 +5053,102 @@ video.asset-image {
 .faq__a-inner .legal__list { margin-bottom: 16px; }
 @media (prefers-reduced-motion: reduce) { .faq__a { transition: none; } }
 
+/* ── Product Care — premium editorial page (alternating image/text, generous whitespace).
+   Reuses the .legal--band hero; the body breaks out into a wide editorial column. ── */
+.pcare-hero__line { max-width: 32ch; }
+.pcare-hero__sub { font-family: var(--font-sans, sans-serif); font-size: clamp(0.95rem, 1.6vw, 1.05rem); line-height: 1.7; color: var(--smoke, #6b6259); max-width: 54ch; margin: 16px auto 0; }
+.pcare__body { max-width: 1180px; margin-inline: auto; padding: clamp(56px, 10vh, 120px) clamp(20px, 5vw, 48px) clamp(80px, 12vh, 140px); }
+/* Vertical rhythm — calm but ~12% tighter between consecutive editorial sections. */
+.pcare__section { margin-top: clamp(56px, 10.5vh, 132px); }
+.pcare__body > .pcare__section:first-child { margin-top: 0; }
+
+/* Editorial blocks — the image column carries more weight (photography leads the story). */
+.pcare__section--left, .pcare__section--right { display: grid; gap: clamp(32px, 5vw, 84px); align-items: center; }
+.pcare__section--left { grid-template-columns: 1.15fr 0.85fr; }
+.pcare__section--right { grid-template-columns: 0.85fr 1.15fr; }
+.pcare__section--right .pcare__figure { order: 2; } /* text left, image right — image stays the wider column */
+.pcare__section--center, .pcare__section--wide { display: flex; flex-direction: column; align-items: center; text-align: center; gap: clamp(24px, 4vh, 48px); }
+.pcare__section--center .pcare__figure { max-width: 760px; }
+.pcare__section--wide .pcare__figure { max-width: 100%; }
+
+.pcare__figure { margin: 0; width: 100%; }
+.pcare__media { width: 100%; overflow: hidden; background: var(--soft-beige, #F0EBE3); border-radius: 2px; }
+.pcare__media .asset-image { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pcare__caption { margin: 12px 0 0; font-family: var(--font-sans, sans-serif); font-size: 12px; letter-spacing: 0.04em; color: var(--smoke, #6b6259); text-align: center; }
+
+/* Step number — a touch more presence (larger, weightier) while staying understated. */
+.pcare__step { display: block; font-family: var(--font-sans, sans-serif); font-size: 14px; font-weight: 500; letter-spacing: 0.2em; color: var(--gold, #c9a96e); margin: 0 0 16px; }
+.pcare__eyebrow { font-family: var(--font-sans, sans-serif); font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold, #c9a96e); margin: 0 0 12px; }
+.pcare__title { font-family: var(--font-serif, Georgia, serif); font-weight: 400; font-size: clamp(1.5rem, 3vw, 2.2rem); line-height: 1.22; color: var(--ink, #1f1a16); margin: 0 0 18px; }
+.pcare__p { font-family: var(--font-sans, sans-serif); font-size: clamp(15px, 1.3vw, 16px); line-height: 1.85; color: var(--ink, #1f1a16); opacity: 0.85; margin: 0 0 14px; max-width: 44ch; }
+.pcare__list { margin: 0 0 14px; padding-left: 1.1em; font-family: var(--font-sans, sans-serif); font-size: clamp(15px, 1.3vw, 16px); line-height: 1.8; color: var(--ink, #1f1a16); }
+.pcare__list li { opacity: 0.85; margin: 0 0 4px; }
+.pcare__section--center .pcare__p, .pcare__section--wide .pcare__p, .pcare__section--center .pcare__list, .pcare__section--wide .pcare__list { margin-inline: auto; text-align: left; }
+.pcare__section--center .pcare__text, .pcare__section--wide .pcare__text { max-width: 620px; }
+
+/* Editorial text-only sections (image not set yet) — alternate the reading rhythm rather than
+   centring everything: a left- or right-offset column, or centred for center/wide layouts. */
+.pcare__section--textblock .pcare__text { max-width: 600px; }
+.pcare__section--align-left .pcare__text { margin-right: auto; text-align: left; }
+.pcare__section--align-right .pcare__text { margin-left: auto; text-align: left; }
+.pcare__section--align-center { text-align: center; }
+.pcare__section--align-center .pcare__text { max-width: 640px; margin-inline: auto; }
+.pcare__section--align-center .pcare__p, .pcare__section--align-center .pcare__list { margin-inline: auto; }
+
+/* Movement divider (e.g. "The Ritual of Light") */
+.pcare__section--divider { text-align: center; margin-top: clamp(84px, 14vh, 176px); }
+.pcare__divider-title { font-family: var(--font-serif, Georgia, serif); font-weight: 400; font-size: clamp(1.6rem, 3.4vw, 2.6rem); color: var(--ink, #1f1a16); margin: 0; }
+.pcare__divider-title::after { content: ""; display: block; width: 48px; height: 1px; background: var(--gold, #c9a96e); opacity: 0.6; margin: 22px auto 0; }
+
+/* Centred text / closing statement */
+.pcare__section--text { text-align: center; }
+.pcare__section--text .pcare__text { max-width: 640px; margin-inline: auto; }
+.pcare__section--text .pcare__p { margin-inline: auto; max-width: 50ch; opacity: 0.9; }
+.pcare__section--closing { margin-top: clamp(64px, 11vh, 132px); }
+.pcare__section--closing .pcare__p { font-family: var(--font-serif, Georgia, serif); font-style: italic; font-size: clamp(1.3rem, 2.8vw, 1.9rem); line-height: 1.5; color: var(--deep-charcoal, #1A1A1A); opacity: 1; max-width: 32ch; }
+/* Item 7 — the final statement on the page gets extra air for a stronger closing moment. */
+.pcare__body > .pcare__section--closing:last-child { margin-top: clamp(104px, 18vh, 216px); }
+
+/* Image break with overlay text */
+.pcare__section--overlay { margin-top: clamp(78px, 13vh, 158px); }
+.pcare__overlay { position: relative; width: 100%; min-height: clamp(340px, 56vh, 640px); overflow: hidden; border-radius: 2px; background: var(--soft-beige, #F0EBE3); display: grid; place-items: center; }
+.pcare__overlay .asset-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.pcare__overlay--image::before { content: ""; position: absolute; inset: 0; background: rgba(0,0,0,0.30); }
+/* Text alignment (item 3) — default centred; left / right shift the block and its text-align. */
+.pcare__overlay--left { justify-items: start; }
+.pcare__overlay--right { justify-items: end; }
+.pcare__overlay-text { position: relative; z-index: 1; max-width: 30ch; padding: clamp(24px, 4vw, 56px); text-align: center; }
+.pcare__overlay--left .pcare__overlay-text { text-align: left; }
+.pcare__overlay--right .pcare__overlay-text { text-align: right; }
+.pcare__overlay-text p { margin: 0; font-family: var(--font-serif, Georgia, serif); font-style: italic; font-size: clamp(1.3rem, 3vw, 2.2rem); line-height: 1.4; color: var(--ink, #1f1a16); }
+.pcare__overlay--image .pcare__overlay-text p { color: #fff; text-shadow: 0 1px 24px rgba(0,0,0,0.4); }
+/* Editorial fallback (item 2) — with no image, the band reads as an intentional chapter cover:
+   a soft gradient plus hairline dividers and letter-spaced serif, never an empty tinted rectangle. */
+.pcare__overlay--plain { background: linear-gradient(160deg, #F4EFE7 0%, #EAE3D8 100%); }
+.pcare__overlay--plain .pcare__overlay-text { max-width: 34ch; }
+.pcare__overlay--plain .pcare__overlay-text p { font-style: normal; letter-spacing: 0.02em; color: var(--ink, #1f1a16); }
+.pcare__overlay--plain .pcare__overlay-text::before,
+.pcare__overlay--plain .pcare__overlay-text::after { content: ""; display: block; width: 56px; height: 1px; background: var(--gold, #c9a96e); opacity: 0.65; }
+.pcare__overlay--plain .pcare__overlay-text::before { margin: 0 auto 26px; }
+.pcare__overlay--plain .pcare__overlay-text::after { margin: 26px auto 0; }
+.pcare__overlay--plain.pcare__overlay--left .pcare__overlay-text::before, .pcare__overlay--plain.pcare__overlay--left .pcare__overlay-text::after { margin-inline: 0 auto; }
+.pcare__overlay--plain.pcare__overlay--right .pcare__overlay-text::before, .pcare__overlay--plain.pcare__overlay--right .pcare__overlay-text::after { margin-inline: auto 0; }
+
+/* Accordion block (reuses .faq styles inside a narrower editorial column). Item 6 — extra air above
+   the chapter heading and before the questions so each chapter breathes. */
+.pcare__section--accordion { max-width: 760px; margin-inline: auto; margin-top: clamp(88px, 14vh, 176px); }
+.pcare__title--center { text-align: center; }
+.pcare__section--accordion .pcare__title--center { margin-bottom: clamp(18px, 3vh, 30px); }
+.pcare__lede { text-align: center; font-family: var(--font-serif, Georgia, serif); font-style: italic; font-size: clamp(1.05rem, 2vw, 1.25rem); color: var(--smoke, #6b6259); margin: 0 auto clamp(28px, 5vh, 44px); max-width: 46ch; }
+
+@media (max-width: 860px) {
+  .pcare__section--left, .pcare__section--right { grid-template-columns: 1fr; gap: clamp(20px, 4vh, 32px); }
+  .pcare__section--right .pcare__figure { order: 0; } /* image on top when stacked */
+  .pcare__section--left .pcare__text, .pcare__section--right .pcare__text { text-align: left; }
+  /* Flush the offset editorial columns left on small screens (the desktop rhythm resets cleanly). */
+  .pcare__section--align-left .pcare__text, .pcare__section--align-right .pcare__text { margin-inline: 0; }
+}
+
 /* Contact page — editorial contact methods + a minimal form (inside the legal body column). */
 .contact__methods { display: flex; flex-direction: column; gap: 20px; margin-top: 4px; }
 .contact__method-label { font-family: var(--font-sans, sans-serif); font-size: 11px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink, #1f1a16); margin: 0 0 5px; }

@@ -1161,6 +1161,14 @@ a.adm-badge[data-b="incident"]:hover { background: rgba(168,68,58,0.22); }
 .cms-faq-q input, .cms-faq-q textarea { width: 100%; padding: 7px 9px; font-family: var(--font-sans); font-size: 13px; border: 1px solid var(--ad-hair); border-radius: 3px; box-sizing: border-box; }
 .cms-faq-move { padding: 4px 6px; font-family: var(--font-sans); font-size: 11px; border: 1px solid var(--ad-hair); border-radius: 3px; background: #fff; max-width: 120px; }
 
+/* Product Care editor — per-section image row + hidden state. */
+.pcare-edit.is-hidden { opacity: 0.62; }
+.pcare-edit .cms-section__bar [aria-pressed="true"] { border-color: var(--gold, #c9a96e); }
+.pcare-edit__media { display: flex; gap: 12px; align-items: flex-start; margin-top: 8px; }
+.pcare-edit__thumb { width: 108px; height: 84px; flex: none; object-fit: cover; border-radius: 4px; border: 1px solid var(--ad-hair); background: #f4efe8; }
+.pcare-edit__thumb--empty { display: grid; place-items: center; font-family: var(--font-sans); font-size: 11px; letter-spacing: 0.04em; color: var(--ad-muted, #8a8178); }
+.pcare-edit__media-fields { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+
 /* Customer Enquiries — status pills, filters, manage controls, timeline. */
 .ff-status[data-s="new"] { background: rgba(201, 169, 110, 0.24); color: #8a6d3b; }
 .ff-status[data-s="open"] { background: rgba(60, 100, 140, 0.12); color: #3a5a78; }

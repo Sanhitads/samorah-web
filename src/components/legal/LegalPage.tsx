@@ -1,8 +1,12 @@
 import type { ReactNode } from "react";
 import { groupBody } from "@/lib/cms/pageContent";
+import type { EditorialFields } from "@/lib/cms/sections";
 
-/** Shared editorial layout for policy / info pages. Prop-driven (CMS-ready). */
-export interface LegalSection {
+/** Shared editorial layout for policy / info pages. Prop-driven (CMS-ready).
+ *  Extends EditorialFields so config-seed sections (Product Care) type-check and stay
+ *  structurally compatible with cmsService.PageSection; LegalPage itself ignores those
+ *  fields (they're consumed by the editorial renderer). */
+export interface LegalSection extends EditorialFields {
   heading?: string;
   body: string[]; // paragraphs; consecutive "- " lines render as a semantic bullet list
   items?: { q: string; a: string }[]; // FAQ categories carry Q&A here (rendered as an accordion, not by LegalPage)

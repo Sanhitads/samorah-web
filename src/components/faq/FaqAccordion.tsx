@@ -30,8 +30,10 @@ export function FaqAccordion({ categories }: { categories: FaqCategory[] }) {
   return (
     <div className="faq">
       {categories.map((cat, ci) => (
-        <section key={ci} className="faq__cat" aria-labelledby={`faq-cat-${ci}`}>
-          <h2 id={`faq-cat-${ci}`} className="faq__cat-title">{cat.category}</h2>
+        // A named category renders its own <h2>; an unnamed one (Product Care accordions, which
+        // supply their heading + lede in the surrounding section) omits it — no empty heading.
+        <section key={ci} className="faq__cat" {...(cat.category ? { "aria-labelledby": `faq-cat-${ci}` } : {})}>
+          {cat.category ? <h2 id={`faq-cat-${ci}`} className="faq__cat-title">{cat.category}</h2> : null}
           <ul className="faq__list">
             {cat.items.map((it, qi) => {
               const id = `faq-${ci}-${qi}`;
