@@ -10,15 +10,97 @@ const REVIEW = "This is placeholder policy text pending final review by Samorah 
 
 export const LEGAL: Record<string, { eyebrow: string; title: string; intro?: string; sections: LegalSection[]; footNote?: string }> = {
   shipping: {
-    eyebrow: "Support",
-    title: "Shipping",
-    intro: "How your handmade collection reaches you.",
+    // Hero shows only Title + Subtitle (no eyebrow, no hero image) — mirrors the other policy pages.
+    eyebrow: "",
+    title: "Shipping Policy",
+    intro: "A quiet note on how your order reaches you.",
+    // "- " lines render as a semantic bullet list. Tokens resolved at render time (never hard-coded):
+    // {{supportEmail}} from Site Settings, {{freeShippingThreshold}} from the shipping config. The final
+    // heading-less section is the closing statement.
     sections: [
-      { heading: "Dispatch", body: ["Every candle is poured and finished by hand. Orders are typically dispatched within 1–2 business days.", "You'll receive an email with tracking the moment your order ships."] },
-      { heading: "Delivery", body: ["We deliver across India via trusted courier partners. Estimated delivery is 3–7 business days depending on your location.", "Complimentary shipping applies above the current free-shipping threshold; a flat rate applies otherwise, shown at checkout."] },
-      { heading: "Careful packaging", body: ["Fragile vessels are protected with recyclable, purpose-fit packaging so they arrive exactly as intended."] },
+      { heading: "Introduction", body: [
+        "We take care in how every order is prepared, packed, and shipped.",
+        "From careful packaging to reliable delivery partners, every step reflects the same attention we give to the products themselves.",
+      ] },
+      { heading: "Shipping Overview", body: [
+        "We currently ship across India.",
+        "Every order is carefully packed to help ensure it reaches you safely and in excellent condition.",
+        "Shipping availability may vary for certain remote locations.",
+      ] },
+      { heading: "Shipping Partners", body: [
+        "We work with trusted courier partners selected for reliable and secure delivery across India.",
+        "The courier assigned to your order may vary depending on your delivery location and service availability.",
+      ] },
+      { heading: "Order Processing", body: [
+        "Orders are generally processed within 1–2 business days after successful payment confirmation.",
+        "During launches, festive seasons, or high-order volumes, processing may take slightly longer.",
+      ] },
+      { heading: "Delivery Timelines", body: [
+        "Estimated delivery times are:",
+        "- Metro cities: 2–4 business days",
+        "- Non-metro locations: 4–7 business days",
+        "- Remote locations: delivery times may vary",
+        "Delivery estimates begin after order dispatch.",
+        "These timelines are estimates and not guaranteed delivery commitments.",
+      ] },
+      { heading: "Shipping Charges", body: [
+        "- Complimentary shipping on eligible orders above {{freeShippingThreshold}}",
+        "- Applicable shipping charges (if any) are calculated automatically during checkout before payment",
+        "- Shipping charges are displayed clearly during checkout before payment",
+      ] },
+      { heading: "Order Tracking", body: [
+        "Once your order has been dispatched, you'll receive shipment tracking details via email or SMS (where available).",
+        "Tracking updates depend on the courier partner and may occasionally take time to appear.",
+      ] },
+      { heading: "Partial Shipments", body: [
+        "In rare situations, products within the same order may be shipped separately to help ensure faster delivery.",
+        "Where applicable, separate tracking information will be shared.",
+      ] },
+      { heading: "Delivery Attempts", body: [
+        "Courier partners may make multiple delivery attempts.",
+        "If delivery cannot be completed because the recipient is unavailable or the address is incorrect, the shipment may be returned to us.",
+        "Additional shipping charges may apply for re-dispatch where appropriate.",
+      ] },
+      { heading: "Address Accuracy", body: [
+        "Please ensure that your shipping address and contact details are accurate when placing your order.",
+        "Samorah cannot be responsible for delays resulting from incomplete or incorrect delivery information.",
+      ] },
+      { heading: "Delays & Exceptions", body: [
+        "Occasionally deliveries may be delayed due to:",
+        "- Weather conditions",
+        "- Public holidays",
+        "- Courier operational disruptions",
+        "- Government restrictions",
+        "- Remote delivery locations",
+        "- Other circumstances beyond our reasonable control",
+        "We appreciate your patience should such situations arise.",
+      ] },
+      { heading: "Damaged or Lost Shipments", body: [
+        "If your shipment appears delayed beyond the estimated delivery window, or arrives damaged or appears tampered with, please contact us within 48 hours (where applicable) with:",
+        "- Order number",
+        "- Photographs of the product (if applicable)",
+        "- Photographs of the packaging (if damaged)",
+        "- Brief description of the issue",
+        "We'll investigate with the courier partner and assist you as quickly as possible.",
+      ] },
+      { heading: "International Shipping", body: [
+        "At present, Samorah ships only within India.",
+        "If international shipping becomes available in the future, this page will be updated.",
+      ] },
+      { heading: "Policy Updates", body: [
+        "We may update this Shipping Policy from time to time.",
+        "The latest version will always be available on this page.",
+        "Changes become effective once published on this page.",
+      ] },
+      { heading: "Contact", body: [
+        "For any shipping-related questions:",
+        "Email: {{supportEmail}}",
+      ] },
+      // Closing statement — heading-less, rendered as the quiet sign-off.
+      { body: [
+        "Each order is sent with care — from our hands to your space.",
+      ] },
     ],
-    footNote: REVIEW,
   },
   "product-care": {
     eyebrow: "The Ritual",
