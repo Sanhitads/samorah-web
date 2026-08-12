@@ -27,6 +27,7 @@ const NAV: NavGroup[] = [
       { label: "Returns", href: "/admin/returns", icon: "↩" },
       { label: "Shipments", href: "/admin/shipments", icon: "➜" },
       { label: "Customers", href: "/admin/customers", icon: "☺" },
+      { label: "Customer Enquiries", href: "/admin/enquiries", icon: "✉" },
     ],
   },
   {
@@ -42,6 +43,7 @@ const NAV: NavGroup[] = [
       { label: "Returns & Refund Policy", href: "/admin/content/returns-policy", icon: "↩" },
       { label: "Shipping Policy", href: "/admin/content/shipping", icon: "➜" },
       { label: "FAQ", href: "/admin/content/faq", icon: "❓" },
+      { label: "Contact", href: "/admin/content/contact", icon: "✎" },
       { label: "Media", href: "/admin/media", icon: "▨" },
       { label: "Navigation", href: "/admin/navigation", icon: "❰" },
       { label: "Homepage", href: "/admin/homepage", icon: "⌗" },

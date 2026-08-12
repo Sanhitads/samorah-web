@@ -1,27 +1,85 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { LegalPage } from "@/components/legal/LegalPage";
-import { COMMERCE } from "@/config/commerce";
+import { ContactContent, type ContactBlock } from "@/components/contact/ContactContent";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { getPage } from "@/services/cmsService";
+import { getSiteSettings } from "@/services/siteSettingsService";
+import { splitClosing } from "@/lib/cms/pageContent";
+import { withRouteSeo } from "@/services/seoRedirectService";
+import type { ContactFormConfig } from "@/lib/contact";
+import { canonicalOrigin } from "@/config/site";
 
-export const metadata: Metadata = { title: "Contact", description: "Reach the Samorah studio." };
+/**
+ * Contact — a CMS-managed "Pages" route (edited at /admin/content/contact) on the same
+ * architecture as the policy pages, plus a validated contact form. Editorial content comes from
+ * CMS (blocks read by position); contact methods/hours/studio/social resolve from Site Settings
+ * (single source). Emits ContactPage JSON-LD. Server-rendered, force-dynamic.
+ */
+const SLUG = "contact";
+export const dynamic = "force-dynamic";
 
-export default function ContactPage() {
-  const a = COMMERCE.registeredAddress;
+const META_DESCRIPTION = "Get in touch with Samorah for product enquiries, orders, support or general questions.";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const p = await getPage(SLUG);
+  const title = p?.seo.title || p?.title || "Contact Us";
+  const description = p?.seo.description || META_DESCRIPTION;
+  return withRouteSeo("/contact", {
+    title,
+    description,
+    alternates: { canonical: "/contact" },
+    openGraph: {
+      title,
+      description,
+      type: "website",
+      ...(p?.seo.ogImage ? { images: [p.seo.ogImage] } : {}),
+    },
+  });
+}
+
+const resolveTokens = (b: ContactBlock | undefined, map: Record<string, string>): ContactBlock | undefined =>
+  b && { ...b, body: (b.body ?? []).map((line) => Object.entries(map).reduce((s, [t, v]) => s.split(t).join(v), line)) };
+
+export default async function Page() {
+  const [p, site] = await Promise.all([getPage(SLUG), getSiteSettings()]);
+  if (!p) notFound();
+
+  const { sections, closing } = splitClosing(p.sections);
+  const tokens = { "{{studioAddress}}": site.support.studioAddress || "", "{{businessHours}}": site.support.hours || "", "{{supportEmail}}": site.support.email || "" };
+  const [intro, studio, hours, response] = [0, 1, 2, 3].map((i) => resolveTokens(sections[i], tokens));
+
+  const formConfig = (p.form ?? {}) as ContactFormConfig;
+
+  // ContactPage structured data.
+  const ld = {
+    "@context": "https://schema.org",
+    "@type": "ContactPage",
+    name: p.title,
+    url: `${canonicalOrigin()}/contact`,
+    mainEntity: {
+      "@type": "Organization",
+      name: "Samorah",
+      email: site.support.email || undefined,
+      telephone: site.support.phone || undefined,
+      ...(site.support.studioAddress ? { address: site.support.studioAddress } : {}),
+    },
+  };
+
   return (
-    <LegalPage eyebrow="Studio" title="Contact" intro="A real person reads every message. We usually reply within one business day.">
-      <div className="legal__contact">
-        <div className="legal__contact-item">
-          <p className="legal__contact-label">Email</p>
-          <p><a href={`mailto:${COMMERCE.support.email}`} className="text-link">{COMMERCE.support.email}</a></p>
-        </div>
-        <div className="legal__contact-item">
-          <p className="legal__contact-label">Studio</p>
-          <p>{a.city}, {a.state}, {a.country}</p>
-        </div>
-        <div className="legal__contact-item">
-          <p className="legal__contact-label">Orders</p>
-          <p>Sign in to <a href="/account/orders" className="text-link">Your Orders</a> to track or review an order, or reply to your confirmation email.</p>
-        </div>
-      </div>
-    </LegalPage>
+    <>
+      <JsonLd data={ld} />
+      <LegalPage eyebrow={p.eyebrow} title={p.title} intro={p.intro} sections={[]} closing={closing} heroBand>
+        <ContactContent
+          intro={intro}
+          studio={studio}
+          hours={hours}
+          response={response}
+          methods={{ email: site.support.email, whatsapp: site.support.whatsapp, phone: site.support.phone }}
+          social={site.social}
+          formConfig={formConfig}
+        />
+      </LegalPage>
+    </>
   );
 }

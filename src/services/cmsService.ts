@@ -31,6 +31,7 @@ export interface CmsPage {
   unpublishAt?: string | null;
   updatedAt?: string | null; // last save time (DB rows only) — powers the "Last updated" line
   createdAt?: string | null; // first-created (DB rows only) — the effective-date fallback
+  form?: Record<string, unknown>; // page-type config (e.g. the Contact form) — stored in form_config JSONB
   source: "db" | "config";
 }
 
@@ -50,7 +51,7 @@ function mapRow(data: any): CmsPage {
   return {
     slug: data.slug, title: data.title, eyebrow: data.eyebrow ?? "", intro: data.intro ?? "",
     sections: Array.isArray(data.sections) ? data.sections : [], seo: data.seo ?? {}, status: data.status,
-    publishAt: data.publish_at ?? null, unpublishAt: data.unpublish_at ?? null, updatedAt: data.updated_at ?? null, createdAt: data.created_at ?? null, source: "db",
+    publishAt: data.publish_at ?? null, unpublishAt: data.unpublish_at ?? null, updatedAt: data.updated_at ?? null, createdAt: data.created_at ?? null, form: data.form_config ?? {}, source: "db",
   };
 }
 
@@ -108,6 +109,7 @@ export interface PageInput {
   slug: string; title: string; eyebrow?: string; intro?: string;
   sections: PageSection[]; seo?: { title?: string; description?: string; ogImage?: string };
   status?: PageStatus; publishAt?: string | null; unpublishAt?: string | null;
+  form?: Record<string, unknown>; // page-type config (Contact form) → form_config JSONB
 }
 
 export async function upsertPage(input: PageInput, actorId?: string): Promise<{ ok: boolean; reason?: string }> {
@@ -115,8 +117,9 @@ export async function upsertPage(input: PageInput, actorId?: string): Promise<{ 
   const db = createAdminClient() as any;
   const row = {
     slug: input.slug.trim(), title: input.title.trim(), eyebrow: input.eyebrow || null, intro: input.intro || null,
-    sections: (input.sections ?? []).filter((s) => s.body?.length || s.heading), seo: input.seo ?? {},
+    sections: (input.sections ?? []).filter((s) => s.body?.length || s.heading || s.items?.length), seo: input.seo ?? {},
     status: input.status ?? "published", publish_at: input.publishAt || null, unpublish_at: input.unpublishAt || null,
+    form_config: input.form ?? {},
     updated_at: new Date().toISOString(),
   };
   const { error } = await db.from("cms_pages").upsert(row, { onConflict: "slug" });

@@ -25,6 +25,7 @@ export const CAPABILITIES = [
   "analytics.view",
   "data.export",
   "users.manage",
+  "enquiries.manage", // customer enquiries: change status / assign / notes (CS work, manager+)
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];
@@ -32,7 +33,7 @@ export type Capability = (typeof CAPABILITIES)[number];
 /** Role → capabilities. Higher roles inherit lower ones by construction. */
 const WAREHOUSE: Capability[] = ["fulfillment.operate", "fulfillment.triage", "returns.operate"];
 // inventory.view lands at manager+ (view stock levels + movement history, no mutation).
-const CS_FINANCE: Capability[] = [...WAREHOUSE, "order.cancel", "order.refund", "returns.approve", "analytics.view", "data.export", "inventory.view"];
+const CS_FINANCE: Capability[] = [...WAREHOUSE, "order.cancel", "order.refund", "returns.approve", "analytics.view", "data.export", "inventory.view", "enquiries.manage"];
 // content.edit and content.publish both land at admin+ so current access is unchanged (admins can edit
 // AND publish). The split is server-enforced and future-ready: to let a lower role PREPARE navigation
 // without deploy authority, add "content.edit" (only) to that role's bundle — publish stays gated here.

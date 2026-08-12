@@ -1161,6 +1161,27 @@ a.adm-badge[data-b="incident"]:hover { background: rgba(168,68,58,0.22); }
 .cms-faq-q input, .cms-faq-q textarea { width: 100%; padding: 7px 9px; font-family: var(--font-sans); font-size: 13px; border: 1px solid var(--ad-hair); border-radius: 3px; box-sizing: border-box; }
 .cms-faq-move { padding: 4px 6px; font-family: var(--font-sans); font-size: 11px; border: 1px solid var(--ad-hair); border-radius: 3px; background: #fff; max-width: 120px; }
 
+/* Customer Enquiries — status pills, filters, manage controls, timeline. */
+.ff-status[data-s="new"] { background: rgba(201, 169, 110, 0.24); color: #8a6d3b; }
+.ff-status[data-s="open"] { background: rgba(60, 100, 140, 0.12); color: #3a5a78; }
+.ff-status[data-s="replied"] { background: rgba(60, 100, 140, 0.16); color: #2f5570; }
+.ff-status[data-s="resolved"] { background: rgba(60, 120, 70, 0.14); color: #2f6b3c; }
+.ff-status[data-s="spam"] { background: rgba(168, 68, 58, 0.12); color: #8a3d2f; }
+.ff-status[data-s="archived"] { background: rgba(107, 98, 89, 0.14); color: #6b6259; }
+.enq-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.enq-filters .ff-btn[data-active="1"] { background: var(--ink, #1f1a16); color: var(--ivory, #faf7f2); border-color: var(--ink, #1f1a16); }
+.enq-message .legal__p { font-size: 14px; }
+.enq-manage { display: flex; flex-direction: column; gap: 12px; }
+.enq-manage__row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.enq-manage__label { font-family: var(--font-sans); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--smoke, #6b6259); min-width: 92px; }
+.enq-manage select, .enq-manage textarea { font-family: var(--font-sans); font-size: 13px; padding: 7px 9px; border: 1px solid var(--ad-hair); border-radius: 3px; background: #fff; }
+.enq-manage__notes { display: flex; flex-direction: column; gap: 6px; }
+.enq-manage__notes textarea { width: 100%; box-sizing: border-box; }
+.enq-manage__foot { display: flex; align-items: center; gap: 12px; }
+.enq-timeline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.enq-timeline li { display: flex; gap: 12px; font-family: var(--font-sans); font-size: 13px; color: var(--ink, #1f1a16); }
+.enq-timeline__when { color: var(--smoke, #6b6259); min-width: 150px; flex: none; }
+
 /* Side-by-side content editor: form on the left, live public-renderer preview on the right.
    The preview is the same <LegalPage> the storefront uses, driven by unsaved form state. */
 .om-modal__card--wide.cms-edit-card { max-width: min(1180px, 96vw); }

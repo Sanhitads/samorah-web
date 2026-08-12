@@ -5,11 +5,15 @@ import { useRouter } from "next/navigation";
 import { LegalPage } from "@/components/legal/LegalPage";
 import { injectSupportEmail, splitClosing, SUPPORT_EMAIL_TOKEN, SUPPORT_UNAVAILABLE } from "@/lib/cms/pageContent";
 import { FaqAccordion, type FaqCategory } from "@/components/faq/FaqAccordion";
+import { ContactContent, type ContactBlock } from "@/components/contact/ContactContent";
+import { CONTACT_FORM_DEFAULTS, type ContactFormConfig } from "@/lib/contact";
 
 type FaqItem = { q: string; a: string };
 type Section = { heading?: string; body: string[]; items?: FaqItem[] };
 type Status = "draft" | "scheduled" | "published";
-type PageForm = { slug: string; title: string; eyebrow: string; intro: string; sections: Section[]; seo: { title?: string; description?: string; ogImage?: string }; status: Status; publishAt: string; unpublishAt: string };
+type PageForm = { slug: string; title: string; eyebrow: string; intro: string; sections: Section[]; seo: { title?: string; description?: string; ogImage?: string }; status: Status; publishAt: string; unpublishAt: string; form: Record<string, unknown> };
+/** Site Settings the Contact preview needs (single source; passed by the contact admin route). */
+export type ContactSettings = { support: { email: string; phone: string; hours: string; whatsapp: string; studioAddress: string }; social: { instagram: string; pinterest: string; facebook: string; spotify: string } };
 type PageRow = { slug: string; title: string; status: string; live?: boolean; publishAt?: string | null; unpublishAt?: string | null; source: string };
 type Revision = { id: string; title: string; status: string; createdAt: string; actorId?: string | null };
 
@@ -46,7 +50,7 @@ function buildPreviewProps(edit: PageForm, supportEmail?: string) {
   };
 }
 
-export function ContentManager({ pages, initialSlug, supportEmail }: { pages: PageRow[]; initialSlug?: string; supportEmail?: string }) {
+export function ContentManager({ pages, initialSlug, supportEmail, contact }: { pages: PageRow[]; initialSlug?: string; supportEmail?: string; contact?: ContactSettings }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState(false);
@@ -71,10 +75,10 @@ export function ContentManager({ pages, initialSlug, supportEmail }: { pages: Pa
     const d = await post({ action: "get", slug });
     if (d?.page) {
       const p = d.page;
-      setEdit({ slug: p.slug, title: p.title, eyebrow: p.eyebrow ?? "", intro: p.intro ?? "", sections: p.sections ?? [], seo: p.seo ?? {}, status: p.status ?? "published", publishAt: toLocal(p.publishAt), unpublishAt: toLocal(p.unpublishAt) });
+      setEdit({ slug: p.slug, title: p.title, eyebrow: p.eyebrow ?? "", intro: p.intro ?? "", sections: p.sections ?? [], seo: p.seo ?? {}, status: p.status ?? "published", publishAt: toLocal(p.publishAt), unpublishAt: toLocal(p.unpublishAt), form: p.form ?? {} });
     }
   };
-  const newPage = () => { setErr(""); setEdit({ slug: "", title: "", eyebrow: "", intro: "", sections: [{ heading: "", body: [""] }], seo: {}, status: "published", publishAt: "", unpublishAt: "" }); };
+  const newPage = () => { setErr(""); setEdit({ slug: "", title: "", eyebrow: "", intro: "", sections: [{ heading: "", body: [""] }], seo: {}, status: "published", publishAt: "", unpublishAt: "", form: {} }); };
   const save = async () => {
     if (!edit) return;
     const page = {
@@ -86,6 +90,7 @@ export function ContentManager({ pages, initialSlug, supportEmail }: { pages: Pa
         ...(s.items ? { items: s.items.filter((it) => (it.q || "").trim() || (it.a || "").trim()) } : {}),
       })),
       seo: edit.seo, status: edit.status, publishAt: fromLocal(edit.publishAt), unpublishAt: fromLocal(edit.unpublishAt),
+      form: edit.form,
     };
     if (await post({ action: "save", page })) { setEdit(null); refresh(); }
   };
@@ -137,6 +142,30 @@ export function ContentManager({ pages, initialSlug, supportEmail }: { pages: Pa
       .filter((c) => (c.items?.length ?? 0) > 0 || (c.heading ?? "").trim())
       .map((c) => ({ category: c.heading ?? "", items: (c.items ?? []).filter((it) => it.q.trim() || it.a.trim()).map((it) => ({ q: it.q, a: it.a.split(SUPPORT_EMAIL_TOKEN).join(email) })) }));
   };
+
+  // ── Contact page: edited via the normal sections editor; adds a form-config block + a faithful
+  //    preview. Contact methods / hours / studio / social come from Site Settings (single source). ──
+  const isContact = !!edit && edit.slug === "contact";
+  const formCfg = (edit?.form ?? {}) as ContactFormConfig;
+  const setFormCfg = (patch: Partial<ContactFormConfig>) => edit && setEdit({ ...edit, form: { ...(edit.form ?? {}), ...patch } });
+  const contactPreviewBlocks = () => {
+    const { sections: cs, closing } = splitClosing(edit!.sections);
+    const email = (contact?.support.email || supportEmail || "").trim();
+    const tok: Record<string, string> = { "{{studioAddress}}": contact?.support.studioAddress ?? "", "{{businessHours}}": contact?.support.hours ?? "", "{{supportEmail}}": email };
+    const resolve = (b?: Section): ContactBlock | undefined =>
+      b && { heading: b.heading, body: (b.body ?? []).map((l) => Object.entries(tok).reduce((s, [t, v]) => s.split(t).join(v), l)).filter((x) => x.trim()) };
+    const [intro, studio, hours, response] = [0, 1, 2, 3].map((i) => resolve(cs[i]));
+    return { intro, studio, hours, response, closing, email };
+  };
+  // Contact editor works on a FIXED structure — 4 named content blocks (by position) + a closing quote —
+  // so there is no free-form add/remove that could drop the closing or break the page's index mapping.
+  const CONTACT_BLOCK_LABELS = ["Introduction", "Studio information", "Business hours", "Response expectations"];
+  const CONTACT_BLOCK_HINTS = ["", "Use {{studioAddress}} — resolves from Settings.", "Use {{businessHours}} — resolves from Settings.", ""];
+  const contactSectionBlocks = (): Section[] => { const { sections: content } = splitClosing(edit!.sections); return [0, 1, 2, 3].map((i) => content[i] ?? { heading: "", body: [] }); };
+  const contactClosingText = () => splitClosing(edit!.sections).closing ?? "";
+  const rebuildContact = (blocks: Section[], closing: string) => edit && setEdit({ ...edit, sections: [...blocks, ...(closing.trim() ? [{ body: [closing] } as Section] : [])] });
+  const setContactBlock = (i: number, patch: Partial<Section>) => rebuildContact(contactSectionBlocks().map((b, j) => (j === i ? { ...b, ...patch } : b)), contactClosingText());
+  const setContactClosing = (text: string) => rebuildContact(contactSectionBlocks(), text);
 
   // Deep-link support (e.g. /admin/content/privacy) — open that page's editor once on mount.
   const autoOpened = useRef(false);
@@ -244,6 +273,21 @@ export function ContentManager({ pages, initialSlug, supportEmail }: { pages: Pa
                 <button type="button" className="ff-btn" onClick={faqAddCategory}>+ category</button>
                 <label className="cfg-field" style={{ marginTop: 12 }}><span>Closing quote</span><input value={faqClosing} onChange={(e) => setFaq(faqCats, e.target.value)} placeholder="Questions often begin conversations…" /></label>
               </>
+            ) : isContact ? (
+              <>
+                <p className="cfg-sub">Contact content <span className="admin__muted">· fixed blocks · methods &amp; social come from Settings</span></p>
+                {contactSectionBlocks().map((b, i) => {
+                  const bodyText = Array.isArray(b.body) ? b.body.join("\n") : b.body;
+                  return (
+                    <div key={i} className="cms-section">
+                      <div className="cms-section__bar"><span className="admin__muted">{CONTACT_BLOCK_LABELS[i]}</span>{CONTACT_BLOCK_HINTS[i] ? <span className="cfg-count admin__muted">{CONTACT_BLOCK_HINTS[i]}</span> : null}</div>
+                      <input value={b.heading ?? ""} onChange={(e) => setContactBlock(i, { heading: e.target.value })} placeholder="Heading" />
+                      <textarea rows={3} value={bodyText} onChange={(e) => setContactBlock(i, { body: e.target.value.split("\n") })} placeholder="One paragraph per line" />
+                    </div>
+                  );
+                })}
+                <label className="cfg-field" style={{ marginTop: 12 }}><span>Closing quote</span><input value={contactClosingText()} onChange={(e) => setContactClosing(e.target.value)} placeholder="The finest conversations begin with curiosity…" /></label>
+              </>
             ) : (
               <>
                 <p className="cfg-sub">Sections <span className="admin__muted">· use “- ” at the start of a line for a bullet</span></p>
@@ -271,6 +315,23 @@ export function ContentManager({ pages, initialSlug, supportEmail }: { pages: Pa
               </>
             )}
 
+            {isContact ? (
+              <>
+                <p className="cfg-sub">Contact form</p>
+                <div className="cfg-grid">
+                  <label className="om-check"><input type="checkbox" checked={formCfg.enableOrderNumber !== false} onChange={(e) => setFormCfg({ enableOrderNumber: e.target.checked })} /><span>Show “Order number” field</span></label>
+                  <label className="om-check"><input type="checkbox" checked={formCfg.enablePhone !== false} onChange={(e) => setFormCfg({ enablePhone: e.target.checked })} /><span>Show “Phone number” field</span></label>
+                </div>
+                <label className="cfg-field"><span>Consent label</span><input value={formCfg.consentLabel ?? CONTACT_FORM_DEFAULTS.consentLabel} onChange={(e) => setFormCfg({ consentLabel: e.target.value })} /></label>
+                <div className="cfg-grid">
+                  <label className="cfg-field"><span>Success message</span><textarea rows={3} value={formCfg.successMessage ?? CONTACT_FORM_DEFAULTS.successMessage} onChange={(e) => setFormCfg({ successMessage: e.target.value })} /></label>
+                  <label className="cfg-field"><span>Error message</span><textarea rows={3} value={formCfg.errorMessage ?? CONTACT_FORM_DEFAULTS.errorMessage} onChange={(e) => setFormCfg({ errorMessage: e.target.value })} /></label>
+                </div>
+                <p className="cfg-hint">Cleared fields fall back to the default wording on the page.</p>
+                <p className="cfg-hint">Sections 1–4 above are Introduction · Our Studio · Business Hours · Response Expectations (the last blank-heading section is the closing quote). Contact methods, business hours, studio location &amp; social links come from <strong>Settings</strong> — single source, edit them there.</p>
+              </>
+            ) : null}
+
             <p className="cfg-sub">SEO</p>
             <div className="cfg-grid">
               <label className="cfg-field"><span>Meta title <span className="cfg-count admin__muted">{(edit.seo.title ?? "").length}/60</span></span><input value={edit.seo.title ?? ""} onChange={(e) => setEdit({ ...edit, seo: { ...edit.seo, title: e.target.value } })} /></label>
@@ -293,7 +354,16 @@ export function ContentManager({ pages, initialSlug, supportEmail }: { pages: Pa
                   <LegalPage eyebrow={edit.eyebrow} title={edit.title || "Frequently Asked Questions"} intro={edit.intro} sections={[]} closing={faqClosing || undefined} heroBand>
                     <FaqAccordion categories={faqPreviewCategories()} />
                   </LegalPage>
-                ) : (
+                ) : isContact ? (() => {
+                  const b = contactPreviewBlocks();
+                  return (
+                    <LegalPage eyebrow={edit.eyebrow} title={edit.title || "Contact Us"} intro={edit.intro} sections={[]} closing={b.closing || undefined} heroBand>
+                      <ContactContent intro={b.intro} studio={b.studio} hours={b.hours} response={b.response}
+                        methods={{ email: b.email, whatsapp: contact?.support.whatsapp, phone: contact?.support.phone }}
+                        social={contact?.social ?? {}} formConfig={formCfg} />
+                    </LegalPage>
+                  );
+                })() : (
                   <LegalPage {...buildPreviewProps(edit, supportEmail)} />
                 )}
               </div>

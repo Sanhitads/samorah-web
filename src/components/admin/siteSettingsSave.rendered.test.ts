@@ -9,7 +9,7 @@ import { SiteSettingsForm } from "@/components/admin/SiteSettingsForm";
 
 const settings: SiteSettings = {
   brand: { name: "SAMORAH", tagline: "" },
-  support: { email: "hi@x.test", phone: "", hours: "" },
+  support: { email: "hi@x.test", phone: "", hours: "", whatsapp: "", studioAddress: "" },
   social: { instagram: "", pinterest: "", spotify: "", facebook: "" },
   seo: { titleSuffix: " · S", defaultDescription: "", ogImageUrl: "" },
   analytics: { gaId: "" },

@@ -15,7 +15,9 @@ export type FeatureKey = (typeof FEATURE_KEYS)[number];
 
 export interface SiteSettings {
   brand: { name: string; tagline: string };
-  support: { email: string; phone: string; hours: string };
+  // Customer-facing contact info — the SINGLE SOURCE the Contact page (and footer) read from.
+  // whatsapp / studioAddress are optional; empty = hidden on the page (no placeholders).
+  support: { email: string; phone: string; hours: string; whatsapp: string; studioAddress: string };
   social: { instagram: string; pinterest: string; spotify: string; facebook: string };
   seo: { titleSuffix: string; defaultDescription: string; ogImageUrl: string };
   analytics: { gaId: string };
@@ -36,7 +38,7 @@ export interface SiteSettings {
 function defaults(): SiteSettings {
   return {
     brand: { name: COMMERCE.brandName, tagline: "" },
-    support: { email: COMMERCE.support.email, phone: (COMMERCE.support as { phone?: string }).phone ?? "", hours: "" },
+    support: { email: COMMERCE.support.email, phone: (COMMERCE.support as { phone?: string }).phone ?? "", hours: "Monday – Saturday, 10:00 AM – 6:00 PM IST", whatsapp: "", studioAddress: "Bengaluru, Karnataka, India" },
     social: { instagram: "", pinterest: "", spotify: "", facebook: "" },
     seo: { titleSuffix: ` · ${COMMERCE.brandName}`, defaultDescription: "", ogImageUrl: "" },
     analytics: { gaId: process.env.NEXT_PUBLIC_GA_ID ?? "" },

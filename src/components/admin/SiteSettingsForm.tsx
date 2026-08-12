@@ -82,11 +82,13 @@ export function SiteSettingsForm({ settings }: { settings: SiteSettings }) {
         <label className="cfg-field"><span>Tagline</span><input value={s.brand.tagline} onChange={(e) => g("brand", "tagline", e.target.value)} /></label>
       </div>
 
-      <p className="cfg-sub">Support</p>
+      <p className="cfg-sub">Support &amp; contact <span className="admin__muted">· single source for the Contact page &amp; footer</span></p>
       <div className="cfg-grid">
         <label className="cfg-field"><span>Support email</span><input value={s.support.email} onChange={(e) => g("support", "email", e.target.value)} /></label>
-        <label className="cfg-field"><span>Support phone</span><input value={s.support.phone} onChange={(e) => g("support", "phone", e.target.value)} /></label>
-        <label className="cfg-field"><span>Support hours</span><input value={s.support.hours} onChange={(e) => g("support", "hours", e.target.value)} placeholder="Mon–Sat 10–6" /></label>
+        <label className="cfg-field"><span>Support phone</span><input value={s.support.phone} onChange={(e) => g("support", "phone", e.target.value)} placeholder="optional — hidden if empty" /></label>
+        <label className="cfg-field"><span>WhatsApp</span><input value={s.support.whatsapp} onChange={(e) => g("support", "whatsapp", e.target.value)} placeholder="optional — hidden if empty" /></label>
+        <label className="cfg-field"><span>Business hours</span><input value={s.support.hours} onChange={(e) => g("support", "hours", e.target.value)} placeholder="Monday – Saturday · 10:00 AM – 6:00 PM IST" /></label>
+        <label className="cfg-field"><span>Studio location</span><input value={s.support.studioAddress} onChange={(e) => g("support", "studioAddress", e.target.value)} placeholder="Bengaluru, Karnataka, India" /></label>
       </div>
 
       <p className="cfg-sub">Social links</p>

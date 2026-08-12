@@ -261,6 +261,36 @@ export const LEGAL: Record<string, { eyebrow: string; title: string; intro?: str
       ] },
     ],
   },
+  contact: {
+    // Hero shows only Title + Subtitle (no eyebrow, no hero image) — mirrors the policy pages.
+    // Editorial blocks are read BY POSITION by the /contact page:
+    // [0] Introduction · [1] Our Studio · [2] Business Hours · [3] Response Expectations · closing quote.
+    // {{studioAddress}} / {{businessHours}} resolve from Site Settings (single source of truth).
+    eyebrow: "",
+    title: "Contact Us",
+    intro: "Every conversation begins with a simple hello.",
+    sections: [
+      { heading: "Let's Begin a Conversation", body: [
+        "Whether you have a question about an order, need help choosing a fragrance, or simply want to reach out, we'd be delighted to hear from you.",
+        "Every message is read with care and responded to as thoughtfully as possible.",
+      ] },
+      { heading: "Our Studio", body: [
+        "Samorah Studio",
+        "{{studioAddress}}",
+      ] },
+      { heading: "Business Hours", body: [
+        "{{businessHours}}",
+        "Closed on Sundays & Public Holidays.",
+      ] },
+      { heading: "Response Expectations", body: [
+        "We typically respond within 1–2 business days.",
+        "During launches or festive periods, replies may take a little longer.",
+        "Thank you for your patience.",
+      ] },
+      // Closing quote — heading-less, rendered as the quiet sign-off.
+      { body: ["The finest conversations begin with curiosity — we're always listening."] },
+    ],
+  },
   privacy: {
     // Hero shows only Title + Subtitle (no eyebrow, no hero image) — the editorial policy layout.
     eyebrow: "",
