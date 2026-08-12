@@ -41,6 +41,7 @@ const NAV: NavGroup[] = [
       { label: "Terms & Conditions", href: "/admin/content/terms", icon: "❢" },
       { label: "Returns & Refund Policy", href: "/admin/content/returns-policy", icon: "↩" },
       { label: "Shipping Policy", href: "/admin/content/shipping", icon: "➜" },
+      { label: "FAQ", href: "/admin/content/faq", icon: "❓" },
       { label: "Media", href: "/admin/media", icon: "▨" },
       { label: "Navigation", href: "/admin/navigation", icon: "❰" },
       { label: "Homepage", href: "/admin/homepage", icon: "⌗" },

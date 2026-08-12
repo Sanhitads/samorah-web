@@ -5034,6 +5034,25 @@ video.asset-image {
 /* Closing statement — the page's quiet editorial signature (no card, border, or marks). */
 .legal__closing { max-width: 32ch; margin: clamp(56px, 8vh, 72px) auto 0; text-align: center; font-family: var(--font-serif, Georgia, serif); font-style: italic; font-weight: 400; font-size: clamp(1.1rem, 2.4vw, 1.4rem); line-height: 1.6; color: var(--deep-charcoal, #1A1A1A); }
 
+/* FAQ accordion — minimal editorial disclosure inside the legal body column. */
+.faq__cat { margin-top: clamp(32px, 5vh, 48px); }
+.faq__cat:first-child { margin-top: 0; }
+.faq__cat-title { font-family: var(--font-serif, Georgia, serif); font-size: 1.35rem; font-weight: 400; margin: 0 0 4px; color: var(--ink, #1f1a16); }
+.faq__list { list-style: none; margin: 0; padding: 0; }
+.faq__item { border-bottom: 1px solid rgba(31,26,22,0.1); }
+.faq__q-h { margin: 0; font: inherit; }
+.faq__q { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 16px; background: none; border: 0; padding: 16px 2px; cursor: pointer; text-align: left; font-family: var(--font-sans, sans-serif); font-size: 15px; line-height: 1.5; color: var(--ink, #1f1a16); }
+.faq__q:hover .faq__q-text { color: var(--gold-dark, #A8843C); }
+.faq__q:focus-visible { outline: 2px solid var(--gold, #c9a96e); outline-offset: 2px; border-radius: 2px; }
+.faq__icon { font-family: var(--font-sans, sans-serif); font-size: 20px; line-height: 1; color: var(--gold, #c9a96e); flex: none; }
+.faq__a { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 260ms var(--ease-out, ease); }
+.faq__a[data-open="1"] { grid-template-rows: 1fr; }
+.faq__a-inner { overflow: hidden; }
+.faq__a-inner .legal__p { font-size: 14px; margin: 0 0 10px; }
+.faq__a-inner .legal__p:last-child { margin-bottom: 16px; }
+.faq__a-inner .legal__list { margin-bottom: 16px; }
+@media (prefers-reduced-motion: reduce) { .faq__a { transition: none; } }
+
 .legal__list { list-style: none; margin: 0 0 12px; padding: 0; }
 .legal__list-item { position: relative; font-family: var(--font-sans, sans-serif); font-size: 15px; line-height: 1.8; color: var(--ink, #1f1a16); opacity: 0.86; padding-left: 20px; margin: 0 0 6px; }
 .legal__list-item::before { content: "—"; position: absolute; left: 0; color: var(--gold, #c9a96e); }

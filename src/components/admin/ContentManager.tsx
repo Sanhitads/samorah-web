@@ -3,9 +3,11 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { LegalPage } from "@/components/legal/LegalPage";
-import { injectSupportEmail, splitClosing } from "@/lib/cms/pageContent";
+import { injectSupportEmail, splitClosing, SUPPORT_EMAIL_TOKEN, SUPPORT_UNAVAILABLE } from "@/lib/cms/pageContent";
+import { FaqAccordion, type FaqCategory } from "@/components/faq/FaqAccordion";
 
-type Section = { heading?: string; body: string[] };
+type FaqItem = { q: string; a: string };
+type Section = { heading?: string; body: string[]; items?: FaqItem[] };
 type Status = "draft" | "scheduled" | "published";
 type PageForm = { slug: string; title: string; eyebrow: string; intro: string; sections: Section[]; seo: { title?: string; description?: string; ogImage?: string }; status: Status; publishAt: string; unpublishAt: string };
 type PageRow = { slug: string; title: string; status: string; live?: boolean; publishAt?: string | null; unpublishAt?: string | null; source: string };
@@ -77,7 +79,12 @@ export function ContentManager({ pages, initialSlug, supportEmail }: { pages: Pa
     if (!edit) return;
     const page = {
       slug: edit.slug, title: edit.title, eyebrow: edit.eyebrow, intro: edit.intro,
-      sections: edit.sections.map((s) => ({ heading: s.heading || undefined, body: (Array.isArray(s.body) ? s.body : String(s.body).split("\n")).map((x) => x.trim()).filter(Boolean) })),
+      sections: edit.sections.map((s) => ({
+        heading: s.heading || undefined,
+        body: (Array.isArray(s.body) ? s.body : String(s.body).split("\n")).map((x) => x.trim()).filter(Boolean),
+        // FAQ categories carry Q&A in `items` — preserve them (drop blank pairs). Non-FAQ pages have no items.
+        ...(s.items ? { items: s.items.filter((it) => (it.q || "").trim() || (it.a || "").trim()) } : {}),
+      })),
       seo: edit.seo, status: edit.status, publishAt: fromLocal(edit.publishAt), unpublishAt: fromLocal(edit.unpublishAt),
     };
     if (await post({ action: "save", page })) { setEdit(null); refresh(); }
@@ -94,6 +101,41 @@ export function ContentManager({ pages, initialSlug, supportEmail }: { pages: Pa
     const next = [...edit.sections];
     [next[i], next[j]] = [next[j], next[i]]; // swap to reorder
     setEdit({ ...edit, sections: next });
+  };
+
+  // ── FAQ editor (the `faq` slug): sections are CATEGORIES with Q&A `items`; a trailing
+  //    heading-less section is the closing quote. All ops mutate edit.sections. ──
+  const isFaq = !!edit && edit.slug === "faq";
+  const [faqCollapsed, setFaqCollapsed] = useState<Set<number>>(new Set());
+  const toggleFaqCollapse = (ci: number) => setFaqCollapsed((s) => { const n = new Set(s); n.has(ci) ? n.delete(ci) : n.add(ci); return n; });
+  const faqSplit = (secs: Section[]) => {
+    const last = secs[secs.length - 1];
+    const hasClosing = !!last && !last.heading && !Array.isArray(last.items) && (last.body?.length ?? 0) > 0;
+    return { cats: hasClosing ? secs.slice(0, -1) : secs, closing: hasClosing ? (last.body[0] ?? "") : "" };
+  };
+  const faqCats = edit ? faqSplit(edit.sections).cats : [];
+  const faqClosing = edit ? faqSplit(edit.sections).closing : "";
+  const setFaq = (cats: Section[], closing: string) => edit && setEdit({ ...edit, sections: [...cats, ...(closing.trim() ? [{ body: [closing] } as Section] : [])] });
+  const faqSetCats = (fn: (c: Section[]) => Section[]) => setFaq(fn(faqCats.map((c) => ({ ...c, items: [...(c.items ?? [])] }))), faqClosing);
+  const faqAddCategory = () => faqSetCats((c) => [...c, { heading: "New category", body: [], items: [] }]);
+  const faqDelCategory = (ci: number) => faqSetCats((c) => c.filter((_, i) => i !== ci));
+  const faqMoveCategory = (ci: number, dir: -1 | 1) => faqSetCats((c) => { const j = ci + dir; if (j < 0 || j >= c.length) return c; const n = [...c]; [n[ci], n[j]] = [n[j], n[ci]]; return n; });
+  const faqSetCategoryName = (ci: number, name: string) => faqSetCats((c) => c.map((s, i) => (i === ci ? { ...s, heading: name } : s)));
+  const faqAddQ = (ci: number) => faqSetCats((c) => c.map((s, i) => (i === ci ? { ...s, items: [...(s.items ?? []), { q: "", a: "" }] } : s)));
+  const faqDelQ = (ci: number, qi: number) => faqSetCats((c) => c.map((s, i) => (i === ci ? { ...s, items: (s.items ?? []).filter((_, k) => k !== qi) } : s)));
+  const faqSetQ = (ci: number, qi: number, patch: Partial<FaqItem>) => faqSetCats((c) => c.map((s, i) => (i === ci ? { ...s, items: (s.items ?? []).map((it, k) => (k === qi ? { ...it, ...patch } : it)) } : s)));
+  const faqMoveQ = (ci: number, qi: number, dir: -1 | 1) => faqSetCats((c) => c.map((s, i) => { if (i !== ci) return s; const its = [...(s.items ?? [])]; const j = qi + dir; if (j < 0 || j >= its.length) return s; [its[qi], its[j]] = [its[j], its[qi]]; return { ...s, items: its }; }));
+  const faqMoveQToCat = (ci: number, qi: number, target: number) => faqSetCats((c) => {
+    if (target === ci || target < 0 || target >= c.length) return c;
+    const item = (c[ci].items ?? [])[qi];
+    if (!item) return c;
+    return c.map((s, i) => (i === ci ? { ...s, items: (s.items ?? []).filter((_, k) => k !== qi) } : i === target ? { ...s, items: [...(s.items ?? []), item] } : s));
+  });
+  const faqPreviewCategories = (): FaqCategory[] => {
+    const email = (supportEmail || "").trim() || SUPPORT_UNAVAILABLE;
+    return faqCats
+      .filter((c) => (c.items?.length ?? 0) > 0 || (c.heading ?? "").trim())
+      .map((c) => ({ category: c.heading ?? "", items: (c.items ?? []).filter((it) => it.q.trim() || it.a.trim()).map((it) => ({ q: it.q, a: it.a.split(SUPPORT_EMAIL_TOKEN).join(email) })) }));
   };
 
   // Deep-link support (e.g. /admin/content/privacy) — open that page's editor once on mount.
@@ -158,28 +200,76 @@ export function ContentManager({ pages, initialSlug, supportEmail }: { pages: Pa
             <p className="cfg-hint">Scheduled pages go live automatically at “publish at” and hide at “unpublish at” — no manual step.</p>
             <label className="cfg-field"><span>Intro</span><input value={edit.intro} onChange={(e) => setEdit({ ...edit, intro: e.target.value })} /></label>
 
-            <p className="cfg-sub">Sections <span className="admin__muted">· use “- ” at the start of a line for a bullet</span></p>
-            {edit.sections.map((s, i) => {
-              const bodyText = Array.isArray(s.body) ? s.body.join("\n") : s.body;
-              return (
-                <div key={i} className="cms-section">
-                  <div className="cms-section__bar">
-                    <span className="admin__muted">Section {i + 1}{s.heading ? ` · ${s.heading}` : " · (no heading)"}</span>
-                    <div className="ff-actions">
-                      <button type="button" className="ff-btn" disabled={i === 0} aria-label="Move section up" onClick={() => moveSection(i, -1)}>↑</button>
-                      <button type="button" className="ff-btn" disabled={i === edit.sections.length - 1} aria-label="Move section down" onClick={() => moveSection(i, 1)}>↓</button>
+            {isFaq ? (
+              <>
+                <p className="cfg-sub">FAQ categories &amp; questions <span className="admin__muted">· one accordion open at a time on the page</span></p>
+                {faqCats.map((cat, ci) => {
+                  const collapsed = faqCollapsed.has(ci);
+                  return (
+                    <div key={ci} className="cms-faq-cat">
+                      <div className="cms-section__bar">
+                        <button type="button" className="ff-btn" aria-expanded={!collapsed} aria-label={collapsed ? "Expand category" : "Collapse category"} onClick={() => toggleFaqCollapse(ci)}>{collapsed ? "▸" : "▾"}</button>
+                        <input className="cms-faq-cat__name" value={cat.heading ?? ""} onChange={(e) => faqSetCategoryName(ci, e.target.value)} placeholder="Category name" />
+                        <div className="ff-actions">
+                          <button type="button" className="ff-btn" disabled={ci === 0} aria-label="Move category up" onClick={() => faqMoveCategory(ci, -1)}>↑</button>
+                          <button type="button" className="ff-btn" disabled={ci === faqCats.length - 1} aria-label="Move category down" onClick={() => faqMoveCategory(ci, 1)}>↓</button>
+                          <button type="button" className="ff-btn ff-btn--danger" onClick={() => faqDelCategory(ci)}>Delete</button>
+                        </div>
+                      </div>
+                      {!collapsed ? (
+                        <div className="cms-faq-qs">
+                          {(cat.items ?? []).map((it, qi) => (
+                            <div key={qi} className="cms-faq-q">
+                              <div className="cms-section__bar">
+                                <span className="admin__muted">Q{qi + 1}</span>
+                                <div className="ff-actions">
+                                  <button type="button" className="ff-btn" disabled={qi === 0} aria-label="Move question up" onClick={() => faqMoveQ(ci, qi, -1)}>↑</button>
+                                  <button type="button" className="ff-btn" disabled={qi === (cat.items?.length ?? 0) - 1} aria-label="Move question down" onClick={() => faqMoveQ(ci, qi, 1)}>↓</button>
+                                  <select className="cms-faq-move" value={ci} aria-label="Move question to another category" onChange={(e) => faqMoveQToCat(ci, qi, Number(e.target.value))}>
+                                    {faqCats.map((c2, i2) => <option key={i2} value={i2}>{i2 === ci ? "Move to…" : `→ ${c2.heading || `Category ${i2 + 1}`}`}</option>)}
+                                  </select>
+                                  <button type="button" className="ff-btn ff-btn--danger" onClick={() => faqDelQ(ci, qi)}>Remove</button>
+                                </div>
+                              </div>
+                              <input value={it.q} onChange={(e) => faqSetQ(ci, qi, { q: e.target.value })} placeholder="Question" />
+                              <textarea rows={3} value={it.a} onChange={(e) => faqSetQ(ci, qi, { a: e.target.value })} placeholder="Answer — one line per paragraph; “- ” for a bullet; {{supportEmail}} resolves from Settings" />
+                            </div>
+                          ))}
+                          <button type="button" className="ff-btn" onClick={() => faqAddQ(ci)}>+ question</button>
+                        </div>
+                      ) : null}
                     </div>
-                  </div>
-                  <input value={s.heading ?? ""} onChange={(e) => setSection(i, { heading: e.target.value })} placeholder="Section heading (leave blank for the closing statement)" />
-                  <textarea rows={3} value={bodyText} onChange={(e) => setSection(i, { body: e.target.value.split("\n") })} placeholder="One paragraph per line" />
-                  <div className="cms-section__foot">
-                    <span className="cfg-count admin__muted">{String(bodyText).length} characters</span>
-                    <button type="button" className="ff-btn ff-btn--danger" onClick={() => setEdit({ ...edit, sections: edit.sections.filter((_, j) => j !== i) })}>Remove section</button>
-                  </div>
-                </div>
-              );
-            })}
-            <button type="button" className="ff-btn" onClick={() => setEdit({ ...edit, sections: [...edit.sections, { heading: "", body: [""] }] })}>+ section</button>
+                  );
+                })}
+                <button type="button" className="ff-btn" onClick={faqAddCategory}>+ category</button>
+                <label className="cfg-field" style={{ marginTop: 12 }}><span>Closing quote</span><input value={faqClosing} onChange={(e) => setFaq(faqCats, e.target.value)} placeholder="Questions often begin conversations…" /></label>
+              </>
+            ) : (
+              <>
+                <p className="cfg-sub">Sections <span className="admin__muted">· use “- ” at the start of a line for a bullet</span></p>
+                {edit.sections.map((s, i) => {
+                  const bodyText = Array.isArray(s.body) ? s.body.join("\n") : s.body;
+                  return (
+                    <div key={i} className="cms-section">
+                      <div className="cms-section__bar">
+                        <span className="admin__muted">Section {i + 1}{s.heading ? ` · ${s.heading}` : " · (no heading)"}</span>
+                        <div className="ff-actions">
+                          <button type="button" className="ff-btn" disabled={i === 0} aria-label="Move section up" onClick={() => moveSection(i, -1)}>↑</button>
+                          <button type="button" className="ff-btn" disabled={i === edit.sections.length - 1} aria-label="Move section down" onClick={() => moveSection(i, 1)}>↓</button>
+                        </div>
+                      </div>
+                      <input value={s.heading ?? ""} onChange={(e) => setSection(i, { heading: e.target.value })} placeholder="Section heading (leave blank for the closing statement)" />
+                      <textarea rows={3} value={bodyText} onChange={(e) => setSection(i, { body: e.target.value.split("\n") })} placeholder="One paragraph per line" />
+                      <div className="cms-section__foot">
+                        <span className="cfg-count admin__muted">{String(bodyText).length} characters</span>
+                        <button type="button" className="ff-btn ff-btn--danger" onClick={() => setEdit({ ...edit, sections: edit.sections.filter((_, j) => j !== i) })}>Remove section</button>
+                      </div>
+                    </div>
+                  );
+                })}
+                <button type="button" className="ff-btn" onClick={() => setEdit({ ...edit, sections: [...edit.sections, { heading: "", body: [""] }] })}>+ section</button>
+              </>
+            )}
 
             <p className="cfg-sub">SEO</p>
             <div className="cfg-grid">
@@ -199,7 +289,13 @@ export function ContentManager({ pages, initialSlug, supportEmail }: { pages: Pa
             <aside className="cms-edit__preview" aria-label="Live preview">
               <p className="cms-edit__preview-label">Live preview <span className="admin__muted">· reflects unsaved edits</span></p>
               <div className="cms-edit__preview-frame">
-                <LegalPage {...buildPreviewProps(edit, supportEmail)} />
+                {isFaq ? (
+                  <LegalPage eyebrow={edit.eyebrow} title={edit.title || "Frequently Asked Questions"} intro={edit.intro} sections={[]} closing={faqClosing || undefined} heroBand>
+                    <FaqAccordion categories={faqPreviewCategories()} />
+                  </LegalPage>
+                ) : (
+                  <LegalPage {...buildPreviewProps(edit, supportEmail)} />
+                )}
               </div>
             </aside>
             </div>

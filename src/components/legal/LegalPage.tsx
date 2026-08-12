@@ -5,6 +5,7 @@ import { groupBody } from "@/lib/cms/pageContent";
 export interface LegalSection {
   heading?: string;
   body: string[]; // paragraphs; consecutive "- " lines render as a semantic bullet list
+  items?: { q: string; a: string }[]; // FAQ categories carry Q&A here (rendered as an accordion, not by LegalPage)
 }
 
 export function LegalPage({ eyebrow, title, intro, sections, footNote, children, heroBand, effectiveDate, lastUpdated, closing }: {

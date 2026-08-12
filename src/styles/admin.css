@@ -1153,6 +1153,14 @@ a.adm-badge[data-b="incident"]:hover { background: rgba(168,68,58,0.22); }
 .cms-section__foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .cfg-count { font-family: var(--font-sans); font-size: 11px; }
 
+/* FAQ editor — categories with Q&A (reuses the ContentManager modal + save/preview flow). */
+.cms-faq-cat { border: 1px solid var(--ad-hair); border-radius: 5px; padding: 12px; margin-bottom: 10px; }
+.cms-faq-cat__name { flex: 1; min-width: 0; padding: 6px 8px; font-family: var(--font-sans); font-size: 13px; font-weight: 600; border: 1px solid var(--ad-hair); border-radius: 3px; background: #fff; }
+.cms-faq-qs { margin-top: 10px; padding-left: 10px; border-left: 2px solid var(--ad-hair); display: flex; flex-direction: column; gap: 8px; }
+.cms-faq-q { display: flex; flex-direction: column; gap: 6px; padding: 8px; background: rgba(31,26,22,0.02); border-radius: 4px; }
+.cms-faq-q input, .cms-faq-q textarea { width: 100%; padding: 7px 9px; font-family: var(--font-sans); font-size: 13px; border: 1px solid var(--ad-hair); border-radius: 3px; box-sizing: border-box; }
+.cms-faq-move { padding: 4px 6px; font-family: var(--font-sans); font-size: 11px; border: 1px solid var(--ad-hair); border-radius: 3px; background: #fff; max-width: 120px; }
+
 /* Side-by-side content editor: form on the left, live public-renderer preview on the right.
    The preview is the same <LegalPage> the storefront uses, driven by unsaved form state. */
 .om-modal__card--wide.cms-edit-card { max-width: min(1180px, 96vw); }

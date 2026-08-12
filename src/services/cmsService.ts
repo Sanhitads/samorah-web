@@ -11,7 +11,13 @@ import { LEGAL } from "@/config/legalContent";
 import { isLive } from "@/lib/cms/publishable";
 import { snapshotRevision as snapshotCmsRevision, listRevisions as listCmsRevisions, getRevisionSnapshot } from "@/services/cms/revisions";
 
-export interface PageSection { heading?: string; body: string[] }
+/** A single FAQ question/answer. Answers may contain "\n"-separated lines (rendered as
+ *  paragraphs; "- " lines become bullets). Used only by the FAQ page — see PageSection.items. */
+export interface FaqItem { q: string; a: string }
+/** A content section. For legal/policy pages: heading + body paragraphs. For the FAQ page a
+ *  section is a CATEGORY: `heading` = category name, `items` = its questions (additive; other
+ *  pages never set `items`, so they are unaffected — stored in the existing sections JSONB). */
+export interface PageSection { heading?: string; body: string[]; items?: FaqItem[] }
 export type PageStatus = "draft" | "scheduled" | "published";
 export interface CmsPage {
   slug: string;

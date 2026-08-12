@@ -113,14 +113,53 @@ export const LEGAL: Record<string, { eyebrow: string; title: string; intro?: str
     ],
   },
   faq: {
-    eyebrow: "Help",
-    title: "Frequently Asked",
+    // Hero shows only Title + Subtitle (no eyebrow, no hero image) — mirrors the policy pages.
+    // FAQ sections are CATEGORIES: heading = category, items = its questions (rendered as an
+    // accordion). The Contact answer uses {{supportEmail}} (resolved from Site Settings). The final
+    // heading-less section is the closing quote.
+    eyebrow: "",
+    title: "Frequently Asked Questions",
+    intro: "Helpful answers before you ask.",
     sections: [
-      { heading: "Are your candles hand-made?", body: ["Yes — every piece is poured, finished and inspected by hand in small batches."] },
-      { heading: "How long do they burn?", body: ["Burn time varies by size and vessel; each product page lists its approximate burn time."] },
-      { heading: "Do you ship across India?", body: ["Yes. See our Shipping page for timelines and rates."] },
-      { heading: "Can I return an order?", body: ["Yes, within the eligible window — see Returns & Refunds."] },
-      { heading: "How do I track my order?", body: ["Use the tracking link in your dispatch email, or sign in and open the order from Your Account."] },
+      { heading: "Orders & Delivery", body: [], items: [
+        { q: "How long does delivery take?", a: "Most orders arrive within 2–5 business days, depending on your location. Delivery estimates begin after dispatch." },
+        { q: "Do you ship internationally?", a: "At present, Samorah ships only within India. International shipping will be announced when available." },
+        { q: "Can I change or cancel my order?", a: "Changes or cancellations are possible only before your order has been dispatched. Once shipping has begun, the order is already in transit." },
+        { q: "Will my order arrive safely?", a: "Every order is carefully packed to protect both the vessel and its fragrance during transit." },
+        { q: "Is this suitable for gifting?", a: "Yes. Our products are designed to feel complete as gifts and are presented in premium packaging." },
+        { q: "How can I track my order?", a: "Once your order has been dispatched, you'll receive tracking details via email or SMS (where available)." },
+      ] },
+      { heading: "Products & Fragrance", body: [], items: [
+        { q: "How strong is the fragrance?", a: "Our fragrances are designed to be present without overwhelming the space. They reveal themselves gradually rather than dominating the room." },
+        { q: "How do I choose the right fragrance?", a: "Choose the feeling before the fragrance.\nWhether you're seeking calm, warmth, freshness or quiet comfort, the scent follows the mood." },
+        { q: "Can I use candles and room sprays together?", a: "Yes.\nThey are designed to complement each other.\n- Candle → depth and warmth\n- Room Spray → immediate atmosphere" },
+        { q: "How long do your candles burn?", a: "Burn time depends on the vessel size. Every candle is created for slow, intentional use rather than rapid fragrance release." },
+        { q: "Why does the scent feel softer than cheaper candles?", a: "Luxury fragrance is layered rather than artificially intense. It develops naturally throughout the room instead of producing an immediate overpowering scent." },
+        { q: "Are your products handmade?", a: "Yes.\nMany of our products are handcrafted, so slight variations in colour, finish or texture are part of their character." },
+      ] },
+      { heading: "Candle Care & Safety", body: [], items: [
+        { q: "Why is the first burn important?", a: "The first burn helps create an even wax memory, allowing future burns to melt evenly." },
+        { q: "How long should I burn my candle?", a: "Generally between 1–3 hours, allowing the wax surface to melt evenly." },
+        { q: "Should I trim the wick?", a: "Yes.\nTrim the wick before every burn for a cleaner flame and better performance." },
+        { q: "Is it safe to burn candles every day?", a: "Yes, when used responsibly and following the Candle Care recommendations." },
+        { q: "Can I use room spray on fabric?", a: "Only on suitable fabrics.\nAlways test a small hidden area first." },
+        { q: "Why does fragrance smell different in different rooms?", a: "Room size, airflow, temperature and furnishings all influence how fragrance develops." },
+      ] },
+      { heading: "Returns & Support", body: [], items: [
+        { q: "What if my product arrives damaged?", a: "Please contact us within 48 hours with photographs of the product and packaging. We'll review your request and help resolve it promptly." },
+        { q: "Can I return a product if I simply don't like the fragrance?", a: "Because fragrance is highly personal and products cannot be resold once opened, we generally cannot accept returns based on scent preference alone." },
+        { q: "Do handcrafted products vary slightly?", a: "Yes.\nEspecially with ceramic and terracotta vessels, every piece carries subtle differences that make it unique." },
+        { q: "How do I contact support?", a: "Email us anytime at:\n{{supportEmail}}\nWe'll respond as quickly as possible." },
+      ] },
+      { heading: "General", body: [], items: [
+        { q: "How should a home smell?", a: "Not constantly — intentionally.\nA fragrance should appear, evolve and gently fade." },
+        { q: "How many fragrances should I use throughout my home?", a: "Different rooms can carry different moods, much like chapters within the same story." },
+        { q: "When should I choose a candle instead of a room spray?", a: "Candles create atmosphere over time.\nRoom sprays refresh a space immediately.\nMany customers enjoy using both together." },
+        { q: "Where are Samorah products made?", a: "Samorah products are thoughtfully designed and handcrafted in India." },
+        { q: "Are your fragrances safe for everyday home use?", a: "Yes.\nWhen used according to the care instructions, our products are intended for normal home fragrance use." },
+      ] },
+      // Closing quote — heading-less, rendered as the quiet sign-off.
+      { body: ["Questions often begin conversations — we're always happy to help with both."] },
     ],
   },
   "returns-policy": {
