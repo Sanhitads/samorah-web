@@ -19,6 +19,7 @@ const settings: SiteSettings = {
   storeNotice: { text: "", active: false },
   costs: { packagingPerOrder: 20, paymentFeePercent: 2, shippingCostPerOrder: 60 },
   dispatch: { cutoffTime: "14:00", slaHours: 24 },
+  shipping: { freeThreshold: 1499 },
 };
 
 const q = (c: HTMLElement, s: string) => c.querySelector(s) as HTMLElement | null;

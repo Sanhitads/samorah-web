@@ -5,6 +5,7 @@ import { getPromoBanner } from "@/services/couponAdminService";
 import { StoreChrome } from "@/components/layout/StoreChrome";
 import { Footer } from "@/components/layout/Footer";
 import { getSiteSettings } from "@/services/siteSettingsService";
+import { ShippingConfigProvider } from "@/components/commerce/ShippingConfigProvider";
 import { getNavigation, getFooterMeta } from "@/services/navigationService";
 import { requireStaff } from "@/lib/auth/requireStaff";
 import { ClearPreviewLink } from "@/components/page/ClearPreviewLink";
@@ -49,7 +50,7 @@ export default async function StoreLayout({
   const showBanner = banner.enabled && !!banner.message;
 
   return (
-    <>
+    <ShippingConfigProvider freeShippingThresholdInr={settings.shipping.freeThreshold}>
       {/* When the promo banner shows, widen the top-bars offset so the FLOATING header sits under BOTH
           the announcement bar and the banner (each 38px) instead of overlapping the banner. */}
       {showBanner ? <style dangerouslySetInnerHTML={{ __html: ":root{--top-bars:76px}" }} /> : null}
@@ -64,6 +65,6 @@ export default async function StoreLayout({
       <StoreChrome branches={nav.branches} />
       {children}
       <Footer sections={nav.footer} poetic={footerMeta.poetic} copyright={footerMeta.copyright} madeIn={footerMeta.madeIn} />
-    </>
+    </ShippingConfigProvider>
   );
 }

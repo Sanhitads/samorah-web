@@ -16,6 +16,7 @@ import {
 import { useCompositionStore } from "@/store/useCompositionStore";
 import { composeComposition } from "@/lib/bundle";
 import { buildCartSummary } from "@/lib/cart";
+import { useFreeShippingThreshold } from "@/components/commerce/ShippingConfigProvider";
 import { formatPaise } from "@/lib/money";
 
 const NUM_WORD = ["Zero", "One", "Two", "Three", "Four", "Five", "Six"];
@@ -54,7 +55,8 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
   // a customer had anything in their bag. `useStore` (BRD §24.1) returns undefined until mounted.
   const items = useStore(useCartStore, (s) => s.items) ?? [];
   const count = useStore(useCartStore, selectCartCount) ?? 0;
-  const summary = buildCartSummary(items);
+  const freeThreshold = useFreeShippingThreshold();
+  const summary = buildCartSummary(items, freeThreshold);
   const subtotal = summary.subtotal;
   const compositionDiscount = summary.discount;
   const total = summary.total;

@@ -109,20 +109,23 @@ export const SHIPPING = {
 };
 
 /** Estimated standard shipping for a goods total (post-discount). The Shiprocket
- *  rate API (Beat 2) becomes the real implementation; this stays the fallback. */
-export function estimateShipping(goodsTotal: number): number {
+ *  rate API (Beat 2) becomes the real implementation; this stays the fallback.
+ *  `freeThresholdInr` defaults to the code constant; server callers pass the
+ *  admin-editable Site Settings value so the charge tracks configuration. */
+export function estimateShipping(goodsTotal: number, freeThresholdInr: number = SHIPPING.freeThreshold): number {
   if (goodsTotal <= 0) return 0;
-  return goodsTotal >= SHIPPING.freeThreshold ? 0 : SHIPPING.flatRate;
+  return goodsTotal >= freeThresholdInr ? 0 : SHIPPING.flatRate;
 }
 
-/** The free-shipping threshold as a formatted rupee string ("₹1,499"). */
-export function freeShippingLabel(): string {
-  return `${COMMERCE.currencySymbol}${SHIPPING.freeThreshold.toLocaleString("en-IN")}`;
+/** The free-shipping threshold as a formatted rupee string ("₹1,499"). Defaults to
+ *  the code constant; pass the Site Settings value to reflect admin configuration. */
+export function freeShippingLabel(freeThresholdInr: number = SHIPPING.freeThreshold): string {
+  return `${COMMERCE.currencySymbol}${freeThresholdInr.toLocaleString("en-IN")}`;
 }
 
 /** The one canonical shipping sentence read by every surface. */
-export function shippingPolicySentence(): string {
-  return `Complimentary standard shipping within India on orders over ${freeShippingLabel()}.`;
+export function shippingPolicySentence(freeThresholdInr: number = SHIPPING.freeThreshold): string {
+  return `Complimentary standard shipping within India on orders over ${freeShippingLabel(freeThresholdInr)}.`;
 }
 
 // ── Invoice (Financial-Year numbering — allocated on payment success) ─────────

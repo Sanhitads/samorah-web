@@ -93,7 +93,7 @@ export const AIR_SECTION_POSITIONS: { value: string; label: string; order: numbe
  *  Composition / Shipping are visible and editable from the first open (the admin can edit / add / remove). */
 export const AIR_ACCORDION_DEFAULTS: { title: string; body: string }[] = [
   { title: "Composition", body: "A 100ml room & linen mist. Alcohol-free, skin-safe formula, made with premium fragrance and essential oils. Mist lightly into the air, or over linen and soft furnishings, and let it settle." },
-  { title: "Shipping & Exchanges", body: "Dispatched within 2–3 business days. Complimentary standard shipping within India on orders over ₹1,499. Returns accepted within 48 hours of delivery for damaged or incorrect items." },
+  { title: "Shipping & Exchanges", body: "Dispatched within 2–3 business days. Complimentary standard shipping within India on qualifying orders. Returns accepted within 48 hours of delivery for damaged or incorrect items." },
 ];
 
 export interface HourGroup {

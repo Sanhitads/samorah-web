@@ -91,6 +91,22 @@ describe("commerce engine — GST-compliant totals (paise)", () => {
     expect(computeOrderTotals([line("a", 1498)]).freeShipping).toBe(false);
   });
 
+  it("honours an admin-configured free-shipping threshold override (single source of truth)", () => {
+    // ₹1,200 is charged under the default ₹1,499…
+    const dflt = computeOrderTotals([line("a", 1200)]);
+    expect(dflt.freeShipping).toBe(false);
+    expect(dflt.freeShippingRemaining).toBe(29900); // (1499 − 1200) × 100 paise
+    // …but ships free once the threshold is lowered to ₹1,000.
+    const lowered = computeOrderTotals([line("a", 1200)], { freeShippingThresholdInr: 1000 });
+    expect(lowered.freeShipping).toBe(true);
+    expect(lowered.shipping).toBe(0);
+    expect(lowered.freeShippingRemaining).toBe(0);
+    // Raising the threshold makes a previously-free ₹1,600 order charged again.
+    const raised = computeOrderTotals([line("a", 1600)], { freeShippingThresholdInr: 2000 });
+    expect(raised.freeShipping).toBe(false);
+    expect(raised.freeShippingRemaining).toBe(40000); // (2000 − 1600) × 100
+  });
+
   it("inter-state place of supply → IGST, intra-state → CGST+SGST", () => {
     const inter = computeOrderTotals([line("a", 899)], { state: AWAY });
     expect(inter.interState).toBe(true);

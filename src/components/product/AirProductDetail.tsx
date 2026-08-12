@@ -22,15 +22,17 @@ export function AirProductDetail({
   volume,
   others,
   preview = false,
+  freeShippingThresholdInr,
 }: {
   hour: HourEntry;
   group: HourGroup;
   volume: AirVolume;
   others: HourEntry[];
   preview?: boolean;
+  freeShippingThresholdInr?: number;
 }) {
   bootstrapPlatform();
-  const editorial = buildAirEditorial({ hour, volume, others });
+  const editorial = buildAirEditorial({ hour, volume, others, freeShippingThresholdInr });
   const category = group.kind === "room" ? "Room Spray" : "Linen Spray";
 
   // Volume numbering — the admin's chapter position drives the number (VOL. I.4); otherwise it falls

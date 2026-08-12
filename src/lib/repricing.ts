@@ -10,6 +10,7 @@ import { getHourBySlug, airProductType } from "@/config/theHours";
 import { effectivePrice, isOnSale } from "@/lib/pricing";
 import { computeOrderTotals, type CommerceLine, type OrderTotals } from "@/lib/commerce";
 import { loadCouponRegistry, customerHasPaidOrder } from "@/services/couponService";
+import { getFreeShippingThresholdInr } from "@/services/siteSettingsService";
 import { BUNDLE_SIZE } from "@/lib/bundle";
 import { COMMERCE } from "@/config/commerce";
 
@@ -180,6 +181,9 @@ export async function repriceCart(items: ClientCartLine[], state?: string, coupo
   if (couponRegistry.some((c) => c.eligibility === "first_order") && (identity?.userId || identity?.email)) {
     firstOrder = !(await customerHasPaidOrder(identity.userId, identity.email));
   }
-  const totals = computeOrderTotals(lines, { state, couponCode, couponRegistry, firstOrder });
+  // Free-shipping threshold from admin Site Settings (money-critical single source of truth) — the
+  // authoritative charge tracks configuration; falls back to the code constant inside computeOrderTotals.
+  const freeShippingThresholdInr = await getFreeShippingThresholdInr();
+  const totals = computeOrderTotals(lines, { state, couponCode, couponRegistry, firstOrder, freeShippingThresholdInr });
   return { valid: true, lines, details, totals };
 }

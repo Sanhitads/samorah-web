@@ -14,10 +14,10 @@ export type { OrderTotals };
 export function calculateOrderTotals(
   items: { key: string; name: string; price: number; qty: number; productType?: string; compositionId?: string }[],
   state?: string,
-  opts?: { giftCard?: number; couponCode?: string },
+  opts?: { giftCard?: number; couponCode?: string; freeShippingThresholdInr?: number },
 ): OrderTotals {
   const lines: CommerceLine[] = toCommerceLines(items);
-  return computeOrderTotals(lines, { state, giftCard: opts?.giftCard, couponCode: opts?.couponCode });
+  return computeOrderTotals(lines, { state, giftCard: opts?.giftCard, couponCode: opts?.couponCode, freeShippingThresholdInr: opts?.freeShippingThresholdInr });
 }
 
 // ── Address (India) ───────────────────────────────────────────────────────────

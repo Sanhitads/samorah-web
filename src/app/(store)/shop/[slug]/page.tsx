@@ -8,6 +8,7 @@ import { buildCandleEditorial, buildProductArtist, applyCandleViewOverrides, typ
 import { chapterTheme } from "@/lib/chapterPage";
 import { productLd } from "@/lib/seo/productLd";
 import { getEditionMap } from "@/services/collectionService";
+import { getSiteSettings } from "@/services/siteSettingsService";
 import { AirProductDetail } from "@/components/product/AirProductDetail";
 import { CandleProductDetail } from "@/components/product/CandleProductDetail";
 import { getAirVolumes, getHourBySlug } from "@/config/theHours";
@@ -69,7 +70,8 @@ export default async function ProductRoute({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const product = await getProductBySlug(slug);
+  // Free-shipping threshold from admin Site Settings — the house PDP "Shipping" copy tracks it (single source).
+  const [product, { shipping: shipCfg }] = await Promise.all([getProductBySlug(slug), getSiteSettings()]);
   if (!product) {
     // Air products live in config/theHours (no DB rows yet) — same UI + builder.
     const air = getHourBySlug(slug);
@@ -77,7 +79,7 @@ export default async function ProductRoute({
     const others = air.volume.groups
       .flatMap((g) => g.hours)
       .filter((h) => h.productSlug !== slug);
-    return <AirProductDetail hour={air.hour} group={air.group} volume={air.volume} others={others} />;
+    return <AirProductDetail hour={air.hour} group={air.group} volume={air.volume} others={others} freeShippingThresholdInr={shipCfg.freeThreshold} />;
   }
   // Air products (room / linen fresheners) render the air PDP — now from the DB, not config.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -85,7 +87,7 @@ export default async function ProductRoute({
   if (AIR_PRODUCT_TYPES.includes(dbp.product_type)) {
     const siblings = dbp.collection?.id ? await getAirSiblings(dbp.collection.id, dbp.id) : [];
     const { hour, group, volume, others } = buildAirViewFromDb(dbp, siblings);
-    return <AirProductDetail hour={hour} group={group} volume={volume} others={others} />;
+    return <AirProductDetail hour={hour} group={group} volume={volume} others={others} freeShippingThresholdInr={shipCfg.freeThreshold} />;
   }
 
   const raw = product as unknown as ProductInput & {
@@ -111,7 +113,7 @@ export default async function ProductRoute({
   const artist = buildProductArtist(product);
   const pdpContent = ((product as { pdp_content?: CandlePdpContent | null }).pdp_content) ?? undefined;
   applyCandleViewOverrides(p, pdpContent); // edition / collection-type / per-size burn time overrides
-  const editorial = buildCandleEditorial({ view: p, artist, related, content: pdpContent });
+  const editorial = buildCandleEditorial({ view: p, artist, related, content: pdpContent, freeShippingThresholdInr: shipCfg.freeThreshold });
   const palette = pdpContent?.palette || chapterTheme(p.chapterSlug);
   const ld = productLd({ name: p.name, slug: p.slug, description: p.tagline, gallery: p.gallery, priceLabel: p.priceLabel, variants: p.variants });
 

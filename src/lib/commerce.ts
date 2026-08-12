@@ -109,6 +109,11 @@ export interface ComputeOpts {
   couponCode?: string;
   couponRegistry?: Coupon[]; // server injects DB-loaded active coupons; defaults to config
   firstOrder?: boolean; // customer-eligibility context (Phase 2 #14); undefined = identity unknown
+  /** Free-shipping threshold in RUPEES. Server/client injects the admin-editable Site
+   *  Settings value; defaults to the code constant (SHIPPING.freeThreshold) so pure
+   *  callers and tests are unaffected. Single source of truth: same value drives the
+   *  charge here, the cart hint, and the policy copy. */
+  freeShippingThresholdInr?: number;
 }
 
 /** The full GST-compliant order totals (paise) for a set of lines. */
@@ -158,11 +163,12 @@ export function computeOrderTotals(lines: CommerceLine[], opts: ComputeOpts = {}
   const goodsGst = breakdown.reduce((s, l) => s + l.gst, 0);
 
   // Shipping — a taxable composite supply; GST at the principal rate.
-  const freeThreshold = toPaise(SHIPPING.freeThreshold);
+  const freeThresholdInr = opts.freeShippingThresholdInr ?? SHIPPING.freeThreshold;
+  const freeThreshold = toPaise(freeThresholdInr);
   // Free when a promo grants it, the threshold is met, OR there's nothing to ship
   // (a fully-discounted / empty order carries no shipping and therefore no GST).
   const freeShip = promo.freeShipping || goodsTotal >= freeThreshold || goodsTotal <= 0;
-  const flatShipping = toPaise(estimateShipping(SHIPPING.freeThreshold - 1)); // the flat rate that would apply
+  const flatShipping = toPaise(estimateShipping(freeThresholdInr - 1, freeThresholdInr)); // the flat rate that would apply
   const shipping = freeShip ? 0 : flatShipping;
   // What a free-shipping PROMO actually saved (0 if the order would ship free anyway) — the redemption
   // benefit for a free-shipping coupon (points 8/10). goodsTotal>0 && <threshold ⇒ shipping would apply.

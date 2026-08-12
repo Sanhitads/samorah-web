@@ -4,6 +4,7 @@
  * cart / checkout / invoice never drift. GST-inclusive throughout.
  */
 import { computeOrderTotals, toCommerceLines } from "@/lib/commerce";
+import { SHIPPING } from "@/config/commerce";
 
 /** The minimal cart-line shape the summary needs (CartItem satisfies it). */
 export interface SummaryLine {
@@ -27,9 +28,11 @@ export interface CartSummary {
   total: number; // goodsTotal + shipping
 }
 
-/** Build the cart summary from the cart lines. */
-export function buildCartSummary(items: SummaryLine[]): CartSummary {
-  const t = computeOrderTotals(toCommerceLines(items));
+/** Build the cart summary from the cart lines. `freeThresholdInr` (admin-configured, from
+ *  the ShippingConfig context) keeps the cart's free-shipping hint in step with the server
+ *  charge; defaults to the code constant. */
+export function buildCartSummary(items: SummaryLine[], freeThresholdInr: number = SHIPPING.freeThreshold): CartSummary {
+  const t = computeOrderTotals(toCommerceLines(items), { freeShippingThresholdInr: freeThresholdInr });
   return {
     subtotal: t.subtotal,
     discount: t.discount,

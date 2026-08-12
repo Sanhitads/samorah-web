@@ -3,6 +3,7 @@ import { requireCapability } from "@/lib/auth/requireStaff";
 import { updateSiteSettings, type SiteSettings } from "@/services/siteSettingsService";
 import { validateCosts } from "@/lib/settings/costValidation";
 import { validateDispatch } from "@/lib/settings/dispatchValidation";
+import { validateShipping } from "@/lib/settings/shippingValidation";
 
 /** POST /api/admin/settings/site { patch } — general site settings. shipping.configure. */
 export const runtime = "nodejs";
@@ -34,6 +35,12 @@ export async function POST(request: Request) {
   if (body.patch.dispatch) {
     const d = body.patch.dispatch;
     const errors = validateDispatch({ cutoffTime: String(d.cutoffTime), slaHours: Number(d.slaHours) });
+    if (errors.length) return NextResponse.json({ error: errors[0].message, fieldErrors: errors }, { status: 422 });
+  }
+
+  // Server-side shipping validation (money-critical threshold; same corrective rules as the client).
+  if (body.patch.shipping) {
+    const errors = validateShipping({ freeThreshold: Number(body.patch.shipping.freeThreshold) });
     if (errors.length) return NextResponse.json({ error: errors[0].message, fieldErrors: errors }, { status: 422 });
   }
 

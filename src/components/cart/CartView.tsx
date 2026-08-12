@@ -11,6 +11,7 @@ import {
 } from "@/store/useCartStore";
 import { useCompositionStore } from "@/store/useCompositionStore";
 import { buildCartSummary } from "@/lib/cart";
+import { useFreeShippingThreshold } from "@/components/commerce/ShippingConfigProvider";
 import { composeComposition } from "@/lib/bundle";
 import { formatPaise } from "@/lib/money";
 
@@ -35,6 +36,7 @@ export function CartView() {
   const updateQty = useCartStore((s) => s.updateQty);
   const removeItem = useCartStore((s) => s.removeItem);
   const loadComposition = useCompositionStore((s) => s.loadComposition);
+  const freeThreshold = useFreeShippingThreshold();
   const router = useRouter();
 
   // Persisted cart hydrates on the client only — render after mount (a single,
@@ -62,7 +64,7 @@ export function CartView() {
     );
   }
 
-  const summary = buildCartSummary(items);
+  const summary = buildCartSummary(items, freeThreshold);
   const count = items.reduce((n, i) => n + i.qty, 0);
 
   const removeComposition = (lines: CartItem[]) => lines.forEach((l) => removeItem(l.key));

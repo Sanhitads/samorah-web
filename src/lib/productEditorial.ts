@@ -13,7 +13,7 @@ import { getArtist, type Artist } from "@/config/artist";
 import { getTestimonials } from "@/config/testimonials";
 import type { ProductCardModel } from "@/components/ui/ProductCard";
 import { imageMedia, type MediaContent } from "@/lib/presentation";
-import { freeShippingLabel, shippingPolicySentence } from "@/config/commerce";
+import { freeShippingLabel, shippingPolicySentence, SHIPPING } from "@/config/commerce";
 import { effectivePrice, formatINR, type Priceable } from "@/lib/pricing";
 import { primaryImage, productBadge, type ImageLike } from "@/lib/product";
 
@@ -214,6 +214,9 @@ export interface CandleEditorialInput {
   artist?: Artist;
   related: RelatedProductInput[];
   content?: CandlePdpContent;
+  /** Admin-configured free-shipping threshold (₹) for the house "Shipping & Exchanges"
+   *  copy; defaults to the code constant so callers/tests stay unaffected. */
+  freeShippingThresholdInr?: number;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -264,7 +267,7 @@ function deriveMoments(text: string | null): string[] {
 
 /** Care · Wax & Wick · Ingredients · Shipping · Sustainability — filled from the
  *  product where structured data exists; otherwise from house policy copy. */
-function candleAccordion(view: ProductPageView): AccordionItem[] {
+function candleAccordion(view: ProductPageView, freeThresholdInr: number = SHIPPING.freeThreshold): AccordionItem[] {
   const wax = view.details.find((d) => d.label === "Wax")?.value;
   const wick = view.details.find((d) => d.label === "Wick")?.value;
   const vessel = view.vessels.length ? view.vessels.join(" · ") : "ceramic or glass";
@@ -283,7 +286,7 @@ function candleAccordion(view: ProductPageView): AccordionItem[] {
     },
     {
       title: "Shipping & Exchanges",
-      body: `Carefully packed and dispatched within 1–3 business days (a little longer during festive periods). Complimentary standard shipping within India on orders over ${freeShippingLabel()}; most orders arrive in 3–7 business days. Worldwide shipping via trusted couriers (duties/taxes at checkout). Due to the handcrafted nature of our candles we do not accept returns, but if your order arrives damaged or incorrect, write to us within 48 hours and we will make it right.`,
+      body: `Carefully packed and dispatched within 1–3 business days (a little longer during festive periods). Complimentary standard shipping within India on orders over ${freeShippingLabel(freeThresholdInr)}; most orders arrive in 3–7 business days. Worldwide shipping via trusted couriers (duties/taxes at checkout). Due to the handcrafted nature of our candles we do not accept returns, but if your order arrives damaged or incorrect, write to us within 48 hours and we will make it right.`,
     },
     {
       title: "Sustainability & Reusability",
@@ -297,7 +300,7 @@ const fill = (id: string, settings: object, extra: Partial<SectionInstance> = {}
 
 // ── The builder ──────────────────────────────────────────────────────────────
 
-export function buildCandleEditorial({ view, artist, related, content }: CandleEditorialInput): SectionInstance[] {
+export function buildCandleEditorial({ view, artist, related, content, freeShippingThresholdInr }: CandleEditorialInput): SectionInstance[] {
   const L = content?.labels ?? {};
   const storyBody = splitParagraphs(view.mood.story);
   const galleryImage = view.gallery[1]?.src ?? view.gallery[0]?.src;
@@ -435,7 +438,7 @@ export function buildCandleEditorial({ view, artist, related, content }: CandleE
     fill("divider-close", {} satisfies EditorialDividerSettings),
     fill(
       "details",
-      { items: content?.accordion?.length ? content.accordion.filter((r) => r.title?.trim() || r.body?.trim()) : candleAccordion(view) } satisfies EditorialAccordionSettings,
+      { items: content?.accordion?.length ? content.accordion.filter((r) => r.title?.trim() || r.body?.trim()) : candleAccordion(view, freeShippingThresholdInr) } satisfies EditorialAccordionSettings,
     ),
     fill(
       "related",
@@ -481,6 +484,8 @@ export interface AirEditorialInput {
   hour: HourEntry;
   volume: AirVolume;
   others: HourEntry[];
+  /** Admin-configured free-shipping threshold (₹) for the house Shipping copy; defaults to the constant. */
+  freeShippingThresholdInr?: number;
 }
 
 function toHourCard(h: HourEntry, volume: AirVolume): ProductCardModel {
@@ -495,7 +500,7 @@ function toHourCard(h: HourEntry, volume: AirVolume): ProductCardModel {
   };
 }
 
-function airAccordion(composition?: string): AccordionItem[] {
+function airAccordion(composition?: string, freeThresholdInr: number = SHIPPING.freeThreshold): AccordionItem[] {
   return [
     {
       title: "Composition",
@@ -505,7 +510,7 @@ function airAccordion(composition?: string): AccordionItem[] {
     },
     {
       title: "Shipping & Exchanges",
-      body: `Dispatched within 2–3 business days. ${shippingPolicySentence()} Returns accepted within 48 hours of delivery for damaged or incorrect items.`,
+      body: `Dispatched within 2–3 business days. ${shippingPolicySentence(freeThresholdInr)} Returns accepted within 48 hours of delivery for damaged or incorrect items.`,
     },
   ];
 }
@@ -568,7 +573,7 @@ function buildAirCustomSections(list: CustomSection[]): SectionInstance[] {
   return list.map((c, i) => buildCustomSection(c, i, POS_ORDER, 6.5)).filter((s): s is SectionInstance => s !== null);
 }
 
-export function buildAirEditorial({ hour, volume, others }: AirEditorialInput): SectionInstance[] {
+export function buildAirEditorial({ hour, volume, others, freeShippingThresholdInr }: AirEditorialInput): SectionInstance[] {
   // Every heading/eyebrow can be overridden per product (labels); a blank falls back to the house
   // default, so nothing on the air PDP is truly hard-coded — it is all editable in the admin.
   const L = hour.labels ?? {};
@@ -579,7 +584,7 @@ export function buildAirEditorial({ hour, volume, others }: AirEditorialInput): 
     .filter(Boolean);
   // Details accordion — admin-defined rows when present (rename / reorder / add / remove),
   // otherwise the house defaults (Composition + Shipping).
-  const accordionItems = hour.accordion?.length ? hour.accordion : airAccordion(hour.productDetails);
+  const accordionItems = hour.accordion?.length ? hour.accordion : airAccordion(hour.productDetails, freeShippingThresholdInr);
   const overrides: SectionInstance[] = [
     // The Hour — the signature time, prominent, with the reason + story beneath it.
     fill("the-hour", {

@@ -15,6 +15,7 @@ import {
   type AddressForm,
 } from "@/lib/checkout";
 import { COMMERCE } from "@/config/commerce";
+import { useFreeShippingThreshold } from "@/components/commerce/ShippingConfigProvider";
 import { composeComposition } from "@/lib/bundle";
 import { formatPaise, formatPaise2 } from "@/lib/money";
 import { readStoredUtm } from "@/lib/utm";
@@ -97,14 +98,15 @@ export function CheckoutView() {
   // calculateOrderTotals). A restored code is re-validated on mount; see below.
   const couponCode = useCheckoutStore((s) => s.couponCode);
   const setCouponCode = useCheckoutStore((s) => s.setCouponCode);
+  const freeThreshold = useFreeShippingThreshold(); // admin-configured; keeps the instant client fallback in step with the server
 
   // Place of supply = the delivery (shipping) state (GST §12/13). Client compute is the instant fallback,
   // but it CANNOT resolve DB coupons (no registry, no catalogue relationships) — so a valid coupon would
   // look "not recognised". The server preview below runs the SAME engine as create-order and is
   // authoritative for display when present.
   const clientTotals = useMemo(
-    () => calculateOrderTotals(items, ship.state, { couponCode: couponCode || undefined }),
-    [items, ship.state, couponCode],
+    () => calculateOrderTotals(items, ship.state, { couponCode: couponCode || undefined, freeShippingThresholdInr: freeThreshold }),
+    [items, ship.state, couponCode, freeThreshold],
   );
   const [serverTotals, setServerTotals] = useState<ReturnType<typeof calculateOrderTotals> | null>(null);
   const [previewing, setPreviewing] = useState(false);

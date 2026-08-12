@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { SiteSettings } from "@/services/siteSettingsService";
 import { validateCosts, type CostValidationError } from "@/lib/settings/costValidation";
 import { validateDispatch, type DispatchValidationError } from "@/lib/settings/dispatchValidation";
+import { validateShipping, type ShippingValidationError } from "@/lib/settings/shippingValidation";
 import { shouldGuardNavigation } from "@/lib/bundleNavGuard";
 
 const FEATURE_LABELS: Record<string, string> = {
@@ -51,7 +52,7 @@ export function SiteSettingsForm({ settings }: { settings: SiteSettings }) {
 
   const save = async () => {
     // Client-side corrective validation first (server re-checks — defense-in-depth).
-    const errs: (CostValidationError | DispatchValidationError)[] = [...validateCosts(s.costs), ...validateDispatch(s.dispatch)];
+    const errs: (CostValidationError | DispatchValidationError | ShippingValidationError)[] = [...validateCosts(s.costs), ...validateDispatch(s.dispatch), ...validateShipping(s.shipping)];
     if (errs.length) {
       setFieldErrors(Object.fromEntries(errs.map((e) => [e.field, e.message])));
       setMsg({ tone: "err", text: `Please correct ${errs.length} field${errs.length > 1 ? "s" : ""} below before saving.` });
@@ -135,6 +136,12 @@ export function SiteSettingsForm({ settings }: { settings: SiteSettings }) {
         <label className="cfg-field"><span>Dispatch SLA (hours)</span><input type="number" min="0" max="240" aria-invalid={!!fieldErrors.slaHours} value={s.dispatch.slaHours} onChange={(e) => setS((p) => ({ ...p, dispatch: { ...p.dispatch, slaHours: Number(e.target.value) } }))} />{fieldErrors.slaHours ? <span className="ff-err" role="alert">{fieldErrors.slaHours}</span> : null}</label>
       </div>
       <p className="cfg-hint">Orders placed before the cutoff dispatch same day; the SLA is the promised dispatch window, in hours.</p>
+
+      <p className="cfg-sub">Shipping</p>
+      <div className="cfg-grid">
+        <label className="cfg-field"><span>Free shipping threshold (₹)</span><input type="number" min="0" step="1" aria-invalid={!!fieldErrors.freeThreshold} value={s.shipping.freeThreshold} onChange={(e) => setS((p) => ({ ...p, shipping: { ...p.shipping, freeThreshold: Number(e.target.value) } }))} />{fieldErrors.freeThreshold ? <span className="ff-err" role="alert">{fieldErrors.freeThreshold}</span> : null}</label>
+      </div>
+      <p className="cfg-hint">The single source of truth for free shipping — this same amount drives the checkout charge, the cart’s “free shipping remaining” hint, and the Shipping Policy copy. Set to 0 to ship everything free.</p>
 
       <p className="cfg-sub">Announcement bar</p>
       <label className="cfg-field"><span>Text</span><input value={s.announcement.text} onChange={(e) => g("announcement", "text", e.target.value)} placeholder="Complimentary shipping over ₹1,499" /></label>

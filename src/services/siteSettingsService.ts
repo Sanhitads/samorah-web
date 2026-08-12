@@ -7,7 +7,7 @@
  */
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logEvent } from "@/services/auditService";
-import { COMMERCE } from "@/config/commerce";
+import { COMMERCE, SHIPPING } from "@/config/commerce";
 
 /** Module toggles (R5). Default false — these gate not-yet-live/optional features. */
 export const FEATURE_KEYS = ["reviews", "wishlist", "rewards", "blog", "wholesale", "referral", "subscription", "aiSearch"] as const;
@@ -28,6 +28,9 @@ export interface SiteSettings {
   costs: { packagingPerOrder: number; paymentFeePercent: number; shippingCostPerOrder: number };
   // Dispatch operations (S2A) — same-day cutoff time + dispatch SLA. Operational config, editable here.
   dispatch: { cutoffTime: string; slaHours: number };
+  // Shipping — the free-shipping threshold (₹). Single source of truth: drives the checkout
+  // charge, the cart's free-shipping hint, AND the policy/product copy. Default = code constant.
+  shipping: { freeThreshold: number };
 }
 
 function defaults(): SiteSettings {
@@ -43,6 +46,7 @@ function defaults(): SiteSettings {
     storeNotice: { text: "", active: false },
     costs: { packagingPerOrder: 0, paymentFeePercent: 2, shippingCostPerOrder: 0 },
     dispatch: { cutoffTime: "14:00", slaHours: 24 },
+    shipping: { freeThreshold: SHIPPING.freeThreshold },
   };
 }
 
@@ -65,10 +69,22 @@ export async function getSiteSettings(): Promise<SiteSettings> {
       storeNotice: { ...d.storeNotice, ...s.storeNotice },
       costs: { ...d.costs, ...s.costs },
       dispatch: { ...d.dispatch, ...s.dispatch },
+      shipping: { ...d.shipping, ...s.shipping },
     };
   } catch {
     return d;
   }
+}
+
+/**
+ * Canonical accessor for the admin-editable free-shipping threshold (₹). The single place
+ * that knows it lives at `site_settings.shipping.freeThreshold` (defaulting to the code
+ * constant via getSiteSettings). Use this in server contexts that need ONLY the threshold;
+ * callers already holding a `SiteSettings` should read `settings.shipping.freeThreshold`
+ * directly to avoid a second fetch. Does not touch the money engine — it consumes the number.
+ */
+export async function getFreeShippingThresholdInr(): Promise<number> {
+  return (await getSiteSettings()).shipping.freeThreshold;
 }
 
 /** Merge a partial patch into the stored JSONB (group-wise) + audit. */
