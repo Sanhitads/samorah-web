@@ -412,9 +412,10 @@ export const LEGAL: Record<string, { eyebrow: string; title: string; intro?: str
         "So we work with a coconut-based wax blend, carefully chosen fragrance oils, and materials we're comfortable bringing into people's homes.",
         "Every candle is poured in small batches. Every label is applied by hand. Because the details matter.",
       ] },
-      // Where Scent Meets Sight — the artwork (feature, WIDE: a full-width image with text beneath — a
-      // deliberate peak in the visual weight, unlike the two-column features).
-      { variant: "person", displayStyle: "feature", label: "Our Story", heading: "Where Scent Meets Sight", layout: "wide", ratio: "landscape", body: [
+      // Where Scent Meets Sight — the artwork (feature, reverse / right). Kept a normal aligned feature
+      // so it reads consistently; switch it to "wide" in the CMS once a full-width image is uploaded
+      // (a text-only "wide" section centres, which looks misaligned beside the left/right features).
+      { variant: "person", displayStyle: "feature", label: "Our Story", heading: "Where Scent Meets Sight", layout: "right", ratio: "portrait", body: [
         "Before you smell a fragrance, you usually see it. That is why every Samorah collection begins with artwork.",
         "Our artist spends time with the fragrance before putting brush to paper. Sometimes the inspiration is a place, sometimes a memory, sometimes simply a feeling that is hard to explain.",
         "That artwork becomes part of the box, and sometimes part of the vessel itself — another way of telling the same story.",
