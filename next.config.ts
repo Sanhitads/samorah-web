@@ -30,6 +30,9 @@ export default (phase: string): NextConfig => ({
       // Returns consolidation — the old short /returns page is retired in favour of the
       // full CMS-managed Returns & Refund Policy. 301 preserves any existing links/SEO.
       { source: "/returns", destination: "/returns-policy", statusCode: 301 },
+      // "Meet the Makers" was renamed to "The People Behind Samorah". The legacy /about path never
+      // existed in this app; 301 it (and any stale nav/menu link) to the new CMS page.
+      { source: "/about/meet-the-makers", destination: "/the-people-behind-samorah", statusCode: 301 },
     ];
   },
   images: {

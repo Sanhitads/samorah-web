@@ -38,7 +38,7 @@ export const ARTISTS: Artist[] = [
     signature: "— The Samorah Artist",
     quote: "Every colour begins with a feeling.",
     ctaLabel: "The story of our art",
-    ctaHref: "/about/meet-the-makers",
+    ctaHref: "/the-people-behind-samorah",
   },
 ];
 
