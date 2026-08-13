@@ -294,20 +294,21 @@ export const LEGAL: Record<string, { eyebrow: string; title: string; intro?: str
       ] },
       // Feature — The Candle Maker (image left).
       { variant: "person", displayStyle: "feature", label: "The Craft", heading: "The Candle Maker", layout: "left", ratio: "portrait", body: [
-        "A candle seems simple — wax, wick and fragrance. Bringing them into balance takes care and experience.",
-        "Every Samorah candle is poured by hand: the wax melted slowly, blended with fragrance and poured at the right temperature, so the scent settles naturally into it.",
-        "The wick is chosen with the same care as the wax. It shapes how the candle burns, how the fragrance unfolds, and how the flame settles into a room.",
-        "Once poured, the candle rests. Time lets the wax and fragrance bind, so that when it is lit the scent unfolds in layers rather than all at once.",
-        "The work is quiet and precise — and it is what lets a candle change a room.",
+        "People often think a candle is just wax, a wick and fragrance. But getting those three to work well together takes time.",
+        "We melt the wax slowly, mix in the fragrance, and pour each candle by hand. Small changes in temperature can change how a candle performs, so we don't rush it.",
+        "The wick matters just as much. We choose it to suit the wax, the fragrance and the vessel, so the candle burns evenly and the scent slowly fills the room.",
+        "After pouring, the candle is left to rest. That gives the wax and fragrance time to settle together before it's ready to be lit.",
+        "Most of this work isn't something you'll notice. But you'll notice how the candle feels when you light it.",
       ] },
       // Full-width image break (atmospheric photo — a soft band until an image is added).
       { variant: "overlay", layout: "overlay", ratio: "landscape", align: "center", body: [] },
       // Feature — The Artist (reverse, image right).
       { variant: "person", displayStyle: "feature", label: "The Craft", heading: "The Artist", layout: "right", ratio: "portrait", body: [
-        "Every fragrance begins as a story. Before you ever light a Samorah candle, the scent has already been translated into something you can see.",
-        "An artist begins with the fragrance story and slowly turns it into colour, texture and form — the artwork that appears on the packaging.",
-        "It meets you first on the box, and sometimes on the vessel itself: certain terracotta jars are painted by hand, so art and candle live together in one object.",
-        "Because every brushstroke is painted by hand, no two pieces are ever exactly alike — a candle that carries both scent and art.",
+        "Every candle begins with a fragrance.",
+        "Before it's poured, someone imagines what that fragrance might look like.",
+        "The artist paints from that feeling. Sometimes it's a landscape, sometimes just a colour or texture that feels right.",
+        "That artwork becomes part of the packaging, so the first thing you experience isn't the scent — it's the story around it. Each one is painted by hand, so no two are ever exactly the same.",
+        "Every brushstroke is a reminder that a real person made it.",
       ] },
       // Full-width image break.
       { variant: "overlay", layout: "overlay", ratio: "landscape", align: "center", body: [] },
@@ -343,9 +344,9 @@ export const LEGAL: Record<string, { eyebrow: string; title: string; intro?: str
         "The smallest detail often has the greatest influence.",
         "The wick is chosen to suit the wax, the vessel and the fragrance, helping the candle burn steadily from the first light to the last.",
       ] },
-      // Closing (no layout → the large centred quote style).
+      // Closing (no layout → the large centred quote style). Distinct from the Behind Samorah closing.
       { variant: "statement", body: [
-        "Every object remembers how it was made.",
+        "You may never see the work — but you'll always feel it.",
       ] },
       // Brand signature (small, centred, subtle).
       { variant: "statement", layout: "center", body: [
