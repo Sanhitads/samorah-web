@@ -217,14 +217,14 @@ export const LEGAL: Record<string, { eyebrow: string; title: string; intro?: str
       ] },
     ],
   },
-  // The People Behind Samorah — a quiet editorial page (rendered by PeopleContent, edited at
+  // Behind Samorah — a quiet editorial page (rendered by PeopleContent, edited at
   // /admin/content/the-people-behind-samorah). Contributors are CONTENT: each `person` section's
   // `displayStyle` (feature / card / highlight) sets its weight, so people are added, reordered and
   // reweighted entirely in the CMS. Consecutive card people auto-collect into a responsive grid.
   // Portraits are added in the CMS (this seed ships copy + structure). Intro = hero line + subtitle.
   "the-people-behind-samorah": {
     eyebrow: "",
-    title: "The People Behind Samorah",
+    title: "Behind Samorah",
     intro: "Some people stay behind the scenes.\nTheir work doesn't.",
     sections: [
       // Editorial intro statement (centred, understated).

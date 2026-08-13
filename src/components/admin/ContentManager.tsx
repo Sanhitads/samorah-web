@@ -572,7 +572,7 @@ export function ContentManager({ pages, initialSlug, supportEmail, contact }: { 
                 })() : isProductCare ? (
                   <ProductCareContent eyebrow={edit.eyebrow} title={edit.title || "Product Care"} intro={edit.intro} sections={edit.sections} />
                 ) : isPeople ? (
-                  <PeopleContent eyebrow={edit.eyebrow} title={edit.title || "The People Behind Samorah"} intro={edit.intro} heroImage={heroImg ?? null} sections={edit.sections} />
+                  <PeopleContent eyebrow={edit.eyebrow} title={edit.title || "Behind Samorah"} intro={edit.intro} heroImage={heroImg ?? null} sections={edit.sections} />
                 ) : (
                   <LegalPage {...buildPreviewProps(edit, supportEmail)} />
                 )}

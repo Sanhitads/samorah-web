@@ -11,7 +11,7 @@ import { ContentManager } from "@/components/admin/ContentManager";
  * image break / statement / divider, an optional hero image, and a faithful live preview. Same CMS,
  * publishing, scheduling, SEO, revisions and audit as every other page.
  */
-export const metadata: Metadata = { title: "The People Behind Samorah", robots: { index: false } };
+export const metadata: Metadata = { title: "Behind Samorah", robots: { index: false } };
 export const dynamic = "force-dynamic";
 
 export default async function PeopleContentPage() {
@@ -25,7 +25,7 @@ export default async function PeopleContentPage() {
     <main className="admin">
       <header className="admin__head">
         <p className="admin__eyebrow">Content · {staff.role}</p>
-        <h1 className="admin__title">The People Behind Samorah</h1>
+        <h1 className="admin__title">Behind Samorah</h1>
         <p className="admin__count">Edit the CMS-managed <span className="admin__mono">/the-people-behind-samorah</span> editorial page — people, imagery, hero, draft, publish &amp; history</p>
       </header>
       <ContentManager pages={pages} initialSlug="the-people-behind-samorah" />

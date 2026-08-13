@@ -25,11 +25,11 @@
 | FAQ | `/faq` | **Committed · Frozen** | `fcaac8a` |
 | Contact | `/contact` | **Committed · Frozen** | `e13a6cf` |
 | Product Care | `/product-care` *(existing route)* | **Committed · Frozen** | `e74f633` |
-| The People Behind Samorah | `/the-people-behind-samorah` | **Committed · Frozen** | this commit |
+| Behind Samorah | `/the-people-behind-samorah` | **Committed · Frozen** | this commit |
 
 ---
 
-## Phase C3 — The People Behind Samorah
+## Phase C3 — Behind Samorah
 
 **Status: Approved · Committed · Frozen. LAUNCH READY.**
 

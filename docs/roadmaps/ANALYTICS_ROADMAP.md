@@ -4,6 +4,43 @@ Single source of truth for the Analytics product vision. **Milestone 2 (Analytic
 milestone under active development.** Milestones 3–5 are vision-only — no implementation begins without
 explicit approval.
 
+---
+
+## Milestone 2 — Production Ready · Status: FROZEN
+
+**Analytics Milestone 2 (Analytics Polish) is Production Ready and FROZEN.** Stages 1–5 are delivered,
+verified, and committed on `replatform/nextjs` (Stage 1 `899a828` · Stage 2 `11ce139` · Stage 3 `772cc0e`
+· Stage 4 `25d27c7` · Stage 5 Drill-downs Commit 1 `8082f11`). No further Analytics work — including
+Stage 5 Commit 2, Stage 6, or Stage 7 — begins without an **explicit milestone reopening**.
+
+### Launch Scope
+
+**Included in Launch (ships day one)**
+- Foundation: `KpiCard` primitive + SQL/RPC + materialized-view data layer (server-side aggregation).
+- Executive Dashboard: founder-scan KPIs with previous/Δ/%/trend/sparkline/tooltips and source-specific empty states.
+- Navigation & Filters: sticky date selector, section jump-links, refresh (pending state), last-updated + data-freshness bar.
+- Charts: four trend charts via the single `SamorahChart` wrapper (Recharts, route-scoped to `/admin/analytics`).
+- Drill-downs (Commit 1): registry-driven, context-preserving links for Business Overview / Revenue / Returns / Inventory / Fulfillment / Shipments.
+- Governance baked in: per-widget feature flags, RBAC (`analytics.view` / `data.export`), automated MV refresh cron, honest external-source degradation.
+
+**Deferred Until Post-launch (optional — requires milestone reopening)**
+- Stage 5 **Commit 2** — Search / Attribution / Campaigns drill-downs (only if operationally valuable).
+- Stage 6 **Exports** — Print / Excel (`exceljs`) / PDF (`@react-pdf/renderer`).
+- Stage 7 **Goals** — optional business goals with progress tracking.
+
+### Architecture Index
+
+Primary reference documents for future developers:
+- **Analytics Roadmap** — `docs/roadmaps/ANALYTICS_ROADMAP.md` (this file)
+- **ADR 0001 — RPC Foundation / versioning** — `docs/adr/0001-analytics-rpc-versioning.md`
+- **ADR 0002 — Materialized-view strategy** — `docs/adr/0002-materialized-view-strategy.md`
+- **ADR 0003 — Registry Architecture** — `docs/adr/0003-analytics-registry.md`
+- **ADR 0004 — Cache strategy** — `docs/adr/0004-analytics-cache-strategy.md`
+- **ADR 0005 — Chart Architecture** — `docs/adr/0005-chart-library.md`
+- **Registry (source of truth)** — `src/lib/analytics/analyticsRegistry.ts`
+
+---
+
 ## Standing engineering rules (all milestones)
 - Reuse existing server-side services (`analyticsService`, `businessOverviewService`, `reportsService`,
   `marketingAnalyticsService`, `customerAdminService`, `commandCenterService`, `ga4DataService`,

@@ -8,7 +8,7 @@ import { canonicalOrigin } from "@/config/site";
 import type { SectionImage } from "@/lib/cms/sections";
 
 /**
- * The People Behind Samorah — a CMS-managed "Pages" route (edited at
+ * Behind Samorah — a CMS-managed "Pages" route (edited at
  * /admin/content/the-people-behind-samorah) on the same architecture as the policy / Product Care
  * pages, rendered with the editorial PeopleContent layout. Contributors are content (person sections
  * with a displayStyle), so people are added entirely in the CMS. Emits Breadcrumb JSON-LD.
@@ -21,7 +21,7 @@ const META_DESCRIPTION =
 
 export async function generateMetadata(): Promise<Metadata> {
   const p = await getPage(SLUG);
-  const title = p?.seo.title || p?.title || "The People Behind Samorah";
+  const title = p?.seo.title || p?.title || "Behind Samorah";
   const description = p?.seo.description || p?.intro?.split("\n")[0] || META_DESCRIPTION;
   return withRouteSeo("/the-people-behind-samorah", {
     title,

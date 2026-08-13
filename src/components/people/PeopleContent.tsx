@@ -4,7 +4,7 @@ import type { Asset } from "@/platform/asset";
 import type { PageSection, SectionImage, SectionLayout, SectionRatio, SectionVariant } from "@/services/cmsService";
 
 /**
- * The People Behind Samorah — a quiet editorial renderer (Trudon / Aesop / Kinfolk register:
+ * Behind Samorah — a quiet editorial renderer (Trudon / Aesop / Kinfolk register:
  * generous whitespace, asymmetry, large photography). Built on the SAME section model + image atom
  * as Product Care — no new CMS. Contributors are CONTENT, not architecture: a `person` section's
  * `displayStyle` (feature / card / highlight) decides its weight, so people are added, reordered and
