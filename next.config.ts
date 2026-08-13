@@ -36,6 +36,9 @@ export default (phase: string): NextConfig => ({
       // "Craft & Ingredients" is superseded by the Craft & Materials editorial page; the legacy /about
       // path never existed here — 301 it (and any stale nav/menu link) to the new page.
       { source: "/about/craft-ingredients", destination: "/craft-materials", statusCode: 301 },
+      // Our Story now lives at the root /our-story (consistent with the other editorial pages); the
+      // legacy /about/our-story path never existed here — 301 it (and any stale nav/menu link).
+      { source: "/about/our-story", destination: "/our-story", statusCode: 301 },
     ];
   },
   images: {

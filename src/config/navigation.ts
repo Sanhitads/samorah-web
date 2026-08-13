@@ -123,7 +123,7 @@ export const MENU_BRANCHES: MenuBranch[] = [
     id: "about",
     label: "About",
     items: [
-      { label: "Our Story", href: "/about/our-story" },
+      { label: "Our Story", href: "/our-story" },
       { label: "Craft & Materials", href: "/craft-materials" },
       { label: "Behind Samorah", href: "/the-people-behind-samorah" },
       { label: "Contact", href: "/contact" },
@@ -132,7 +132,7 @@ export const MENU_BRANCHES: MenuBranch[] = [
       eyebrow: "Featured",
       title: "Made With Intention",
       description: "Every candle, a story.",
-      href: "/about/our-story",
+      href: "/our-story",
       gradient: "grad-story",
     },
   },
@@ -180,7 +180,7 @@ export const FOOTER_SECTIONS: FooterSection[] = [
   {
     title: "About",
     links: [
-      { label: "Our Story", href: "/about/our-story" },
+      { label: "Our Story", href: "/our-story" },
       { label: "Craft & Materials", href: "/craft-materials" },
       { label: "Behind Samorah", href: "/the-people-behind-samorah" },
       { label: "Product Care", href: "/product-care" },

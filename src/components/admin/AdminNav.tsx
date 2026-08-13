@@ -47,6 +47,7 @@ const NAV: NavGroup[] = [
       { label: "Product Care", href: "/admin/content/product-care", icon: "✿" },
       { label: "Behind Samorah", href: "/admin/content/the-people-behind-samorah", icon: "❦" },
       { label: "Craft & Materials", href: "/admin/content/craft-materials", icon: "⚒" },
+      { label: "Our Story", href: "/admin/content/our-story", icon: "❧" },
       { label: "Media", href: "/admin/media", icon: "▨" },
       { label: "Navigation", href: "/admin/navigation", icon: "❰" },
       { label: "Homepage", href: "/admin/homepage", icon: "⌗" },

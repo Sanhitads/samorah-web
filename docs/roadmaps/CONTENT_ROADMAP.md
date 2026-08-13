@@ -26,7 +26,38 @@
 | Contact | `/contact` | **Committed · Frozen** | `e13a6cf` |
 | Product Care | `/product-care` *(existing route)* | **Committed · Frozen** | `e74f633` |
 | Behind Samorah | `/the-people-behind-samorah` | **Committed · Frozen** | `4e8ef82` |
-| Craft & Materials | `/craft-materials` | **Committed · Frozen** | this commit |
+| Craft & Materials | `/craft-materials` | **Committed · Frozen** | `e045c6a` |
+| Our Story | `/our-story` | **Committed · Frozen** | this commit |
+
+---
+
+## Phase C5 — Our Story (signature editorial page)
+
+**Status: Approved · Committed · Frozen. LAUNCH READY.**
+
+The editorial trilogy is complete and frozen: **Our Story** (why) · **Craft & Materials** (how) ·
+**Behind Samorah** (who) — shared design language and brand motifs, distinct emotional identity each.
+
+The emotional centre of the site: a first-person, reflective journal answering *how Samorah came to be
+and why it makes the way it does* — **not** a timeline, milestone list, or About page (no dates, icons,
+stats or infographics). **Reuses `PeopleContent` and the same Pages CMS** — no new renderer, section
+types, schema, editor or route architecture. Distinct from the other editorial pages through voice +
+structure, not new components.
+
+### IA (existing section types only)
+Hero (optional immersive image) → large editorial statement → **The Beginning** feature → **How Samorah
+Began** feature → *Every Fragrance Begins the Same Way* statement → image break → **From Fragrance to
+Flame** feature → *Made with Intention* statement → **Where Scent Meets Sight** feature → full-width
+image → *Our Way* statement → *What We Believe* statement → closing quote → signature.
+
+### Notes
+- New root route `/our-story`; the dead legacy `/about/our-story` nav links repointed + 301'd.
+- Reflective **statements** carry the introspective voice; **features** carry the photography; a couple
+  of **overlay** image breaks pace it — all existing types.
+- Copy is the founder's, lightly edited. Some passages deliberately retell the brand story that also
+  appears (differently phrased) on Craft & Materials / Behind Samorah — flagged in the review for
+  optional differentiation.
+- Future chapters / founder notes / philosophy are added entirely in the CMS.
 
 ---
 

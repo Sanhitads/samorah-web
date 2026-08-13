@@ -354,6 +354,94 @@ export const LEGAL: Record<string, { eyebrow: string; title: string; intro?: str
       ] },
     ],
   },
+  // Our Story — the signature editorial page (rendered by PeopleContent, edited at /admin/content/
+  // our-story). First-person, reflective, journal-like — NOT a timeline or an About page. Reuses the
+  // existing section types only: a hero (optional image), a large editorial statement, story FEATURES
+  // (image + text), OVERLAY image breaks, and reflective STATEMENTS. Distinct from the other editorial
+  // pages through its introspective voice + structure, not new components. Copy is the founder's, lightly
+  // edited; hero/atmospheric imagery is added in the CMS.
+  "our-story": {
+    eyebrow: "",
+    title: "Our Story",
+    intro: "It began with a simple love for candles.\nNot because they filled a room with fragrance.\nBecause they changed how a room felt.",
+    sections: [
+      // Hero flows straight into the story — no second opening statement.
+      // The Beginning (feature, image left) — observations, not biography.
+      { variant: "person", displayStyle: "feature", label: "Our Story", heading: "The Beginning", layout: "left", ratio: "portrait", body: [
+        "I've always been drawn to candles.",
+        "Whenever I travelled, or found a small local shop, I would usually come back with one. Each felt a little different — some made a room calmer, others made it warmer, more alive.",
+        "Over time I realised I wasn't collecting candles. I was collecting moments.",
+        "That quiet habit eventually became Samorah.",
+      ] },
+      // How Samorah Began (feature, reverse, landscape — a wider frame, breaking the portrait rhythm).
+      { variant: "person", displayStyle: "feature", label: "Our Story", heading: "How Samorah Began", layout: "right", ratio: "landscape", body: [
+        "I didn't start by making candles. I started by trying to understand fragrance.",
+        "I spent hours smelling individual notes, blending them, then starting over. Some combinations worked. Most didn't.",
+        "Slowly, I understood something: fragrance isn't only about how something smells — it's about how it makes you feel.",
+        "That changed everything.",
+      ] },
+      // ── Objects We Return To — a memory gallery (card grid): one photograph + one line each. A pause
+      //    in the reading, like a page from a notebook. Objects are added / reordered entirely in the CMS. ──
+      { variant: "divider", heading: "Objects We Return To", body: [] },
+      { variant: "person", displayStyle: "card", heading: "Notebook", ratio: "square", body: ["The first fragrance ideas still begin here."] },
+      { variant: "person", displayStyle: "card", heading: "Brush", ratio: "square", body: ["Sometimes the artwork finds the story before the fragrance does."] },
+      { variant: "person", displayStyle: "card", heading: "Fragrance strips", ratio: "square", body: ["Most were set aside. A few we never quite forgot."] },
+      { variant: "person", displayStyle: "card", heading: "Tea cup", ratio: "square", body: ["Some blends stayed beside a cup of tea longer than in the bottle."] },
+      { variant: "person", displayStyle: "card", heading: "Old book", ratio: "square", body: ["Some ideas come from memories. Others from old pages."] },
+      { variant: "person", displayStyle: "card", heading: "Wax", ratio: "square", body: ["The smell of warm wax still feels like where it started."] },
+      // Image break — an almost-hidden line, into the fragrance chapter.
+      { variant: "overlay", layout: "overlay", ratio: "landscape", align: "center", heading: "Every scent begins with curiosity.", body: [] },
+      // Every Fragrance Begins the Same Way (reflective statement).
+      { variant: "statement", layout: "center", heading: "Every Fragrance Begins the Same Way", body: [
+        "Every fragrance starts with curiosity.",
+        "We begin with individual notes and slowly build them into something complete — testing, resting, returning, changing small things until they feel right.",
+        "Sometimes a fragrance comes together quickly. Sometimes it takes weeks. We don't rush it.",
+        "Because the goal isn't to make another fragrance. It is to make one worth remembering.",
+      ] },
+      // Large, quiet image break, before the flame.
+      { variant: "overlay", layout: "overlay", ratio: "landscape", align: "center", heading: "Nothing here is rushed.", body: [] },
+      // From Fragrance to Flame (feature, image left).
+      { variant: "person", displayStyle: "feature", label: "Our Story", heading: "From Fragrance to Flame", layout: "left", ratio: "portrait", body: [
+        "Once a fragrance feels complete, the work begins again.",
+        "Different waxes hold fragrance differently. Different wicks change how a candle burns. Even small changes affect how the scent fills a room.",
+        "So every candle is poured in small batches and finished by hand. We take our time, because small details make a big difference.",
+      ] },
+      // Made with Intention (reflective statement).
+      { variant: "statement", layout: "center", heading: "Made with Intention", body: [
+        "We don't believe better candles come from more ingredients. We believe they come from better choices.",
+        "So we work with a coconut-based wax blend, carefully chosen fragrance oils, and materials we're comfortable bringing into people's homes.",
+        "Every candle is poured in small batches. Every label is applied by hand. Because the details matter.",
+      ] },
+      // Where Scent Meets Sight — the artwork (feature, WIDE: a full-width image with text beneath — a
+      // deliberate peak in the visual weight, unlike the two-column features).
+      { variant: "person", displayStyle: "feature", label: "Our Story", heading: "Where Scent Meets Sight", layout: "wide", ratio: "landscape", body: [
+        "Before you smell a fragrance, you usually see it. That is why every Samorah collection begins with artwork.",
+        "Our artist spends time with the fragrance before putting brush to paper. Sometimes the inspiration is a place, sometimes a memory, sometimes simply a feeling that is hard to explain.",
+        "That artwork becomes part of the box, and sometimes part of the vessel itself — another way of telling the same story.",
+      ] },
+      // Full-width image break — a quiet line.
+      { variant: "overlay", layout: "overlay", ratio: "landscape", align: "center", heading: "The story is drawn before it is poured.", body: [] },
+      // Our Way (reflective statement).
+      { variant: "statement", layout: "center", heading: "Our Way", body: [
+        "We don't begin with products. We begin with stories.",
+        "The fragrance comes first. Then the artwork. Then the materials. Then the candle.",
+        "Every step is handled by different people, each bringing their own craft. That is how a Samorah candle comes together.",
+      ] },
+      // What We Believe (reflective statement).
+      { variant: "statement", layout: "center", heading: "What We Believe", body: [
+        "We believe a fragrance should belong to a room, not take it over.",
+        "We believe making fewer things, carefully, is better than making many things quickly.",
+        "We believe hands still matter — because people leave behind something machines never can.",
+        "We believe India has always understood fragrance: in the steam from a cup of chai, in temple incense, in the smell of rain on dry earth. Those everyday moments still inspire us.",
+        "And we believe that once a Samorah candle reaches your home, it is no longer ours. It becomes part of your story.",
+      ] },
+      // Closing (large centred quote) — the page ends on its strongest emotional moment; no signature.
+      { variant: "statement", body: [
+        "Samorah is built slowly.",
+        "Through fragrance. Through craft. Through people.",
+      ] },
+    ],
+  },
   faq: {
     // Hero shows only Title + Subtitle (no eyebrow, no hero image) — mirrors the policy pages.
     // FAQ sections are CATEGORIES: heading = category, items = its questions (rendered as an

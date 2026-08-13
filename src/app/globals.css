@@ -5203,7 +5203,7 @@ video.asset-image {
 
 /* People grid — cards auto-flow (3 / 2 / 1 columns by width), sized and centred so a few cards stay
    dense and editorial rather than stretching into large empty tiles; highlight spans wider. */
-.people__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 320px)); justify-content: center; gap: clamp(28px, 3vw, 48px); max-width: 1080px; margin-inline: auto; }
+.people__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 320px)); justify-content: center; gap: clamp(40px, 4.5vw, 72px); max-width: 1080px; margin-inline: auto; } /* generous, curated spacing — like opening a drawer */
 .people__card { display: flex; flex-direction: column; }
 .people__card--highlight { grid-column: span 2; }
 .people__card-media { width: 100%; overflow: hidden; background: var(--soft-beige, #F0EBE3); border-radius: 2px; margin-bottom: 14px; } /* text sits closer to the portrait */

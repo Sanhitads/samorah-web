@@ -189,7 +189,7 @@ export function ContentManager({ pages, initialSlug, supportEmail, contact }: { 
   // The People page and Craft & Materials share this editorial editor — a `person` section
   // (Feature / Card / Highlight via displayStyle) plus image break / statement / divider, an optional
   // hero image, and the PeopleContent preview. Both render through PeopleContent.
-  const isPeople = !!edit && (edit.slug === "the-people-behind-samorah" || edit.slug === "craft-materials");
+  const isPeople = !!edit && (edit.slug === "the-people-behind-samorah" || edit.slug === "craft-materials" || edit.slug === "our-story");
   const isEditorialPage = isProductCare || isPeople;
   type PcType = "editorial" | "person" | "overlay" | "accordion" | "statement" | "divider";
   const PC_TYPE_LABEL: Record<PcType, string> = { editorial: "Editorial (image + text)", person: "Person (Feature / Card)", overlay: "Image break (overlay)", accordion: "Accordion (Q&A)", statement: "Statement / text", divider: "Section divider" };
