@@ -147,7 +147,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                 <p className="cart-drawer__empty-title">The quiet before the flame.</p>
                 <p className="cart-drawer__empty-sub">Your ritual begins here.</p>
                 <Link
-                  href="/chapters"
+                  href="/shop"
                   className="text-link cart-drawer__empty-link"
                   onClick={onClose}
                 >

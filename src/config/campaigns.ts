@@ -66,7 +66,7 @@ export const HERO_CAMPAIGNS: HeroCampaign[] = [
     subheading:
       "Slow-crafted luxury candles inspired by ritual, silence and timeless warmth.",
     ctaLabel: "Explore Chapters",
-    ctaHref: "/chapters",
+    ctaHref: "/shop",
     theme: "warm-dark",
     chapterSlugs: ["dessert-chapter"],
     isActive: true,
