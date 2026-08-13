@@ -155,3 +155,54 @@ None of these block launch — each is a deliberate Phase-1 boundary, not an unf
    `src/features/luxury-experience/` **and** revert the 2 lines in `src/app/(store)/page.tsx`.
 
 Zero DB/API/dependency footprint, so any of these is a redeploy away.
+
+---
+
+## QA Sign-Off Checklist (freeze gate)
+
+The technical verification above is automated (build · SSR · source). This is the **human sign-off** —
+run it on a real preview deploy and tick every box. Phase 1 is formally frozen only when all are checked.
+
+**Sign-off:** name ______________  · date ____________  · build/commit ____________
+
+### Feature behaviour
+- [ ] First visit plays the intro **exactly once**.
+- [ ] Returning visit (reload) **skips** the experience — no flicker, no overlay flash.
+- [ ] Fresh incognito session plays the intro again.
+- [ ] Reduced-motion mode shows the simplified ~400 ms fade (no flame/spark/glow).
+- [ ] Kill switch (`NEXT_PUBLIC_ENABLE_LUXURY_EXPERIENCE=false`) fully disables the feature.
+- [ ] Homepage is **interactive immediately** after the overlay dismisses (scroll, nav, clicks).
+- [ ] Esc key and click both dismiss the overlay early.
+- [ ] Overlay always self-dismisses (never sticks past the failsafe).
+
+### Console & performance
+- [ ] No console errors.
+- [ ] No React hydration warnings.
+- [ ] No failed asset requests (Network tab).
+- [ ] No CSP warnings (if applicable).
+- [ ] No Lighthouse regression beyond agreed thresholds (Performance · Accessibility · Best Practices · SEO).
+- [ ] CLS remains 0; LCP effectively unchanged.
+
+### Browser & device matrix
+- [ ] Chrome (desktop) verified.
+- [ ] Safari (desktop) verified.
+- [ ] Firefox (desktop) verified.
+- [ ] Edge (desktop) verified.
+- [ ] Android Chrome verified — smooth, no viewport jump, no white flash.
+- [ ] iOS Safari verified — smooth, no viewport jump, no white flash.
+
+### Regression — existing surfaces unaffected
+- [ ] Product pages unaffected (no overlay, no layout shift).
+- [ ] Cart unaffected.
+- [ ] Checkout unaffected.
+- [ ] Authentication / account unaffected.
+- [ ] Admin unaffected.
+- [ ] Every non-home route renders **zero** overlay.
+
+### Analytics
+- [ ] Normal page views still fire (GA4 / GTM / Clarity).
+- [ ] No duplicate page views.
+- [ ] No duplicate session starts.
+- [ ] Existing analytics behaviour unchanged (experience events remain intentionally dormant — see Known Limitations).
+
+**Once every box is checked, Phase 1 can be formally frozen.**
