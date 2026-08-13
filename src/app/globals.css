@@ -5062,11 +5062,18 @@ video.asset-image {
 .pcare__section { margin-top: clamp(56px, 10.5vh, 132px); }
 .pcare__body > .pcare__section:first-child { margin-top: 0; }
 
-/* Editorial blocks — the image column carries more weight (photography leads the story). */
-.pcare__section--left, .pcare__section--right { display: grid; gap: clamp(32px, 5vw, 84px); align-items: center; }
+/* Editorial blocks — the image column carries more weight (photography leads the story). The image
+   FILLS the full height of its column (matched to the text) so the two sides read as one composition
+   rather than a floating image with empty space. */
+.pcare__section--left, .pcare__section--right { display: grid; gap: clamp(32px, 5vw, 84px); align-items: stretch; }
 .pcare__section--left { grid-template-columns: 1.15fr 0.85fr; }
 .pcare__section--right { grid-template-columns: 0.85fr 1.15fr; }
 .pcare__section--right .pcare__figure { order: 2; } /* text left, image right — image stays the wider column */
+@media (min-width: 861px) {
+  .pcare__section--left .pcare__figure, .pcare__section--right .pcare__figure { display: flex; flex-direction: column; }
+  .pcare__section--left .pcare__media, .pcare__section--right .pcare__media { flex: 1 1 auto; min-height: clamp(360px, 46vh, 560px); }
+  .pcare__section--left .pcare__text, .pcare__section--right .pcare__text { display: flex; flex-direction: column; justify-content: center; }
+}
 .pcare__section--center, .pcare__section--wide { display: flex; flex-direction: column; align-items: center; text-align: center; gap: clamp(24px, 4vh, 48px); }
 .pcare__section--center .pcare__figure { max-width: 760px; }
 .pcare__section--wide .pcare__figure { max-width: 100%; }
@@ -5170,11 +5177,18 @@ video.asset-image {
 .people__name { font-family: var(--font-serif, Georgia, serif); font-weight: 400; font-size: clamp(1.6rem, 3.2vw, 2.4rem); line-height: 1.15; color: var(--ink, #1f1a16); margin: 0 0 18px; }
 .people__quote { margin: 22px 0 0; padding: 0; border: 0; font-family: var(--font-serif, Georgia, serif); font-style: italic; font-size: clamp(1.15rem, 2vw, 1.4rem); line-height: 1.5; color: var(--deep-charcoal, #1A1A1A); }
 
-/* Feature — large, asymmetric two-column (image column is the more generous one). */
-.people__feature--left, .people__feature--right { display: grid; gap: clamp(32px, 5vw, 88px); align-items: center; }
+/* Feature — large, asymmetric two-column (image column is the more generous one). The portrait
+   FILLS the full height of its column (matched to the text) so the two sides read as one composition
+   — no floating image with empty space. object-fit: cover keeps it edge-to-edge. */
+.people__feature--left, .people__feature--right { display: grid; gap: clamp(32px, 5vw, 88px); align-items: stretch; }
 .people__feature--left { grid-template-columns: 1.08fr 0.92fr; }
 .people__feature--right { grid-template-columns: 0.92fr 1.08fr; }
 .people__feature--right .people__portrait { order: 2; }
+@media (min-width: 861px) {
+  .people__feature--left .people__portrait, .people__feature--right .people__portrait { display: flex; flex-direction: column; }
+  .people__feature--left .people__portrait-media, .people__feature--right .people__portrait-media { flex: 1 1 auto; min-height: clamp(360px, 46vh, 560px); } /* fills the row height; aspect-ratio becomes a floor */
+  .people__feature--left .people__feature-text, .people__feature--right .people__feature-text { display: flex; flex-direction: column; justify-content: center; } /* text sits centred beside the full-height portrait */
+}
 .people__feature--wide { display: flex; flex-direction: column; align-items: center; text-align: center; gap: clamp(28px, 4vh, 48px); }
 .people__feature--wide .people__feature-text { max-width: 640px; }
 .people__feature--wide .people__p, .people__feature--wide .people__quote { margin-inline: auto; }
