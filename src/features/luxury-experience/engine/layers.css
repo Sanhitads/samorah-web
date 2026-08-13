@@ -1,0 +1,13 @@
+/**
+ * Luxury Experience Engine — z-index layer scale (single source).
+ *
+ * The app's current highest z-index is 1200, so the experience layer sits well above everything
+ * (header, dropdowns, drawers, modals, toasts). Because the experience UNMOUNTS after it plays,
+ * there is no lasting z-index competition — this token exists to prevent FUTURE conflicts and to
+ * document the intended stacking order:
+ *
+ *   content < header/dropdown < drawer < modal < toast < experience (this)
+ */
+:root {
+  --lux-z-experience: 9000;
+}
