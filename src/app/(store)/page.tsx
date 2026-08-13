@@ -6,6 +6,7 @@ import { PreviewBanner } from "@/components/page/PreviewBanner";
 import { SectionTracker } from "@/components/analytics/SectionTracker";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { withRouteSeo, getRouteStructuredData } from "@/services/seoRedirectService";
+import { LuxuryExperience } from "@/features/luxury-experience";
 
 /**
  * Homepage — consumer #1 of the Composable Page framework. Composition + content are
@@ -27,6 +28,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
   return (
     <main>
+      {/* Luxury Experience Engine — Phase 1 homepage intro (isolated presentation layer; overlays only,
+          self-dismisses, feature-flagged, removable). Zero coupling to the homepage's content/data. */}
+      <LuxuryExperience />
       {structuredData ? <JsonLd data={structuredData} /> : null}
       {preview ? <PreviewBanner label="homepage" livePath="/" /> : null}
       <ComposedSections sections={sections} track={!preview} />
