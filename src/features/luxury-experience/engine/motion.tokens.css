@@ -1,0 +1,31 @@
+/**
+ * Motion Design System — CSS tokens for the Luxury Experience Engine.
+ *
+ * The single source for durations, easing curves, opacity scale, glow intensity and warm-light
+ * colours. All experience CSS references these — NO hardcoded values. Namespaced `--lux-*` so the
+ * whole system is self-contained and removable with the folder. Extends the app's existing motion
+ * language (globals `--ease-luxury` / `--ease-out`) rather than replacing it.
+ */
+:root {
+  /* Durations (mirror motion.tokens.ts) */
+  --lux-dur-total: 2600ms;
+  --lux-dur-reduced: 400ms;
+
+  /* Easing curves — the shared luxury motion language (reusable by future buttons/cards/transitions) */
+  --lux-ease-entrance: cubic-bezier(0.16, 1, 0.3, 1); /* refined ease-out for reveals */
+  --lux-ease-inout: cubic-bezier(0.65, 0, 0.35, 1);   /* symmetric fades */
+  --lux-ease-glow: cubic-bezier(0.33, 0, 0.2, 1);     /* slow, luxurious light spread */
+
+  /* Opacity scale */
+  --lux-op-hidden: 0;
+  --lux-op-veil: 0.6;
+  --lux-op-full: 1;
+
+  /* Warm-light palette */
+  --lux-color-dark: #14100c;   /* warm near-black overlay */
+  --lux-color-amber: #d6aa54;  /* warm golden light */
+  --lux-color-flame: #ffd9a0;  /* flame core */
+
+  /* Glow intensity (0–1) */
+  --lux-glow-intensity: 0.9;
+}
