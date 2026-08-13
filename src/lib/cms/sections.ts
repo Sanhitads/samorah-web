@@ -28,10 +28,15 @@ export interface SectionImage {
 export type SectionLayout = "left" | "right" | "center" | "wide" | "overlay";
 /** Crop shape for a section's image (CLS-safe aspect reserved before load). */
 export type SectionRatio = "square" | "portrait" | "landscape";
-/** Which of the five editorial section types this is. Stored EXPLICITLY (optional) so the editor
- *  can switch types non-destructively; when absent the renderer/editor infer it from the shape
- *  (back-compatible with the config seed). Not a new type — just records one of the existing five. */
-export type SectionVariant = "editorial" | "overlay" | "accordion" | "statement" | "divider";
+/** Which editorial section type this is. Stored EXPLICITLY (optional) so the editor can switch types
+ *  non-destructively; when absent the renderer/editor infer it from the shape (back-compatible with
+ *  the config seed). "person" is the People page's contributor block (rendered per `displayStyle`). */
+export type SectionVariant = "editorial" | "overlay" | "accordion" | "statement" | "divider" | "person";
+
+/** How a contributor (a `person` section) renders — the role HIERARCHY, stored as content so people
+ *  can be added/reordered/reweighted entirely in the CMS (no code): a large editorial feature, a
+ *  standard grid card, or a larger highlighted card. Hidden uses the existing `hidden` toggle. */
+export type DisplayStyle = "feature" | "card" | "highlight";
 
 /** The optional editorial fields a content section may carry (Product Care et al.). */
 export interface EditorialFields {
@@ -49,6 +54,10 @@ export interface EditorialFields {
   /** Text alignment for an overlay image break — left / center / right. Optional; defaults to
    *  center (the original behaviour). Presentational only — reuses the section, adds no new type. */
   align?: "left" | "center" | "right";
+  /** An optional pull-quote (People feature profiles). Rendered as a quiet editorial line. */
+  quote?: string;
+  /** For a `person` section — how it renders (feature block vs grid card vs highlight card). */
+  displayStyle?: DisplayStyle;
   /** Hidden sections are stored but never rendered on the storefront (CMS toggle). */
   hidden?: boolean;
 }

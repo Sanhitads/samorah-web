@@ -217,6 +217,59 @@ export const LEGAL: Record<string, { eyebrow: string; title: string; intro?: str
       ] },
     ],
   },
+  // The People Behind Samorah — a quiet editorial page (rendered by PeopleContent, edited at
+  // /admin/content/the-people-behind-samorah). Contributors are CONTENT: each `person` section's
+  // `displayStyle` (feature / card / highlight) sets its weight, so people are added, reordered and
+  // reweighted entirely in the CMS. Consecutive card people auto-collect into a responsive grid.
+  // Portraits are added in the CMS (this seed ships copy + structure). Intro = hero line + subtitle.
+  "the-people-behind-samorah": {
+    eyebrow: "",
+    title: "The People Behind Samorah",
+    intro: "Some stories are carried by fragrance.\nOthers are carried by the people who quietly shape it.",
+    sections: [
+      // Editorial intro statement (centred, understated).
+      { variant: "statement", layout: "center", body: [
+        "A fragrance is never created by one pair of hands.",
+        "It is shaped through conversation, craft, patience, and people who care deeply about the smallest details.",
+      ] },
+      // Feature — Founder (image left, portrait).
+      { variant: "person", displayStyle: "feature", label: "Founder", heading: "Ananya Das", layout: "left", ratio: "portrait", body: [
+        "She has always been drawn to quiet things — morning light through old windows, the smell of books, the comfort of familiar rooms.",
+        "Samorah grew slowly from those observations, and she still shapes every collection with the same instinct.",
+      ], quote: "Fragrance should never dominate a room. It should simply belong there." },
+      // Image break — full-width (a gradient band with a quiet line until a photograph is added).
+      { variant: "overlay", layout: "overlay", ratio: "landscape", align: "center", heading: "The quiet work behind every object.", body: [] },
+      // Feature — Advisor (reverse layout, image right; abstract, not a résumé).
+      { variant: "person", displayStyle: "feature", label: "Advisor", layout: "right", ratio: "portrait", body: [
+        "Every creative journey benefits from another perspective.",
+        "Sometimes the best ideas arrive through conversation rather than certainty. Questions become refinement, and restraint becomes part of the design.",
+        "That quiet exchange continues behind every collection.",
+      ] },
+      // Editorial quote (large italic serif — a pause, not a divider).
+      { variant: "statement", body: ["Good fragrance is remembered quietly."] },
+      // Divider — introduces the studio grid.
+      { variant: "divider", heading: "The Studio", body: [] },
+      // Grid — cards auto-flow to 3 / 2 / 1 columns; add contributors simply by adding cards.
+      { variant: "person", displayStyle: "card", label: "Artist", heading: "Somyadeep Das", ratio: "portrait", body: [
+        "He notices textures, forgotten places and quiet details most people walk past.",
+        "In time, they become the artwork behind a collection.",
+      ] },
+      { variant: "person", displayStyle: "card", label: "Studio Companion", heading: "Milo", ratio: "portrait", body: [
+        "Every studio needs someone who reminds us to pause.",
+        "Always nearby, usually sleeping, occasionally supervising.",
+      ] },
+      // Future contributor — a HIDDEN template card (reveal or duplicate in the CMS as people join).
+      { variant: "person", displayStyle: "card", label: "Future contributor", ratio: "portrait", hidden: true, body: [
+        "Photographer, perfumer, ceramic artist, packaging designer — future hands are added here.",
+        "Reveal this card, or duplicate it, as the studio grows.",
+      ] },
+      // Closing philosophy (large italic, centred).
+      { variant: "statement", body: [
+        "Every object carries the fingerprints of the people who made it.",
+        "That is what makes it human.",
+      ] },
+    ],
+  },
   faq: {
     // Hero shows only Title + Subtitle (no eyebrow, no hero image) — mirrors the policy pages.
     // FAQ sections are CATEGORIES: heading = category, items = its questions (rendered as an

@@ -24,7 +24,44 @@
 | Shipping Policy | `/shipping` *(existing route)* | **Committed · Frozen** | `2b171fc` |
 | FAQ | `/faq` | **Committed · Frozen** | `fcaac8a` |
 | Contact | `/contact` | **Committed · Frozen** | `e13a6cf` |
-| Product Care | `/product-care` *(existing route)* | **Committed · Frozen** | this commit |
+| Product Care | `/product-care` *(existing route)* | **Committed · Frozen** | `e74f633` |
+| The People Behind Samorah | `/the-people-behind-samorah` | **Committed · Frozen** | this commit |
+
+---
+
+## Phase C3 — The People Behind Samorah
+
+**Status: Approved · Committed · Frozen. LAUNCH READY.**
+
+A quiet editorial "people" page (Trudon / Aesop / Kinfolk register) on the **same Pages CMS** and the
+Product Care rendering pattern. Answers one question — *who quietly shapes Samorah* — not the brand
+story (that is Our Story). No new CMS, editor framework, route, or database schema.
+
+### Includes
+- ✓ Editorial renderer (`PeopleContent`) — optional hero image, **person Feature** blocks (asymmetric
+  image left / right / wide), an auto-expanding **card grid** (3 / 2 / 1 columns), **image breaks**
+  (overlay + gradient fallback), **dividers**, and centred **statements / pull-quotes**
+- ✓ **Role-as-content hierarchy** — each `person` section's `displayStyle` (**feature / card /
+  highlight**, plus the hidden toggle) sets its weight, so contributors are added, reordered,
+  reweighted or hidden **entirely in the CMS** (no code): perfumer, ceramic artist, photographer,
+  packaging designer, etc.
+- ✓ CMS editor (`/admin/content/the-people-behind-samorah`) — reuses the ContentManager editorial
+  editor: Type (person / image break / statement / divider), displayStyle, role / name / story /
+  optional quote, Media Library portrait, layout, ratio, hero image, and move / duplicate / hide /
+  delete; faithful side-by-side live preview
+- ✓ Images via the platform `AssetImage` atom (responsive Cloudinary `srcSet`, blur-up, lazy,
+  CLS-safe); **delete-protected** in the Media Library (mediaId in `sections` / `form_config`)
+- ✓ SEO (title / description / canonical / OG) + **Breadcrumb** JSON-LD; semantic headings;
+  responsive (features stack image-first, grid collapses to one column on mobile)
+
+### Additive fields *(reference)*
+`variant: "person"`, `displayStyle`, `quote` — optional, in the existing `sections` JSONB. The hero
+image lives in the existing `form_config` JSONB (`{ heroImage }`). **No migration.** Text-only pages
+and Product Care are unaffected.
+
+### Future Enhancements *(post-launch, roadmap-controlled)*
+- Highlight cards (larger featured grid card) — supported, unused in the seed
+- Per-person detail links; sub-teams / departments as additional grids
 
 ---
 

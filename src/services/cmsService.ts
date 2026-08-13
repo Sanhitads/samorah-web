@@ -12,7 +12,7 @@ import { isLive } from "@/lib/cms/publishable";
 import { snapshotRevision as snapshotCmsRevision, listRevisions as listCmsRevisions, getRevisionSnapshot } from "@/services/cms/revisions";
 import type { EditorialFields } from "@/lib/cms/sections";
 
-export type { SectionImage, SectionLayout, SectionRatio, SectionVariant, EditorialFields } from "@/lib/cms/sections";
+export type { SectionImage, SectionLayout, SectionRatio, SectionVariant, DisplayStyle, EditorialFields } from "@/lib/cms/sections";
 
 /** A single FAQ question/answer. Answers may contain "\n"-separated lines (rendered as
  *  paragraphs; "- " lines become bullets). Used by the FAQ page AND by Product Care accordion

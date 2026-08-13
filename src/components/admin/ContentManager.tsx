@@ -8,11 +8,12 @@ import { FaqAccordion, type FaqCategory } from "@/components/faq/FaqAccordion";
 import { ContactContent, type ContactBlock } from "@/components/contact/ContactContent";
 import { CONTACT_FORM_DEFAULTS, type ContactFormConfig } from "@/lib/contact";
 import { ProductCareContent } from "@/components/product-care/ProductCareContent";
+import { PeopleContent } from "@/components/people/PeopleContent";
 import { MediaPicker } from "@/components/admin/MediaPicker";
-import type { SectionImage, SectionLayout, SectionRatio, SectionVariant } from "@/lib/cms/sections";
+import type { SectionImage, SectionLayout, SectionRatio, SectionVariant, DisplayStyle } from "@/lib/cms/sections";
 
 type FaqItem = { q: string; a: string };
-type Section = { heading?: string; body: string[]; items?: FaqItem[]; step?: string; label?: string; image?: SectionImage; layout?: SectionLayout; ratio?: SectionRatio; variant?: SectionVariant; align?: "left" | "center" | "right"; hidden?: boolean };
+type Section = { heading?: string; body: string[]; items?: FaqItem[]; step?: string; label?: string; image?: SectionImage; layout?: SectionLayout; ratio?: SectionRatio; variant?: SectionVariant; align?: "left" | "center" | "right"; quote?: string; displayStyle?: DisplayStyle; hidden?: boolean };
 type Status = "draft" | "scheduled" | "published";
 type PageForm = { slug: string; title: string; eyebrow: string; intro: string; sections: Section[]; seo: { title?: string; description?: string; ogImage?: string }; status: Status; publishAt: string; unpublishAt: string; form: Record<string, unknown> };
 /** Site Settings the Contact preview needs (single source; passed by the contact admin route). */
@@ -99,6 +100,8 @@ export function ContentManager({ pages, initialSlug, supportEmail, contact }: { 
         ...(s.ratio ? { ratio: s.ratio } : {}),
         ...(s.variant ? { variant: s.variant } : {}),
         ...(s.align ? { align: s.align } : {}),
+        ...(s.quote ? { quote: s.quote } : {}),
+        ...(s.displayStyle ? { displayStyle: s.displayStyle } : {}),
         ...(s.hidden ? { hidden: true } : {}),
       })),
       seo: edit.seo, status: edit.status, publishAt: fromLocal(edit.publishAt), unpublishAt: fromLocal(edit.unpublishAt),
@@ -183,10 +186,20 @@ export function ContentManager({ pages, initialSlug, supportEmail, contact }: { 
   //    types, inferred from its shape and switchable via a Type select. Reuses the same sections
   //    array + the Media Library picker + the accordion mechanism — no new CMS. ──
   const isProductCare = !!edit && edit.slug === "product-care";
-  type PcType = "editorial" | "overlay" | "accordion" | "statement" | "divider";
-  const PC_TYPE_LABEL: Record<PcType, string> = { editorial: "Editorial (image + text)", overlay: "Image break (overlay)", accordion: "Accordion (Q&A)", statement: "Statement / text", divider: "Section divider" };
+  // The People page (`the-people-behind-samorah`) reuses this same editorial editor — a `person`
+  // section (Feature / Card / Highlight via displayStyle) plus image break / statement / divider.
+  const isPeople = !!edit && edit.slug === "the-people-behind-samorah";
+  const isEditorialPage = isProductCare || isPeople;
+  type PcType = "editorial" | "person" | "overlay" | "accordion" | "statement" | "divider";
+  const PC_TYPE_LABEL: Record<PcType, string> = { editorial: "Editorial (image + text)", person: "Person (Feature / Card)", overlay: "Image break (overlay)", accordion: "Accordion (Q&A)", statement: "Statement / text", divider: "Section divider" };
+  const PC_TYPE_OPTIONS: PcType[] = isPeople ? ["person", "overlay", "statement", "divider"] : ["editorial", "overlay", "accordion", "statement", "divider"];
   const PC_LAYOUTS: SectionLayout[] = ["left", "right", "center", "wide"];
+  const PEOPLE_FEATURE_LAYOUTS: SectionLayout[] = ["left", "right", "wide"];
   const PC_RATIOS: SectionRatio[] = ["landscape", "portrait", "square"];
+  const DISPLAY_STYLES: DisplayStyle[] = ["feature", "card", "highlight"];
+  // Hero image (People) lives in the page `form` JSONB (form_config) — no schema change.
+  const heroImg = (edit?.form as { heroImage?: SectionImage } | undefined)?.heroImage;
+  const setHeroImage = (img: SectionImage | undefined) => edit && setEdit({ ...edit, form: { ...(edit.form ?? {}), heroImage: img } });
   const pcHasBody = (s: Section) => (Array.isArray(s.body) ? s.body : [String(s.body)]).some((b) => (b ?? "").trim());
   // The type is stored explicitly (variant) once the editor sets it; otherwise inferred from shape.
   const pcType = (s: Section): PcType =>
@@ -204,6 +217,7 @@ export function ContentManager({ pages, initialSlug, supportEmail, contact }: { 
     const cur = edit!.sections[i];
     switch (t) {
       case "editorial": return { variant: t, layout: (cur.layout && cur.layout !== "overlay" ? cur.layout : "left") as SectionLayout, ratio: cur.ratio ?? "landscape" };
+      case "person": return { variant: t, displayStyle: cur.displayStyle ?? "card", layout: (cur.layout && cur.layout !== "overlay" ? cur.layout : "left") as SectionLayout, ratio: cur.ratio ?? "portrait" };
       case "overlay": return { variant: t, layout: "overlay" as SectionLayout };
       case "accordion": return { variant: t, items: cur.items ?? [] };
       case "statement": return { variant: t };
@@ -212,7 +226,7 @@ export function ContentManager({ pages, initialSlug, supportEmail, contact }: { 
   })());
   const setPcImage = (i: number, patch: Partial<SectionImage>) => setSection(i, { image: { url: "", ...(edit!.sections[i].image ?? {}), ...patch } });
   const pcDuplicate = (i: number) => { if (!edit) return; const next = [...edit.sections]; next.splice(i + 1, 0, JSON.parse(JSON.stringify(edit.sections[i]))); setEdit({ ...edit, sections: next }); };
-  const pcAddSection = () => edit && setEdit({ ...edit, sections: [...edit.sections, { heading: "", body: [""], layout: "left", ratio: "landscape" }] });
+  const pcAddSection = () => edit && setEdit({ ...edit, sections: [...edit.sections, isPeople ? { variant: "person", displayStyle: "card", body: [""], ratio: "portrait" } : { heading: "", body: [""], layout: "left", ratio: "landscape" }] });
   const pcToggleHidden = (i: number) => setSection(i, { hidden: !edit!.sections[i].hidden });
   const pcAddQ = (i: number) => setSection(i, { items: [...(edit!.sections[i].items ?? []), { q: "", a: "" }] });
   const pcDelQ = (i: number, qi: number) => setSection(i, { items: (edit!.sections[i].items ?? []).filter((_, k) => k !== qi) });
@@ -299,11 +313,28 @@ export function ContentManager({ pages, initialSlug, supportEmail, contact }: { 
               <label className="cfg-field"><span>Unpublish at (optional)</span><input type="datetime-local" value={edit.unpublishAt} onChange={(e) => setEdit({ ...edit, unpublishAt: e.target.value })} /></label>
             </div>
             <p className="cfg-hint">Scheduled pages go live automatically at “publish at” and hide at “unpublish at” — no manual step.</p>
-            {isProductCare ? (
+            {isEditorialPage ? (
               <label className="cfg-field"><span>Hero intro <span className="admin__muted">· line 1 = hero line, line 2 = subtitle</span></span><textarea rows={2} value={edit.intro} onChange={(e) => setEdit({ ...edit, intro: e.target.value })} /></label>
             ) : (
               <label className="cfg-field"><span>Intro</span><input value={edit.intro} onChange={(e) => setEdit({ ...edit, intro: e.target.value })} /></label>
             )}
+            {isPeople ? (
+              <div className="cfg-field"><span>Hero image <span className="admin__muted">· optional · large portrait / background</span></span>
+                <div className="pcare-edit__media">
+                  {heroImg?.url
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img className="pcare-edit__thumb" src={heroImg.url} alt="" />
+                    : <div className="pcare-edit__thumb pcare-edit__thumb--empty">No image</div>}
+                  <div className="pcare-edit__media-fields">
+                    <div className="ff-actions">
+                      <button type="button" className="ff-btn ff-btn--primary ff-btn--mini" onClick={() => setPcPicker(-1)}>{heroImg?.url ? "Replace image" : "Choose image"}</button>
+                      {heroImg?.url ? <button type="button" className="ff-btn ff-btn--mini" onClick={() => setHeroImage(undefined)}>Remove</button> : null}
+                    </div>
+                    {heroImg?.url ? <label className="cfg-field"><span>Alt text</span><input value={heroImg.alt ?? ""} onChange={(e) => setHeroImage({ ...heroImg, alt: e.target.value })} placeholder="Describe the image" /></label> : null}
+                  </div>
+                </div>
+              </div>
+            ) : null}
 
             {isFaq ? (
               <>
@@ -364,16 +395,17 @@ export function ContentManager({ pages, initialSlug, supportEmail, contact }: { 
                 })}
                 <label className="cfg-field" style={{ marginTop: 12 }}><span>Closing quote</span><input value={contactClosingText()} onChange={(e) => setContactClosing(e.target.value)} placeholder="The finest conversations begin with curiosity…" /></label>
               </>
-            ) : isProductCare ? (
+            ) : isEditorialPage ? (
               <>
-                <p className="cfg-sub">Editorial sections <span className="admin__muted">· image + text, accordions, statements &amp; dividers</span></p>
+                <p className="cfg-sub">{isPeople ? "People & sections" : "Editorial sections"} <span className="admin__muted">{isPeople ? "· features, cards, image breaks & statements — role is content" : "· image + text, accordions, statements & dividers"}</span></p>
                 {edit.sections.map((s, i) => {
                   const t = pcType(s);
                   const bodyText = Array.isArray(s.body) ? s.body.join("\n") : s.body;
+                  const label = t === "person" ? [s.label, s.heading].filter(Boolean).join(" · ") : s.heading;
                   return (
                     <div key={i} className={`cms-section pcare-edit${s.hidden ? " is-hidden" : ""}`}>
                       <div className="cms-section__bar">
-                        <span className="admin__muted">Section {i + 1} · {PC_TYPE_LABEL[t]}{s.heading ? ` · ${s.heading}` : ""}{s.hidden ? " · hidden" : ""}</span>
+                        <span className="admin__muted">Section {i + 1} · {PC_TYPE_LABEL[t]}{t === "person" && s.displayStyle ? ` (${s.displayStyle})` : ""}{label ? ` · ${label}` : ""}{s.hidden ? " · hidden" : ""}</span>
                         <div className="ff-actions">
                           <button type="button" className="ff-btn" disabled={i === 0} aria-label="Move section up" onClick={() => moveSection(i, -1)}>↑</button>
                           <button type="button" className="ff-btn" disabled={i === edit.sections.length - 1} aria-label="Move section down" onClick={() => moveSection(i, 1)}>↓</button>
@@ -386,7 +418,7 @@ export function ContentManager({ pages, initialSlug, supportEmail, contact }: { 
                       <div className="cfg-grid">
                         <label className="cfg-field"><span>Type</span>
                           <select value={t} onChange={(e) => pcSetType(i, e.target.value as PcType)}>
-                            {(Object.keys(PC_TYPE_LABEL) as PcType[]).map((k) => <option key={k} value={k}>{PC_TYPE_LABEL[k]}</option>)}
+                            {PC_TYPE_OPTIONS.map((k) => <option key={k} value={k}>{PC_TYPE_LABEL[k]}</option>)}
                           </select>
                         </label>
                         {t === "editorial" ? <label className="cfg-field"><span>Step number <span className="admin__muted">· optional</span></span><input value={s.step ?? ""} onChange={(e) => setSection(i, { step: e.target.value })} placeholder="01" /></label> : null}
@@ -427,8 +459,23 @@ export function ContentManager({ pages, initialSlug, supportEmail, contact }: { 
                         </>
                       ) : t === "statement" ? (
                         <>
-                          <input value={s.heading ?? ""} onChange={(e) => setSection(i, { heading: e.target.value })} placeholder="Title (optional — leave blank for a closing statement)" />
+                          <input value={s.heading ?? ""} onChange={(e) => setSection(i, { heading: e.target.value })} placeholder="Title (optional — leave blank for a large centred quote / closing)" />
                           <textarea rows={3} value={bodyText} onChange={(e) => setSection(i, { body: e.target.value.split("\n") })} placeholder="One paragraph per line" />
+                        </>
+                      ) : t === "person" ? (
+                        <>
+                          <div className="cfg-grid">
+                            <label className="cfg-field"><span>Display style <span className="admin__muted">· weight</span></span><select value={s.displayStyle ?? "card"} onChange={(e) => setSection(i, { displayStyle: e.target.value as DisplayStyle })}>{DISPLAY_STYLES.map((d) => <option key={d} value={d}>{d}</option>)}</select></label>
+                            <label className="cfg-field"><span>Role <span className="admin__muted">· optional</span></span><input value={s.label ?? ""} onChange={(e) => setSection(i, { label: e.target.value })} placeholder="Founder / Artist / Studio Companion" /></label>
+                          </div>
+                          <input value={s.heading ?? ""} onChange={(e) => setSection(i, { heading: e.target.value })} placeholder="Name (e.g. Ananya Das)" />
+                          <textarea rows={3} value={bodyText} onChange={(e) => setSection(i, { body: e.target.value.split("\n") })} placeholder="Their story — one paragraph per line; “- ” for a bullet" />
+                          {(s.displayStyle ?? "card") === "feature" ? <input value={s.quote ?? ""} onChange={(e) => setSection(i, { quote: e.target.value })} placeholder="Pull-quote (optional)" /> : null}
+                          {pcImageRow(i, s)}
+                          <div className="cfg-grid">
+                            {(s.displayStyle ?? "card") === "feature" ? <label className="cfg-field"><span>Image position</span><select value={s.layout ?? "left"} onChange={(e) => setSection(i, { layout: e.target.value as SectionLayout })}>{PEOPLE_FEATURE_LAYOUTS.map((l) => <option key={l} value={l}>{l}</option>)}</select></label> : null}
+                            <label className="cfg-field"><span>Portrait ratio</span><select value={s.ratio ?? "portrait"} onChange={(e) => setSection(i, { ratio: e.target.value as SectionRatio })}>{PC_RATIOS.map((r) => <option key={r} value={r}>{r}</option>)}</select></label>
+                          </div>
                         </>
                       ) : (
                         <>
@@ -524,6 +571,8 @@ export function ContentManager({ pages, initialSlug, supportEmail, contact }: { 
                   );
                 })() : isProductCare ? (
                   <ProductCareContent eyebrow={edit.eyebrow} title={edit.title || "Product Care"} intro={edit.intro} sections={edit.sections} />
+                ) : isPeople ? (
+                  <PeopleContent eyebrow={edit.eyebrow} title={edit.title || "The People Behind Samorah"} intro={edit.intro} heroImage={heroImg ?? null} sections={edit.sections} />
                 ) : (
                   <LegalPage {...buildPreviewProps(edit, supportEmail)} />
                 )}
@@ -559,7 +608,10 @@ export function ContentManager({ pages, initialSlug, supportEmail, contact }: { 
         <MediaPicker
           open
           kind="image"
-          onSelect={(url, focal, _fm, _mu, assetId) => { if (pcPicker !== null) setPcImage(pcPicker, { url, mediaId: assetId, focal }); }}
+          onSelect={(url, focal, _fm, _mu, assetId) => {
+            if (pcPicker === -1) setHeroImage({ url, mediaId: assetId, focal, ...(heroImg?.alt ? { alt: heroImg.alt } : {}) });
+            else if (pcPicker !== null) setPcImage(pcPicker, { url, mediaId: assetId, focal });
+          }}
           onClose={() => setPcPicker(null)}
         />
       ) : null}
