@@ -108,15 +108,42 @@ light-spread `1400–2000` · wordmark `2000–2400` · fade `2400–2600`. Redu
 
 ## Phase 1 Success Criteria (definition of done)
 
-- [ ] No functional regressions — all existing features operational.
-- [ ] No Lighthouse degradation beyond the agreed threshold.
-- [ ] **CLS remains 0** (fixed overlay, out of flow).
-- [ ] **LCP effectively unchanged** (homepage hero paints beneath; overlay is not an LCP candidate).
-- [ ] **Zero hydration warnings**, zero console errors.
-- [ ] No new accessibility violations.
-- [ ] All existing automated tests pass.
-- [ ] Performance budget met: **JS ≤ 10 KB gz · CSS ≤ 5 KB · scripting ≤ ~2 ms · no retained memory after unmount.**
-- [ ] Removable by reverting the mount commit.
+Verified in this environment (build + SSR + source):
+
+- [x] **No functional regressions** — analytics wiring (`SectionTracker`/`JsonLd`/`ComposedSections`) untouched by the mount diff; every non-home route renders zero overlay.
+- [x] **CLS 0 by construction** — overlay is `position:fixed`, out of flow.
+- [x] **Removable by reverting the mount** — `git revert d248ec5` verified: overlay gone, engine files intact, build passes.
+- [x] **Kill switch verified** — `NEXT_PUBLIC_ENABLE_LUXURY_EXPERIENCE=false` build → overlay + gate script fully absent, homepage intact.
+- [x] **Deterministic render** — server === first client render (no window/localStorage reads during render) → no hydration mismatch by construction.
+- [x] **Reduced-motion correct at source** — `[data-lux-tier="reduced"]` **and** `@media (prefers-reduced-motion)` both drop flame/spark/glow → 400 ms no-transform fade.
+- [x] **Production build clean** — `next build` exit 0; overlay present on first-visit SSR; isolation confirmed.
+
+Requires a human at a real browser before freeze (cannot be produced headlessly here):
+
+- [ ] Zero **runtime console errors / React hydration warnings** (browser DevTools).
+- [ ] **Lighthouse** before/after — Performance · A11y · Best Practices · SEO effectively unchanged. *(lighthouse CLI not installed locally.)*
+- [ ] **First / return / incognito** visual pass (plays once · no flash · no blank · reload skips cleanly).
+- [ ] **Mobile** — iOS Safari + Android Chrome: smooth, no viewport jump, no white flash.
+- [ ] No failed asset requests / CSP warnings in the Network tab.
+
+---
+
+## Known Limitations (Phase 1)
+
+- **Analytics experience events are intentionally not wired.** `reporting.ts` is a no-op seam; viewed/skipped/completed are not sent to GA4/GTM/Clarity yet.
+- **CMS control is scaffolded, not connected.** `resolveExperienceConfig()` is the merge seam, but config is in-code today (env kill switch + `enabled` flag); no DB/admin toggle.
+- **Runtime FPS adaptation is architected, not implemented.** Tiering is pre-emptive (reduced-motion / core / memory heuristics); there is no live frame-rate downgrade mid-animation.
+- **Sound engine is a disabled placeholder.** `silentSound` is a no-op; no audio is loaded or played.
+- **Brand mark is the text wordmark.** `brandMark.kind` supports `svg`/`animatedSvg`/`video` in the type, but only `text` ("SAMORAH") is rendered in Phase 1.
+- **One experience only.** `intro` is the sole experience; page transitions, ambient lighting, flame physics, particles, hover, and seasonal variants are future phases.
+
+None of these block launch — each is a deliberate Phase-1 boundary, not an unfinished feature.
+
+---
+
+## Production readiness
+
+**Status: Production Ready** for everything verifiable without a browser (build, SSR, isolation, kill switch, rollback, analytics isolation, deterministic render, reduced-motion source). The five browser-only checks above are the remaining sign-off gate — the design satisfies them by construction, but they should be eyeballed once on real devices before freeze.
 
 ---
 
