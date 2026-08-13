@@ -10,3 +10,4 @@ export { reportExperience, EXPERIENCE_EVENTS, type ExperiencePhase } from "./eng
 export { detectMotionTier, type MotionTier } from "./engine/capability";
 export { silentSound, type SoundEngine } from "./engine/sound";
 export { ExperienceBoundary } from "./engine/ExperienceBoundary";
+export { LuxuryExperience } from "./LuxuryExperience";
