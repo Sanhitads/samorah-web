@@ -5209,7 +5209,7 @@ video.asset-image {
 .people__card-media { width: 100%; overflow: hidden; background: var(--soft-beige, #F0EBE3); border-radius: 2px; margin-bottom: 14px; } /* text sits closer to the portrait */
 .people__card-media .asset-image { width: 100%; height: 100%; object-fit: cover; display: block; }
 .people__card-ph { display: block; width: 100%; height: 100%; background: linear-gradient(160deg, #F4EFE7 0%, #EAE3D8 100%); }
-.people__card .people__role { margin-bottom: 6px; }
+.people__card .people__role { font-size: 10px; opacity: 0.72; margin-bottom: 6px; } /* subordinate to the name */
 .people__name--card { font-size: clamp(1.2rem, 2vw, 1.45rem); margin: 0 0 10px; }
 .people__card .people__p { font-size: 14px; max-width: none; margin-bottom: 10px; }
 

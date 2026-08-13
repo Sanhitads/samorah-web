@@ -225,7 +225,7 @@ export const LEGAL: Record<string, { eyebrow: string; title: string; intro?: str
   "the-people-behind-samorah": {
     eyebrow: "",
     title: "The People Behind Samorah",
-    intro: "Some stories are carried by fragrance.\nOthers are carried by the people who quietly shape it.",
+    intro: "Some people stay behind the scenes.\nTheir work doesn't.",
     sections: [
       // Editorial intro statement (centred, understated).
       { variant: "statement", layout: "center", body: [
@@ -235,7 +235,7 @@ export const LEGAL: Record<string, { eyebrow: string; title: string; intro?: str
       // Feature — Founder (image left, portrait; the primary subject).
       { variant: "person", displayStyle: "feature", label: "Founder", heading: "Ananya Das", layout: "left", ratio: "portrait", body: [
         "She has always been drawn to small, familiar things — light through an old window, the smell of books, a room settling into evening.",
-        "Samorah grew out of those observations, and she still shapes each new release with the same instinct.",
+        "Those quiet habits eventually became Samorah, and she still shapes each new release with the same instinct.",
       ], quote: "The best things are the ones you almost don't notice." },
       // Image break — full-width (a gradient band with a quiet line until a photograph is added).
       { variant: "overlay", layout: "overlay", ratio: "landscape", align: "center", heading: "Most of the making is never seen.", body: [] },
