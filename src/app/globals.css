@@ -5181,12 +5181,12 @@ video.asset-image {
    FILLS the full height of its column (matched to the text) so the two sides read as one composition
    — no floating image with empty space. object-fit: cover keeps it edge-to-edge. */
 .people__feature--left, .people__feature--right { display: grid; gap: clamp(32px, 5vw, 88px); align-items: stretch; }
-.people__feature--left { grid-template-columns: 1.08fr 0.92fr; }
-.people__feature--right { grid-template-columns: 0.92fr 1.08fr; }
+.people__feature--left { grid-template-columns: 1.5fr 1fr; }   /* ~60% image / 40% text — the portrait leads */
+.people__feature--right { grid-template-columns: 1fr 1.5fr; }
 .people__feature--right .people__portrait { order: 2; }
 @media (min-width: 861px) {
   .people__feature--left .people__portrait, .people__feature--right .people__portrait { display: flex; flex-direction: column; }
-  .people__feature--left .people__portrait-media, .people__feature--right .people__portrait-media { flex: 1 1 auto; min-height: clamp(360px, 46vh, 560px); } /* fills the row height; aspect-ratio becomes a floor */
+  .people__feature--left .people__portrait-media, .people__feature--right .people__portrait-media { flex: 1 1 auto; min-height: clamp(440px, 60vh, 720px); } /* large — the founder/advisor is the primary subject */
   .people__feature--left .people__feature-text, .people__feature--right .people__feature-text { display: flex; flex-direction: column; justify-content: center; } /* text sits centred beside the full-height portrait */
 }
 .people__feature--wide { display: flex; flex-direction: column; align-items: center; text-align: center; gap: clamp(28px, 4vh, 48px); }
@@ -5201,16 +5201,17 @@ video.asset-image {
 .people__portrait-media .asset-image { width: 100%; height: 100%; object-fit: cover; display: block; }
 .people__caption { margin: 12px 0 0; font-family: var(--font-sans, sans-serif); font-size: 12px; letter-spacing: 0.04em; color: var(--smoke, #6b6259); }
 
-/* People grid — cards auto-flow (3 / 2 / 1 columns by width); highlight spans wider. */
-.people__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: clamp(28px, 3.5vw, 56px); max-width: 1040px; margin-inline: auto; }
+/* People grid — cards auto-flow (3 / 2 / 1 columns by width), sized and centred so a few cards stay
+   dense and editorial rather than stretching into large empty tiles; highlight spans wider. */
+.people__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 320px)); justify-content: center; gap: clamp(28px, 3vw, 48px); max-width: 1080px; margin-inline: auto; }
 .people__card { display: flex; flex-direction: column; }
 .people__card--highlight { grid-column: span 2; }
-.people__card-media { width: 100%; overflow: hidden; background: var(--soft-beige, #F0EBE3); border-radius: 2px; margin-bottom: 18px; }
+.people__card-media { width: 100%; overflow: hidden; background: var(--soft-beige, #F0EBE3); border-radius: 2px; margin-bottom: 14px; } /* text sits closer to the portrait */
 .people__card-media .asset-image { width: 100%; height: 100%; object-fit: cover; display: block; }
 .people__card-ph { display: block; width: 100%; height: 100%; background: linear-gradient(160deg, #F4EFE7 0%, #EAE3D8 100%); }
-.people__card .people__role { margin-bottom: 8px; }
-.people__name--card { font-size: clamp(1.2rem, 2vw, 1.45rem); margin: 0 0 12px; }
-.people__card .people__p { font-size: 14px; max-width: none; }
+.people__card .people__role { margin-bottom: 6px; }
+.people__name--card { font-size: clamp(1.2rem, 2vw, 1.45rem); margin: 0 0 10px; }
+.people__card .people__p { font-size: 14px; max-width: none; margin-bottom: 10px; }
 
 /* Image break — full-width photography with overlay text (gradient fallback when no image). */
 .people__section--break { margin-top: clamp(84px, 14vh, 168px); }

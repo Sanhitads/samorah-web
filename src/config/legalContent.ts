@@ -229,30 +229,32 @@ export const LEGAL: Record<string, { eyebrow: string; title: string; intro?: str
     sections: [
       // Editorial intro statement (centred, understated).
       { variant: "statement", layout: "center", body: [
-        "A fragrance is never created by one pair of hands.",
-        "It is shaped through conversation, craft, patience, and people who care deeply about the smallest details.",
+        "A fragrance is never made by one pair of hands.",
+        "It takes conversation, craft and patience, and people who notice the things most of us miss.",
       ] },
-      // Feature — Founder (image left, portrait).
+      // Feature — Founder (image left, portrait; the primary subject).
       { variant: "person", displayStyle: "feature", label: "Founder", heading: "Ananya Das", layout: "left", ratio: "portrait", body: [
-        "She has always been drawn to quiet things — morning light through old windows, the smell of books, the comfort of familiar rooms.",
-        "Samorah grew slowly from those observations, and she still shapes every collection with the same instinct.",
-      ], quote: "Fragrance should never dominate a room. It should simply belong there." },
+        "She has always been drawn to small, familiar things — light through an old window, the smell of books, a room settling into evening.",
+        "Samorah grew out of those observations, and she still shapes each new release with the same instinct.",
+      ], quote: "The best things are the ones you almost don't notice." },
       // Image break — full-width (a gradient band with a quiet line until a photograph is added).
-      { variant: "overlay", layout: "overlay", ratio: "landscape", align: "center", heading: "The quiet work behind every object.", body: [] },
-      // Feature — Advisor (reverse layout, image right; abstract, not a résumé).
+      { variant: "overlay", layout: "overlay", ratio: "landscape", align: "center", heading: "Most of the making is never seen.", body: [] },
+      // Feature — Advisor (reverse layout, image right; not a résumé).
       { variant: "person", displayStyle: "feature", label: "Advisor", layout: "right", ratio: "portrait", body: [
-        "Every creative journey benefits from another perspective.",
-        "Sometimes the best ideas arrive through conversation rather than certainty. Questions become refinement, and restraint becomes part of the design.",
-        "That quiet exchange continues behind every collection.",
+        "Not everyone here makes things directly.",
+        "Some ask the harder questions, or say plainly when a piece is finished.",
+        "A second opinion keeps the work honest, long after the first idea.",
       ] },
       // Editorial quote (large italic serif — a pause, not a divider).
       { variant: "statement", body: ["Good fragrance is remembered quietly."] },
+      // Transition — a small, understated line into the studio grid.
+      { variant: "statement", layout: "center", body: ["No one here works alone for long."] },
       // Divider — introduces the studio grid.
       { variant: "divider", heading: "The Studio", body: [] },
       // Grid — cards auto-flow to 3 / 2 / 1 columns; add contributors simply by adding cards.
       { variant: "person", displayStyle: "card", label: "Artist", heading: "Somyadeep Das", ratio: "portrait", body: [
-        "He notices textures, forgotten places and quiet details most people walk past.",
-        "In time, they become the artwork behind a collection.",
+        "He pays attention to texture, to worn and overlooked places, to the details most people pass by.",
+        "Given time, they turn into the artwork on a label or a lid.",
       ] },
       { variant: "person", displayStyle: "card", label: "Studio Companion", heading: "Milo", ratio: "portrait", body: [
         "Every studio needs someone who reminds us to pause.",
