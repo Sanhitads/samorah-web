@@ -33,6 +33,9 @@ export default (phase: string): NextConfig => ({
       // "Meet the Makers" was renamed to "The People Behind Samorah". The legacy /about path never
       // existed in this app; 301 it (and any stale nav/menu link) to the new CMS page.
       { source: "/about/meet-the-makers", destination: "/the-people-behind-samorah", statusCode: 301 },
+      // "Craft & Ingredients" is superseded by the Craft & Materials editorial page; the legacy /about
+      // path never existed here — 301 it (and any stale nav/menu link) to the new page.
+      { source: "/about/craft-ingredients", destination: "/craft-materials", statusCode: 301 },
     ];
   },
   images: {

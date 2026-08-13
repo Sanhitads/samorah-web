@@ -186,9 +186,10 @@ export function ContentManager({ pages, initialSlug, supportEmail, contact }: { 
   //    types, inferred from its shape and switchable via a Type select. Reuses the same sections
   //    array + the Media Library picker + the accordion mechanism — no new CMS. ──
   const isProductCare = !!edit && edit.slug === "product-care";
-  // The People page (`the-people-behind-samorah`) reuses this same editorial editor — a `person`
-  // section (Feature / Card / Highlight via displayStyle) plus image break / statement / divider.
-  const isPeople = !!edit && edit.slug === "the-people-behind-samorah";
+  // The People page and Craft & Materials share this editorial editor — a `person` section
+  // (Feature / Card / Highlight via displayStyle) plus image break / statement / divider, an optional
+  // hero image, and the PeopleContent preview. Both render through PeopleContent.
+  const isPeople = !!edit && (edit.slug === "the-people-behind-samorah" || edit.slug === "craft-materials");
   const isEditorialPage = isProductCare || isPeople;
   type PcType = "editorial" | "person" | "overlay" | "accordion" | "statement" | "divider";
   const PC_TYPE_LABEL: Record<PcType, string> = { editorial: "Editorial (image + text)", person: "Person (Feature / Card)", overlay: "Image break (overlay)", accordion: "Accordion (Q&A)", statement: "Statement / text", divider: "Section divider" };
@@ -217,10 +218,15 @@ export function ContentManager({ pages, initialSlug, supportEmail, contact }: { 
     const cur = edit!.sections[i];
     switch (t) {
       case "editorial": return { variant: t, layout: (cur.layout && cur.layout !== "overlay" ? cur.layout : "left") as SectionLayout, ratio: cur.ratio ?? "landscape" };
-      case "person": return { variant: t, displayStyle: cur.displayStyle ?? "card", layout: (cur.layout && cur.layout !== "overlay" ? cur.layout : "left") as SectionLayout, ratio: cur.ratio ?? "portrait" };
+      // Only keep a layout valid for a person feature (left/right/wide); anything else (e.g. a leftover
+      // "center" from a statement) defaults to "left" so the editor + renderer stay consistent.
+      case "person": return { variant: t, displayStyle: cur.displayStyle ?? "card", layout: ((["left", "right", "wide"] as string[]).includes(cur.layout ?? "") ? cur.layout : "left") as SectionLayout, ratio: cur.ratio ?? "portrait" };
       case "overlay": return { variant: t, layout: "overlay" as SectionLayout };
       case "accordion": return { variant: t, items: cur.items ?? [] };
-      case "statement": return { variant: t };
+      // Statements default to the understated centred style (layout "center"). Switching types never
+      // leaves a stale layout that would flip the section into the large-quote style — pick the style
+      // explicitly via the Style select. (layout "center" → centred text; otherwise → large quote.)
+      case "statement": return { variant: t, layout: "center" as SectionLayout };
       case "divider": return { variant: t };
     }
   })());
@@ -459,7 +465,15 @@ export function ContentManager({ pages, initialSlug, supportEmail, contact }: { 
                         </>
                       ) : t === "statement" ? (
                         <>
-                          <input value={s.heading ?? ""} onChange={(e) => setSection(i, { heading: e.target.value })} placeholder="Title (optional — leave blank for a large centred quote / closing)" />
+                          <div className="cfg-grid">
+                            <label className="cfg-field"><span>Style</span>
+                              <select value={s.layout === "center" ? "text" : "quote"} onChange={(e) => setSection(i, { layout: e.target.value === "text" ? ("center" as SectionLayout) : undefined })}>
+                                <option value="text">Text — centred, understated</option>
+                                <option value="quote">Large quote — big centred italic</option>
+                              </select>
+                            </label>
+                          </div>
+                          <input value={s.heading ?? ""} onChange={(e) => setSection(i, { heading: e.target.value })} placeholder="Title (optional — a Large-quote style is only used when there is no title)" />
                           <textarea rows={3} value={bodyText} onChange={(e) => setSection(i, { body: e.target.value.split("\n") })} placeholder="One paragraph per line" />
                         </>
                       ) : t === "person" ? (
@@ -572,7 +586,7 @@ export function ContentManager({ pages, initialSlug, supportEmail, contact }: { 
                 })() : isProductCare ? (
                   <ProductCareContent eyebrow={edit.eyebrow} title={edit.title || "Product Care"} intro={edit.intro} sections={edit.sections} />
                 ) : isPeople ? (
-                  <PeopleContent eyebrow={edit.eyebrow} title={edit.title || "Behind Samorah"} intro={edit.intro} heroImage={heroImg ?? null} sections={edit.sections} />
+                  <PeopleContent eyebrow={edit.eyebrow} title={edit.title || "Untitled"} intro={edit.intro} heroImage={heroImg ?? null} sections={edit.sections} />
                 ) : (
                   <LegalPage {...buildPreviewProps(edit, supportEmail)} />
                 )}

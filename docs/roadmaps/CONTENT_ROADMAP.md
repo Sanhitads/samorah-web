@@ -25,7 +25,38 @@
 | FAQ | `/faq` | **Committed · Frozen** | `fcaac8a` |
 | Contact | `/contact` | **Committed · Frozen** | `e13a6cf` |
 | Product Care | `/product-care` *(existing route)* | **Committed · Frozen** | `e74f633` |
-| Behind Samorah | `/the-people-behind-samorah` | **Committed · Frozen** | this commit |
+| Behind Samorah | `/the-people-behind-samorah` | **Committed · Frozen** | `4e8ef82` |
+| Craft & Materials | `/craft-materials` | **Committed · Frozen** | this commit |
+
+---
+
+## Phase C4 — Craft & Materials
+
+**Status: Approved · Committed · Frozen. LAUNCH READY.**
+
+A quiet editorial page answering one question — *how is a Samorah object thoughtfully made* — not a
+manufacturing guide. **Reuses the Behind Samorah renderer (`PeopleContent`)** and the same Pages CMS:
+no new renderer, section types, schema, editor framework or route architecture.
+
+### Includes
+- ✓ Route `/craft-materials` + editor `/admin/content/craft-materials` (reuses the People editor mode)
+- ✓ IA (existing section types only): Hero (optional image) → intro statement → **The Craft** divider →
+  Feature *Candle Maker* → image break → Feature *Artist* → **hidden** Feature *Terracotta Maker* →
+  **The Materials** divider → intro statement → Feature *The Vessel* (glass/ceramic/terracotta) → *Wax*
+  statement → image break → Feature *Fragrance* → image break → *Wick* statement → closing → signature
+- ✓ **Terracotta ships hidden** via the existing Hidden toggle (editable in CMS, unhide anytime — no code)
+- ✓ Scalable: future makers/materials (Packaging, Perfumer, Glassblower, Labels, Botanical, …) added as
+  features/cards/statements entirely in the CMS
+- ✓ Inherits everything from PeopleContent: hero image, responsive `AssetImage` (srcSet, blur-up, lazy,
+  CLS-safe reserved aspect-ratio), focal-point cropping, Media Library delete-protection; SEO
+  (title/description/canonical/OG) + Breadcrumb JSON-LD; reorder/duplicate/hide/publish/schedule/revisions
+
+### Notes
+- **Materials with imagery** (The Vessel, Fragrance) are person *features*; **narrow material text**
+  (Wax, Wick) are *statements* — a minor editor-label nuance (Type shows "Person"), the trade for zero
+  new architecture.
+- Copy is human and unhurried; verified **no sentence duplicated** from Our Story, Product Care or
+  Behind Samorah (the closing was reworded to avoid echoing Behind Samorah's).
 
 ---
 

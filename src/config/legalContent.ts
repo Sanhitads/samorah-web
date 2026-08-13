@@ -272,6 +272,87 @@ export const LEGAL: Record<string, { eyebrow: string; title: string; intro?: str
       ] },
     ],
   },
+  // Craft & Materials — a quiet editorial page answering "how is a Samorah object thoughtfully made".
+  // Reuses the Behind Samorah renderer (PeopleContent): a hero (optional image via form_config),
+  // person FEATURES for the makers (and for the material blocks that carry an image), STATEMENTS for
+  // the narrow material text, OVERLAY image breaks, DIVIDERS and a closing. No new section types,
+  // renderer, schema or editor. Terracotta ships HIDDEN via the existing toggle (unhide in the CMS).
+  // Intro is a single hero line. Copy is human and unhurried — not a manufacturing guide.
+  "craft-materials": {
+    eyebrow: "",
+    title: "Craft & Materials",
+    intro: "Each candle begins long before the flame.\nIt takes many hands, carefully chosen materials, and time.",
+    sections: [
+      // ── The Craft ─────────────────────────────────────────────────────────
+      { variant: "divider", heading: "The Craft", body: [] },
+      // Craft introduction (centred).
+      { variant: "statement", layout: "center", body: [
+        "Every Samorah candle begins with people — not machines.",
+        "Hands shape the clay, hands paint the art, and hands pour the wax.",
+        "Every piece carries the quiet mark of the hands that made it. Small variations are left untouched — they remind us that something real was made.",
+        "This is Samorah — crafted with soul.",
+      ] },
+      // Feature — The Candle Maker (image left).
+      { variant: "person", displayStyle: "feature", label: "The Craft", heading: "The Candle Maker", layout: "left", ratio: "portrait", body: [
+        "A candle seems simple — wax, wick and fragrance. Bringing them into balance takes care and experience.",
+        "Every Samorah candle is poured by hand: the wax melted slowly, blended with fragrance and poured at the right temperature, so the scent settles naturally into it.",
+        "The wick is chosen with the same care as the wax. It shapes how the candle burns, how the fragrance unfolds, and how the flame settles into a room.",
+        "Once poured, the candle rests. Time lets the wax and fragrance bind, so that when it is lit the scent unfolds in layers rather than all at once.",
+        "The work is quiet and precise — and it is what lets a candle change a room.",
+      ] },
+      // Full-width image break (atmospheric photo — a soft band until an image is added).
+      { variant: "overlay", layout: "overlay", ratio: "landscape", align: "center", body: [] },
+      // Feature — The Artist (reverse, image right).
+      { variant: "person", displayStyle: "feature", label: "The Craft", heading: "The Artist", layout: "right", ratio: "portrait", body: [
+        "Every fragrance begins as a story. Before you ever light a Samorah candle, the scent has already been translated into something you can see.",
+        "An artist begins with the fragrance story and slowly turns it into colour, texture and form — the artwork that appears on the packaging.",
+        "It meets you first on the box, and sometimes on the vessel itself: certain terracotta jars are painted by hand, so art and candle live together in one object.",
+        "Because every brushstroke is painted by hand, no two pieces are ever exactly alike — a candle that carries both scent and art.",
+      ] },
+      // Full-width image break.
+      { variant: "overlay", layout: "overlay", ratio: "landscape", align: "center", body: [] },
+      // Feature — The Terracotta Maker (HIDDEN by default; unhide in the CMS when the collection needs it).
+      { variant: "person", displayStyle: "feature", label: "The Craft", heading: "The Terracotta Maker", layout: "left", ratio: "portrait", hidden: true, body: [
+        "Long before the wax is poured, clay begins as earth and slowly becomes a vessel that will one day hold a flame.",
+        "Each keeps small variations in texture and tone; no two are exactly alike. These differences are not flaws — they are the traces of the maker.",
+        "Alongside terracotta, Samorah also works in glass and ceramic, each chosen for the way it shapes a candle's atmosphere. Whether clay, glass or ceramic, the intention stays the same — an object that feels considered, lasting and personal.",
+      ] },
+      // Large immersive image break, into the materials.
+      { variant: "overlay", layout: "overlay", ratio: "landscape", align: "center", body: [] },
+      // ── The Materials ─────────────────────────────────────────────────────
+      { variant: "divider", heading: "The Materials", body: [] },
+      // Materials introduction (centred).
+      { variant: "statement", layout: "center", body: [
+        "Every material inside a Samorah candle is chosen with intention.",
+        "So it can become part of a moment — a quiet evening, a conversation, a pause at the end of the day.",
+      ] },
+      // Wax.
+      { variant: "statement", heading: "Wax", layout: "center", body: [
+        "We chose a coconut-based wax because it burns gently and lets fragrance settle naturally into a space.",
+        "It gives a softer, layered scent and an even, steady melt pool around the flame.",
+        "The result is a candle that feels balanced — never overpowering, never harsh.",
+      ] },
+      // Fragrance.
+      { variant: "statement", heading: "Fragrance", layout: "center", body: [
+        "Every Samorah scent is developed in our own studio.",
+        "We begin with single notes, testing them quietly on paper before bringing them together. From there the fragrance is shaped into layers — a gentle opening, a heart that gives it character, and a base that lingers softly in the room.",
+        "Each blend is tested, adjusted and refined until it feels complete. Every fragrance is built patiently, one note at a time.",
+      ] },
+      // Wick.
+      { variant: "statement", heading: "Wick", layout: "center", body: [
+        "The smallest detail often has the greatest influence.",
+        "The wick is chosen to suit the wax, the vessel and the fragrance, helping the candle burn steadily from the first light to the last.",
+      ] },
+      // Closing (no layout → the large centred quote style).
+      { variant: "statement", body: [
+        "Every object remembers how it was made.",
+      ] },
+      // Brand signature (small, centred, subtle).
+      { variant: "statement", layout: "center", body: [
+        "Human-made. Story-led. Soul-centred.",
+      ] },
+    ],
+  },
   faq: {
     // Hero shows only Title + Subtitle (no eyebrow, no hero image) — mirrors the policy pages.
     // FAQ sections are CATEGORIES: heading = category, items = its questions (rendered as an

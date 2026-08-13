@@ -124,7 +124,7 @@ export const MENU_BRANCHES: MenuBranch[] = [
     label: "About",
     items: [
       { label: "Our Story", href: "/about/our-story" },
-      { label: "Craft & Ingredients", href: "/about/craft-ingredients" },
+      { label: "Craft & Materials", href: "/craft-materials" },
       { label: "Behind Samorah", href: "/the-people-behind-samorah" },
       { label: "Contact", href: "/contact" },
     ],
@@ -181,7 +181,7 @@ export const FOOTER_SECTIONS: FooterSection[] = [
     title: "About",
     links: [
       { label: "Our Story", href: "/about/our-story" },
-      { label: "Craft & Ingredients", href: "/about/craft-ingredients" },
+      { label: "Craft & Materials", href: "/craft-materials" },
       { label: "Behind Samorah", href: "/the-people-behind-samorah" },
       { label: "Product Care", href: "/product-care" },
       { label: "Contact", href: "/contact" },
