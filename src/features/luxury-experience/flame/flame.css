@@ -1,0 +1,117 @@
+/**
+ * Luxury Flame Primitive — motion + glow (Phase 2).
+ *
+ * ── Luxury Motion Specification (DO NOT EXCEED — keeps it a candle, never a torch/campfire) ────────
+ *   Max sway ........ 2° rotate · ≤1.5% translateX   (amplitude scaled per motion profile)
+ *   Opacity ......... 90%–95%    (flicker is never hard on/off)
+ *   Scale ........... 1.00–1.02  (micro scaleY only)
+ *   Glow ............ 95%–100%   (of --lux-flame-glow-opacity)
+ *   Easing .......... --lux-flame-ease (shared in-out) — no linear, no sudden changes
+ *   Timing .......... sway / flicker / glow run at DIFFERENT durations + phase offsets → never synced
+ *
+ * ── SVG layer responsibilities (which elements may animate) ────────────────────────────────────────
+ *   .lux-flame__wick   STATIC — the anchor; never animated independently (only the near-origin sway).
+ *   .lux-flame__body   follows the global sway only (no independent animation).
+ *   .lux-flame__inner  the ONLY independently animated SVG element — subtle flicker (opacity + scaleY).
+ *   .lux-flame__glow   (non-SVG div) — the glow pulse. Separate layer so it can be themed / removed.
+ *
+ * ALL motion is CSS. No JS, no timers, no rAF, no listeners, no effects. Only transform + opacity
+ * animate (GPU-composited). Reduced-motion and the "still" profile → a static LIT flame (never hidden).
+ */
+@import "./flame.tokens.css";
+
+.lux-flame {
+  display: inline-block;
+  position: relative;
+  aspect-ratio: 40 / 64; /* matches the SVG viewBox → width derives from height → no layout shift */
+  height: var(--lux-flame-size-md); /* default; a size modifier or inline height overrides */
+  pointer-events: none;
+  /* per-profile sway amplitude, always within the 2° / 1.5% caps */
+  --lux-flame-amp: calc(var(--lux-flame-sway-angle) * 0.6);
+  --lux-flame-amp-x: calc(var(--lux-flame-sway-shift) * 0.6);
+}
+
+/* Size modifiers (xs–xl) */
+.lux-flame--xs { height: var(--lux-flame-size-xs); }
+.lux-flame--sm { height: var(--lux-flame-size-sm); }
+.lux-flame--md { height: var(--lux-flame-size-md); }
+.lux-flame--lg { height: var(--lux-flame-size-lg); }
+.lux-flame--xl { height: var(--lux-flame-size-xl); }
+
+/* Signature uses the full amplitude cap; classic (default) is calmer; still = no motion. */
+.lux-flame--signature {
+  --lux-flame-amp: var(--lux-flame-sway-angle);
+  --lux-flame-amp-x: var(--lux-flame-sway-shift);
+}
+
+/* Glow / light radius — separate layer, behind the flame (painted first in the DOM). */
+.lux-flame__glow {
+  position: absolute;
+  left: 50%;
+  top: 56%;
+  width: 190%;
+  height: 150%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle,
+    var(--lux-flame-core) 0%,
+    var(--lux-flame-amber) 32%,
+    transparent 70%);
+  opacity: var(--lux-flame-glow-opacity);
+  pointer-events: none;
+  animation: lux-flame-glow var(--lux-flame-glow-dur) var(--lux-flame-ease) infinite;
+  animation-delay: -1700ms; /* phase offset */
+}
+
+/* The flame artwork — sways about the wick (bottom centre). */
+.lux-flame__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  transform-origin: 50% 100%;
+  animation: lux-flame-sway var(--lux-flame-sway-dur) var(--lux-flame-ease) infinite;
+}
+
+/* Inner core — the only independently animated SVG element. */
+.lux-flame__inner {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: lux-flame-flicker var(--lux-flame-flicker-dur) var(--lux-flame-ease) infinite;
+  animation-delay: -900ms; /* different period + delay → never synced with sway / glow */
+}
+
+@keyframes lux-flame-sway {
+  0%, 100% { transform: rotate(calc(var(--lux-flame-amp) * -1)) translateX(calc(var(--lux-flame-amp-x) * -1)); }
+  50%      { transform: rotate(var(--lux-flame-amp)) translateX(var(--lux-flame-amp-x)); }
+}
+@keyframes lux-flame-flicker {
+  0%, 100% { opacity: 0.92; transform: scaleY(1); }
+  50%      { opacity: 0.95; transform: scaleY(1.02); }
+}
+@keyframes lux-flame-glow {
+  0%, 100% { opacity: calc(var(--lux-flame-glow-opacity) * 0.95); transform: translate(-50%, -50%) scale(1); }
+  50%      { opacity: var(--lux-flame-glow-opacity);              transform: translate(-50%, -50%) scale(1.05); }
+}
+
+/* Still profile — a beautiful, static LIT flame (NOT hidden): motion off, fully lit, steady glow. */
+.lux-flame--still .lux-flame__svg,
+.lux-flame--still .lux-flame__inner,
+.lux-flame--still .lux-flame__glow {
+  animation: none;
+}
+.lux-flame--still .lux-flame__inner { opacity: 1; }
+
+/* no-sway — disable only the horizontal drift; flicker + glow remain. */
+.lux-flame--no-sway .lux-flame__svg { animation: none; }
+
+/* Reduced motion — the same graceful outcome for every flame: static lit, never hidden. */
+@media (prefers-reduced-motion: reduce) {
+  .lux-flame__svg,
+  .lux-flame__inner,
+  .lux-flame__glow {
+    animation: none;
+  }
+  .lux-flame__inner { opacity: 1; }
+}
