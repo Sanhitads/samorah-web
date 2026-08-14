@@ -121,6 +121,13 @@ light-spread `1400–2000` · wordmark `2000–2400` · fade `2400–2600`. Redu
 
 ---
 
+## Related: Luxury Flame Primitive (Phase 2)
+
+A reusable decorative SVG+CSS flame built on this Motion Design System lives at
+`src/features/luxury-experience/flame/` and is exported as `<Flame />` from the feature root. It is a
+standalone primitive with **no production mount** and does not modify Phase 1. Full spec, config model,
+Motion Specification, validation, and roadmap: [FLAME_PRIMITIVE.md](./roadmaps/FLAME_PRIMITIVE.md).
+
 ## Extension points (Phase 2+)
 
 - **brandMark** — swap text → SVG → animated SVG → video via config.
