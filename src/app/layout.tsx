@@ -55,8 +55,12 @@ export const metadata: Metadata = {
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  // suppressHydrationWarning on <html>: the Luxury Experience pre-paint script sets data-lux-skip /
+  // data-lux-tier on <html> before hydration (returning-visitor / reduced-motion gate). It is shallow
+  // — covers <html>'s own attributes only, not its children — the same technique theme libraries use
+  // for pre-hydration <html> mutations. Without it, React warns on the script-added attribute.
   return (
-    <html lang="en" className={`${cormorant.variable} ${dmSans.variable}`}>
+    <html lang="en" className={`${cormorant.variable} ${dmSans.variable}`} suppressHydrationWarning>
       <body>
         {/* Design-system theme tokens, generated from src/platform/theme.ts.
             React 19 hoists this <style> (precedence) into <head>. */}
