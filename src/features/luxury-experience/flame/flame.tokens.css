@@ -1,0 +1,40 @@
+/**
+ * Luxury Flame Primitive — tokens (Phase 2).
+ *
+ * Derives from the Motion Design System (engine/motion.tokens.css) — NO hardcoded easing or colour.
+ * Scoped to `.lux-flame` so the primitive's vars never leak into global scope. Sizes xs–xl. All motion
+ * values obey the Luxury Motion Specification (documented in flame.css, added in commit 3).
+ *
+ * The theme layer (Phase 2.x) will override --lux-flame-core / --lux-flame-amber / --lux-flame-glow-*
+ * per campaign; the wind input (Phase 3) is consumed via a var() fallback in flame.css, so an ancestor
+ * can drive it without a token default here.
+ */
+@import "../engine/motion.tokens.css";
+
+.lux-flame {
+  /* Size scale (px) — md is the default; a numeric `size` prop overrides via inline style. */
+  --lux-flame-size-xs: 16px;
+  --lux-flame-size-sm: 24px;
+  --lux-flame-size-md: 40px;
+  --lux-flame-size-lg: 64px;
+  --lux-flame-size-xl: 96px;
+
+  /* Palette — inherits the shared warm-light tokens (the theme layer overrides these later). */
+  --lux-flame-core: var(--lux-color-flame);
+  --lux-flame-amber: var(--lux-color-amber);
+
+  /* Glow / light radius — intensity from the shared token, kept in the 95–100% band (Motion Spec). */
+  --lux-flame-glow-opacity: var(--lux-glow-intensity);
+
+  /* Motion durations — organic, mutually offset (never synchronized → no visible loop). */
+  --lux-flame-sway-dur: 5200ms;
+  --lux-flame-flicker-dur: 2600ms;
+  --lux-flame-glow-dur: 3600ms;
+
+  /* Easing — the shared luxury in-out curve (no linear, no sudden changes). */
+  --lux-flame-ease: var(--lux-ease-inout);
+
+  /* Motion amplitude caps (Motion Spec). Wind (Phase 3) scales sway via a var() fallback in flame.css. */
+  --lux-flame-sway-angle: 2deg; /* max rotate */
+  --lux-flame-sway-shift: 1.5%; /* max translateX as % of width */
+}
