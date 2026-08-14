@@ -61,7 +61,7 @@ render (deterministic: server === first client → no hydration mismatch)
 | `experienceId` | CMS instance identifier (maps to a future settings row's key). Static today (`"default"`). |
 | `experience` | Which built-in experience runs (`"intro"`). |
 | `version` | Number; bump to re-show on a major launch (compared to the stored last-seen version). |
-| `replayPolicy` | `"once"` · `"version"` (default) · `"version_or_days"`. See below. |
+| `replayPolicy` | `"once"` · `"version"` · `"version_or_days"` (**launch default**). See below. |
 | `replayAfterDays` | Day count used **only** by `"version_or_days"`. Default `30`. |
 | `duration` | Full-tier animation duration (ms) — CMS seam for timing; matches the CSS token today. |
 | `brandMark` | Reveal target: `{ kind: "text" | "svg" | "animatedSvg" | "video", text }`. |
@@ -78,14 +78,18 @@ under `samorah:lux-intro`. The decision is a pure function (`shouldReplay`) driv
 | Policy | Replays when |
 |---|---|
 | `"once"` | never after the first view (a version bump does **not** bring it back). |
-| `"version"` *(default)* | the `version` changes — a deliberate re-launch. **Byte-for-byte the original behaviour.** |
-| `"version_or_days"` | the `version` changes **or** `replayAfterDays` have elapsed since the last view. |
+| `"version"` | the `version` changes — a deliberate re-launch. The original once-per-version behaviour. |
+| `"version_or_days"` *(launch default)* | the `version` changes **or** `replayAfterDays` (30) have elapsed since the last view. |
+
+**Launch policy (`version_or_days`, 30 days)** — the premium, non-intrusive lifecycle:
+first visit → show · returns next week → skip · returns after a month → show again ·
+new campaign (version bump) → show immediately.
 
 Both the client gate and the pre-paint inline script derive from the **same** `resolveReplayRule()`
 (`{ versionKey, replayOnVersion, replayDays }`), so they cannot drift — no flash, no wrong replay.
 Legacy string versions compare equal to the numeric version, so existing visitors are not re-shown on
-upgrade. The 30-day replay is a one-line flip: `replayPolicy: "version_or_days"`. Admin UI is a later
-phase — this is the config seam only.
+upgrade. Admin UI is a later phase — this is the config seam only; a future "Replay Mode" screen
+(First Visit · Every N Days · On New Version) maps directly onto these fields.
 
 **Two off-switches:**
 1. **Env kill switch** — `NEXT_PUBLIC_ENABLE_LUXURY_EXPERIENCE=false` (build-time; redeploy to apply) —

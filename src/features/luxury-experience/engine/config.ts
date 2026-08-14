@@ -23,9 +23,10 @@ export type BrandMarkKind = "text" | "svg" | "animatedSvg" | "video";
 /**
  * How often the experience replays for a returning visitor (Phase 1.1):
  *   - "once"            — play once, ever (a version bump does NOT bring it back).
- *   - "version"         — replay only when `version` changes (default — a deliberate re-launch).
- *   - "version_or_days" — replay when `version` changes OR `replayAfterDays` have elapsed.
- * The default "version" is byte-for-byte the original behaviour (play once per version).
+ *   - "version"         — replay only when `version` changes (a deliberate re-launch). Original behaviour.
+ *   - "version_or_days" — replay when `version` changes OR `replayAfterDays` have elapsed. LAUNCH DEFAULT.
+ * Launch policy = first visit → show · frequent visits → skip · after `replayAfterDays` → show again ·
+ * new campaign (version bump) → show immediately.
  */
 export type ReplayPolicy = "once" | "version" | "version_or_days";
 
@@ -55,7 +56,7 @@ const DEFAULT: ExperienceConfig = {
   experienceId: "default",
   experience: "intro",
   version: 1,
-  replayPolicy: "version", // == the original once-per-version behaviour; flip to "version_or_days" for 30-day replay
+  replayPolicy: "version_or_days", // launch policy: first visit + replay after `replayAfterDays` + on version change
   replayAfterDays: 30,
   duration: INTRO_TOTAL_MS,
   brandMark: { kind: "text", text: "SAMORAH" },
