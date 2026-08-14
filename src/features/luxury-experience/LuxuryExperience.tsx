@@ -1,28 +1,30 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { resolveExperienceConfig } from "./engine/config";
+import { resolveExperienceConfig, resolveReplayRule } from "./engine/config";
 import { detectMotionTier } from "./engine/capability";
 import { reportExperience } from "./engine/reporting";
 import { ExperienceBoundary } from "./engine/ExperienceBoundary";
-import { INTRO_TOTAL_MS, REDUCED_TOTAL_MS } from "./engine/motion.tokens";
+import { REDUCED_TOTAL_MS } from "./engine/motion.tokens";
 import { IntroExperience } from "./experiences/intro/IntroExperience";
 import { shouldPlayIntro, markIntroSeen, INTRO_STORAGE_KEY } from "./experiences/intro/useIntroGate";
 
 const config = resolveExperienceConfig();
+const rule = resolveReplayRule(config);
 
 /**
  * Pre-paint gate (runs before hydration). Hides the overlay for returning visitors and marks the
  * reduced tier for reduced-motion / low-power devices, BEFORE first paint — so there is no flash.
  * React still renders the overlay deterministically, so there is no hydration mismatch either.
+ * The replay logic below mirrors `shouldReplay` exactly (version and/or elapsed-days triggers).
  */
 const PRE_PAINT = `(function(){try{
-var K=${JSON.stringify(INTRO_STORAGE_KEY)},V=${JSON.stringify(config.version)},R=${config.replayAfterDays == null ? "null" : config.replayAfterDays};
+var K=${JSON.stringify(INTRO_STORAGE_KEY)},V=${JSON.stringify(rule.versionKey)},RV=${rule.replayOnVersion ? 1 : 0},RD=${rule.replayDays == null ? "null" : rule.replayDays};
 var play=true,s=localStorage.getItem(K);
-if(s){try{var o=JSON.parse(s);if(o.v===V){if(R==null)play=false;else if(Date.now()-(o.t||0)<R*864e5)play=false;}}catch(e){}}
-var e=document.documentElement;
-if(!play){e.setAttribute('data-lux-skip','1');return;}
-try{if(matchMedia('(prefers-reduced-motion: reduce)').matches||(navigator.hardwareConcurrency||8)<=2||(navigator.deviceMemory||8)<=1)e.setAttribute('data-lux-tier','reduced');}catch(x){}
+if(s){try{var o=JSON.parse(s);var byV=RV&&String(o.v)!==V;var byD=RD!=null&&(Date.now()-(o.t||0))>=RD*864e5;play=byV||byD;}catch(e){play=true;}}
+var el=document.documentElement;
+if(!play){el.setAttribute('data-lux-skip','1');return;}
+try{if(matchMedia('(prefers-reduced-motion: reduce)').matches||(navigator.hardwareConcurrency||8)<=2||(navigator.deviceMemory||8)<=1)el.setAttribute('data-lux-tier','reduced');}catch(x){}
 }catch(e){}})();`;
 
 /**
@@ -51,7 +53,7 @@ export function LuxuryExperience() {
       setMounted(false);
     };
 
-    const duration = tier === "reduced" ? REDUCED_TOTAL_MS : INTRO_TOTAL_MS;
+    const duration = tier === "reduced" ? REDUCED_TOTAL_MS : config.duration;
     timers.current.push(window.setTimeout(() => dismiss("completed"), duration + 80));
     timers.current.push(window.setTimeout(() => dismiss("completed"), config.failsafeMs)); // hard failsafe
 
