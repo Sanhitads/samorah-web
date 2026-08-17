@@ -52,6 +52,11 @@ progressive enhancement.
 > imagery and storytelling always remain visually dominant. Lighting exists only to reinforce emotional
 > atmosphere.**
 
+### Light Dominance Review (permanent release gate)
+> Any lighting placement must pass this gate before it ships. Reviewers answer only one question:
+> **"Did you notice the light before you noticed [the flame / the content]?"** If **yes → reject
+> immediately** — the Focal Point Rule has been violated. Light is a consequence, never the subject.
+
 ### Light Source Ownership Contract
 > A **LightSource is the only authority** that determines whether a light exists.
 > - If a source disappears, the `AmbientLight` renderer must **gracefully disappear with it.**
