@@ -54,6 +54,17 @@ Recorded in the docs above; the load-bearing ones:
 - **Canonical Flame Contract** / **Canonical Experience Rule** — the flame's visual identity and the intro's emotional language change only by design review.
 - **Lighting Design Contract** — lighting must *notice its absence before its presence*, never be the primary focal point; CSS-first, capability-gated.
 
+## 🛡️ Platform Stability Rule
+> Once a platform engine reaches **Frozen** status, subsequent phases must **compose with its public API**
+> rather than modifying its internal implementation.
+>
+> Engine evolution requires: **a new architecture review · a documented ADR · regression verification · a
+> new freeze.** Experience phases **consume** platform primitives — they do not extend or modify them.
+
+This prevents platform erosion — the slow drift of *"let's just add one more prop"* or *"let's just tweak
+`AmbientLight`"* that turns stable engines into tangled ones. A frozen engine changes only through its own
+governed evolution cycle, never as a side effect of an experience phase.
+
 ## Roadmap (current)
 ```
 ✅ Phase 1 · 1.1   Luxury Experience Engine · Replay Policy
