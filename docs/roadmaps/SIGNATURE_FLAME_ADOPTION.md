@@ -74,17 +74,25 @@ even if the adoption is reverted (harmless).
 
 ## Commit plan (small, reversible — verify + report before each next)
 1. **`match` variant** (config + FlameSvg + Flame + tests) — additive; primitive frozen-by-default.
-2. **A/B harness** — original flame vs `<Flame variant="match">` in an intro ignition wrapper, side by side
-   behind a flag, across the full spark → ignite → flicker → fade.
+2. **A/B harness (toggle — never simultaneous)** — a flag switches the intro between **Mode A = original
+   flame** and **Mode B = adopted `<Flame variant="match">`** in an intro ignition wrapper. The two intros
+   are **never played at the same time** — you experience one, then the other — so the brain *experiences*
+   rather than *diffs*. The original stays fully intact throughout.
 3. **Tune to emotional parity** — ignition wrapper, `motionProfile`, reduced-motion hide.
 4. **Adopt + remove original** — only after the Emotional Regression Review + Cross-Experience Consistency
    pass + browser QA. Freeze.
 
 ## Validation checklist — release gates
-- [ ] **Emotional Regression Review (release gate):** old vs new intro back to back — they **feel the same**;
-      the match-strike still feels magical. **If even one reviewer says "it doesn't feel the same," do not merge.**
+- [ ] **Emotional Regression Review (release gate):** watch old vs new **one at a time** (toggle Mode A /
+      Mode B — **never two intros simultaneously**, so you *experience* rather than *diff*) — they **feel the
+      same**; the match-strike still feels magical. **If even one reviewer says "it doesn't feel the same,"
+      do not merge.**
+- [ ] **Blind review:** a reviewer who does **not** know which version is which watches Intro A then Intro B
+      and answers only **"which felt more magical?"** A preference for the original signals emotional regression.
 - [ ] **Cross-Experience Consistency (release gate):** the Intro, the standalone Primitive preview, and any
       demo usage render the **identical canonical flame** — proving it truly became canonical.
+- [ ] **Cross-variant regression:** `classic`, `match` (and future variants) do not accidentally change the
+      default sizing, glow, motion profile, or alignment — only the intended difference (the wick) varies.
 - [ ] Timeline boundaries unchanged (ignition ~30.8%, fade at 100%); pacing preserved.
 - [ ] Reduced-motion matches the current intro (flame hidden, wordmark fade).
 - [ ] Replay unchanged (first-visit plays · returning skips · version/30-day).

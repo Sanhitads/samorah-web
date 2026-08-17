@@ -62,6 +62,18 @@ not alter the canonical identity and are exempt; anything that changes how the f
 Enforced at release time by the **Cross-Experience Consistency** gate (see SIGNATURE_FLAME_ADOPTION.md):
 the Intro, the standalone Primitive preview, and any demo usage must render the identical canonical flame.
 
+## 🔒 Match Variant Contract
+
+`variant="match"` is **reserved for experience-driven storytelling** — specifically the Match Strike intro.
+It is **not** a generic decorative flame for general site use. Do **not** reach for `match` on a product
+card, empty state, or campaign tile "because the wickless flame looks nice" — `classic` (or a future
+purpose-built variant) is the canonical choice there.
+
+**Canonical geometry:** `match` intentionally reuses the **canonical flame geometry** — the same body and
+inner-core paths as `classic` — and differs **only by omitting the wick**. It must never diverge (thinner,
+bluer, a different silhouette); if it did, Samorah would have two different flames. Any change to `match`'s
+geometry, palette, or motion is a change to the canonical flame and falls under the Canonical Flame Contract.
+
 ## ⭐ Signature Components
 
 Not every reusable component is *signature*. These carry the brand's emotional identity and **require
