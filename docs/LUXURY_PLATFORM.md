@@ -65,6 +65,25 @@ This prevents platform erosion — the slow drift of *"let's just add one more p
 `AmbientLight`"* that turns stable engines into tangled ones. A frozen engine changes only through its own
 governed evolution cycle, never as a side effect of an experience phase.
 
+## 🧩 Platform Extension Rule
+> New public APIs may be introduced **only when they provide reusable platform capability.** Platform
+> engines must **not** expose public APIs that exist solely for a single experience, campaign, prototype, or
+> temporary integration.
+>
+> Experience-specific requirements should be met through **composition using existing public APIs** wherever
+> possible. A **new** public API is justified only if it satisfies at least one of: reusable across
+> **multiple experiences · multiple products · future campaigns · or as a general platform capability.**
+> Otherwise it stays **internal to the consuming experience.**
+
+## ✅ Platform Composition Checklist
+Run at the **start of every architecture review** (answer before any code):
+- [ ] Does this phase modify any **frozen engine**?
+- [ ] Can this be achieved using **public APIs only**?
+- [ ] Is a **new platform capability** actually required?
+- [ ] Does this introduce a **reusable** capability (not single-use)?
+- [ ] Can rollback remain a **simple `git revert`**?
+- [ ] Does this preserve **all existing ADRs and platform contracts**?
+
 ## Roadmap (current)
 ```
 ✅ Phase 1 · 1.1   Luxury Experience Engine · Replay Policy
