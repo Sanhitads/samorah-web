@@ -2,18 +2,16 @@
 
 import "./intro.css";
 import { Flame } from "../../flame/Flame";
-import { INTRO_FLAME_AB } from "./introFlameAB.config";
 
 /**
  * The intro overlay markup. Presentation only — the animation is entirely CSS (see intro.css); the
  * orchestration (gate, timers, dismiss, cleanup) lives in LuxuryExperience. `aria-hidden` so it is
  * ignored by assistive tech; `onSkip` fires on click (Esc is handled by the orchestrator).
  *
- * Mode B (PROTOTYPE, Phase 2.1 · Commit 2 — default OFF): the flame is the adopted Flame Primitive
- * (`variant="match"`, static) inside `.lux-intro__flame--adopted`. That wrapper carries the intro's own
- * `lux-flame` animation (opacity + scale + flicker + fade on the 2600 ms timeline) — so the INTRO owns
- * 100% of the choreography and the primitive supplies ONLY the visual (Presentation vs Experience). The
- * A/B harness is removed in Commit 4.
+ * The flame is the canonical Luxury Flame Primitive (`variant="match"`, static). The intro owns 100% of
+ * the choreography: `.lux-intro__flame` is the ignition wrapper — it carries the `lux-flame` animation
+ * (opacity + scale + flicker + fade on the 2600 ms timeline). The primitive supplies ONLY the visual
+ * (Presentation vs Experience). See docs/roadmaps/SIGNATURE_FLAME_ADOPTION.md.
  */
 export function IntroExperience({ text, onSkip }: { text: string; onSkip: () => void }) {
   return (
@@ -22,16 +20,9 @@ export function IntroExperience({ text, onSkip }: { text: string; onSkip: () => 
       <div className="lux-intro__scene">
         <div className="lux-intro__flamewrap">
           <span className="lux-intro__spark" />
-          {INTRO_FLAME_AB.mode === "B" ? (
-            <span className="lux-intro__flame lux-intro__flame--adopted">
-              {/* Commit 3 tuning (presentation only; the intro owns all motion/timing): size ≈ the original
-                  26px flame; static glow (motionProfile "still" → no glow motion) restores the original
-                  gradient flame's softness. Final visual/emotional parity is decided by browser review. */}
-              <Flame variant="match" motionProfile="still" size={34} />
-            </span>
-          ) : (
-            <span className="lux-intro__flame" />
-          )}
+          <span className="lux-intro__flame">
+            <Flame variant="match" motionProfile="still" size={34} />
+          </span>
         </div>
         <p className="lux-intro__wordmark">{text}</p>
       </div>

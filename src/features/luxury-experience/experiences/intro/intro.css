@@ -72,11 +72,12 @@
   100% { opacity: 0; }
 }
 
+/* The ignition wrapper for the canonical Flame Primitive. It draws nothing itself — it only carries the
+   `lux-flame` animation (opacity + scale + flicker + fade on the timeline → the Intro owns ALL
+   choreography) and centres the static primitive it holds (Presentation vs Experience). */
 .lux-intro__flame {
-  width: 12px;
-  height: 26px;
-  border-radius: 50% 50% 45% 45% / 62% 62% 38% 38%;
-  background: radial-gradient(ellipse at 50% 72%, var(--lux-color-flame) 0%, var(--lux-color-amber) 55%, rgba(214, 170, 84, 0) 78%);
+  display: grid;
+  place-items: center;
   transform-origin: 50% 100%;
   opacity: 0;
   transform: scale(0.15);
@@ -91,19 +92,6 @@
   78% { transform: scale(1.015); }
   92.3% { opacity: 1; transform: scale(1); }
   100% { opacity: 0; }
-}
-
-/* PROTOTYPE (Phase 2.1 · Commit 2) — Mode B ignition wrapper. It KEEPS the .lux-intro__flame animation
-   (opacity + scale + flicker + fade on the timeline → the Intro owns ALL choreography) but draws nothing
-   itself; it only holds the static Flame Primitive (Presentation). Reduced-motion still hides it via the
-   inherited .lux-intro__flame class. Remove with the A/B harness before freeze (Commit 4). */
-.lux-intro__flame--adopted {
-  width: auto;
-  height: auto;
-  background: none;
-  border-radius: 0;
-  display: grid;
-  place-items: center;
 }
 
 .lux-intro__wordmark {

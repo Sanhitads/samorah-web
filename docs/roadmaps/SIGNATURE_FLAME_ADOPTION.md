@@ -4,8 +4,22 @@ The cinematic Match Strike Intro **adopts** the Luxury Flame Primitive as its fl
 the primitive becomes the single canonical flame across Samorah. This is an *adoption*, not an
 integration: the intro **composes** the primitive; it does not merge with it.
 
-> **Status:** specification complete — implementation may begin (Commit 1). No pixel of the intro changes
-> until the Emotional Regression Review passes.
+> **Status:** ✅ ADOPTED & FROZEN — the Match Strike Intro now renders the canonical Flame Primitive
+> (`variant="match"`). The A/B harness and the original handcrafted flame have been removed.
+
+---
+
+## Design Decision
+
+During review, the Flame Primitive adoption was found to **better represent the Samorah visual language**
+than the original handcrafted intro flame. The original emotional intent (**match strike → candle reveal**)
+is preserved, but the Primitive becomes the **canonical flame implementation across the platform.** This is
+an **intentional design evolution, not a parity replacement.**
+
+The team selected Mode B deliberately: not because strict pixel parity was achieved, but because the
+Primitive unifies the brand's flame language while keeping the intro's emotional story intact. So when a
+future contributor asks *"why did we replace the original flame?"*, the answer is not "because it looked
+nicer" — it is **"because the design system matured, and we intentionally unified the brand language."**
 
 ---
 

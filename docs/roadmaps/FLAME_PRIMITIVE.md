@@ -5,8 +5,8 @@ flame. Pure **SVG + CSS**, zero JavaScript motion, drop it anywhere with one imp
 Luxury Experience Motion Design System; Phase 1 (intro + replay) is frozen and untouched.
 
 > **Status:** Phase 2 **frozen** — reusable platform primitive, **no production mount**. A homepage-hero
-> placement was prototyped and **deliberately rejected** (see below). Next: **Phase 2.1 — Signature Flame
-> Adoption (Intro Retrofit).**
+> placement was prototyped and **deliberately rejected** (see below). **Phase 2.1 (Signature Flame Adoption)
+> is complete** — the Match Strike Intro now renders the canonical Primitive (`variant="match"`).
 
 ---
 
@@ -236,9 +236,9 @@ the export (and the docs), or `git revert` the four Phase 2 commits. No mount, n
 ✅ Phase 2     Luxury Flame Primitive                     (frozen — reusable platform component)
 ❌ —           Homepage Hero placement — EVALUATED & REJECTED (deliberate brand decision; see the
                Brand Exclusivity Principle above). Homepage stays typography-led.
-➡ Phase 2.1   Signature Flame Adoption (Intro Retrofit) — the intro ADOPTS the Primitive as its flame
-               visual (Intro owns 100% choreography · Primitive stays 100% presentation). Release gate:
-               EMOTIONAL parity — the match-strike must still feel magical — not pixel parity.
+✅ Phase 2.1   Signature Flame Adoption (Intro Retrofit) — DONE. The intro now renders the canonical
+               Primitive (`variant="match"`); Intro owns 100% choreography · Primitive is 100% presentation.
+               An intentional design evolution (see SIGNATURE_FLAME_ADOPTION.md · Design Decision).
 ➡ Phase 3     Cursor-Reactive Warm Lighting — ONLY after the intro uses the Signature Flame.
 ➡ Phase 4     Campaign Storytelling (Diwali · Christmas · Anniversary · Limited Collections).
 ➡ Phase 5     Product Storytelling (craft · collection intros · editorial · luxury loading · checkout
