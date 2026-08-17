@@ -79,8 +79,16 @@ even if the adoption is reverted (harmless).
    are **never played at the same time** — you experience one, then the other — so the brain *experiences*
    rather than *diffs*. The original stays fully intact throughout.
 3. **Tune to emotional parity** — ignition wrapper, `motionProfile`, reduced-motion hide.
-4. **Adopt + remove original** — only after the Emotional Regression Review + Cross-Experience Consistency
-   pass + browser QA. Freeze.
+4. **Adopt + remove original + delete the A/B harness** — only after the Emotional Regression Review +
+   Cross-Experience Consistency pass + browser QA. The toggle / flag / harness is deleted here (it is
+   prototype tooling — see A/B Harness Lifecycle). Freeze.
+
+## A/B Harness Lifecycle
+
+The Mode A / Mode B toggle is **temporary prototype infrastructure** — exactly like the rejected homepage
+prototype. It exists only to run the emotional-parity review and **must be removed before freeze**. It must
+**never remain in production after the adoption decision is complete** (Commit 4 deletes it entirely). Until
+then it is dormant (default Mode A) so it has no production effect.
 
 ## Validation checklist — release gates
 - [ ] **Emotional Regression Review (release gate):** watch old vs new **one at a time** (toggle Mode A /
@@ -97,5 +105,12 @@ even if the adoption is reverted (harmless).
 - [ ] Reduced-motion matches the current intro (flame hidden, wordmark fade).
 - [ ] Replay unchanged (first-visit plays · returning skips · version/30-day).
 - [ ] `variant` defaults to `classic` → primitive's existing output unchanged; `match` omits the wick.
+- [ ] **Animation Ownership:** the Flame Primitive owns **none** of opacity / visibility / ignition timing /
+      fade timing / replay timing / choreography — the intro's ignition wrapper owns all of it (Presentation
+      vs Experience, in practice).
+- [ ] **Review artifact:** a 10–15 s screen recording of Mode A and Mode B is captured for future regression
+      comparison (the recording does not ship).
+- [ ] **A/B harness removed before freeze:** the toggle / flag / harness is prototype tooling and must NOT
+      exist in production after the adoption decision (deleted in Commit 4).
 - [ ] No hydration warnings / console errors; 60fps; CLS 0; dismiss & failsafe timing unchanged.
 - [ ] Browser QA before freeze.

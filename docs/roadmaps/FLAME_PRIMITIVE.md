@@ -86,6 +86,16 @@ design review before any change** to their look or motion:
 Editing a signature component is never a local change — it changes how Samorah *feels*. Treat such edits
 with the same rigor the Canonical Flame Contract applies to the flame's visual identity.
 
+## 🎬 Canonical Experience Rule
+
+> **The Match Strike Intro is the canonical implementation of the Samorah cinematic experience. Future
+> experiences may reuse the Flame Primitive but must not redefine the emotional language established by the
+> Match Strike Intro without explicit design review.**
+
+Where the Canonical Flame Contract protects the flame's *visual* identity, this protects the intro's
+*emotional* language — its timing, pacing, and strike-to-reveal arc — from slowly drifting as new
+experiences are built. New experiences **compose** the primitive; they do not re-author the signature feeling.
+
 ---
 
 ## Public API
