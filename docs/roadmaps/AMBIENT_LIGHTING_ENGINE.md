@@ -5,8 +5,9 @@ the mouse" — it is to make the site feel *physically illuminated by the flame.
 **light** (presentation) from what **drives** it (source + optional modulators). Cursor is only one future
 driver, never the architecture.
 
-> **Status:** Phase 3.0 (architecture + dormant infrastructure). **Nothing is mounted or visible.** Built
-> like the Flame Primitive: dormant, frozen, then placed in a later phase.
+> **Status:** ✅ **Phase 3.0 FROZEN** — architecture + dormant infrastructure complete. **Nothing is
+> mounted or visible; runtime impact: none.** Canonical reference: [ADR-0008](../adr/0008-ambient-lighting-engine.md).
+> Static placement begins in Phase 3.1 (awaits architectural approval).
 
 ## Roadmap (numbering fixed)
 ```
@@ -114,6 +115,16 @@ Multiple drivers may exist in later phases. They **modulate**, they never replac
 > always produce **identical output**. It must never depend on **time · randomness · browser state · user
 > input · environment · hidden internal state.** (Any future dynamism lives in a driver's bounded
 > modulation, never inside the renderer.)
+
+### Public API Stability Contract
+> **`lighting/index.ts` is the only supported public entry point.** Experiences import **only** from the
+> barrel. Every other file inside `lighting/` is an **internal implementation detail** and may be
+> refactored freely — **internal refactoring must never require an Experience to change.**
+
+### Experience Resolver Contract
+> **`resolveAmbientLight()` exists only to prepare renderer input.** It *may* compose configuration,
+> presets, and sources. It must **never** render · animate · detect capability · own drivers · own replay ·
+> own business logic.
 
 ---
 
