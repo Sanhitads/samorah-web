@@ -4,7 +4,25 @@ A reusable, decorative **design-system primitive** (not an "engine"): the canoni
 flame. Pure **SVG + CSS**, zero JavaScript motion, drop it anywhere with one import. Built on the Phase 1
 Luxury Experience Motion Design System; Phase 1 (intro + replay) is frozen and untouched.
 
-> **Status:** Phase 2 complete — primitive only, **no production mount**. Placement begins in Phase 2.1.
+> **Status:** Phase 2 **frozen** — reusable platform primitive, **no production mount**. A homepage-hero
+> placement was prototyped and **deliberately rejected** (see below). Next: **Phase 2.1 — Signature Flame
+> Integration (Intro Retrofit).**
+
+---
+
+## 🕯️ Brand Exclusivity Principle
+
+> **The Luxury Flame Primitive should appear only where it creates narrative or emotional value. Reusing
+> it in places where it becomes expected or decorative should be avoided, even if technically feasible.**
+
+Part of the Samorah Luxury Design System — it guides every future luxury-experience decision. Two tenets:
+- *"Every luxury interaction must earn its place. If removing it does not diminish the emotional experience, it should not exist."*
+- *"Luxury is created through restraint, not abundance. Reusable components should become signature moments, not recurring decorations."*
+
+**Precedent (Phase 2.1):** a homepage-hero flame was fully prototyped, then removed — not for any technical
+reason, but to preserve the cinematic intro as *the* signature flame moment. A continuously visible homepage
+flame would make that signature moment ordinary. The primitive is reserved for moments with narrative or
+emotional weight (intro · campaigns · product storytelling).
 
 ---
 
@@ -141,21 +159,24 @@ the export (and the docs), or `git revert` the four Phase 2 commits. No mount, n
 
 ## Roadmap
 ```
-✅ Phase 1     Luxury Experience Engine            (frozen)
-✅ Phase 1.1   Replay Policy                        (frozen)
-🔥 Phase 2     Luxury Flame Primitive               (no mounts · verified) → FREEZE   ← done
-   Phase 2.1   Homepage Hero Integration            → VERIFY → FREEZE
-   Phase 2.2   Intro Retrofit (A/B visual-parity gate, then remove the old flame) → FREEZE
-   Phase 2.3   Broader usage: Product Cards · Loading · Empty State · Campaign · CMS Preview
-✨ Phase 3     Cursor-Reactive Lighting (flame as the light source; drives --lux-flame-wind)
-🎬 Phase 4     Page Motion & Transitions (dedicated review)
-🛠️ Phase 5     Luxury Experience Admin & Campaign CMS
-📊 Phase 6     Scheduling · Analytics · Campaign Management
+✅ Phase 1     Luxury Experience Engine                  (frozen)
+✅ Phase 1.1   Replay Policy                              (frozen)
+✅ Phase 2     Luxury Flame Primitive                     (frozen — reusable platform component)
+❌ —           Homepage Hero placement — EVALUATED & REJECTED (deliberate brand decision; see the
+               Brand Exclusivity Principle above). Homepage stays typography-led.
+➡ Phase 2.1   Signature Flame Integration (Intro Retrofit) — replace the intro's flame with the Primitive
+               after visual A/B parity; preserve emotional timing + cinematic quality; no visual regression.
+➡ Phase 3     Cursor-Reactive Warm Lighting — ONLY after the intro uses the Signature Flame.
+➡ Phase 4     Campaign Storytelling (Diwali · Christmas · Anniversary · Limited Collections).
+➡ Phase 5     Product Storytelling (craft · collection intros · editorial · luxury loading · checkout
+               success · empty states) — never generic decoration.
+➡ Phase 6     Luxury Experience Admin (Experiences · Campaigns · Themes · Scheduling · Analytics).
+➡ Phase 7     Page Motion & Navigation Transitions.
 ```
 
 ## Future extension points
 - **Variants** — add a silhouette by drawing one path set in `FlameSvg`; no API change.
 - **Themes** — a theme overrides `--lux-flame-core/amber/glow` (+ optional `lux-flame--theme-*` CSS); seasonal campaigns live here, not as variants.
-- **Wind** (Phase 3) — cursor lighting sets `--lux-flame-wind`; consumed via a `var()` fallback, no JS in the primitive.
+- **Wind** (Phase 3 — Cursor-Reactive Warm Lighting) — lighting sets `--lux-flame-wind`; consumed via a `var()` fallback, no JS in the primitive.
 - **Tier auto-selection** — map `detectMotionTier()` → `motionProfile` per the table above.
 - **CMS** — `resolveFlameConfig()` merges a campaign/settings layer with no engine change.
