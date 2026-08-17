@@ -25,6 +25,14 @@ nicer" — it is **"because the design system matured, and we intentionally unif
 flame implementations across the platform. The Flame Primitive now serves as the single source of truth for
 all flame visuals, while the Match Strike Intro remains responsible for the cinematic experience.
 
+## 🧊 Freeze Note
+
+> **Future visual refinements to the Match Strike Intro must begin from the Flame Primitive. Reintroducing
+> an independent flame implementation is prohibited unless a new ADR explicitly approves it.**
+
+An architectural safeguard to preserve the canonical flame implementation across the platform: the intro
+composes the primitive; it never grows its own flame again without a documented, approved exception.
+
 ---
 
 ## Governing principles (see FLAME_PRIMITIVE.md)
