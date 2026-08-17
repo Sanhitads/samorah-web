@@ -93,6 +93,19 @@
   100% { opacity: 0; }
 }
 
+/* PROTOTYPE (Phase 2.1 · Commit 2) — Mode B ignition wrapper. It KEEPS the .lux-intro__flame animation
+   (opacity + scale + flicker + fade on the timeline → the Intro owns ALL choreography) but draws nothing
+   itself; it only holds the static Flame Primitive (Presentation). Reduced-motion still hides it via the
+   inherited .lux-intro__flame class. Remove with the A/B harness before freeze (Commit 4). */
+.lux-intro__flame--adopted {
+  width: auto;
+  height: auto;
+  background: none;
+  border-radius: 0;
+  display: grid;
+  place-items: center;
+}
+
 .lux-intro__wordmark {
   margin: 0;
   font-family: var(--font-cormorant, Georgia, serif);

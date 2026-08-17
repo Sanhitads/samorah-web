@@ -112,5 +112,7 @@ then it is dormant (default Mode A) so it has no production effect.
       comparison (the recording does not ship).
 - [ ] **A/B harness removed before freeze:** the toggle / flag / harness is prototype tooling and must NOT
       exist in production after the adoption decision (deleted in Commit 4).
+- [ ] **Performance Parity:** Mode B introduces **no measurable regression** vs Mode A in animation
+      smoothness, scripting time, or paint behavior. Any noticeable degradation is investigated before Commit 3.
 - [ ] No hydration warnings / console errors; 60fps; CLS 0; dismiss & failsafe timing unchanged.
 - [ ] Browser QA before freeze.
