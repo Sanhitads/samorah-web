@@ -102,7 +102,7 @@ Flame → variant (silhouette) → theme (skin/palette) → motionProfile (motio
 
 | Prop | Values | Built in Phase 2 | Meaning |
 |---|---|---|---|
-| `variant` | `classic` · tall · short · ceramic · luxury | **classic** only | shape only |
+| `variant` | `classic` · `match` · tall · short · ceramic · luxury | **classic + match** | shape only (`match` = classic body, no wick) |
 | `theme` | `default` · light · dark · luxury · seasonal | **default** only | palette only |
 | `motionProfile` | `still` · `classic` · `signature` | **all three** | motion only |
 | `size` | `xs` `sm` `md` `lg` `xl` · number(px) | **all** | size (aspect-ratio fixed → CLS 0) |

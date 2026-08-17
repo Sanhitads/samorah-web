@@ -20,7 +20,9 @@
  *
  * Decorative: aria-hidden + focusable="false"; contains no interactive or focusable nodes.
  */
-export function FlameSvg({ className }: { className?: string }) {
+export function FlameSvg({ className, showWick = true }: { className?: string; showWick?: boolean }) {
+  // `showWick` is an INTERNAL detail (FlameSvg is not exported). The public API is the `match` variant,
+  // which <Flame> maps to showWick=false — so wick control stays a curated variant, not a low-level flag.
   return (
     <svg
       className={className}
@@ -29,15 +31,17 @@ export function FlameSvg({ className }: { className?: string }) {
       aria-hidden="true"
       focusable="false"
     >
-      <rect
-        className="lux-flame__wick"
-        x="19.25"
-        y="52"
-        width="1.5"
-        height="9"
-        rx="0.75"
-        fill="var(--lux-flame-wick, #3a2a1a)"
-      />
+      {showWick ? (
+        <rect
+          className="lux-flame__wick"
+          x="19.25"
+          y="52"
+          width="1.5"
+          height="9"
+          rx="0.75"
+          fill="var(--lux-flame-wick, #3a2a1a)"
+        />
+      ) : null}
       <path
         className="lux-flame__body"
         d="M20 6 C24 18 31 26 31 40 C31 50 26 55 20 55 C14 55 9 50 9 40 C9 26 16 18 20 6 Z"

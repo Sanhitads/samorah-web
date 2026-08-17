@@ -33,6 +33,22 @@ describe("Flame — CSS modifier application (no conditional render logic)", () 
   });
 });
 
+describe("Flame — wick via curated variant (no public showWick)", () => {
+  it("classic (default) renders the wick", () => {
+    const html = render();
+    expect(html).toContain("lux-flame--variant-classic");
+    expect(html).toContain("lux-flame__wick");
+  });
+  it("match omits the wick and sets the match variant class", () => {
+    const html = render({ variant: "match" });
+    expect(html).toContain("lux-flame--variant-match");
+    expect(html).not.toContain("lux-flame__wick");
+    // still a full flame — body + core remain
+    expect(html).toContain("lux-flame__body");
+    expect(html).toContain("lux-flame__inner");
+  });
+});
+
 describe("Flame — motionProfile class assignment", () => {
   it("still / classic / signature each map to their own class", () => {
     expect(render({ motionProfile: "still" })).toContain("lux-flame--still");

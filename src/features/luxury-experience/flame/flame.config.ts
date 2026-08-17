@@ -25,8 +25,13 @@
  * · sizes xs–xl · optional glow/sway. Everything else is TYPED and DEFAULTED only.
  */
 
-/** Silhouette layer. Only "classic" is drawn in Phase 2; the rest are typed for future geometry. */
-export type FlameVariant = "classic" | "tall" | "short" | "ceramic" | "luxury";
+/**
+ * Silhouette layer (a curated, design-reviewed set — see the Canonical Flame Contract).
+ * Drawn: "classic" (candle, with wick) and "match" (the classic body WITHOUT the wick — a struck match /
+ * relit flame). The rest are typed for future geometry. Wick visibility is a property of the variant, NOT
+ * a public low-level flag: "match" maps to no-wick internally; there is deliberately no public `showWick`.
+ */
+export type FlameVariant = "classic" | "match" | "tall" | "short" | "ceramic" | "luxury";
 
 /** Skin/palette layer — seasonal campaigns live here, NOT as variants. Only "default" is built. */
 export type FlameTheme = "default" | "light" | "dark" | "luxury" | "seasonal";

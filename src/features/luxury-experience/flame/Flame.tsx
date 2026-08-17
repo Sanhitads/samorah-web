@@ -32,11 +32,13 @@ export function Flame({ className, ...overrides }: FlameProps) {
     .filter(Boolean)
     .join(" ");
   const style = sizeIsToken ? undefined : { height: `${cfg.size}px` };
+  // Wick control is a property of the curated variant — "match" = classic body without the wick.
+  const showWick = cfg.variant !== "match";
 
   return (
     <span className={classes} style={style} aria-hidden="true">
       {cfg.glow ? <span className="lux-flame__glow" /> : null}
-      <FlameSvg className="lux-flame__svg" />
+      <FlameSvg className="lux-flame__svg" showWick={showWick} />
     </span>
   );
 }
