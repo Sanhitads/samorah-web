@@ -90,6 +90,17 @@ prototype. It exists only to run the emotional-parity review and **must be remov
 **never remain in production after the adoption decision is complete** (Commit 4 deletes it entirely). Until
 then it is dormant (default Mode A) so it has no production effect.
 
+## Commit 3 rules — Emotional Preservation & Timeline Lock
+
+**Emotional Preservation Rule.** Commit 3 is **not an enhancement phase.** Its purpose is to preserve the
+existing emotional character of the Match Strike Intro while adopting the canonical Flame Primitive — *the
+objective is parity, not enhancement.* Any change that makes the intro feel **different** — even if
+technically superior — is rejected. Only the **flame presentation** may be tuned (size · position · glow).
+
+**Timeline Lock.** Commit 3 must **not** change the intro's timing. Total duration **2600 ms** and the key
+timing for **spark · ignition · glow · wordmark · fade** remain exactly as they are — no keyframe boundary,
+duration, or delay may move. Only the flame presentation is tunable.
+
 ## Validation checklist — release gates
 - [ ] **Emotional Regression Review (release gate):** watch old vs new **one at a time** (toggle Mode A /
       Mode B — **never two intros simultaneously**, so you *experience* rather than *diff*) — they **feel the
@@ -101,6 +112,12 @@ then it is dormant (default Mode A) so it has no production effect.
       demo usage render the **identical canonical flame** — proving it truly became canonical.
 - [ ] **Cross-variant regression:** `classic`, `match` (and future variants) do not accidentally change the
       default sizing, glow, motion profile, or alignment — only the intended difference (the wick) varies.
+- [ ] **Emotional Preservation:** the tuned Mode B preserves the intro's emotional character — parity, not
+      enhancement. If it feels *different* (even "better"), reject.
+- [ ] **Timeline Lock:** total duration (2600 ms) and spark / ignition / glow / wordmark / fade timings are
+      unchanged — only flame presentation was tuned.
+- [ ] **Timeline drift check:** compare the intro at ~0 ms · 650 ms · 1300 ms · 2000 ms · 2600 ms (beginning ·
+      ignition · midpoint · reveal · completion) — nothing shifted accidentally.
 - [ ] Timeline boundaries unchanged (ignition ~30.8%, fade at 100%); pacing preserved.
 - [ ] Reduced-motion matches the current intro (flame hidden, wordmark fade).
 - [ ] Replay unchanged (first-visit plays · returning skips · version/30-day).
