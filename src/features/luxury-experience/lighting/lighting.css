@@ -1,0 +1,25 @@
+/**
+ * Ambient Lighting Engine — the light field (Phase 3.0). CONSUMES the --lx-* tokens only (declared in
+ * lighting.tokens.css — Lighting Token Ownership Contract); it declares none. Compositor-safe: a static
+ * radial-gradient positioned by transform, shown via opacity. NO animation in Phase 3.0. Absolutely
+ * positioned, pointer-events:none — it never affects layout and reserves no space. Invisible with the
+ * default preset (--lx-intensity: 0).
+ *
+ * No filters, no backdrop-filter, no browser hacks. mix-blend-mode applies the resolved preset's blend
+ * (default "normal" = no blending); non-normal blends are validated per placement (3.1+).
+ */
+@import "./lighting.tokens.css";
+
+.lx-light {
+  position: absolute;
+  left: var(--lx-x);
+  top: var(--lx-y);
+  width: calc(var(--lx-radius) * 2);
+  height: calc(var(--lx-radius) * 2);
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--lx-color-warm) 0%, transparent var(--lx-falloff));
+  opacity: var(--lx-intensity);
+  mix-blend-mode: var(--lx-blend);
+  pointer-events: none;
+}

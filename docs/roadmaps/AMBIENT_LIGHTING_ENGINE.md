@@ -83,6 +83,23 @@ Multiple drivers may exist in later phases. They **modulate**, they never replac
 - **Responsive:** `%` coordinates scale with the container; radius/intensity use relative units
   (`clamp`, `vmin`) + tier tokens, so the light scales down and dims gracefully on small screens.
 
+### AmbientLight Renderer Responsibility Contract
+> `AmbientLight` is a **presentation renderer only.** It consumes one resolved `LightingPreset` + one
+> `LightSource`, renders the light field, applies compositor-safe CSS, and exposes accessibility
+> attributes — and **nothing else.** It must never own: animation choreography · timing · capability
+> detection · replay · business logic · cursor logic · scroll logic · state · event listeners ·
+> requestAnimationFrame · timers · `LightSource` implementations · driver implementations.
+>
+> It renders **only** when a valid resolved preset exists **and** the supplied `LightSource.isAvailable()`
+> is `true`; otherwise it returns `null`. It never creates fallback lights, never guesses defaults, and
+> never invents presentation.
+
+### Lighting Token Ownership Contract
+> Only **`lighting.tokens.css`** may *declare* the `--lx-*` tokens (and their defaults). All components
+> **consume** those tokens (`var(--lx-*)`); the renderer applies resolved preset/source values per
+> instance. **No experience, page, or campaign may redefine lighting tokens** — the token vocabulary has a
+> single owner, so lighting stays visually consistent everywhere.
+
 ---
 
 ## Configuration · Profiles · Capability
