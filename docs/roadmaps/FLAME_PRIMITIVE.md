@@ -24,6 +24,16 @@ reason, but to preserve the cinematic intro as *the* signature flame moment. A c
 flame would make that signature moment ordinary. The primitive is reserved for moments with narrative or
 emotional weight (intro · campaigns · product storytelling).
 
+## 🧪 Prove-in-Isolation Principle
+
+> **Every new luxury component must first prove itself in isolation before becoming part of a signature
+> experience.**
+
+Primitive → prototype (dormant, no production impact) → review → keep *or* reject. The Flame Primitive
+followed exactly this path (ADR [0007](../adr/0007-homepage-flame.md)): built standalone, prototyped on the
+homepage behind an off-by-default switch, reviewed, and rejected — with zero risk to production. This
+process is a permanent part of the Luxury Design System.
+
 ---
 
 ## Public API
