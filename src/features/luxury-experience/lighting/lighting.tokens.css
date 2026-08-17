@@ -1,0 +1,23 @@
+/**
+ * Ambient Lighting Engine — tokens (Phase 3.0). Derived from the Motion Design System (no hardcoded
+ * colour). Scoped to `.lx-light` so nothing leaks globally. Presentation only; there is NO animation in
+ * Phase 3.0, and nothing renders `.lx-light` until the renderer lands in Commit 2 (dormant until then).
+ * Default intensity 0 → invisible by default.
+ */
+@import "../engine/motion.tokens.css";
+
+.lx-light {
+  /* Warm-light palette — inherits the shared tokens; the theme/profile layer overrides these later. */
+  --lx-color-warm: var(--lux-color-amber);
+  --lx-color-core: var(--lux-color-flame);
+
+  /* Renderer inputs (set from a resolved preset + source at render time; dormant defaults here). */
+  --lx-intensity: 0; /* 0 = invisible (dormant) */
+  --lx-radius: clamp(120px, 28vmin, 360px);
+  --lx-falloff: 70%; /* gradient transparent stop */
+  --lx-blend: normal;
+
+  /* Coordinate space — container-relative %, centred via translate(-50%, -50%) at render time. */
+  --lx-x: 50%;
+  --lx-y: 50%;
+}
