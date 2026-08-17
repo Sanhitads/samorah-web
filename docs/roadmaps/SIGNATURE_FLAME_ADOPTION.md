@@ -21,6 +21,10 @@ Primitive unifies the brand's flame language while keeping the intro's emotional
 future contributor asks *"why did we replace the original flame?"*, the answer is not "because it looked
 nicer" — it is **"because the design system matured, and we intentionally unified the brand language."**
 
+**Single source of truth.** The original implementation was intentionally retired to eliminate duplicate
+flame implementations across the platform. The Flame Primitive now serves as the single source of truth for
+all flame visuals, while the Match Strike Intro remains responsible for the cinematic experience.
+
 ---
 
 ## Governing principles (see FLAME_PRIMITIVE.md)
