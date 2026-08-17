@@ -24,7 +24,10 @@ export function IntroExperience({ text, onSkip }: { text: string; onSkip: () => 
           <span className="lux-intro__spark" />
           {INTRO_FLAME_AB.mode === "B" ? (
             <span className="lux-intro__flame lux-intro__flame--adopted">
-              <Flame variant="match" motionProfile="still" glow={false} size={32} />
+              {/* Commit 3 tuning (presentation only; the intro owns all motion/timing): size ≈ the original
+                  26px flame; static glow (motionProfile "still" → no glow motion) restores the original
+                  gradient flame's softness. Final visual/emotional parity is decided by browser review. */}
+              <Flame variant="match" motionProfile="still" size={34} />
             </span>
           ) : (
             <span className="lux-intro__flame" />
