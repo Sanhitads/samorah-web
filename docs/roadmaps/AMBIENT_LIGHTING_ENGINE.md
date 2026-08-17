@@ -11,11 +11,14 @@ driver, never the architecture.
 
 ## Roadmap (numbering fixed)
 ```
-3.0  Ambient Lighting Architecture   — tokens · config · renderer · sources · capability · API. No mount. → Freeze
-3.1  Static Ambient Lighting         — the flame casts a still warm light (no movement). → Freeze
-3.2  Cursor Influence                — cursor subtly BENDS the existing light (not follows). → Freeze
-3.3  Scroll Influence                — the light breathes while scrolling (felt, not seen). → Freeze
-3.4  CMS Lighting Profiles           — admin: disabled/subtle/premium/campaign/seasonal, no code. → Freeze
+3.0  Ambient Lighting Architecture   — tokens · config · renderer · sources · capability · API. No mount. → FROZEN
+3.1  Composition Validation          — prove Flame→FlameLightSource→resolveAmbientLight→AmbientLight via a
+                                       Composition Validation Harness, in isolation. NO placement. → Freeze
+3.2  Signature Intro Static Light    — the intro flame casts a still warm light (AFTER validation; signature
+                                       experience → Canonical Experience Rule / emotional-parity review). → Freeze
+3.3  Cursor Bend                     — cursor subtly BENDS the existing light (not follows). → Freeze
+3.4  Scroll Breathe                  — the light breathes while scrolling (felt, not seen). → Freeze
+3.5  CMS Lighting Profiles           — admin: disabled/subtle/premium/campaign/seasonal, no code. → Freeze
 ```
 
 ## Engine components (the renderer alone is the Primitive)

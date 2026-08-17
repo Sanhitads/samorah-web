@@ -104,8 +104,9 @@ implementation. A review that cannot close this section cleanly does not proceed
 ✅ Phase 2         Luxury Flame Primitive
 ✅ Phase 2.1       Signature Flame Adoption (intro)
 ✅ Phase 3.0       Ambient Lighting Engine (architecture · frozen · dormant)
-➡ Phase 3.1       Static Ambient Lighting (flame casts light)   ← next, awaits approval
-➡ Phase 3.2       Cursor Influence · 3.3 Scroll · 3.4 CMS Profiles
+➡ Phase 3.1       Composition Validation (harness — prove engines compose in isolation; no placement)   ← next
+➡ Phase 3.2       Signature Intro Static Light (the intro flame casts light — after validation)
+➡ Phase 3.3–3.5   Cursor Bend · Scroll Breathe · CMS Profiles
 ➡ Phase 4+        Campaign Storytelling · Product Storytelling · Admin · Page Motion
 ```
 
