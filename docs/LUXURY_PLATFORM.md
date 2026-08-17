@@ -84,6 +84,20 @@ Run at the **start of every architecture review** (answer before any code):
 - [ ] Can rollback remain a **simple `git revert`**?
 - [ ] Does this preserve **all existing ADRs and platform contracts**?
 
+## 🔒 Platform Contract Verification
+The **mandatory closing section of every architecture review.** Verify the proposed phase against **all**
+existing governance and state, for each, whether the phase **preserves** the contract:
+- **ADRs** (0007 · 0008 · …)
+- **Platform Stability Rule**
+- **Platform Extension Rule**
+- **Platform Composition Checklist**
+- **Engine Contracts** (all Flame + Lighting contracts)
+- **Freeze Notes**
+
+If any contract would change, **stop the review** and document why a **platform evolution** — a new
+architecture review + a new ADR + regression verification + a new freeze — is required *before* any
+implementation. A review that cannot close this section cleanly does not proceed to code.
+
 ## Roadmap (current)
 ```
 ✅ Phase 1 · 1.1   Luxury Experience Engine · Replay Policy
