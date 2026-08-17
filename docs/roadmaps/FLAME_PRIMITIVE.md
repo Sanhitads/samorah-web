@@ -6,7 +6,7 @@ Luxury Experience Motion Design System; Phase 1 (intro + replay) is frozen and u
 
 > **Status:** Phase 2 **frozen** — reusable platform primitive, **no production mount**. A homepage-hero
 > placement was prototyped and **deliberately rejected** (see below). Next: **Phase 2.1 — Signature Flame
-> Integration (Intro Retrofit).**
+> Adoption (Intro Retrofit).**
 
 ---
 
@@ -33,6 +33,19 @@ Primitive → prototype (dormant, no production impact) → review → keep *or*
 followed exactly this path (ADR [0007](../adr/0007-homepage-flame.md)): built standalone, prototyped on the
 homepage behind an off-by-default switch, reviewed, and rejected — with zero risk to production. This
 process is a permanent part of the Luxury Design System.
+
+## 🧭 Presentation vs Experience Principle
+
+> **Presentation Components provide reusable visual language. Experience Components provide storytelling.
+> Neither layer should depend on or absorb responsibilities belonging to the other — Presentation never
+> owns storytelling; Experience never owns visual language.**
+
+The Flame Primitive is a **Presentation Component** — it supplies the visual flame (shape, palette, glow,
+ambient idle motion, wick visibility) and nothing else. The Match Strike Intro is an **Experience
+Component** — it owns storytelling (spark, ignition, glow timeline, the 2600 ms sequence, wordmark, fade,
+replay). An Experience *composes* a Presentation component and drives *when* it appears; the Presentation
+component never learns about the Experience's timeline. Cross-layer control happens through **supported
+APIs** (e.g. `showWick`), never by reaching into the other layer's internal CSS or timing.
 
 ---
 
@@ -174,8 +187,9 @@ the export (and the docs), or `git revert` the four Phase 2 commits. No mount, n
 ✅ Phase 2     Luxury Flame Primitive                     (frozen — reusable platform component)
 ❌ —           Homepage Hero placement — EVALUATED & REJECTED (deliberate brand decision; see the
                Brand Exclusivity Principle above). Homepage stays typography-led.
-➡ Phase 2.1   Signature Flame Integration (Intro Retrofit) — replace the intro's flame with the Primitive
-               after visual A/B parity; preserve emotional timing + cinematic quality; no visual regression.
+➡ Phase 2.1   Signature Flame Adoption (Intro Retrofit) — the intro ADOPTS the Primitive as its flame
+               visual (Intro owns 100% choreography · Primitive stays 100% presentation). Release gate:
+               EMOTIONAL parity — the match-strike must still feel magical — not pixel parity.
 ➡ Phase 3     Cursor-Reactive Warm Lighting — ONLY after the intro uses the Signature Flame.
 ➡ Phase 4     Campaign Storytelling (Diwali · Christmas · Anniversary · Limited Collections).
 ➡ Phase 5     Product Storytelling (craft · collection intros · editorial · luxury loading · checkout
