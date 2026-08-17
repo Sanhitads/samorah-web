@@ -16,6 +16,17 @@ Luxury Platform
 └── Design Principles & Contracts                     — the governance that keeps it luxury
 ```
 
+## Platform version — **Luxury Platform v1.0**
+| Component | Version | State |
+|---|---|---|
+| Luxury Experience Engine | v1 | live (intro + replay) |
+| Luxury Flame Primitive | v1 | live (canonical flame) |
+| Ambient Lighting Engine | v1 | frozen · dormant (Phase 3.0) |
+
+Bump a **component** version on a breaking/major change (e.g. Lighting Engine v2 for a new driver model);
+bump the **platform** version when the component set changes materially. Documentation only — it becomes
+invaluable once v2s appear.
+
 ## Engines & primitives
 | Component | What it is | Read |
 |---|---|---|
