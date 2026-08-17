@@ -100,6 +100,21 @@ Multiple drivers may exist in later phases. They **modulate**, they never replac
 > instance. **No experience, page, or campaign may redefine lighting tokens** — the token vocabulary has a
 > single owner, so lighting stays visually consistent everywhere.
 
+### Experience Ownership Contract
+> **Only an Experience may compose `<AmbientLight>`.**
+> - `AmbientLight` never mounts itself.
+> - A `LightSource` never mounts `AmbientLight`.
+> - A driver never mounts `AmbientLight`.
+> - The renderer is **completely passive** until composed by an Experience.
+>
+> Placement is an Experience responsibility (Presentation vs Experience); the engine is inert until placed.
+
+### Renderer Purity Contract
+> **`AmbientLight` is deterministic.** Given the same `LightingPreset` + `LightSource`, the renderer must
+> always produce **identical output**. It must never depend on **time · randomness · browser state · user
+> input · environment · hidden internal state.** (Any future dynamism lives in a driver's bounded
+> modulation, never inside the renderer.)
+
 ---
 
 ## Configuration · Profiles · Capability
