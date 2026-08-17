@@ -44,8 +44,35 @@ The Flame Primitive is a **Presentation Component** — it supplies the visual f
 ambient idle motion, wick visibility) and nothing else. The Match Strike Intro is an **Experience
 Component** — it owns storytelling (spark, ignition, glow timeline, the 2600 ms sequence, wordmark, fade,
 replay). An Experience *composes* a Presentation component and drives *when* it appears; the Presentation
-component never learns about the Experience's timeline. Cross-layer control happens through **supported
-APIs** (e.g. `showWick`), never by reaching into the other layer's internal CSS or timing.
+component never learns about the Experience's timeline. Cross-layer control happens through **supported,
+high-level APIs** (e.g. a `match` variant), never through low-level rendering flags or by reaching into
+the other layer's internal CSS or timing.
+
+## 📜 Canonical Flame Contract
+
+The **Luxury Flame Primitive is the single source of truth for the Samorah flame's visual identity.**
+Every experience that adopts it — the Match Strike Intro, campaigns, product storytelling, loading
+moments — renders the *same* canonical flame.
+
+Therefore any change to the flame's **silhouette, proportions, glow, palette, or motion characteristics**
+requires **explicit design review**: such a change is never local — it propagates to every adopting
+experience at once. Bug fixes and *additive, backward-compatible* APIs (e.g. adding a `match` variant) do
+not alter the canonical identity and are exempt; anything that changes how the flame **looks or moves** is not.
+
+Enforced at release time by the **Cross-Experience Consistency** gate (see SIGNATURE_FLAME_ADOPTION.md):
+the Intro, the standalone Primitive preview, and any demo usage must render the identical canonical flame.
+
+## ⭐ Signature Components
+
+Not every reusable component is *signature*. These carry the brand's emotional identity and **require
+design review before any change** to their look or motion:
+
+- **Flame** — the Luxury Flame Primitive (this document).
+- **Match Strike** — the cinematic intro sequence.
+- **Wordmark Reveal** — the SAMORAH wordmark animation.
+
+Editing a signature component is never a local change — it changes how Samorah *feels*. Treat such edits
+with the same rigor the Canonical Flame Contract applies to the flame's visual identity.
 
 ---
 
