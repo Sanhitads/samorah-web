@@ -75,6 +75,17 @@ governed evolution cycle, never as a side effect of an experience phase.
 > **multiple experiences · multiple products · future campaigns · or as a general platform capability.**
 > Otherwise it stays **internal to the consuming experience.**
 
+## 🧱 Composition Layer Contract
+A **composition layer** (e.g. `lighting/composition/FlameLightSource.ts`) sits between engine and
+experience — `Platform Engine → Composition Layer → Experience` — and is where cross-engine wiring lives so
+engines stay pure and experiences stay thin. A composition layer:
+- composes existing **frozen** platform engines **exclusively through public APIs**;
+- does **not** modify engine internals;
+- does **not** expose new platform APIs;
+- **may depend on multiple engines** simultaneously;
+- remains **independent from any individual experience** where practical;
+- **may be deleted without changing engine behavior.**
+
 ## ✅ Platform Composition Checklist
 Run at the **start of every architecture review** (answer before any code):
 - [ ] Does this phase modify any **frozen engine**?
@@ -104,8 +115,8 @@ implementation. A review that cannot close this section cleanly does not proceed
 ✅ Phase 2         Luxury Flame Primitive
 ✅ Phase 2.1       Signature Flame Adoption (intro)
 ✅ Phase 3.0       Ambient Lighting Engine (architecture · frozen · dormant)
-➡ Phase 3.1       Composition Validation (harness — prove engines compose in isolation; no placement)   ← next
-➡ Phase 3.2       Signature Intro Static Light (the intro flame casts light — after validation)
+✅ Phase 3.1       Composition Proven (Flame→FlameLightSource→resolveAmbientLight→AmbientLight compose; harness)
+➡ Phase 3.2       Signature Intro Static Light (the intro flame casts light — after validation)   ← next
 ➡ Phase 3.3–3.5   Cursor Bend · Scroll Breathe · CMS Profiles
 ➡ Phase 4+        Campaign Storytelling · Product Storytelling · Admin · Page Motion
 ```

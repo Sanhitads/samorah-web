@@ -12,8 +12,8 @@ driver, never the architecture.
 ## Roadmap (numbering fixed)
 ```
 3.0  Ambient Lighting Architecture   — tokens · config · renderer · sources · capability · API. No mount. → FROZEN
-3.1  Composition Validation          — prove Flame→FlameLightSource→resolveAmbientLight→AmbientLight via a
-                                       Composition Validation Harness, in isolation. NO placement. → Freeze
+3.1  Composition Proven              — Flame→FlameLightSource→resolveAmbientLight→AmbientLight compose via a
+                                       Composition Validation Harness, in isolation. NO placement. → DONE ✅
 3.2  Signature Intro Static Light    — the intro flame casts a still warm light (AFTER validation; signature
                                        experience → Canonical Experience Rule / emotional-parity review). → Freeze
 3.3  Cursor Bend                     — cursor subtly BENDS the existing light (not follows). → Freeze
