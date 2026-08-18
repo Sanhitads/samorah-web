@@ -5,8 +5,9 @@ the mouse" — it is to make the site feel *physically illuminated by the flame.
 **light** (presentation) from what **drives** it (source + optional modulators). Cursor is only one future
 driver, never the architecture.
 
-> **Status:** ✅ **Phase 3.0 FROZEN** — architecture + dormant infrastructure complete. **Nothing is
-> mounted or visible; runtime impact: none.** Canonical reference: [ADR-0008](../adr/0008-ambient-lighting-engine.md).
+> **Status:** ✅ **FROZEN — v1.1** (architecture + dormant infrastructure; runtime impact: none). v1.1
+> ([ADR-0009](../adr/0009-ambient-lighting-engine-v1-1.md)) fixes a self-referential preset color so the
+> light renders visibly. **Nothing is mounted or visible.** Canonical reference: [ADR-0008](../adr/0008-ambient-lighting-engine.md).
 > Static placement begins in Phase 3.1 (awaits architectural approval).
 
 ## Roadmap (numbering fixed)

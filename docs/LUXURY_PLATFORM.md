@@ -21,7 +21,7 @@ Luxury Platform
 |---|---|---|
 | Luxury Experience Engine | v1 | live (intro + replay) |
 | Luxury Flame Primitive | v1 | live (canonical flame) |
-| Ambient Lighting Engine | v1 | frozen · dormant (Phase 3.0) |
+| Ambient Lighting Engine | **v1.1** | frozen · dormant (self-referential color fix — ADR-0009) |
 
 Bump a **component** version on a breaking/major change (e.g. Lighting Engine v2 for a new driver model);
 bump the **platform** version when the component set changes materially. Documentation only — it becomes
@@ -46,6 +46,7 @@ invaluable once v2s appear.
 |---|---|
 | [ADR-0007](adr/0007-homepage-flame.md) | Homepage flame prototype rejected (reserve the flame for signature moments) |
 | [ADR-0008](adr/0008-ambient-lighting-engine.md) | Ambient Lighting Engine — canonical driver model + all lighting contracts |
+| [ADR-0009](adr/0009-ambient-lighting-engine-v1-1.md) | Ambient Lighting Engine v1.1 — self-referential color fix (governed evolution) |
 
 ## Governing principles (the platform's "constitution")
 Recorded in the docs above; the load-bearing ones:
