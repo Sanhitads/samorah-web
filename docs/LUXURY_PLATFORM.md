@@ -146,6 +146,21 @@ consciously attributed to the input. If reviewers start "playing with it," the i
 cut. (Applied as a hard reject gate for Phase 3.3 Cursor Bend Validation — see
 [roadmaps/CURSOR_BEND.md](roadmaps/CURSOR_BEND.md).)
 
+## 📏 Movement Budget (permanent platform rule)
+A **permanent constraint on every interactive lighting/decorative driver** (cursor bend today; scroll
+breathe, pointer-reactive motion tomorrow).
+
+> **The maximum positional (or intensity) modulation produced by an input driver must remain within a small,
+> predefined budget relative to the affected property — small enough that the effect is perceptible only
+> subconsciously and never reads as an object following the input.**
+
+The **rule** is permanent; the **number** is an implementation choice, tuned down until imperceptible, and
+enforced **in the driver/experience layer** — never by changing an engine (the frozen renderer never sees
+it). It is the measurable companion to the subjective *"stay subconscious"* intent: a driver's bounded delta
+must be clamped to its budget (e.g. Phase 3.3 cursor bend caps at ±6px ≈ ≤ ~4 % of the light radius). First
+enforced by `experiences/_validation/cursorBend/movementBudget.ts` — see
+[roadmaps/CURSOR_BEND.md](roadmaps/CURSOR_BEND.md).
+
 ## Roadmap (current)
 ```
 ✅ Phase 1 · 1.1   Luxury Experience Engine · Replay Policy
