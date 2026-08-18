@@ -124,6 +124,16 @@ and that would reintroduce overshoot/oscillation and break *breathe-not-pulse*. 
 state; the breath only ever dims slightly and settles back. (Enforced by the driver's idle timer + an
 explicit "returns once, no oscillation" test.)
 
+### Event-rate independence (permanent invariant)
+> **The maximum breathing effect must be independent of the scroll event rate.** 100, 500, or 1000 `scroll`
+> events over the same travel must produce the **same** maximum breath — never a larger effect just because
+> more events fired.
+
+Guaranteed by construction: events are **coalesced** to ≤ one update per animation frame (effect is tied to
+frames, not event count) and every update is **clamped to the Breath Budget** (the maximum is the cap
+regardless of input volume). This is precisely what the 500-event scroll-flood test protects — it exists to
+prove the driver never scales its effect with event rate.
+
 ---
 
 ## 5. Driver Resolution — order, conflict, bounds
@@ -149,6 +159,13 @@ one as a `transform`, the other as `opacity`:
 Cursor  →  dx = +4px          Scroll  →  dIntensity = +0.03
                     ↓ (composed on the SAME wrapper, orthogonally)
         transform: translate(+4px, …)   AND   opacity: (1 − 0.03)
+```
+
+Separation of channels, at a glance:
+```
+   Cursor ──▶ transform ┐
+                         ├──▶ same experience wrapper ──▶ <AmbientLight> (frozen renderer)
+   Scroll ──▶ opacity   ┘
 ```
 Neither driver reads or overwrites the other's channel; each stays within its own budget (±6px · ≤0.06). This
 is proven mechanically in `crossDriver.test.ts`.
