@@ -19,8 +19,18 @@ blocks as history.)
 | **Edge Visibility** — disappears naturally (dim laptop · bright desktop · high-brightness mobile) | | |
 | **Decorative Necessity** — "if it disappeared, would users immediately notice?" (No = pass) | | |
 
+## Observed Differences
+Specific, objective observations vs. Mode A (so a **Tune** verdict is deterministic, not guesswork):
+
+None
+
+_…or, for example:_
+- • Light radius appears larger than expected
+- • Glow reaches beyond the typography
+- • Flame no longer feels primary
+
 ## Overall decision
-☐ **Adopt**  ☐ **Tune** (presentation only, specific difference below)  ☐ **Reject**
+☐ **Adopt**  ☐ **Tune** (presentation only — address the Observed Differences above)  ☐ **Reject**
 
 **Rationale:** ______________________________________________
 
