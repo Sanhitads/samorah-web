@@ -66,6 +66,16 @@ This prevents platform erosion — the slow drift of *"let's just add one more p
 `AmbientLight`"* that turns stable engines into tangled ones. A frozen engine changes only through its own
 governed evolution cycle, never as a side effect of an experience phase.
 
+## 🔁 Validation Reset Rule
+When a platform **engine changes** after an experience has already been validated:
+- **All visual validation performed before the engine evolution becomes invalid.**
+- Experience validation **must restart from the earliest affected validation checkpoint.**
+- Previous screenshots, recordings, and review decisions remain **historical artifacts only** — they must
+  **not** be reused as release evidence.
+
+(Practiced in Engine v1.1: the pre-v1.1 Phase 3.2 harness validation was discarded and Phase 3.2 restarts
+from a fresh Commit 1 against the corrected engine.)
+
 ## 🧩 Platform Extension Rule
 > New public APIs may be introduced **only when they provide reusable platform capability.** Platform
 > engines must **not** expose public APIs that exist solely for a single experience, campaign, prototype, or
