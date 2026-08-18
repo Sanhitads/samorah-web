@@ -126,3 +126,21 @@ frozen intro exactly.
 | ADR-0007 / 0008 · Freeze Notes | ✅ (intro freeze re-opened under governance, re-frozen) |
 
 **No engine contract changes.** The review closes cleanly — no platform evolution required.
+
+## 🔒 Freeze Note (Phase 3.2 — binding)
+This experience composes **Ambient Lighting Engine v1.1 exactly as frozen**. It is now a **closed, frozen
+experience.**
+
+> **Any future change to the intro's lighting behavior — position, radius, intensity, colour, blend, bend,
+> breathe, timing, or the addition of any driver — must begin with a NEW architecture review and its own
+> re-freeze. It must NOT be implemented by editing this frozen experience in place.**
+
+**Why this is stated explicitly:** Phase 3.3 (Cursor Bend) is next, and the natural temptation while working
+nearby will be *"I'll just tweak the intro light while I'm here."* That is precisely the platform erosion the
+Stability Rule exists to prevent. This Freeze Note forbids it. The intro's ambient illumination changes
+**only** through the governed cycle — new review · ADR (if a contract is touched) · regression verification ·
+new freeze — never as a side effect of an adjacent phase.
+
+**Concretely, Phase 3.3 must NOT touch:** `IntroExperience.tsx`, `intro.css`, `LuxuryExperience.tsx`, or any
+Ambient Lighting Engine file. Cursor Bend is a **separate composition** proven in isolation; it does not
+re-open this experience. See [CURSOR_BEND.md](CURSOR_BEND.md).
