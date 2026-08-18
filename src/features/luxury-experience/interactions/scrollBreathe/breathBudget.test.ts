@@ -1,5 +1,5 @@
 /**
- * Phase 3.4 — Breath Budget enforcement. The bound is the whole point: the breath must never pulse.
+ * Scroll Breathe — Breath Budget enforcement. The bound is the whole point: the breath must never pulse.
  */
 import { describe, it, expect } from "vitest";
 import { clampToBreath, BREATH_BUDGET } from "./breathBudget";

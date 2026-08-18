@@ -1,8 +1,8 @@
-import type { LightDriver, LightModulation } from "../../../lighting";
+import type { LightDriver, LightModulation } from "../../lighting";
 import { BREATH_BUDGET, clampToBreath } from "./breathBudget";
 
 /**
- * Phase 3.4 — Scroll Breathe Validation · the Scroll Breathe DRIVER (validation layer only).
+ * Scroll Breathe · DRIVER (adopted · reusable interaction driver).
  *
  * Implements the frozen `LightDriver` interface unchanged — it MODULATES an existing light's INTENSITY within
  * the Breath Budget and does nothing else:
@@ -15,6 +15,10 @@ import { BREATH_BUDGET, clampToBreath } from "./breathBudget";
  * spring). Input capture is a passive, rAF-coalesced `scroll` listener owned HERE (the renderer owns no
  * listeners); it is removed on detach, along with any pending frame/idle timer. SSR-safe: no window/document
  * access at import — only inside `attach`, which an Experience calls from an effect.
+ *
+ * ADOPTED · DORMANT: this module is the sanctioned home for the validated capability. It is imported by no
+ * production route or experience yet — a future reviewed placement phase attaches it to a persistent light.
+ * It introduces NO runtime behaviour on its own.
  */
 
 /** Gain: scroll velocity (px/frame) → opacity delta, before clamping. Impl choice; the clamp is the guard. */

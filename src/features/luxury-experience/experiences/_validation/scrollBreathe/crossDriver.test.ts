@@ -9,8 +9,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { createCursorBendDriver } from "../cursorBend/cursorBendDriver";
 import { MOVEMENT_BUDGET_PX } from "../cursorBend/movementBudget";
-import { createScrollBreatheDriver, type ScrollTarget } from "./scrollBreatheDriver";
-import { BREATH_BUDGET } from "./breathBudget";
+import { createScrollBreatheDriver, type ScrollTarget } from "../../../interactions/scrollBreathe/scrollBreatheDriver";
+import { BREATH_BUDGET } from "../../../interactions/scrollBreathe/breathBudget";
 import type { LightModulation } from "../../../lighting";
 
 let rafMap: Map<number, FrameRequestCallback>;

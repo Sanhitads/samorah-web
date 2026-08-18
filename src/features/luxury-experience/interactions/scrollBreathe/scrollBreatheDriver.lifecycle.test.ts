@@ -1,14 +1,14 @@
 /**
- * Phase 3.4 — Scroll Breathe runtime lifecycle invariants (node env with stubbed globals + fake timers).
+ * Scroll Breathe driver — runtime lifecycle invariants (node env with stubbed globals + fake timers).
  *
- * Verifies scroll lifecycle (1 listener on mount / 0 on unmount / no duplicates), NO layout read in the
- * handler (getScrollY only at attach + in the rAF flush), scroll-flood coalescing (≤ one frame), neutral
- * reset when scrolling stops (Scroll Idle Rule — exactly once, no oscillation), and memory safety (no
- * retained listeners, frames, or idle timers after detach).
+ * Scroll lifecycle (1 listener on mount / 0 on unmount / no duplicates), NO layout read in the handler
+ * (getScrollY only at attach + in the rAF flush), scroll-flood coalescing (≤ one frame), neutral reset when
+ * scrolling stops (Scroll Idle Rule — exactly once, no oscillation), and memory safety (no retained
+ * listeners, frames, or idle timers after detach).
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { createScrollBreatheDriver, type ScrollTarget } from "./scrollBreatheDriver";
-import type { LightModulation } from "../../../lighting";
+import type { LightModulation } from "../../lighting";
 
 let rafMap: Map<number, FrameRequestCallback>;
 let rafId: number;
@@ -90,11 +90,11 @@ describe("Performance", () => {
     for (let i = 0; i < 500; i++) {
       target.setY(i * 3);
       target.fire();
-      expect(rafMap.size).toBe(1); // never more than one queued frame during the flood
+      expect(rafMap.size).toBe(1);
     }
     expect(calls).toBe(0);
     flushRAF();
-    expect(calls).toBe(1); // exactly one update for the entire burst
+    expect(calls).toBe(1); // event-rate independent: N events → one bounded update
     expect(rafMap.size).toBe(0);
   });
 });
@@ -109,12 +109,12 @@ describe("Scroll Idle Rule — neutral reset", () => {
     target.setY(400);
     target.fire();
     flushRAF();
-    expect(mods[mods.length - 1].dIntensity ?? 0).toBeGreaterThan(0); // active scroll → breath > 0
+    expect(mods[mods.length - 1].dIntensity ?? 0).toBeGreaterThan(0);
 
     const before = mods.length;
-    vi.advanceTimersByTime(500); // past the idle window
-    expect(mods[mods.length - 1].dIntensity).toBe(0); // returned to neutral
-    expect(mods.length).toBe(before + 1); // fired exactly once — no oscillation
+    vi.advanceTimersByTime(500);
+    expect(mods[mods.length - 1].dIntensity).toBe(0);
+    expect(mods.length).toBe(before + 1); // exactly once — no oscillation
     expect(driver.modulate()).toEqual({ dIntensity: 0 });
   });
 });
@@ -127,12 +127,12 @@ describe("Memory safety", () => {
       const detach = handle.attach(target, () => {});
       target.setY(i * 20);
       target.fire();
-      flushRAF(); // schedules the idle timer
+      flushRAF();
       expect(vi.getTimerCount()).toBe(1);
       detach();
       expect(target.count()).toBe(0);
       expect(rafMap.size).toBe(0);
-      expect(vi.getTimerCount()).toBe(0); // idle timer cleared on detach — no retained timer
+      expect(vi.getTimerCount()).toBe(0);
     }
   });
 

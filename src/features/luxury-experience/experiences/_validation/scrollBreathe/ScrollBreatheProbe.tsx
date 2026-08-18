@@ -10,7 +10,7 @@ import {
   type LightModulation,
 } from "../../../lighting";
 import { createFlameLightSource } from "../../../lighting/composition/FlameLightSource";
-import { createScrollBreatheDriver, type ScrollTarget } from "./scrollBreatheDriver";
+import { createScrollBreatheDriver, type ScrollTarget } from "../../../interactions/scrollBreathe/scrollBreatheDriver";
 
 /**
  * Phase 3.4 — Scroll Breathe Validation · ISOLATION harness (never routed, never imported by production).

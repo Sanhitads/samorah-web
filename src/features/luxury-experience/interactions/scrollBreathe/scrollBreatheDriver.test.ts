@@ -1,5 +1,5 @@
 /**
- * Phase 3.4 — Scroll Breathe driver: bounded intensity modulation + frozen LightDriver conformance.
+ * Scroll Breathe driver: bounded intensity modulation + frozen LightDriver conformance.
  */
 import { describe, it, expect } from "vitest";
 import { computeBreath, createScrollBreatheDriver } from "./scrollBreatheDriver";
