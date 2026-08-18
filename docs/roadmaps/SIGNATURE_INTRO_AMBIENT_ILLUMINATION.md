@@ -82,6 +82,9 @@ it exists and any fade; the renderer stays static.
 - [ ] **Layer Dominance Review** *(browser QA)* — confirm: the **spark remains the brightest event**; the
       **flame remains the primary focal point**; the **`AmbientLight` is noticed only by its absence**; the
       **`__glow` and `AmbientLight` never visually merge** into one indistinct effect.
+- [ ] **Edge Visibility Review** *(browser QA)* — watch the intro on a **dim laptop**, a **bright desktop**,
+      and a **high-brightness mobile**; confirm the light **disappears naturally rather than ending
+      abruptly** (ambient light can look perfect on one display yet "pop" off on another).
 - [ ] **Timeline Lock** — 2600 ms + spark/ignition/wordmark/fade timings unchanged.
 - [ ] **No frozen-engine diff** — `git diff` of Flame + Lighting engines = 0.
 - [ ] No replay / hydration / performance / accessibility regression.
@@ -89,6 +92,14 @@ it exists and any fade; the renderer stays static.
 ## Rollback
 Plain **`git revert`** — the intro changes are additive (`<AmbientLight>` + its CSS); reverting restores the
 frozen intro exactly.
+
+## Implementation sequence (disciplined — never combined)
+1. **Commit 1 — A/B harness only** (default = original intro; nothing adopted or removed).
+2. **Visual review** — Emotional Parity + Light Dominance + Layer Dominance + Edge Visibility.
+3. **Tune** — presentation only, and only in response to a specific reviewer-identified difference.
+4. **Commit 2 — Adopt** (after unanimous approval).
+5. **Commit 3 — Remove the prototype harness.**
+6. **Commit 4 — Freeze** documentation + rollback verification.
 
 ## 🔒 Platform Contract Verification
 | Governance | Preserved? |
