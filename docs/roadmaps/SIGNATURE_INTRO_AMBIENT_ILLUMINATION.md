@@ -91,10 +91,10 @@ Spark/Flame relative stacking is inherited from the frozen Phase 2.1 intro and i
 - [ ] **Edge Visibility Review** *(browser QA)* — watch the intro on a **dim laptop**, a **bright desktop**,
       and a **high-brightness mobile**; confirm the light **disappears naturally rather than ending
       abruptly** (ambient light can look perfect on one display yet "pop" off on another).
-- [ ] **Absence Review** *(release gate)* — **"If the ambient light disappeared, would you immediately
-      notice?"** Desired answer: **No.** If reviewers immediately notice its removal, the light has become
-      too important and violates the Lighting Design Contract — the strongest confirmation of *absence
-      before presence*.
+- [ ] **Decorative Necessity Review** *(release gate)* — **"If this decorative layer disappeared, would
+      users immediately notice?"** Desired answer: **No.** If reviewers immediately notice its removal, the
+      layer has become too important and violates the Lighting Design Contract — the strongest confirmation
+      of *absence before presence*. (A **permanent platform-wide gate** — see LUXURY_PLATFORM.md.)
 - [ ] **Visual regression artifacts** — the 8-shot Mode A / Mode B × desktop/mobile × dark/light matrix is
       captured into `docs/reviews/phase-3.2/` (baseline for future comparison).
 - [ ] **Timeline Lock** — 2600 ms + spark/ignition/wordmark/fade timings unchanged.

@@ -120,6 +120,17 @@ If any contract would change, **stop the review** and document why a **platform 
 architecture review + a new ADR + regression verification + a new freeze — is required *before* any
 implementation. A review that cannot close this section cleanly does not proceed to code.
 
+## 🕯️ Decorative Necessity Review
+A **permanent, platform-wide release gate for every decorative experience layer** — Ambient Lighting today;
+cursor light, page transitions, particles, and seasonal/campaign effects tomorrow.
+
+> **"If this decorative layer disappeared, would users immediately notice?"** Desired answer: **No.**
+
+If reviewers immediately notice its removal, the layer has become too important — it violates *absence
+before presence* and must be dialed back or cut. This is the strongest confirmation that a decorative layer
+reinforces the experience rather than competing with it. (Lighting has an additional, sharper companion:
+the **Light Dominance Review** — "did you notice the light before the content?")
+
 ## Roadmap (current)
 ```
 ✅ Phase 1 · 1.1   Luxury Experience Engine · Replay Policy
