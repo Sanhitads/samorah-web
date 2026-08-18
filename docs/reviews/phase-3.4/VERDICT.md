@@ -35,9 +35,18 @@ _…or, for example:_
 - • The breath is noticeable on a bright display but not a dim one
 
 ## Overall decision
-☐ **Adopt** (all six gates pass)  ☐ **Tune** (presentation only — address the Observed Differences above)  ☐ **Reject**
+☑ **Adopt** (all six gates pass)  ☐ **Tune** (presentation only — address the Observed Differences above)  ☐ **Reject**
 
 **Rationale:** ____________________________________________
+
+### Recorded browser observation (why the effect is intentionally this restrained)
+> **Start, mid-scroll, and idle states remain visually similar under normal observation. The breathing effect
+> is intentionally difficult to perceive directly and serves only as subconscious atmosphere.**
+
+This is the *desired* result, not a defect: the near-identical mid/idle appearance is the effect working
+(*absence before presence*). It is recorded to protect future work from "making it more obvious" — increasing
+the Breath Budget or the gain to make the breath visible would violate the Lighting Design Contract and the
+Interaction Dominance gate. No tuning was recommended.
 
 ---
 
