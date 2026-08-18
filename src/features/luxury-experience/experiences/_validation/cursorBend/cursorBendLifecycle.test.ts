@@ -161,6 +161,20 @@ describe("Performance", () => {
     expect(rafMap.size).toBe(1); // a subsequent move schedules a fresh single frame
   });
 
+  it("survives a pointer flood — 500 moves keep at most ONE queued frame → exactly one update on flush", () => {
+    const { el, t } = makeContainer();
+    let calls = 0;
+    createCursorBendDriver().attach(el, () => calls++);
+    for (let i = 0; i < 500; i++) {
+      t.fire("pointermove", { clientX: 100 + (i % 50), clientY: 100 + (i % 30) });
+      expect(rafMap.size).toBe(1); // never more than one queued frame at any point in the flood
+    }
+    expect(calls).toBe(0); // nothing applied mid-flood
+    flushRAF();
+    expect(calls).toBe(1); // exactly one transform update for the entire burst
+    expect(rafMap.size).toBe(0);
+  });
+
   it("performs NO layout read inside the pointer handler (measured only in the rAF flush)", () => {
     const { el, t } = makeContainer();
     createCursorBendDriver().attach(el, () => {});
@@ -176,5 +190,22 @@ describe("Performance", () => {
     expect(css).toMatch(/transition:\s*transform/); // transitions transform only
     expect(css).not.toMatch(/transition:\s*all/);
     expect(css).not.toContain("--lx-bend"); // experience namespace, never engine tokens
+  });
+});
+
+describe("Memory safety", () => {
+  it("repeated mount/unmount cycles leave zero listeners and no pending frame (no retained closures/timers)", () => {
+    const { el, t } = makeContainer();
+    const handle = createCursorBendDriver();
+    for (let i = 0; i < 50; i++) {
+      const detach = handle.attach(el, () => {});
+      t.fire("pointermove", { clientX: 130, clientY: 130 }); // schedule a frame this cycle
+      expect(rafMap.size).toBe(1);
+      detach(); // must remove every listener AND cancel the pending frame
+      expect(t.count("pointermove")).toBe(0);
+      expect(t.count("pointerleave")).toBe(0);
+      expect(win.count("blur")).toBe(0);
+      expect(rafMap.size).toBe(0); // no retained timer survives detach
+    }
   });
 });
