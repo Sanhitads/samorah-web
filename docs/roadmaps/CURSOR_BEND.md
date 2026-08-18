@@ -10,10 +10,12 @@
 > phase has failed — no matter how subtle the tuning. The desired perception is not "it moves"; it is
 > *"the room feels alive"* — and the viewer can never say why.
 
-> **Status:** 🧭 **Architecture review only — awaiting approval. No implementation exists or is authorised by
-> this document.** Cursor interaction is materially more dangerous than static lighting: static light can
-> only be too bright; cursor light can become a *gimmick.* This review's job is to make a gimmick
-> structurally impossible before a single line is written.
+> **Status:** ✅ **VALIDATION COMPLETE — FROZEN (isolation only; NOT adopted).** The Cursor Bend driver is
+> proven in isolation against Ambient Lighting Engine v1.1 through frozen public APIs. It is not routed, is
+> absent from every production bundle, and is attached to no experience. Adoption onto a persistent light
+> remains a **separate, later, reviewed** phase. Cursor interaction is materially more dangerous than static
+> lighting — a gimmick was made structurally impossible (bend-not-follow · Movement Budget · capability-gated
+> · Interaction Dominance as a hard reject gate) rather than tuned away after the fact.
 
 ---
 

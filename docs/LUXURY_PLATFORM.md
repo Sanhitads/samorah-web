@@ -173,8 +173,8 @@ enforced by `experiences/_validation/cursorBend/movementBudget.ts` — see
 ✅ Phase 3.0       Ambient Lighting Engine (architecture · frozen · dormant)
 ✅ Phase 3.1       Composition Proven (Flame→FlameLightSource→resolveAmbientLight→AmbientLight compose; harness)
 ✅ Phase 3.2       Signature Intro Ambient Illumination (the intro flame casts a still warm light — ADOPTED)
-➡ Phase 3.3       Cursor Bend Validation (prove cursor bend in isolation — no adoption)   ← next
-➡ Phase 3.4–3.5   Scroll Breathe · CMS Profiles
+✅ Phase 3.3       Cursor Bend Validation (proven in isolation — frozen; not adopted)
+➡ Phase 3.4–3.5   Scroll Breathe · CMS Profiles   ← next
 ➡ Phase 4+        Campaign Storytelling · Product Storytelling · Admin · Page Motion
 ```
 
