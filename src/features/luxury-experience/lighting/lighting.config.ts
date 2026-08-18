@@ -27,7 +27,10 @@ export interface LightingPreset {
   blend: BlendMode;
 }
 
-const WARM = "var(--lx-color-warm)";
+// v1.1 fix (ADR-0009): presets carry a CONCRETE shared design token, never the engine's own `--lx-color-warm`
+// variable. The renderer copies this value onto `--lx-color-warm`; referencing that same name here would be
+// self-referential (invalid at computed-value time → invisible light). The renderer stays a pure copier.
+const WARM = "var(--lux-color-amber)";
 
 /** Profile → preset. Deliberately subtle; the Focal Point Rule caps intensity. */
 export const LIGHTING_PRESETS: Record<LightingProfile, LightingPreset> = {
