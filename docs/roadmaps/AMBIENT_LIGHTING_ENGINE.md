@@ -22,6 +22,11 @@ driver, never the architecture.
 3.4  Scroll Breathe                  — the light breathes while scrolling (felt, not seen). → Freeze
 3.5  CMS Lighting Profiles           — admin: disabled/subtle/premium/campaign/seasonal, no code. → Freeze
 ```
+> **Interaction drivers (3.4 Scroll Breathe · 3.5 · future campaign interactions) begin from the frozen
+> Cursor Bend Validation harness** (`experiences/_validation/cursorBend/`) as the canonical reference — reuse
+> its shape (frozen-`LightDriver` impl + Movement Budget + experience-owned `--lux-*` transform, proven in
+> isolation). **Do not duplicate the driver/budget machinery and do not prototype interaction inside a
+> production experience.** See [CURSOR_BEND.md](CURSOR_BEND.md) §13.
 
 ## Engine components (the renderer alone is the Primitive)
 ```

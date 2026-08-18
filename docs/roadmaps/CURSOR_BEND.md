@@ -268,3 +268,22 @@ compositor-only · capability-gated · subconscious test + **Interaction Dominan
 gates), not left to tuning.
 
 **Stop. No implementation.** Awaiting explicit approval to begin the build sequence in §8.
+
+---
+
+## 13. 🔒 Freeze Note — reference implementation
+> **This validation harness is frozen as a reference implementation. Future interaction experiments should
+> begin from this harness rather than modifying production experiences directly.**
+
+The harness (`src/features/luxury-experience/experiences/_validation/cursorBend/`) is the **canonical pattern
+for every future interaction driver** (Scroll Breathe · pointer-reactive motion · campaign interactions): a
+frozen-`LightDriver` implementation + a Movement Budget + an experience-owned `--lux-*` transform, composed
+through frozen public APIs, proven in isolation, and absent from production. Later phases **compose from — or
+copy the shape of — this harness; they do not fork production experiences to prototype interaction, and they
+do not duplicate the driver/budget machinery.** Adoption of Cursor Bend onto a live persistent light, if ever
+pursued, is a **separate, reviewed** sub-phase — this freeze covers validation only.
+
+**Frozen audit (permanent record):** bundle delta **0 KB** (`.next/static` identical with the harness present
+vs. physically removed) · **0** validation assets in any production bundle · **0** production importers ·
+**0** changes to any frozen engine / public API across the phase · rollback = a clean `git revert` (rehearsed;
+removes only the `_validation` files).
