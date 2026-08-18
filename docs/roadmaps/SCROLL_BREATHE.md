@@ -255,6 +255,20 @@ folder / revert the commits; zero engine, intro, and Cursor-Bend impact (none ar
 
 ---
 
+## 9a. Why the adopted module is NOT public API (Platform Extension Rule)
+> **Scroll Breathe is a reusable *interaction capability*, not a platform *engine* capability. It remains
+> internal until multiple production experiences require a common public contract.**
+
+The adopted module (`interactions/scrollBreathe/`) is deliberately **not** exported from `lighting/index.ts`.
+Per the **Platform Extension Rule**, a new public API is justified only when it delivers reusable *platform*
+capability across multiple experiences/products/campaigns — not for a single (or, today, zero) consumer.
+Scroll Breathe composes the frozen engine through its **existing** public surface (`LightDriver`,
+`resolveAmbientLight`, `AmbientLight`) and adds nothing to it. Keeping it internal preserves the Extension
+Rule and avoids widening the engine's contract for a capability with no production consumer yet. If several
+experiences later need it through one shared contract, promoting it to public API is its own governed
+evolution (new review · ADR · re-freeze). This keeps **capability** (internal, reusable) and **platform
+surface** (public, contractual) cleanly separated.
+
 ## 10. Assessment
 Phase 3.4 requires **only experience composition.**
 - **Engine evolution:** ❌ none — every frozen engine file stays byte-identical.

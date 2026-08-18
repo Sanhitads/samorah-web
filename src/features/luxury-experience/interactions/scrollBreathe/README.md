@@ -3,11 +3,29 @@
 The **sanctioned, permanent home** for the validated Scroll Breathe capability, promoted here from
 `experiences/_validation/scrollBreathe/` after passing browser/emotional review (Phase 3.4, Commit 2).
 
-## Status: ADOPTED · DORMANT
-- **Adopted** — this is the canonical, reusable implementation (no longer validation-area code).
-- **Dormant** — imported by **no** production route or experience. It introduces **no runtime behaviour** on
-  its own. A future **reviewed placement phase** (see roadmap: *First Persistent Ambient Lighting Placement*)
-  attaches it to a persistent light. Capability and experience-adoption stay deliberately separated.
+## Lifecycle status
+```
+✓ Adopted            — canonical, sanctioned implementation (no longer validation-area code)
+✓ Reusable           — a general interaction capability; any experience may compose it
+✓ Dormant            — introduces no runtime behaviour on its own
+✗ Not attached       — wired to no production experience
+✗ Not routed         — reachable by no URL
+✗ Not user-visible   — absent from every shipped bundle; zero runtime footprint
+```
+A future **reviewed placement phase** (see roadmap: *First Persistent Ambient Lighting Placement*) attaches it
+to a persistent light. Capability and experience-adoption stay deliberately separated.
+
+## Why this is NOT exported from the Lighting Engine public API
+> **Scroll Breathe is a reusable *interaction capability*, not a platform *engine* capability. It remains
+> internal until multiple production experiences require a common public contract.**
+
+Per the **Platform Extension Rule**, a new public API is justified only when it provides reusable *platform*
+capability across multiple experiences/products/campaigns — not for a single (or zero) consumer. Scroll
+Breathe composes the frozen engine through its **existing** public APIs (`LightDriver`, `resolveAmbientLight`,
+`AmbientLight`); it adds nothing to `lighting/index.ts`. Exporting it now would widen the engine's public
+surface for a capability with no production consumer yet — precisely the platform erosion the rule prevents.
+If several experiences later need it through one contract, promoting it to a public API is its own governed
+evolution (new review · ADR · re-freeze).
 
 ## What it is
 A bounded **intensity** modulator implementing the frozen `LightDriver` interface — the intensity-channel
