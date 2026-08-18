@@ -10,6 +10,10 @@
  * and requires NO engine change: the frozen renderer never sees it; only the experience wrapper's transform
  * is bounded by it.
  *
+ * The budget limits the MAXIMUM effect, not the AVERAGE effect: smaller movements stay proportional
+ * (`computeBend` scales linearly inside the container); only excessive movement is clamped. The cap is a
+ * fixed LOGICAL length — it never scales with devicePixelRatio, zoom, or screen size.
+ *
  * Chosen value: 6px per axis ≈ ≤ ~4 % of the premium light radius (clamp(160px, 34vmin, 460px)). A "lean",
  * never a "travel".
  */
