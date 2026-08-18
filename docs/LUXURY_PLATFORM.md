@@ -153,6 +153,10 @@ breathe, pointer-reactive motion tomorrow).
 > **The maximum positional (or intensity) modulation produced by an input driver must remain within a small,
 > predefined budget relative to the affected property — small enough that the effect is perceptible only
 > subconsciously and never reads as an object following the input.**
+>
+> **The Movement Budget limits the maximum effect, not the average effect.** Smaller movements remain
+> proportional; only excessive movement is clamped. (That is why clamping exists: it caps the extreme without
+> flattening the natural, proportional response in the common case.)
 
 The **rule** is permanent; the **number** is an implementation choice, tuned down until imperceptible, and
 enforced **in the driver/experience layer** — never by changing an engine (the frozen renderer never sees
