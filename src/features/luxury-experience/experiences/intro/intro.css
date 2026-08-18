@@ -94,6 +94,14 @@
   100% { opacity: 0; }
 }
 
+/* PROTOTYPE (Phase 3.2 A/B harness, v1.1) — the composed ambient illumination sits BEHIND the flame (it is
+   the first child of .lux-intro__flamewrap; the flame's transform creates a stacking context, so the flame
+   paints on top). The Intro owns position/offset/layering (Spatial Ownership); the light is static — NO
+   animation (Light Lifecycle Rule). It coexists with .lux-intro__glow. Remove with the harness before adopt. */
+.lux-intro__ambient {
+  z-index: 0;
+}
+
 .lux-intro__wordmark {
   margin: 0;
   font-family: var(--font-cormorant, Georgia, serif);
