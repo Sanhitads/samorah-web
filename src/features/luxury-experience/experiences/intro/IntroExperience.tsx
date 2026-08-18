@@ -4,7 +4,6 @@ import "./intro.css";
 import { Flame } from "../../flame/Flame";
 import { AmbientLight, resolveAmbientLight, resolveLightingConfig } from "../../lighting";
 import { createFlameLightSource } from "../../lighting/composition/FlameLightSource";
-import { INTRO_AMBIENT_AB } from "./introAmbientAB.config";
 
 /**
  * The intro overlay markup. Presentation only — the animation is entirely CSS (see intro.css); the
@@ -16,21 +15,16 @@ import { INTRO_AMBIENT_AB } from "./introAmbientAB.config";
  * (opacity + scale + flicker + fade on the 2600 ms timeline). The primitive supplies ONLY the visual
  * (Presentation vs Experience). See docs/roadmaps/SIGNATURE_FLAME_ADOPTION.md.
  *
- * Phase 3.2 A/B harness (PROTOTYPE, built fresh against Ambient Lighting Engine v1.1; default Mode A →
- * nothing added). Mode B composes an ambient illumination BEHIND the flame from the frozen public APIs —
- * Experience → FlameLightSource → resolveAmbientLight() → AmbientLight. The Intro owns the source lifecycle
- * + position/layering; the renderer stays passive and is never animated (Light Lifecycle Rule). It coexists
- * with — never replaces — `.lux-intro__glow`. See docs/roadmaps/SIGNATURE_INTRO_AMBIENT_ILLUMINATION.md.
+ * Ambient illumination (adopted · Phase 3.2): the flame casts a warm light BEHIND itself, composed from the
+ * frozen public APIs — Experience → FlameLightSource → resolveAmbientLight() → AmbientLight. The Intro owns
+ * the source + position/layering; the renderer is passive and never animated (Light Lifecycle Rule). It
+ * coexists with — never replaces — `.lux-intro__glow`. See docs/roadmaps/SIGNATURE_INTRO_AMBIENT_ILLUMINATION.md.
  */
 export function IntroExperience({ text, onSkip }: { text: string; onSkip: () => void }) {
-  // Default Mode A → null (byte-identical intro). Mode B composes a visible ambient illumination (v1.1).
-  const ambient =
-    INTRO_AMBIENT_AB.mode === "B"
-      ? resolveAmbientLight(
-          resolveLightingConfig({ enabled: true, profile: "premium" }),
-          createFlameLightSource({ position: { x: "50%", y: "50%" }, intensity: 0.16, color: "var(--lux-color-amber)", lit: true }),
-        )
-      : null;
+  const ambient = resolveAmbientLight(
+    resolveLightingConfig({ enabled: true, profile: "premium" }),
+    createFlameLightSource({ position: { x: "50%", y: "50%" }, intensity: 0.16, color: "var(--lux-color-amber)", lit: true }),
+  );
 
   return (
     <div className="lux-intro" aria-hidden="true" onClick={onSkip}>
