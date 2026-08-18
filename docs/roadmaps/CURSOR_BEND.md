@@ -274,6 +274,10 @@ gates), not left to tuning.
 ## 13. 🔒 Freeze Note — reference implementation
 > **This validation harness is frozen as a reference implementation. Future interaction experiments should
 > begin from this harness rather than modifying production experiences directly.**
+>
+> **The validation harness should remain unchanged except for defect fixes. Future interaction experiments
+> should copy or compose from it rather than extending it directly** — this prevents the harness from slowly
+> becoming another platform.
 
 The harness (`src/features/luxury-experience/experiences/_validation/cursorBend/`) is the **canonical pattern
 for every future interaction driver** (Scroll Breathe · pointer-reactive motion · campaign interactions): a
@@ -287,3 +291,11 @@ pursued, is a **separate, reviewed** sub-phase — this freeze covers validation
 vs. physically removed) · **0** validation assets in any production bundle · **0** production importers ·
 **0** changes to any frozen engine / public API across the phase · rollback = a clean `git revert` (rehearsed;
 removes only the `_validation` files).
+
+### Known limitations
+- **No empirical profiler baseline captured** — the performance baseline is analytical (one compositor
+  transform/frame · one rAF max in flight · zero layout reads in the handler); real CPU/Memory/FPS numbers
+  need a DevTools Performance session and were not captured headless.
+- **No production adoption** — the driver is attached to no live experience.
+- **No persistent-light integration** — proven against an isolated probe light only; adoption onto a
+  persistent ambient light remains a separate, later, reviewed sub-phase.

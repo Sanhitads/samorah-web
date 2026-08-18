@@ -19,7 +19,8 @@ driver, never the architecture.
                                        experience → Canonical Experience Rule / emotional-parity review). → ADOPTED & FROZEN ✅
 3.3  Cursor Bend Validation          — PROVE in isolation that the cursor subtly BENDS the existing light
                                        (not follows); no adoption, no placement. → VALIDATION FROZEN ✅
-3.4  Scroll Breathe                  — the light breathes while scrolling (felt, not seen). → Freeze
+3.4  Scroll Breathe Validation       — PROVE in isolation that the light breathes while scrolling (felt, not
+                                       seen; bounded intensity driver). Architecture review: SCROLL_BREATHE.md. → Freeze
 3.5  CMS Lighting Profiles           — admin: disabled/subtle/premium/campaign/seasonal, no code. → Freeze
 ```
 > **Interaction drivers (3.4 Scroll Breathe · 3.5 · future campaign interactions) begin from the frozen
