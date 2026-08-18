@@ -17,7 +17,8 @@ driver, never the architecture.
                                        Composition Validation Harness, in isolation. NO placement. → DONE ✅
 3.2  Signature Intro Static Light    — the intro flame casts a still warm light (AFTER validation; signature
                                        experience → Canonical Experience Rule / emotional-parity review). → ADOPTED & FROZEN ✅
-3.3  Cursor Bend                     — cursor subtly BENDS the existing light (not follows). → Freeze
+3.3  Cursor Bend Validation          — PROVE in isolation that the cursor subtly BENDS the existing light
+                                       (not follows); no adoption, no placement. → Freeze
 3.4  Scroll Breathe                  — the light breathes while scrolling (felt, not seen). → Freeze
 3.5  CMS Lighting Profiles           — admin: disabled/subtle/premium/campaign/seasonal, no code. → Freeze
 ```

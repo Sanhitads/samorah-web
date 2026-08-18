@@ -135,7 +135,7 @@ experience.**
 > breathe, timing, or the addition of any driver — must begin with a NEW architecture review and its own
 > re-freeze. It must NOT be implemented by editing this frozen experience in place.**
 
-**Why this is stated explicitly:** Phase 3.3 (Cursor Bend) is next, and the natural temptation while working
+**Why this is stated explicitly:** Phase 3.3 (Cursor Bend Validation) is next, and the natural temptation while working
 nearby will be *"I'll just tweak the intro light while I'm here."* That is precisely the platform erosion the
 Stability Rule exists to prevent. This Freeze Note forbids it. The intro's ambient illumination changes
 **only** through the governed cycle — new review · ADR (if a contract is touched) · regression verification ·

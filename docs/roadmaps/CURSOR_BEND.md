@@ -1,4 +1,8 @@
-# Phase 3.3 — Cursor Bend · Architecture Review (NO CODE)
+# Phase 3.3 — Cursor Bend Validation · Architecture Review (NO CODE)
+
+> **Naming (mirrors "3.1 Composition Proven").** This phase is **Cursor Bend *Validation*** — it *proves the
+> concept in isolation*; it does **not** permanently adopt the interaction. The name is deliberately honest
+> about scope: a validated capability, not a shipped feature.
 
 > **Cursor movement must never become a visible animation. It exists only to create a subconscious
 > impression that the light is naturally responding to presence.** The cursor is not tracked, not followed,
@@ -122,6 +126,11 @@ It must satisfy every permanent lighting gate:
 
 - **Decorative Necessity** — *"If the bend disappeared, would users immediately notice?"* Desired: **No.** The
   bend is a whisper on top of an already-complete static light; removing it must feel like nothing changed.
+- **Interaction Dominance** *(new — the interaction equivalent of Decorative Necessity)* — *"Did moving the
+  cursor become something users wanted to play with?"* Desired: **No.** If users intentionally wave the
+  cursor to watch the light, the interaction has **become the feature** — visually dominant, and a violation
+  of the Lighting Design Contract. The cursor response must stay **subconscious**, reinforcing presence, not
+  **entertaining.** (Recorded permanently in `LUXURY_PLATFORM.md` alongside Decorative Necessity.)
 - **Light Dominance** — *"Did you notice the light (or your cursor) before the content?"* If **yes → reject.**
   The content stays dominant; the light stays a consequence.
 - **Never the focal point** — the light is never the subject; the cursor is **never drawn, never tracked,
@@ -183,6 +192,9 @@ me*). The tuning target is the largest bend that **cannot be consciously attribu
 ### 7.2 Emotional (human review — separate from technical)
 - [ ] **Subconscious test** — *"Does this read as an animation / does the light follow the cursor?"* If **yes
       → reject.**
+- [ ] **Interaction Dominance Review** — *"Did moving the cursor become something you wanted to play with?"*
+      Must be **No.** If reviewers start waving the cursor to watch the light, the interaction has become the
+      feature → **reject.**
 - [ ] **Decorative Necessity** — *"If the bend vanished, would you immediately notice?"* Must be **No.**
 - [ ] **Light Dominance** — *"Did you notice the light/cursor before the content?"* Must be **No.**
 - [ ] The light **leans**, never **arrives**; at rest it is perfectly still.
@@ -229,6 +241,7 @@ line. Zero engine and zero intro impact (they were never touched).
 | **AmbientLight Renderer + Renderer Purity Contracts** | ✅ | Renderer untouched; dynamism lives entirely in the driver's bounded modulation, never in the renderer. |
 | **Lighting Token Ownership Contract** | ✅ | Bend var is experience-owned `--lux-*`; no `--lx-*` token declared or mutated. |
 | **Decorative Necessity Review** | ✅ | Explicit release gate — bend must pass *"would users notice its absence?"* → No. |
+| **Interaction Dominance Review** *(new permanent gate)* | ✅ | Release gate — bend must pass *"did the cursor become something users wanted to play with?"* → No. |
 | **ADR-0007 / 0008 / 0009 · Freeze Notes** | ✅ | No contract changed; intro Freeze Note honoured (not re-opened). |
 
 **No engine contract changes. The review closes cleanly — no platform evolution required for Phase 3.3.**
@@ -249,6 +262,7 @@ This review demonstrates that **Phase 3.3 is a composition phase**: the Cursor B
 light purely by composing frozen public APIs through an experience-owned transform, changing **no** frozen
 engine file and adding **no** engine public API. The single greatest risk — the cursor becoming a visible,
 gimmicky animation — is designed out structurally (bend-not-follow · hard clamp · heavy damping ·
-compositor-only · capability-gated · subconscious test as a hard reject gate), not left to tuning.
+compositor-only · capability-gated · subconscious test + **Interaction Dominance Review** as hard reject
+gates), not left to tuning.
 
 **Stop. No implementation.** Awaiting explicit approval to begin the build sequence in §8.

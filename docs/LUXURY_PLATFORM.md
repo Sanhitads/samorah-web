@@ -131,6 +131,21 @@ before presence* and must be dialed back or cut. This is the strongest confirmat
 reinforces the experience rather than competing with it. (Lighting has an additional, sharper companion:
 the **Light Dominance Review** — "did you notice the light before the content?")
 
+## 🖱️ Interaction Dominance Review
+A **permanent, platform-wide release gate for every interactive decorative layer** — cursor bend today;
+scroll breathe, pointer-reactive motion, and campaign interactions tomorrow. It is the **interaction
+equivalent of Decorative Necessity.**
+
+> **"Did moving the cursor (or interacting) become something users wanted to play with?"** Desired answer:
+> **No.**
+
+If users intentionally move the cursor to watch the effect, the interaction has **become the feature** — it
+is now visually dominant and violates the Lighting Design Contract (and the Focal Point Rule). A luxury
+interaction reinforces **presence**, never **entertainment**: it must stay **subconscious**, felt but never
+consciously attributed to the input. If reviewers start "playing with it," the interaction is dialed back or
+cut. (Applied as a hard reject gate for Phase 3.3 Cursor Bend Validation — see
+[roadmaps/CURSOR_BEND.md](roadmaps/CURSOR_BEND.md).)
+
 ## Roadmap (current)
 ```
 ✅ Phase 1 · 1.1   Luxury Experience Engine · Replay Policy
@@ -139,7 +154,8 @@ the **Light Dominance Review** — "did you notice the light before the content?
 ✅ Phase 3.0       Ambient Lighting Engine (architecture · frozen · dormant)
 ✅ Phase 3.1       Composition Proven (Flame→FlameLightSource→resolveAmbientLight→AmbientLight compose; harness)
 ✅ Phase 3.2       Signature Intro Ambient Illumination (the intro flame casts a still warm light — ADOPTED)
-➡ Phase 3.3–3.5   Cursor Bend · Scroll Breathe · CMS Profiles   ← next
+➡ Phase 3.3       Cursor Bend Validation (prove cursor bend in isolation — no adoption)   ← next
+➡ Phase 3.4–3.5   Scroll Breathe · CMS Profiles
 ➡ Phase 4+        Campaign Storytelling · Product Storytelling · Admin · Page Motion
 ```
 
