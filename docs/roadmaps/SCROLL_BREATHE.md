@@ -114,6 +114,16 @@ Per the Driver Resolution Contract, drivers **modulate**, never replace. Scroll 
 `dIntensity` only; it creates no light, mounts nothing, reads no source, and leaves position/colour/profile
 untouched. Remove it and the light is exactly Source × Preset (+ any Cursor position delta).
 
+### 🌬️ Scroll Idle Rule (permanent invariant)
+> **When scrolling stops, the breath returns SMOOTHLY to its neutral value — exactly once, with no overshoot
+> and no lingering oscillation.**
+
+The return is a **CSS ease**, not physics — **no spring, no bounce, no rubber-band.** This is a permanent
+invariant for every idle-returning interaction driver: someone will later be tempted to add spring physics,
+and that would reintroduce overshoot/oscillation and break *breathe-not-pulse*. Neutral is the fully-lit
+state; the breath only ever dims slightly and settles back. (Enforced by the driver's idle timer + an
+explicit "returns once, no oscillation" test.)
+
 ---
 
 ## 5. Driver Resolution — order, conflict, bounds
@@ -130,6 +140,18 @@ Source (base) → Profile/CMS preset → Scroll (intensity) → Cursor (position
 - **All modulation bounded:** each driver's delta is capped by its own budget (Movement Budget / Breath
   Budget); the composite is capped by a global clamp; **accessibility overrides everything** and can force
   static/none. With no drivers, the light is fully static (the 3.1 baseline) — determinism preserved.
+
+### Concrete coexistence example
+Because the channels are disjoint, both drivers apply to the same experience wrapper without contending —
+one as a `transform`, the other as `opacity`:
+
+```
+Cursor  →  dx = +4px          Scroll  →  dIntensity = +0.03
+                    ↓ (composed on the SAME wrapper, orthogonally)
+        transform: translate(+4px, …)   AND   opacity: (1 − 0.03)
+```
+Neither driver reads or overwrites the other's channel; each stays within its own budget (±6px · ≤0.06). This
+is proven mechanically in `crossDriver.test.ts`.
 
 ---
 
