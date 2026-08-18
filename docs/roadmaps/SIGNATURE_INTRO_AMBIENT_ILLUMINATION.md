@@ -66,6 +66,12 @@ it exists and any fade; the renderer stays static.
 | Radius (value) | `LightingPreset` (the *profile* is selected by the Intro Experience) |
 | Rendering | `AmbientLight` |
 
+### Layer order (explicit — asserted, not implicit)
+Front → back: **Spark · Flame · AmbientLight · Background.** Phase 3.2's invariant, asserted in
+`experiences/intro/ambientLayerOrder.test.ts`: **`AmbientLight` is behind both the Flame and the Spark, and
+in front of the Background** — it is the backmost overlay (`ambient < flame`, `ambient < spark`). The
+Spark/Flame relative stacking is inherited from the frozen Phase 2.1 intro and is not altered here.
+
 ## Files
 - **Change (additive, the intro *experience*):** `IntroExperience.tsx` (compose `<AmbientLight>` behind the
   flame **and control the `LightSource` lifecycle**), `intro.css` (position + layer the light behind the
@@ -85,6 +91,12 @@ it exists and any fade; the renderer stays static.
 - [ ] **Edge Visibility Review** *(browser QA)* — watch the intro on a **dim laptop**, a **bright desktop**,
       and a **high-brightness mobile**; confirm the light **disappears naturally rather than ending
       abruptly** (ambient light can look perfect on one display yet "pop" off on another).
+- [ ] **Absence Review** *(release gate)* — **"If the ambient light disappeared, would you immediately
+      notice?"** Desired answer: **No.** If reviewers immediately notice its removal, the light has become
+      too important and violates the Lighting Design Contract — the strongest confirmation of *absence
+      before presence*.
+- [ ] **Visual regression artifacts** — the 8-shot Mode A / Mode B × desktop/mobile × dark/light matrix is
+      captured into `docs/reviews/phase-3.2/` (baseline for future comparison).
 - [ ] **Timeline Lock** — 2600 ms + spark/ignition/wordmark/fade timings unchanged.
 - [ ] **No frozen-engine diff** — `git diff` of Flame + Lighting engines = 0.
 - [ ] No replay / hydration / performance / accessibility regression.
