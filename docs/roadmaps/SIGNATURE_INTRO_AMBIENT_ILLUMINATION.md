@@ -9,8 +9,9 @@ make the existing Match Strike Intro feel *warmer*, as an ambient consequence of
 competes with it. It composes the proven `FlameLightSource` (Phase 3.1) into the intro, touching **no
 frozen engine**.
 
-> **Status:** architecture approved (this doc) — awaiting implementation. Implementation follows the Phase
-> 2.1 discipline (A/B harness → parity + dominance + blind review → adopt → re-freeze).
+> **Status:** ✅ **ADOPTED & FROZEN** — the Match Strike Intro renders the ambient illumination (premium
+> profile) behind the flame **by default**; the A/B harness has been removed. Human verdict: **Adopt** (all
+> five gates pass — see `docs/reviews/phase-3.2/VERDICT.md`).
 
 ## Decisions (locked)
 1. **Coexist with `.lux-intro__glow`.** `AmbientLight` is an **independent atmospheric layer**; it **never

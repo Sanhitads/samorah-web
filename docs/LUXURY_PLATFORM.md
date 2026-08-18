@@ -9,7 +9,7 @@ Luxury Platform
 ├── Luxury Experience Engine        (Phase 1 · 1.1)   — the cinematic intro + replay orchestration
 ├── Luxury Flame Primitive          (Phase 2)         — the canonical flame visual (single source of truth)
 │     └── Signature Flame Adoption   (Phase 2.1)       — the intro adopts the Primitive
-├── Ambient Lighting Engine         (Phase 3.0)        — reusable decorative lighting (frozen; dormant)
+├── Ambient Lighting Engine         (Phase 3.0 · 3.2)   — reusable decorative lighting (frozen; live in the intro)
 │
 ├── Motion Design System                              — shared durations · easing · warm-light tokens
 ├── Capability System                                 — motion tier (full/reduced/off) → per-engine tiers
@@ -21,7 +21,7 @@ Luxury Platform
 |---|---|---|
 | Luxury Experience Engine | v1 | live (intro + replay) |
 | Luxury Flame Primitive | v1 | live (canonical flame) |
-| Ambient Lighting Engine | **v1.1** | frozen · dormant (self-referential color fix — ADR-0009) |
+| Ambient Lighting Engine | **v1.1** | frozen · **live** (composed into the intro ambient — Phase 3.2; ADR-0009) |
 
 Bump a **component** version on a breaking/major change (e.g. Lighting Engine v2 for a new driver model);
 bump the **platform** version when the component set changes materially. Documentation only — it becomes
@@ -138,8 +138,8 @@ the **Light Dominance Review** — "did you notice the light before the content?
 ✅ Phase 2.1       Signature Flame Adoption (intro)
 ✅ Phase 3.0       Ambient Lighting Engine (architecture · frozen · dormant)
 ✅ Phase 3.1       Composition Proven (Flame→FlameLightSource→resolveAmbientLight→AmbientLight compose; harness)
-➡ Phase 3.2       Signature Intro Static Light (the intro flame casts light — after validation)   ← next
-➡ Phase 3.3–3.5   Cursor Bend · Scroll Breathe · CMS Profiles
+✅ Phase 3.2       Signature Intro Ambient Illumination (the intro flame casts a still warm light — ADOPTED)
+➡ Phase 3.3–3.5   Cursor Bend · Scroll Breathe · CMS Profiles   ← next
 ➡ Phase 4+        Campaign Storytelling · Product Storytelling · Admin · Page Motion
 ```
 
