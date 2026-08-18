@@ -5,14 +5,14 @@ blocks as history.)
 
 ---
 
-- **Review date:** ______________________
-- **Reviewer:** ______________________
+- **Review date:** _____18/8/2026________
+- **Reviewer:** ____Sanhita___________
 - **Build / commit reviewed:** ______________________  (e.g. `749e14c`)
-- **Mode A watched:** ☐   **Mode B watched:** ☐   (one at a time — never simultaneously)
+- **Mode A watched:** y   **Mode B watched:** y   (one at a time — never simultaneously)
 
 ## Gates
 | Gate | Pass / Fail | Notes |
-|---|---|---|
+|--pass-|---|
 | **Emotional Parity** — the intro still feels like the Match Strike; the flame remains the focus | | |
 | **Light Dominance** — "did you notice the light before the flame?" (No = pass) | | |
 | **Layer Dominance** — spark brightest · flame focal · ambient behind · never merges with `__glow` | | |
@@ -30,7 +30,7 @@ _…or, for example:_
 - • Flame no longer feels primary
 
 ## Overall decision
-☐ **Adopt**  ☐ **Tune** (presentation only — address the Observed Differences above)  ☐ **Reject**
+y **Adopt**  ☐ **Tune** (presentation only — address the Observed Differences above)  ☐ **Reject**
 
 **Rationale:** ______________________________________________
 
