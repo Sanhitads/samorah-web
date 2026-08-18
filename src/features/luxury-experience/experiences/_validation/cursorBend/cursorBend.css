@@ -1,0 +1,32 @@
+/**
+ * Phase 3.3 — Cursor Bend Validation · ISOLATION harness styles.
+ * Never routed, never imported by production — proves the bend in isolation only.
+ *
+ * The bend wrapper consumes EXPERIENCE-owned `--lux-bend-*` vars (NOT engine `--lx-*` tokens — Lighting Token
+ * Ownership Contract). Movement is a compositor transform ONLY: no layout, no gradient repaint (CLS 0). The
+ * Movement Budget is enforced in JS (clampToBudget); CSS merely eases the already-bounded delta in and out.
+ */
+@import "../../../engine/motion.tokens.css";
+
+.lux-cbv {
+  position: relative;
+  width: min(70vmin, 460px);
+  height: min(70vmin, 460px);
+  margin: 12vh auto;
+}
+
+.lux-cbv__bendwrap {
+  position: absolute;
+  inset: 0;
+  transform: translate3d(var(--lux-bend-x, 0px), var(--lux-bend-y, 0px), 0);
+  transition: transform var(--lux-dur-reduced, 480ms) var(--lux-ease-glow, ease-out);
+  will-change: transform;
+}
+
+/* Accessibility governor (final vote): reduced motion → the wrapper never transforms, even if a var is set. */
+@media (prefers-reduced-motion: reduce) {
+  .lux-cbv__bendwrap {
+    transform: none;
+    transition: none;
+  }
+}
