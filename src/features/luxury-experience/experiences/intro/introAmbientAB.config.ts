@@ -9,4 +9,4 @@
  * Only ONE mode ever renders — the two versions are never shown at once. Default "A" → production is
  * untouched. Nothing is adopted or removed by this harness. See SIGNATURE_INTRO_AMBIENT_ILLUMINATION.md.
  */
-export const INTRO_AMBIENT_AB: { mode: "A" | "B" } = { mode: "A" };
+export const INTRO_AMBIENT_AB: { mode: "A" | "B" } = { mode: "B" };
