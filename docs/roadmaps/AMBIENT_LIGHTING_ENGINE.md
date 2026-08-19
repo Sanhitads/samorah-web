@@ -19,9 +19,15 @@ driver, never the architecture.
                                        experience → Canonical Experience Rule / emotional-parity review). → ADOPTED & FROZEN ✅
 3.3  Cursor Bend Validation          — PROVE in isolation that the cursor subtly BENDS the existing light
                                        (not follows); no adoption, no placement. → VALIDATION FROZEN ✅
-3.4  Scroll Breathe Validation       — PROVE in isolation that the light breathes while scrolling (felt, not
-                                       seen; bounded intensity driver). Architecture review: SCROLL_BREATHE.md. → Freeze
+3.4  Scroll Breathe                  — bounded intensity driver; light breathes while scrolling (felt, not
+                                       seen). Adopted as a reusable capability (interactions/scrollBreathe/),
+                                       DORMANT — not attached/routed/user-visible. → ADOPTED · DORMANT · FROZEN ✅
+ ─   Lighting Capability Review       — step back: verify static light + Cursor Bend + Scroll Breathe are one
+                                       coherent system; no dup patterns; no platform evolution / new public API
+                                       needed before CMS. → NEXT
 3.5  CMS Lighting Profiles           — admin: disabled/subtle/premium/campaign/seasonal, no code. → Freeze
+3.6  First Persistent Ambient        — the first REVIEWED production placement of a persistent ambient light
+     Lighting Placement                (capability adoption ≠ placement — own review + browser/emotional + freeze). → Freeze
 ```
 > **Interaction drivers (3.4 Scroll Breathe · 3.5 · future campaign interactions) begin from the frozen
 > Cursor Bend Validation harness** (`experiences/_validation/cursorBend/`) as the canonical reference — reuse

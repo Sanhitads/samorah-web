@@ -3,7 +3,7 @@
 The **sanctioned, permanent home** for the validated Scroll Breathe capability, promoted here from
 `experiences/_validation/scrollBreathe/` after passing browser/emotional review (Phase 3.4, Commit 2).
 
-## Lifecycle status
+## Lifecycle status — FROZEN (Phase 3.4)
 ```
 ✓ Adopted            — canonical, sanctioned implementation (no longer validation-area code)
 ✓ Reusable           — a general interaction capability; any experience may compose it
@@ -14,6 +14,12 @@ The **sanctioned, permanent home** for the validated Scroll Breathe capability, 
 ```
 A future **reviewed placement phase** (see roadmap: *First Persistent Ambient Lighting Placement*) attaches it
 to a persistent light. Capability and experience-adoption stay deliberately separated.
+
+> **Adoption does not constitute production placement or activation. Any future attachment of Scroll Breathe
+> to a production light or experience requires its own architecture review, placement decision,
+> browser/emotional review, validation, and freeze.** *"Adopted" means reusable capability — NOT approved for
+> a production experience treatment.* (Frozen except for defect fixes; compose from it, do not extend it in
+> place.) See [SCROLL_BREATHE.md §14](../../../../../docs/roadmaps/SCROLL_BREATHE.md).
 
 ## Why this is NOT exported from the Lighting Engine public API
 > **Scroll Breathe is a reusable *interaction capability*, not a platform *engine* capability. It remains

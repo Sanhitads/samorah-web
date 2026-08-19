@@ -6,10 +6,12 @@
 > scroll,"* the phase has failed. The success criterion is a feeling (*the room is alive*), never a behaviour
 > (*the light responds to scrolling*).
 
-> **Status:** 🧭 **Architecture review only — awaiting approval. No implementation exists or is authorised by
-> this document.** Scroll is a *high-frequency* input (it fires constantly and the user is looking at content
-> the whole time), which makes an intensity effect even easier to notice than cursor position. This review's
-> job is to make a visible pulse structurally impossible before any code is written.
+> **Status:** ✅ **ADOPTED · REUSABLE · DORMANT — FROZEN (Phase 3.4).** The capability is implemented and
+> adopted as a reusable interaction module (`interactions/scrollBreathe/`); it is attached to no experience,
+> routed nowhere, and not user-visible. **Adoption ≠ production placement** — see the Freeze Note (§14).
+> (Scroll is a *high-frequency* input, which makes an intensity effect easy to notice; the visible pulse was
+> made structurally impossible — bounded Breath Budget · Scroll Idle Rule · capability-gated · Interaction
+> Dominance as a hard reject gate — not tuned away after the fact.)
 
 > **Naming (mirrors "3.1 Composition Proven" / "3.3 Cursor Bend Validation").** This is **Scroll Breathe
 > *Validation*** — it *proves the concept in isolation*; it does **not** adopt the interaction. Adoption onto
@@ -284,3 +286,30 @@ hard reject gates), not left to tuning.
 
 **Stop. No implementation.** Awaiting explicit approval to begin the build sequence (Commit 1 = driver +
 harness; then emotional review; then freeze) — the same disciplined sequence proven in 3.1 → 3.3.
+
+---
+
+## 14. 🔒 Freeze Note (Phase 3.4 — binding)
+Scroll Breathe is **frozen** as the canonical reusable implementation at `interactions/scrollBreathe/`.
+
+**Status: ✓ Adopted · ✓ Reusable · ✓ Dormant · ✗ Not attached · ✗ Not routed · ✗ Not user-visible.**
+
+> **Adoption does not constitute production placement or activation. Any future attachment of Scroll Breathe
+> to a production light or experience requires its own architecture review, placement decision,
+> browser/emotional review, validation, and freeze.**
+
+**Capability adoption ≠ production placement.** "Adopted" means the capability is a sanctioned, reusable
+module — **not** that it is approved for a production experience treatment. A reader who sees *"Scroll Breathe
+— ADOPTED"* must not infer it is live or authorised for use; it introduces **no runtime behaviour** and is
+absent from every shipped bundle until a placement phase adopts it.
+
+This reinforces:
+- **Platform Stability Rule** — frozen engines/modules change only through their own governed evolution.
+- **Platform Extension Rule** — the module stays **internal** (not exported from `lighting/index.ts`) until
+  multiple production experiences require a common public contract (see §9a).
+- **Composition Layer Contract** — it composes frozen engines via public APIs only and may be deleted without
+  changing engine behaviour.
+- **The Phase 3.4 separation** — capability adoption and experience placement are deliberately distinct steps.
+
+**Defect-fix exception:** like the Cursor Bend reference harness, the adopted module should remain unchanged
+except for defect fixes; new interaction experiments compose from it, they do not extend it in place.
