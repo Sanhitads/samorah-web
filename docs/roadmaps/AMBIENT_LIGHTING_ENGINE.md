@@ -27,8 +27,10 @@ driver, never the architecture.
 3.5  CMS Lighting Profiles           — admin selects a named profile (Model A, profile-only; no new API).
                                        ARCHITECTURE REVIEWED (CMS_PROFILES.md); implementation DEFERRED — no
                                        production consumer until 3.6. → REVIEWED · DEFERRED
-3.6  First Persistent Ambient        — the first REVIEWED production placement of a persistent ambient light;
-     Lighting Placement                creates the CMS consumer (own review + browser/emotional + freeze). → NEXT
+3.6  First Persistent Ambient        — first REVIEWED production placement: a static `subtle` ambient on
+     Lighting Placement                /our-story via an additive composition StaticLightSource; creates the CMS
+                                       consumer. ARCHITECTURE REVIEWED (FIRST_PERSISTENT_PLACEMENT.md · rec. A).
+                                       → APPROVED — awaiting implementation
 ```
 > **Interaction drivers (3.4 Scroll Breathe · 3.5 · future campaign interactions) begin from the frozen
 > Cursor Bend Validation harness** (`experiences/_validation/cursorBend/`) as the canonical reference — reuse

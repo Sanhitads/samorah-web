@@ -177,8 +177,8 @@ enforced by `experiences/_validation/cursorBend/movementBudget.ts` — see
 ✅ Phase 3.4       Scroll Breathe (adopted capability · reusable · dormant — frozen; NOT attached/routed/user-visible)
 ✅ Lighting Capability Review   (3.0–3.4 are one coherent system — recommendation B; docs/reviews/LIGHTING_CAPABILITY_REVIEW.md)
 ✅ Phase 3.5       CMS Profiles — ARCHITECTURE REVIEWED (CMS_PROFILES.md · Model A profile-only · no new API); implementation DEFERRED until a real consumer
-➡ Phase 3.6       First Persistent Ambient Lighting Placement — creates the CMS consumer   ← next
-⬜ (then)          CMS implementation — against the real consumer 3.6 reveals
+➡ Phase 3.6       First Persistent Ambient Lighting Placement — ARCHITECTURE REVIEWED (FIRST_PERSISTENT_PLACEMENT.md; /our-story · static · subtle · rec. A); creates the CMS consumer   ← next (implementation)
+⬜ (then)          CMS implementation — against the real consumer (placement_key "our-story-ambient")
 ➡ Phase 4+        Campaign Storytelling · Product Storytelling · Admin · Page Motion
 ```
 > **Capability adoption ≠ production placement.** An "adopted" interaction capability
