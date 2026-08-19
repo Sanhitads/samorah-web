@@ -6,6 +6,12 @@ NO CODE. This review chooses the safest real production surface for the **first 
 proves it composes through frozen public APIs, and creates the **real CMS consumer** — without implementing
 CMS, modifying any frozen engine/experience, or adding a public API. Grounded in the app at HEAD `802ee9b`.
 
+> ## ⏸️ STATUS — DEFERRED (recommendation C — see Surface-Strategy Reconsideration at the end)
+> **Commit 1 shipped** (`createStaticLightSource`, approved, dormant, local). **Commit 2 was STOPPED at Step 1
+> (inspect `/our-story`)** before any placement code, on a confirmed **surface–aesthetic mismatch**. A full
+> audit of existing surfaces found **no palette-appropriate persistent surface** → **recommendation C: defer
+> 3.6.** The `/our-story` recommendation in §1 and §16's "APPROVE" below are **superseded** by that audit.
+
 ## Opening gate — Platform Composition Checklist
 | Question | Answer |
 |---|---|
@@ -223,3 +229,55 @@ enhancement (interaction on this page, additional surfaces, CMS) is deferred to 
 
 **NO CODE. NO CMS IMPLEMENTATION. NO ENGINE CHANGE. NO NEW PUBLIC API. NO MODIFICATION OF FROZEN EXPERIENCES.**
 Awaiting approval to begin implementation under the §13 plan.
+
+---
+
+# Surface-Strategy Reconsideration (Phase 3.6 paused → deferred)
+
+Commit 2 was stopped at Step 1 (inspect `/our-story`) on a confirmed palette mismatch, then a full audit of
+**existing** production surfaces was run (no surface invented, none redesigned, intro not reopened).
+
+## Audit of existing production surfaces
+| Surface | Actual palette / composition | Verdict for a subtle warm ambient |
+|---|---|---|
+| `/our-story`, `/the-people-behind-samorah`, `/about`, legal/policy pages | Cream `--ivory #FAF7F2` / beige `--soft-beige #F0EBE3`, dark ink text, deliberately clean whitespace (Aesop/Kinfolk register). | ✗ **Palette mismatch** — the engine is dark-optimized; a warm glow on cream is invisible-or-smudge (Light/Layer Dominance risk). |
+| Homepage hero | *"a dark cinematic ground"* (StoreChrome) — image/video-backed, Header floats transparent over it. | ✗ Image-backed → ambient **competes** with cinematic media; also the intro's page. |
+| Home **Atmosphere** (Section 4, "the signature section") | Dark tonal (`ember #2a1a12`, `twilight #1b1726`, `charcoal`) **+ image + scrim + gold leader lines** — a full atmospheric `__stage`. | ✗ Already **fully composed** → ambient is redundant/competing (Decorative Necessity fail). Marked **PROVISIONAL Phase 7** ("to be revisited … once real photography is integrated") → **not stable**. |
+| `chapters/[slug]` | Photography storytelling; dark gradient scrims `rgba(0,0,0,0.65)`, ivory text over images. | ✗ Image-backed → ambient **competes** with atmosphere media. |
+| Footer · newsletter · buttons · `page-hero--dark` chrome | `--deep-charcoal #1A1A1A` functional UI. | ✗ UI chrome, not a decorative-light canvas. |
+
+## The core insight
+The Ambient Lighting Engine's aesthetic — **warm candlelight in a dark, QUIET canvas** — is intrinsically
+coupled to a dark, near-empty surface. **The signature intro (`#0e0b08`) IS that canvas, and it is rightly
+frozen.** Every *other* surface is either **light** (editorial) or **dark-but-image-backed / already composed**
+(hero, Atmosphere, chapters). **No stable, quiet, dark persistent surface exists** where a single subtle glow
+would *be* the atmosphere and clearly reinforce without competing — and we will **not** invent one, force it
+onto cream, reopen the intro, add a preset, or change the engine to manufacture a consumer.
+
+## Recommendation
+### ➡ **C — DEFER Phase 3.6 until a suitable persistent surface naturally exists**
+
+Defer until the site's own design produces a dark, quiet, **non-provisional** persistent surface — the most
+likely being the **Phase 7 "Atmosphere Language" revisit** (its comment already anticipates real photography
+and a redesign) or a future dedicated dark story surface. Until then the capability stays **frozen · dormant ·
+ready**:
+- Ambient Lighting Engine **v1.1** — frozen.
+- `createStaticLightSource` (Commit 1) — approved, **dormant**, ready for a future placement.
+- Scroll Breathe — adopted · dormant. Cursor Bend — validation/reference.
+
+This is a **legitimate steady state**, fully consistent with the platform's prove-in-isolation / dormant-until-
+a-real-consumer philosophy (the engine itself shipped dormant). Building configurability or placement ahead of
+a real, palette-appropriate surface is exactly the over-engineering the governance exists to prevent.
+
+**Not A** (no legitimate existing surface fits). **Not B** (the placement *architecture* is sound — proven in
+Commit 1; the blocker is surface availability, not architecture).
+
+## Phase 3.5 (CMS) relationship — unchanged
+CMS remains correctly **deferred**: there is still **no CMS-eligible persistent light**, exactly as the
+Lighting Capability Review concluded. The CMS architecture stays **defined** (`CMS_PROFILES.md`, Model A);
+implementation waits for a real placement — which now also waits for a suitable surface.
+
+## Governance — all intact
+Platform Stability · Extension · Composition Layer · Lighting Design · Decorative Necessity · Light Dominance ·
+Layer Dominance · Canonical Experience Rule — all preserved. Nothing reopened; no engine/preset/intro/CMS
+change; no dark section invented. Phases 3.0–3.4 remain frozen.
