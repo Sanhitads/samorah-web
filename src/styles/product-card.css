@@ -48,8 +48,11 @@
   font-size: 10px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--ink);
-  background: var(--white);
+  /* The badge is an ALWAYS-white chip, so its text must be theme-independent dark. `--ink` is a THEME token
+     (the dark "Continue the Chapter" module flips it light), which made the label light-on-white → invisible.
+     Pin a fixed dark ink so the badge reads on the white chip in every theme/section. */
+  color: #1f1a16;
+  background: #ffffff;
   padding: 5px 10px;
   border-radius: 2px;
 }
