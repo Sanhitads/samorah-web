@@ -27,12 +27,34 @@ const IDA = "/seo-it-id-a", IDA2 = "/seo-it-id-a2", IDB = "/seo-it-id-b";
 const rest = (table: string, q: string) => fetch(`${URL}/rest/v1/${table}?${q}`, { headers: H }).then((r) => r.json());
 const patch = (table: string, q: string, body: unknown) => fetch(`${URL}/rest/v1/${table}?${q}`, { method: "PATCH", headers: { ...H, Prefer: "return=minimal" }, body: JSON.stringify(body) });
 
-beforeAll(async () => { if (RUN) svc = await import("@/services/seoRedirectService"); });
+// A non-empty product catalog is a PRECONDITION for broken-destination detection: verdictFor (navValidation)
+// only flags a nonexistent /shop/{slug} as "missing" when the products index is non-empty — an intentional
+// fail-safe that never cries "broken" when it has no catalog to check against (navValidation.ts:112). So seed
+// one active product to make this suite SELF-CONTAINED; without it the "BLOCKS a nonexistent internal
+// destination" assertion silently depended on another test's leftover catalog rows in the shared DB.
+const FX = `seo-it-${Date.now()}`;
+let fxCategoryId = "", fxProductId = "";
+const insOne = async (table: string, row: unknown) => {
+  const r = await fetch(`${URL}/rest/v1/${table}`, { method: "POST", headers: { ...H, Prefer: "return=representation" }, body: JSON.stringify(row) });
+  if (!r.ok) throw new Error(`${table} ${await r.text()}`);
+  return (await r.json())[0];
+};
+
+beforeAll(async () => {
+  if (!RUN) return;
+  svc = await import("@/services/seoRedirectService");
+  const cat = await insOne("categories", { name: FX, slug: FX, sku_prefix: "SEO", default_hsn_code: "3406", default_gst_rate: 12 });
+  fxCategoryId = cat.id;
+  const prod = await insOne("products", { name: FX, slug: `${FX}-prod`, base_sku: FX, category_id: cat.id, status: "active", product_type: "candle", hsn_code: "3406", gst_rate: 12, price: 500, tagline: "t" });
+  fxProductId = prod.id;
+});
 const WRS = "/seo-it-wrs";
 afterAll(async () => {
   if (!RUN) return;
   await del("redirects", `from_path=in.(${[OLD, MID, FIN, IDA, IDA2, IDB].join(",")})`);
   await del("seo_overrides", `path=in.(${[ROUTE, WRS, "/about", "/journal"].join(",")})`);
+  if (fxProductId) await del("products", `id=eq.${fxProductId}`);
+  if (fxCategoryId) await del("categories", `id=eq.${fxCategoryId}`);
 });
 
 d("custom JSON-LD (mechanism A) reaches the storefront emitter for about/journal (P0-6)", () => {
