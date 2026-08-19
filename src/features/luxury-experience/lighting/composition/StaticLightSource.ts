@@ -17,6 +17,12 @@ import type { StaticLightSource } from "../sources/lightSource";
  * Note: `AmbientLight` derives intensity/colour/radius/blend from the resolved **preset**; the source's
  * `getIntensity`/`getColor` exist for interface conformance (and any future driver use), while
  * `getPosition` and `isAvailable` are what the renderer actually consumes.
+ *
+ * STATUS — ADOPTED · DORMANT COMPOSITION INFRASTRUCTURE · NOT A PRODUCTION PLACEMENT.
+ * Internal · not public API (never export from lighting/index.ts) · not routed · not mounted · zero
+ * production footprint · tested · deterministic · reusable. Phase 3.6 (first persistent placement) is
+ * DEFERRED — no palette-appropriate persistent surface exists yet. This factory waits, ready, for a
+ * legitimate future placement. See docs/roadmaps/FIRST_PERSISTENT_PLACEMENT.md.
  */
 export interface StaticLightInput {
   /** Container-relative CSS % where the light sits (the light's origin). Owned by the Experience. */

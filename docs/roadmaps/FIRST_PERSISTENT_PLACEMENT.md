@@ -29,12 +29,13 @@ Audited `src/app` routes. Candidate persistent visual surfaces and their risk:
 
 | Surface | Evidence | Fit as *first* persistent light |
 |---|---|---|
-| **`/our-story`** | In-code: *"the signature editorial page … a first-person, reflective journal"*, `force-dynamic`, CMS-managed (Pages CMS). | ✅ **Recommended.** Single, stable, atmospheric editorial page; no product grid or commerce UI to compete with; the reader lingers (genuinely persistent); a warm glow reinforces the reflective brand mood. |
+| **`/our-story`** | In-code: *"the signature editorial page … a first-person, reflective journal"*, `force-dynamic`, CMS-managed (Pages CMS). | ~~Recommended~~ → ⚠️ **REJECTED / SUPERSEDED**: it is a **light cream** surface (`#FAF7F2`); the dark-optimized glow does not fit (see Reconsideration). **Not the target.** |
 | `/the-people-behind-samorah`, `/journal` | Sibling editorial/story surfaces (Pages CMS / Composable Page). | ✅ Valid **alternates** if `/our-story` palette doesn't suit (confirmed in the browser gate, §13). |
 | `/shop/[slug]` (PDP), `/collections/[slug]`, `/shop` | Product detail / grids. | ⛔ Product imagery must dominate — ambient light risks **Light Dominance** violation; conversion-critical. |
 | `/` (homepage) | Already hosts the **signature Match Strike Intro**. | ⛔ Adding a second persistent ambient here competes with the signature moment; keep the homepage the intro's alone. |
 
-**Why `/our-story` is safest:** it is the smallest, most stable, non-commerce surface where a barely-perceptible
+**⚠️ SUPERSEDED (retained as historical rationale — `/our-story` was rejected by the surface audit; see the
+Reconsideration).** Why `/our-story` *was considered* safest: it is the smallest, most stable, non-commerce surface where a barely-perceptible
 warm glow is *additive-but-inessential* — exactly the profile for a first placement. It is not conversion-
 critical, has no competing product media, and the reader's dwell time makes "persistent" meaningful. No
 consumer was invented; `/our-story` is a real, existing editorial page.
@@ -211,7 +212,11 @@ CMS rollback** is needed because CMS is not implemented. `/our-story` returns to
 | **3.0 · 3.1 · 3.2 · 3.3 · 3.4 remain frozen** | ✅ none reopened to facilitate 3.6. |
 
 ## 16. Final decision
-### ➡ **A — APPROVE IMPLEMENTATION OF FIRST PERSISTENT PLACEMENT**
+> ⚠️ **SUPERSEDED — Phase 3.6 is DEFERRED (recommendation C).** The `/our-story` placement below is **no longer
+> the target**; a post-review surface audit found no palette-appropriate surface. See the Surface-Strategy
+> Reconsideration at the end of this document. The original §16 text is retained only as the historical record.
+
+### ➡ **A — APPROVE IMPLEMENTATION OF FIRST PERSISTENT PLACEMENT** *(historical — superseded by DEFER)*
 
 The smallest, safest, reversible placement — **static · `subtle` · page-local on `/our-story` ·
 capability-gated · no driver** — is fully achievable through the **frozen public APIs plus one additive
@@ -279,5 +284,49 @@ implementation waits for a real placement — which now also waits for a suitabl
 
 ## Governance — all intact
 Platform Stability · Extension · Composition Layer · Lighting Design · Decorative Necessity · Light Dominance ·
-Layer Dominance · Canonical Experience Rule — all preserved. Nothing reopened; no engine/preset/intro/CMS
-change; no dark section invented. Phases 3.0–3.4 remain frozen.
+Layer Dominance · Canonical Experience Rule · CMS Responsibility · Public API Stability — all preserved.
+Nothing reopened; no engine/preset/intro/CMS change; no dark section invented. Phases 3.0–3.4 remain frozen.
+
+## This is a deliberate architecture decision — NOT a failed implementation
+- The placement **architecture was approved** (§1–§16).
+- **Commit 1 was technically proven** (`createStaticLightSource`, 6/6 tests, dormant).
+- The **surface audit was completed** (every real surface palette-checked).
+- **No legitimate production surface currently fits** → **no persistent light is being placed.**
+
+Deferring is the correct, disciplined outcome: the platform was deliberately built ahead of demand
+(prove-in-isolation · dormant-until-a-real-consumer). Placing a light with no matching surface would be the
+over-engineering the governance exists to prevent.
+
+## `createStaticLightSource` — dormant composition infrastructure
+> **ADOPTED · DORMANT COMPOSITION INFRASTRUCTURE — NOT A PRODUCTION PLACEMENT.**
+
+Internal · not public API (never exported from `lighting/index.ts`) · not routed · not mounted · zero
+production footprint · tested · deterministic · reusable. It is **kept** (not reverted) — the ready first piece
+for a legitimate future placement. It must **not** be promoted into the lighting engine or exported.
+
+## 🔒 Resume condition (binding)
+> **Phase 3.6 may reopen ONLY when a genuinely suitable persistent production surface naturally exists.**
+
+A suitable surface must:
+- already belong to the product experience;
+- have an appropriate visual palette (dark / warm-compatible, quiet);
+- provide sufficient visual quiet / negative space;
+- let the light **reinforce** existing content (not compete);
+- **not** require creating a new section solely for lighting;
+- **not** require reopening the frozen Match Strike Intro;
+- **not** require modifying the lighting engine;
+- **not** require a new preset merely to manufacture a fit.
+
+**Do NOT resume 3.6 merely because:** CMS needs a consumer · the engine is available · Cursor Bend exists ·
+Scroll Breathe exists · we want to demonstrate the capability.
+
+## Rejected candidates (do not silently convert into future targets)
+The audit table above is the record: `/our-story`, `/the-people-behind-samorah`, `/about`, legal pages
+(cream/light — poor fit); homepage hero (cinematic-media competition); Home Atmosphere (already composed +
+provisional); `chapters/[slug]` (photography/scrim already provides atmosphere); footer/newsletter/UI chrome
+(not decorative-light canvases). **None of these is a selected or pending consumer.** `/our-story` is **no
+longer** the placement target — §1's recommendation and §16's "APPROVE" are **superseded** by this deferral.
+
+## Intro protection (explicit)
+The **Match Strike Intro remains excluded** from Phase 3.6 and is **not** reopened. Any future change to it
+requires its own architecture review and re-freeze under the **Canonical Experience Rule**.

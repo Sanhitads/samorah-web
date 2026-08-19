@@ -177,7 +177,7 @@ enforced by `experiences/_validation/cursorBend/movementBudget.ts` — see
 ✅ Phase 3.4       Scroll Breathe (adopted capability · reusable · dormant — frozen; NOT attached/routed/user-visible)
 ✅ Lighting Capability Review   (3.0–3.4 are one coherent system — recommendation B; docs/reviews/LIGHTING_CAPABILITY_REVIEW.md)
 ✅ Phase 3.5       CMS Profiles — ARCHITECTURE REVIEWED (CMS_PROFILES.md · Model A profile-only · no new API); implementation DEFERRED until a real consumer
-⏸️ Phase 3.6       First Persistent Ambient Lighting Placement — DEFERRED (rec. C). No palette-appropriate persistent surface exists: every dark surface is image-backed/provisional, every quiet surface is light cream. Capability frozen · dormant · ready. See FIRST_PERSISTENT_PLACEMENT.md.
+⏸️ Phase 3.6       First Persistent Ambient Lighting Placement — DEFERRED: no suitable existing persistent surface currently exists (every dark surface is image-backed/provisional; every quiet surface is light cream). Resume ONLY when a legitimate surface naturally exists. Capability stays frozen · dormant. See FIRST_PERSISTENT_PLACEMENT.md.
 ⬜ (then)          CMS implementation — deferred with 3.6 (still no CMS-eligible persistent light)
 ➡ Phase 4+        Campaign Storytelling · Product Storytelling · Admin · Page Motion
 ```
