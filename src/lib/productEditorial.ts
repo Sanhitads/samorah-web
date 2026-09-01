@@ -197,6 +197,7 @@ export interface CandlePdpContent {
   accordion?: { title: string; body: string }[];
   customSections?: CustomSection[];
   storyImage?: string; lifestyleImage?: string; artworkImage?: string;
+  storyImageFocal?: string; lifestyleImageFocal?: string; artworkImageFocal?: string; // CSS object-position per section image
   testimonials?: { quote: string; attribution: string }[];
   testimonialInterval?: number; // crossfade seconds between voices (default 5.5)
   testimonialColor?: string; // optional font colour for the testimonials section (else the theme ink)
@@ -345,7 +346,7 @@ export function buildCandleEditorial({ view, artist, related, content, freeShipp
       {
         eyebrow: L.storyEyebrow || "The Story Within",
         body: storyBody,
-        media: storyImage ? imageMedia(storyImage, view.name, "landscape") : undefined,
+        media: storyImage ? imageMedia(storyImage, view.name, "landscape", content?.storyImageFocal) : undefined,
         align: "image-left",
       } satisfies EditorialStatementSettings,
       { visibility: storyBody.length > 0 },
@@ -378,7 +379,7 @@ export function buildCandleEditorial({ view, artist, related, content, freeShipp
       "artwork",
       artist
         ? ({
-            media: imageMedia(content?.artworkImage || artist.artworkImages[0] || artist.portrait, `Artwork by ${artist.name}`, "cinematic"),
+            media: imageMedia(content?.artworkImage || artist.artworkImages[0] || artist.portrait, `Artwork by ${artist.name}`, "cinematic", content?.artworkImageFocal),
             caption: artist.signature,
           } satisfies ArtworkFeatureSettings)
         : {},
@@ -410,7 +411,7 @@ export function buildCandleEditorial({ view, artist, related, content, freeShipp
       {
         eyebrow: L.lifestyleEyebrow || "Lifestyle",
         heading: L.lifestyleHeading || "Living with it",
-        media: lifestyleImage ? imageMedia(lifestyleImage, view.name, "landscape") : undefined,
+        media: lifestyleImage ? imageMedia(lifestyleImage, view.name, "landscape", content?.lifestyleImageFocal) : undefined,
         rows: lifestyleRows,
         moments: content?.lifestyleMoments?.length ? content.lifestyleMoments : lifestyleMoments,
         align: "image-left",

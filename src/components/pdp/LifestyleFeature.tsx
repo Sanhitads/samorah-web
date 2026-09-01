@@ -14,7 +14,7 @@ export function LifestyleFeature({ settings }: SectionComponentProps) {
     <div className="lifestyle" data-align={s.align}>
       {s.media?.src ? (
         <div className="lifestyle__media">
-          <ParallaxMedia src={s.media.src} alt={s.media.alt ?? ""} role="lifestyle" imageClassName="lifestyle__image" range={22} />
+          <ParallaxMedia src={s.media.src} alt={s.media.alt ?? ""} role="lifestyle" imageClassName="lifestyle__image" range={22} objectPosition={s.media.objectPosition} />
         </div>
       ) : null}
       <div className="lifestyle__body">

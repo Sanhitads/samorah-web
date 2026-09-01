@@ -14,7 +14,7 @@ export function ArtworkFeature({ settings }: SectionComponentProps) {
   return (
     <figure className="artwork">
       <div className="artwork__frame">
-        <ParallaxMedia src={s.media.src} alt={s.media.alt ?? ""} role="architecture" imageClassName="artwork__image" range={28} />
+        <ParallaxMedia src={s.media.src} alt={s.media.alt ?? ""} role="architecture" imageClassName="artwork__image" range={28} objectPosition={s.media.objectPosition} />
       </div>
       {s.caption ? <figcaption className="artwork__caption">{s.caption}</figcaption> : null}
     </figure>

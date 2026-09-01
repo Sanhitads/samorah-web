@@ -18,6 +18,7 @@ export interface MediaContent {
   alt?: string;
   poster?: string; // video / cinemagraph still
   aspect?: AspectRatio;
+  objectPosition?: string; // CSS object-position ("50% 30%") for the crop; undefined = centre
 }
 
 /** Explicit component states (CMS + runtime), so every component behaves alike. */
@@ -86,7 +87,7 @@ export const DEFAULT_CARD_CAPABILITIES: Required<ProductCardCapabilities> = {
   story: false,
 };
 
-/** Wrap a still image (url or gradient ref) as MediaContent. */
-export function imageMedia(src: string, alt?: string, aspect: AspectRatio = "portrait"): MediaContent {
-  return { kind: "image", src, alt, aspect };
+/** Wrap a still image (url or gradient ref) as MediaContent. `focal` is a CSS object-position. */
+export function imageMedia(src: string, alt?: string, aspect: AspectRatio = "portrait", focal?: string): MediaContent {
+  return { kind: "image", src, alt, aspect, objectPosition: focal || undefined };
 }

@@ -106,6 +106,7 @@ type Core = {
   cLifestyleEyebrow: string; cLifestyleHeading: string; cTestimonialsEyebrow: string; cTestimonialsHeading: string;
   cMemoryLine: string; cContinueEyebrow: string;
   cStoryImage: string; cLifestyleImage: string; cArtworkImage: string; // section-specific images
+  cStoryImageFocal: string; cLifestyleImageFocal: string; cArtworkImageFocal: string; // per-image focal points
   cTestimonials: { quote: string; attribution: string }[]; // In their words — per-product
   cTestimonialInterval: string; // crossfade seconds
   cTestimonialColor: string; // testimonials font colour (blank = theme ink)
@@ -260,6 +261,9 @@ function assembleCandleContent(core: Core) {
     storyImage: core.cStoryImage || undefined,
     lifestyleImage: core.cLifestyleImage || undefined,
     artworkImage: core.cArtworkImage || undefined,
+    storyImageFocal: core.cStoryImageFocal || undefined,
+    lifestyleImageFocal: core.cLifestyleImageFocal || undefined,
+    artworkImageFocal: core.cArtworkImageFocal || undefined,
     testimonials: testimonials.length ? testimonials : undefined,
     testimonialInterval: Number(core.cTestimonialInterval) > 0 ? Number(core.cTestimonialInterval) : undefined,
     testimonialColor: core.cTestimonialColor || undefined,
@@ -370,7 +374,7 @@ export function ProductEditor({ productId, collections, categories, allProducts 
         "cPalette" | "cCustomSurface" | "cCustomInk" | "cCustomAccent" | "cGradient" | "cGradFrom" | "cGradTo" | "cGradAngle" | "cAccordion" | "cCustomSections" |
         "cStoryEyebrow" | "cJourneyEyebrow" | "cJourneyHeading" | "cJourneyIntro" | "cMoodEyebrow" | "cMoodHeading" | "cCraftEyebrow" | "cCraftHeading" | "cArtistEyebrow" |
         "cLifestyleEyebrow" | "cLifestyleHeading" | "cTestimonialsEyebrow" | "cTestimonialsHeading" | "cMemoryLine" | "cContinueEyebrow" |
-        "cStoryImage" | "cLifestyleImage" | "cArtworkImage" | "cTestimonials" |
+        "cStoryImage" | "cLifestyleImage" | "cArtworkImage" | "cStoryImageFocal" | "cLifestyleImageFocal" | "cArtworkImageFocal" | "cTestimonials" |
         "cTestimonialInterval" | "cTestimonialColor" | "cEdition" | "cCollectionType" | "cBurnTimes" | "cLifestyleMoments" | "cCraft" | "cSpecs" | "cSpecsHeading"> => {
         const pc = (p.pdp_content ?? {}) as Record<string, unknown>;
         const clb = (pc.labels ?? {}) as Record<string, unknown>;
@@ -393,6 +397,7 @@ export function ProductEditor({ productId, collections, categories, allProducts 
           cLifestyleEyebrow: sv(clb.lifestyleEyebrow), cLifestyleHeading: sv(clb.lifestyleHeading), cTestimonialsEyebrow: sv(clb.testimonialsEyebrow), cTestimonialsHeading: sv(clb.testimonialsHeading),
           cMemoryLine: sv(clb.memoryLine), cContinueEyebrow: sv(clb.continueEyebrow),
           cStoryImage: sv(pc.storyImage), cLifestyleImage: sv(pc.lifestyleImage), cArtworkImage: sv(pc.artworkImage),
+          cStoryImageFocal: sv(pc.storyImageFocal), cLifestyleImageFocal: sv(pc.lifestyleImageFocal), cArtworkImageFocal: sv(pc.artworkImageFocal),
           cTestimonials: Array.isArray(pc.testimonials) ? (pc.testimonials as { quote?: string; attribution?: string }[]).map((t) => ({ quote: sv(t.quote), attribution: sv(t.attribution) })) : [],
           cTestimonialInterval: pc.testimonialInterval != null ? String(pc.testimonialInterval) : "",
           cTestimonialColor: sv(pc.testimonialColor),
@@ -976,6 +981,9 @@ export function ProductEditor({ productId, collections, categories, allProducts 
               onChange={(v) => set({ cArtworkImage: v })}
               onUpload={(f) => void uploadInto(f, (url) => set({ cArtworkImage: url }))}
               onClear={() => set({ cArtworkImage: "" })} />
+            {core.cArtworkImage && !core.cArtworkImage.startsWith("gradient:") ? (
+              <FocalPicker url={core.cArtworkImage} value={core.cArtworkImageFocal || null} onChange={(pos) => set({ cArtworkImageFocal: pos })} />
+            ) : null}
           </div>
         </details>
 
@@ -1164,14 +1172,17 @@ export function ProductEditor({ productId, collections, categories, allProducts 
             <p className="om-field__hint" style={{ margin: "14px 0 6px", fontWeight: 600 }}>Section images</p>
             <p className="om-field__hint" style={{ margin: "0 0 8px" }}>Each field here is its own image. <b>Blank</b> falls back to the main product photo — so if you leave both blank they show the same picture; set them to make Story and Living With It different. The main product photo is uploaded in the <b>Images</b> section below (not here). The artist&rsquo;s two images live in the Artist section above. Uploading here does <b>not</b> add to the product gallery.</p>
             {([
-              { k: "cStoryImage", label: "Story Within image", anchor: "story" },
-              { k: "cLifestyleImage", label: "Living With It image", anchor: "lifestyle" },
-            ] as const).map(({ k, label, anchor }) => (
+              { k: "cStoryImage", fk: "cStoryImageFocal", label: "Story Within image", anchor: "story" },
+              { k: "cLifestyleImage", fk: "cLifestyleImageFocal", label: "Living With It image", anchor: "lifestyle" },
+            ] as const).map(({ k, fk, label, anchor }) => (
               <div key={k} data-anchor={anchor}>
                 <ImgField value={core[k]} placeholder={`${label} — paste a URL, or upload →`} uploading={uploading}
                   onChange={(v) => set({ [k]: v } as Partial<Core>)}
                   onUpload={(f) => void uploadInto(f, (url) => set({ [k]: url } as Partial<Core>))}
                   onClear={() => set({ [k]: "" } as Partial<Core>)} />
+                {core[k] && !core[k].startsWith("gradient:") ? (
+                  <FocalPicker url={core[k]} value={core[fk] || null} onChange={(pos) => set({ [fk]: pos } as Partial<Core>)} />
+                ) : null}
               </div>
             ))}
 

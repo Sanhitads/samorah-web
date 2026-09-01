@@ -18,12 +18,14 @@ export function ParallaxMedia({
   role = "lifestyle",
   imageClassName,
   range = 16,
+  objectPosition,
 }: {
   src: string;
   alt?: string;
   role?: ImageRole;
   imageClassName?: string;
   range?: number;
+  objectPosition?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const reduce = useReducedMotion();
@@ -44,7 +46,7 @@ export function ParallaxMedia({
           willChange: "transform",
         }}
       >
-        <AssetImage asset={src} alt={alt} role={role} className={imageClassName} />
+        <AssetImage asset={src} alt={alt} role={role} className={imageClassName} objectPosition={objectPosition} />
       </motion.div>
     </div>
   );
