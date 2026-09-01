@@ -77,9 +77,12 @@
   /* The quote is the hero content — use full theme ink (not the faint --ink-soft, which is
      near-invisible on dark section palettes). An admin-chosen colour (--testimonial-ink) wins. */
   color: var(--testimonial-ink, var(--ink, #1f1a16));
-  max-width: 30ch;
+  max-width: 34ch;
+  white-space: pre-line; /* keep intentional line breaks in a multi-line quote */
 }
 .testimonial__attr {
+  display: block;
+  margin-top: clamp(14px, 2vw, 20px); /* the name always sits on its own line, below the quote */
   font-family: var(--font-sans);
   font-size: 11px;
   letter-spacing: 0.2em;
@@ -88,6 +91,7 @@
   color: var(--testimonial-ink, var(--ink-soft, var(--smoke)));
   opacity: 0.85;
 }
+.testimonial__attr::before { content: "— "; } /* a proper attribution dash, not a stray hyphen */
 .testimonials__dots {
   display: flex;
   justify-content: center;
