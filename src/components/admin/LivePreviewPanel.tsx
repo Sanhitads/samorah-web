@@ -16,6 +16,7 @@ export function LivePreviewPanel({
   draft = null,
   focusId = null,
   onRefresh = () => {},
+  onSelect = () => {},
   desktopWidth = 0,
   hint = "Live draft · not saved",
 }: {
@@ -24,6 +25,8 @@ export function LivePreviewPanel({
   draft?: any;
   focusId?: string | null;
   onRefresh?: () => void;
+  /** Fired when a section is clicked in the preview — the editor jumps to that section's controls. */
+  onSelect?: (id: string) => void;
   /** Width the "Desktop" tab renders at, then scales to fit the panel. 0 = native panel width (the
    *  PDP default — crisp, no scaling). Set a real desktop width (e.g. 1280) when the panel is narrow
    *  (the Homepage builder), so "Desktop" shows the true desktop layout instead of the mobile fallback. */
@@ -49,6 +52,8 @@ export function LivePreviewPanel({
   draftRef.current = draft;
   const focusRef = useRef(focusId);
   focusRef.current = focusId;
+  const onSelectRef = useRef(onSelect);
+  onSelectRef.current = onSelect;
 
   const post = useCallback((msg: object) => {
     iframeRef.current?.contentWindow?.postMessage({ source: SRC, ...msg }, window.location.origin);
@@ -68,7 +73,9 @@ export function LivePreviewPanel({
   useEffect(() => {
     const origin = window.location.origin;
     const onMessage = (e: MessageEvent) => {
-      if (e.origin !== origin || e.data?.source !== SRC || e.data.kind !== "ready") return;
+      if (e.origin !== origin || e.data?.source !== SRC) return;
+      if (e.data.kind === "select" && e.data.id) { onSelectRef.current(e.data.id as string); return; }
+      if (e.data.kind !== "ready") return;
       readyRef.current = true;
       post({ kind: "draft", product: draftRef.current });
       if (focusRef.current) post({ kind: "focus", id: focusRef.current });

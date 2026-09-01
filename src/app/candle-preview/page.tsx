@@ -39,9 +39,13 @@ export default function CandlePreviewRoute() {
       flashTimer.current = setTimeout(() => el.classList.remove("pdp-flash"), 1500);
     };
     // In the preview, links must not navigate the iframe away (that 404s / breaks the preview).
+    // Clicking anywhere in a section tells the editor to jump to that section's controls.
     const onClick = (e: MouseEvent) => {
-      const a = (e.target as HTMLElement)?.closest?.("a");
+      const target = e.target as HTMLElement;
+      const a = target?.closest?.("a");
       if (a) e.preventDefault();
+      const shell = target?.closest?.(".section-shell[id]") as HTMLElement | null;
+      if (shell?.id) window.parent?.postMessage({ source: SRC, kind: "select", id: shell.id }, origin);
     };
     window.addEventListener("message", onMessage);
     document.addEventListener("click", onClick, true);
@@ -76,7 +80,13 @@ export default function CandlePreviewRoute() {
     const related = (product.__related ?? []) as RelatedProductInput[];
     const editorial = buildCandleEditorial({ view: p, artist, related, content });
     const palette = content?.palette || chapterTheme(p.chapterSlug);
-    return <CandleProductDetail p={p} editorial={editorial} palette={palette} content={content} preview />;
+    return (
+      <>
+        {/* Preview-only affordance: sections read as clickable (click → jump to that section's editor). */}
+        <style>{`.section-shell{cursor:pointer}`}</style>
+        <CandleProductDetail p={p} editorial={editorial} palette={palette} content={content} preview />
+      </>
+    );
   } catch {
     return <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", color: "#b4534b", fontSize: 14 }}>Preview unavailable for this product.</div>;
   }

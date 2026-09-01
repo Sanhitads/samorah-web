@@ -728,6 +728,18 @@ export function ProductEditor({ productId, collections, categories, allProducts 
     const anchor = (e.target as HTMLElement).closest?.("[data-anchor]")?.getAttribute("data-anchor");
     if (anchor) setFocusId(anchor);
   };
+  // Clicking a section in the live preview → reveal + scroll to its controls in the editor.
+  const onPreviewSelect = (id: string) => {
+    setFocusId(id);
+    const el = typeof document !== "undefined" ? document.querySelector<HTMLElement>(`[data-anchor="${CSS.escape(id)}"]`) : null;
+    if (!el) return;
+    for (let node: HTMLElement | null = el; node; node = node.parentElement) {
+      if (node.tagName === "DETAILS") (node as HTMLDetailsElement).open = true;
+    }
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.add("pe-anchor-flash");
+    setTimeout(() => el.classList.remove("pe-anchor-flash"), 1500);
+  };
   const formCol = (
     <div className={`om-modal__card om-modal__card--wide${showPreview ? " pe-live__card" : ""}`} onClick={(e) => e.stopPropagation()} onFocusCapture={onFieldFocus}>
       <div className="pe-live__cardhead">
@@ -1443,6 +1455,7 @@ export function ProductEditor({ productId, collections, categories, allProducts 
           draft={isAir ? draft : candleDraft}
           focusId={focusId}
           onRefresh={load}
+          onSelect={onPreviewSelect}
         />
       </div>
     );

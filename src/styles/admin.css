@@ -2222,6 +2222,10 @@ a.adm-badge[data-b="incident"]:hover { background: rgba(168,68,58,0.22); }
 .pe-acc__body { width: 100%; resize: vertical; min-height: 2.4em; }
 .pe-acc > input { width: 100%; margin-bottom: 6px; }
 
+/* Editor control flash — when a section is clicked in the live preview, its controls pulse. */
+@keyframes pe-anchor-flash { 0% { box-shadow: 0 0 0 3px rgba(201,169,110,0.55); } 100% { box-shadow: 0 0 0 3px rgba(201,169,110,0); } }
+.pe-anchor-flash { animation: pe-anchor-flash 1.4s ease-out; border-radius: 8px; }
+
 /* Font-colour palette (testimonials section) */
 .pe-swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .pe-swatch { width: 26px; height: 26px; padding: 0; border-radius: 50%; border: 1px solid rgba(0,0,0,.18); cursor: pointer; position: relative; box-shadow: inset 0 0 0 2px #fff; transition: transform .12s, box-shadow .12s; }

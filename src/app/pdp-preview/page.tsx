@@ -38,8 +38,11 @@ export default function PdpPreviewRoute() {
     };
     // In the preview, links must not navigate the iframe away (that 404s / breaks the preview).
     const onClick = (e: MouseEvent) => {
-      const a = (e.target as HTMLElement)?.closest?.("a");
+      const target = e.target as HTMLElement;
+      const a = target?.closest?.("a");
       if (a) e.preventDefault();
+      const shell = target?.closest?.(".section-shell[id]") as HTMLElement | null;
+      if (shell?.id) window.parent?.postMessage({ source: SRC, kind: "select", id: shell.id }, origin);
     };
     window.addEventListener("message", onMessage);
     document.addEventListener("click", onClick, true);
@@ -71,5 +74,11 @@ export default function PdpPreviewRoute() {
   } catch {
     return <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", color: "#b4534b", fontSize: 14 }}>Preview unavailable for this product.</div>;
   }
-  return <AirProductDetail hour={view.hour} group={view.group} volume={view.volume} others={view.others} preview />;
+  return (
+    <>
+      {/* Preview-only affordance: sections read as clickable (click → jump to that section's editor). */}
+      <style>{`.section-shell{cursor:pointer}`}</style>
+      <AirProductDetail hour={view.hour} group={view.group} volume={view.volume} others={view.others} preview />
+    </>
+  );
 }
