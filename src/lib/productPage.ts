@@ -45,6 +45,7 @@ export interface ProductInput {
 export interface ProductGalleryImage {
   src: string;
   alt: string;
+  focal?: string; // CSS object-position for the crop (e.g. "50% 30%"); undefined = centre
 }
 export interface ProductVariantView {
   id: string;
@@ -120,7 +121,7 @@ function toGallery(p: ProductInput): ProductGalleryImage[] {
   if (imgs.length === 0) return [{ src: GRADIENT, alt: p.name }];
   return [...imgs]
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-    .map((i) => ({ src: i.url, alt: i.alt_text ?? p.name }));
+    .map((i) => ({ src: i.url, alt: i.alt_text ?? p.name, focal: i.focal ?? undefined }));
 }
 
 function toVariantViews(variants: ProductVariantInput[]): ProductVariantView[] {

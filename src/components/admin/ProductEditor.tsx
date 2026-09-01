@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type FocusEvent, type TextareaHTMLAttributes } from "react";
 import type { VariantRow, NoteRow, ImageRow, VesselType, ProductStatus } from "@/services/productAdminService";
 import { LivePreviewPanel } from "@/components/admin/LivePreviewPanel";
+import { FocalPicker } from "@/components/admin/FocalPicker";
 import { buildVariantSavePayload } from "@/lib/inventory/variantSavePayload";
 import { AIR_ACCORDION_DEFAULTS, AIR_SECTION_POSITIONS, type CustomSection } from "@/config/theHours";
 import { CANDLE_SECTION_POSITIONS } from "@/lib/productEditorial";
@@ -465,7 +466,7 @@ export function ProductEditor({ productId, collections, categories, allProducts 
       id: productId, name: core.name, slug: core.slug, tagline: core.tagline,
       price: core.price, product_type: core.productType, chapter_position: core.chapterPosition,
       air_content: assembleAirContent(core),
-      product_images: [...images].sort((a, b) => a.sortOrder - b.sortOrder).map((im) => ({ url: im.url, is_primary: im.isPrimary, sort_order: im.sortOrder })),
+      product_images: [...images].sort((a, b) => a.sortOrder - b.sortOrder).map((im) => ({ url: im.url, is_primary: im.isPrimary, sort_order: im.sortOrder, focal: im.focal })),
       collection: col ? { id: col.id, name: col.name, slug: col.slug ?? "", volume: col.volume, tagline: "", cover_image_url: "", is_coming_soon: false } : {},
       __siblings: siblings,
     };
@@ -492,7 +493,7 @@ export function ProductEditor({ productId, collections, categories, allProducts 
         price: v.price, sale_price: v.salePrice, stock: v.stock, low_stock_threshold: v.lowStockThreshold ?? 0,
         is_active: v.isActive, sort_order: v.sortOrder,
       })),
-      product_images: [...images].sort((a, b) => a.sortOrder - b.sortOrder).map((im) => ({ url: im.url, alt_text: im.altText, is_primary: im.isPrimary, sort_order: im.sortOrder })),
+      product_images: [...images].sort((a, b) => a.sortOrder - b.sortOrder).map((im) => ({ url: im.url, alt_text: im.altText, is_primary: im.isPrimary, sort_order: im.sortOrder, focal: im.focal })),
       fragrance_notes: notes.map((n) => ({ layer: n.layer, note: n.note, sort_order: n.sortOrder })),
       pdp_content: assembleCandleContent(core),
       __edition: core.cEdition.trim() || editionOf(col?.volume, Number(core.chapterPosition) || 1),
@@ -706,6 +707,11 @@ export function ProductEditor({ productId, collections, categories, allProducts 
   const primaryImage = async (id: string) => { if (await post({ action: "image.primary", productId, id })) { await load(); onSaved(); } };
   const delImage = async (id: string) => { if (await post({ action: "image.delete", id, productId })) { await load(); onSaved(); } };
   const saveAlt = async (id: string, altText: string) => { await post({ action: "image.update", id, patch: { altText } }); };
+  // Focal point — update local state first so the live preview reframes instantly, then persist.
+  const saveFocal = async (id: string, focal: string) => {
+    setImages((prev) => prev.map((im) => (im.id === id ? { ...im, focal: focal || null } : im)));
+    await post({ action: "image.update", id, patch: { focal } });
+  };
   const moveImage = async (id: string, dir: number) => {
     const sorted = [...images].sort((a, b) => a.sortOrder - b.sortOrder);
     const i = sorted.findIndex((x) => x.id === id); const j = i + dir;
@@ -1365,6 +1371,7 @@ export function ProductEditor({ productId, collections, categories, allProducts 
                   <button type="button" className="ff-btn ff-btn--mini" onClick={() => moveImage(im.id, 1)}>↓</button>
                   <button type="button" className="ff-btn ff-btn--mini ff-btn--danger" onClick={() => delImage(im.id)}>×</button>
                 </div>
+                <FocalPicker url={im.url} value={im.focal} onChange={(pos) => saveFocal(im.id, pos)} />
               </div>
             ))}
           </div>

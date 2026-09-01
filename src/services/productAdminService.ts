@@ -88,7 +88,7 @@ export interface VariantRow {
 }
 
 export interface NoteRow { id: string; layer: string; note: string; sortOrder: number; }
-export interface ImageRow { id: string; url: string; altText: string | null; isPrimary: boolean; sortOrder: number; }
+export interface ImageRow { id: string; url: string; altText: string | null; isPrimary: boolean; sortOrder: number; focal: string | null; }
 
 export async function getProductForEdit(id: string): Promise<{ product: any; variants: VariantRow[]; notes: NoteRow[]; images: ImageRow[] } | null> {
   const db = loose();
@@ -109,7 +109,7 @@ export async function getProductForEdit(id: string): Promise<{ product: any; var
     supplierSku: v.supplier_sku ?? null,
   }));
   const notes: NoteRow[] = (ns ?? []).map((n: any) => ({ id: n.id, layer: n.layer, note: n.note, sortOrder: Number(n.sort_order ?? 0) }));
-  const images: ImageRow[] = (imgs ?? []).map((im: any) => ({ id: im.id, url: im.url, altText: im.alt_text ?? null, isPrimary: Boolean(im.is_primary), sortOrder: Number(im.sort_order ?? 0) }));
+  const images: ImageRow[] = (imgs ?? []).map((im: any) => ({ id: im.id, url: im.url, altText: im.alt_text ?? null, isPrimary: Boolean(im.is_primary), sortOrder: Number(im.sort_order ?? 0), focal: im.focal ?? null }));
   return { product, variants, notes, images };
 }
 
@@ -147,11 +147,12 @@ export async function addProductImage(productId: string, url: string, altText: s
   await logEvent({ entityType: "product", entityId: productId, event: "product.image_added", actorType: actorId ? "staff" : "system", actorId });
   return { ok: true };
 }
-export async function updateProductImage(id: string, patch: { altText?: string; sortOrder?: number }, actorId?: string) {
+export async function updateProductImage(id: string, patch: { altText?: string; sortOrder?: number; focal?: string | null }, actorId?: string) {
   const db = loose();
   const row: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (patch.altText !== undefined) row.alt_text = patch.altText.trim();
   if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;
+  if (patch.focal !== undefined) row.focal = patch.focal || null;
   const { error } = await db.from("product_images").update(row).eq("id", id);
   if (error) return { ok: false, reason: error.message };
   return { ok: true };

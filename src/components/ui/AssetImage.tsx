@@ -22,6 +22,8 @@ interface AssetImageProps {
   /** "img" (default) or "background" for full-bleed cover surfaces. */
   as?: "img" | "background";
   className?: string;
+  /** Explicit CSS object-position ("50% 30%") — overrides the asset's own focal point when set. */
+  objectPosition?: string;
 }
 
 export function AssetImage({
@@ -32,6 +34,7 @@ export function AssetImage({
   sizes,
   as = "img",
   className,
+  objectPosition,
 }: AssetImageProps) {
   const resolved: Asset | null =
     typeof asset === "string" ? resolveAsset(asset, { role, alt }) : asset ?? null;
@@ -54,7 +57,7 @@ export function AssetImage({
           {...a11y}
           style={{
             backgroundImage: `url(${plan.src})`,
-            backgroundPosition: plan.focalPosition,
+            backgroundPosition: objectPosition ?? plan.focalPosition,
             backgroundSize: "cover",
           }}
         />
@@ -90,7 +93,7 @@ export function AssetImage({
           fetchPriority={priority ? "high" : undefined}
           decoding="async"
           style={{
-            objectPosition: plan.focalPosition,
+            objectPosition: objectPosition ?? plan.focalPosition,
             // blur-up LQIP with no JS — the image paints over its own blur background
             backgroundImage: plan.blur ? `url(${plan.blur})` : undefined,
             backgroundSize: plan.blur ? "cover" : undefined,

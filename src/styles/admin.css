@@ -2222,6 +2222,15 @@ a.adm-badge[data-b="incident"]:hover { background: rgba(168,68,58,0.22); }
 .pe-acc__body { width: 100%; resize: vertical; min-height: 2.4em; }
 .pe-acc > input { width: 100%; margin-bottom: 6px; }
 
+/* Focal-point picker (product & section images) */
+.pe-focal { margin-top: 8px; }
+.pe-focal__stage { position: relative; display: inline-block; max-width: 220px; line-height: 0; border-radius: 6px; overflow: hidden; border: 1px solid rgba(0,0,0,.12); }
+.pe-focal__img { display: block; width: 100%; height: auto; cursor: crosshair; }
+.pe-focal__dot { position: absolute; width: 14px; height: 14px; border-radius: 50%; transform: translate(-50%, -50%); border: 2px solid #fff; background: var(--gold, #c9a96e); box-shadow: 0 0 0 1px rgba(0,0,0,.4); pointer-events: none; }
+.pe-focal__row { display: flex; align-items: center; gap: 10px; margin-top: 5px; }
+.pe-focal__hint { font-family: var(--font-sans, sans-serif); font-size: 11px; color: var(--ad-muted, #6b6259); }
+.pe-focal__reset { background: none; border: none; padding: 0; font-family: var(--font-sans, sans-serif); font-size: 11px; color: var(--ink, #1f1a16); text-decoration: underline; cursor: pointer; }
+
 /* Editor control flash — when a section is clicked in the live preview, its controls pulse. */
 @keyframes pe-anchor-flash { 0% { box-shadow: 0 0 0 3px rgba(201,169,110,0.55); } 100% { box-shadow: 0 0 0 3px rgba(201,169,110,0); } }
 .pe-anchor-flash { animation: pe-anchor-flash 1.4s ease-out; border-radius: 8px; }
