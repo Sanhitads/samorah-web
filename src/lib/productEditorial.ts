@@ -75,6 +75,7 @@ export interface TestimonialsSettings {
   heading: string;
   quotes: TestimonialQuote[];
   intervalMs?: number; // crossfade interval (default 5500)
+  color?: string; // optional font colour override (else the section's theme ink)
 }
 export interface MoodCard {
   label: string;
@@ -198,6 +199,7 @@ export interface CandlePdpContent {
   storyImage?: string; lifestyleImage?: string; artworkImage?: string;
   testimonials?: { quote: string; attribution: string }[];
   testimonialInterval?: number; // crossfade seconds between voices (default 5.5)
+  testimonialColor?: string; // optional font colour for the testimonials section (else the theme ink)
   collectionType?: string; // hero meta — "Core Collection" | "Limited Collection" | "Seasonal Collection" | "Archive"
   edition?: string; // hero edition override — "NO. I.1" (else the shared chapter numbering)
   burnTimes?: Record<string, string>; // size label -> burn time, e.g. { "100g": "~25 hours" }
@@ -432,6 +434,7 @@ export function buildCandleEditorial({ view, artist, related, content, freeShipp
         heading: L.testimonialsHeading || "In their words",
         quotes: testimonialQuotes,
         intervalMs: content?.testimonialInterval ? Math.max(2, content.testimonialInterval) * 1000 : undefined,
+        color: content?.testimonialColor || undefined,
       } satisfies TestimonialsSettings,
       { visibility: testimonialQuotes.length > 0 },
     ),

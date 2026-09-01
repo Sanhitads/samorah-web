@@ -58,6 +58,15 @@ const PRODUCT_TYPES = [
   { v: "wax_tablet", l: "Wax Tablet" }, { v: "reed_diffuser", l: "Reed Diffuser" }, { v: "other", l: "Other" },
 ];
 const LAYERS = [{ k: "top", l: "Top notes" }, { k: "heart", l: "Heart notes" }, { k: "base", l: "Base notes" }];
+// Curated font-colour palette for the testimonials section: light options (for dark section
+// backgrounds) + dark options (for light backgrounds). "Auto" (blank) uses the theme ink.
+const TESTIMONIAL_COLORS = [
+  { label: "Ivory", value: "#FAF7F2" },
+  { label: "White", value: "#FFFFFF" },
+  { label: "Gold", value: "#C9A96E" },
+  { label: "Ink", value: "#1F1A16" },
+  { label: "Smoke", value: "#6B6259" },
+] as const;
 const FLAGS: { k: keyof Core; l: string }[] = [
   { k: "isFeatured", l: "Featured" }, { k: "isHero", l: "Hero" }, { k: "isBestseller", l: "Best Seller" }, { k: "isNewArrival", l: "New Arrival" },
   { k: "isLimitedEdition", l: "Limited Edition" }, { k: "isSeasonal", l: "Seasonal" }, { k: "isStaffPick", l: "Staff Pick" }, { k: "isComingSoon", l: "Coming Soon" },
@@ -98,6 +107,7 @@ type Core = {
   cStoryImage: string; cLifestyleImage: string; cArtworkImage: string; // section-specific images
   cTestimonials: { quote: string; attribution: string }[]; // In their words — per-product
   cTestimonialInterval: string; // crossfade seconds
+  cTestimonialColor: string; // testimonials font colour (blank = theme ink)
   cEdition: string; // hero edition override "NO. I.1"
   cCollectionType: string; // "Core Collection" | "Limited Collection" | "Seasonal Collection" | "Archive"
   cBurnTimes: Record<string, string>; // size label -> burn time
@@ -251,6 +261,7 @@ function assembleCandleContent(core: Core) {
     artworkImage: core.cArtworkImage || undefined,
     testimonials: testimonials.length ? testimonials : undefined,
     testimonialInterval: Number(core.cTestimonialInterval) > 0 ? Number(core.cTestimonialInterval) : undefined,
+    testimonialColor: core.cTestimonialColor || undefined,
     collectionType: core.cCollectionType || undefined,
     edition: core.cEdition.trim() || undefined,
     burnTimes: (() => {
@@ -359,7 +370,7 @@ export function ProductEditor({ productId, collections, categories, allProducts 
         "cStoryEyebrow" | "cJourneyEyebrow" | "cJourneyHeading" | "cJourneyIntro" | "cMoodEyebrow" | "cMoodHeading" | "cCraftEyebrow" | "cCraftHeading" | "cArtistEyebrow" |
         "cLifestyleEyebrow" | "cLifestyleHeading" | "cTestimonialsEyebrow" | "cTestimonialsHeading" | "cMemoryLine" | "cContinueEyebrow" |
         "cStoryImage" | "cLifestyleImage" | "cArtworkImage" | "cTestimonials" |
-        "cTestimonialInterval" | "cEdition" | "cCollectionType" | "cBurnTimes" | "cLifestyleMoments" | "cCraft" | "cSpecs" | "cSpecsHeading"> => {
+        "cTestimonialInterval" | "cTestimonialColor" | "cEdition" | "cCollectionType" | "cBurnTimes" | "cLifestyleMoments" | "cCraft" | "cSpecs" | "cSpecsHeading"> => {
         const pc = (p.pdp_content ?? {}) as Record<string, unknown>;
         const clb = (pc.labels ?? {}) as Record<string, unknown>;
         return {
@@ -383,6 +394,7 @@ export function ProductEditor({ productId, collections, categories, allProducts 
           cStoryImage: sv(pc.storyImage), cLifestyleImage: sv(pc.lifestyleImage), cArtworkImage: sv(pc.artworkImage),
           cTestimonials: Array.isArray(pc.testimonials) ? (pc.testimonials as { quote?: string; attribution?: string }[]).map((t) => ({ quote: sv(t.quote), attribution: sv(t.attribution) })) : [],
           cTestimonialInterval: pc.testimonialInterval != null ? String(pc.testimonialInterval) : "",
+          cTestimonialColor: sv(pc.testimonialColor),
           cEdition: sv(pc.edition), cCollectionType: sv(pc.collectionType),
           cBurnTimes: (pc.burnTimes && typeof pc.burnTimes === "object") ? Object.fromEntries(Object.entries(pc.burnTimes as Record<string, unknown>).map(([k, v]) => [k, sv(v)])) : {},
           cLifestyleMoments: Array.isArray(pc.lifestyleMoments) ? (pc.lifestyleMoments as string[]).join("\n") : "",
@@ -1218,6 +1230,38 @@ export function ProductEditor({ productId, collections, categories, allProducts 
               <summary>In their words ({core.cTestimonials.length}) — testimonials</summary>
               <p className="om-field__hint" style={{ margin: "0 0 8px" }}>Per-product testimonials. Leave empty to use the chapter&rsquo;s shared voices. Two or more auto-rotate as a crossfade.</p>
               <label className="cfg-field" style={{ maxWidth: 260, marginBottom: 8 }}><span>Rotation seconds <em className="om-field__hint">between voices (blank = 5.5)</em></span><input type="number" min={2} value={core.cTestimonialInterval} onChange={(e) => set({ cTestimonialInterval: e.target.value })} placeholder="5.5" /></label>
+              <div className="cfg-field" style={{ marginBottom: 10 }}>
+                <span>Font colour <em className="om-field__hint">for this section (blank = theme default)</em></span>
+                <div className="pe-swatches">
+                  {TESTIMONIAL_COLORS.map((c) => (
+                    <button
+                      key={c.value}
+                      type="button"
+                      title={c.label}
+                      aria-label={c.label}
+                      className={`pe-swatch${core.cTestimonialColor.toLowerCase() === c.value.toLowerCase() ? " is-active" : ""}`}
+                      style={{ background: c.value }}
+                      onClick={() => set({ cTestimonialColor: c.value })}
+                    />
+                  ))}
+                  <label className="pe-swatch pe-swatch--custom" title="Custom colour">
+                    <input
+                      type="color"
+                      value={/^#[0-9a-f]{6}$/i.test(core.cTestimonialColor) ? core.cTestimonialColor : "#1f1a16"}
+                      onChange={(e) => set({ cTestimonialColor: e.target.value })}
+                      aria-label="Custom colour"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className={`pe-swatch pe-swatch--auto${core.cTestimonialColor ? "" : " is-active"}`}
+                    onClick={() => set({ cTestimonialColor: "" })}
+                    title="Auto — use the section's theme colour"
+                  >
+                    Auto
+                  </button>
+                </div>
+              </div>
               {core.cTestimonials.map((t, i) => (
                 <div key={i} className="pe-acc">
                   <div className="pe-acc__head">

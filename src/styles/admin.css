@@ -2221,6 +2221,16 @@ a.adm-badge[data-b="incident"]:hover { background: rgba(168,68,58,0.22); }
 .pe-acc__act { display: inline-flex; gap: 4px; flex-shrink: 0; }
 .pe-acc__body { width: 100%; resize: vertical; min-height: 2.4em; }
 .pe-acc > input { width: 100%; margin-bottom: 6px; }
+
+/* Font-colour palette (testimonials section) */
+.pe-swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.pe-swatch { width: 26px; height: 26px; padding: 0; border-radius: 50%; border: 1px solid rgba(0,0,0,.18); cursor: pointer; position: relative; box-shadow: inset 0 0 0 2px #fff; transition: transform .12s, box-shadow .12s; }
+.pe-swatch:hover { transform: scale(1.08); }
+.pe-swatch.is-active { box-shadow: inset 0 0 0 2px #fff, 0 0 0 2px var(--ink, #1f1a16); }
+.pe-swatch--custom { overflow: hidden; background: conic-gradient(from 0deg, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00); }
+.pe-swatch--custom input { position: absolute; inset: -4px; width: calc(100% + 8px); height: calc(100% + 8px); opacity: 0; cursor: pointer; border: none; padding: 0; }
+.pe-swatch--auto { width: auto; height: 26px; border-radius: 13px; padding: 0 12px; background: #fff; font-family: var(--font-sans, sans-serif); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink, #1f1a16); box-shadow: none; }
+.pe-swatch--auto.is-active { box-shadow: 0 0 0 2px var(--ink, #1f1a16); }
 .pe-chprod { margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid rgba(0,0,0,.06); }
 .pe-chprod__interlude { width: 100%; margin-top: 6px; font-style: italic; }
 .ff-btn--mini:disabled { opacity: .4; pointer-events: none; }

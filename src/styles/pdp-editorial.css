@@ -74,7 +74,9 @@
   font-style: italic;
   font-size: clamp(1.4rem, 2.8vw, 2rem);
   line-height: 1.4;
-  color: var(--ink-soft, var(--smoke));
+  /* The quote is the hero content — use full theme ink (not the faint --ink-soft, which is
+     near-invisible on dark section palettes). An admin-chosen colour (--testimonial-ink) wins. */
+  color: var(--testimonial-ink, var(--ink, #1f1a16));
   max-width: 30ch;
 }
 .testimonial__attr {
@@ -82,7 +84,9 @@
   font-size: 11px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--ink-muted, var(--muted));
+  /* Softer than the quote, but still readable; an admin-chosen colour applies here too. */
+  color: var(--testimonial-ink, var(--ink-soft, var(--smoke)));
+  opacity: 0.85;
 }
 .testimonials__dots {
   display: flex;

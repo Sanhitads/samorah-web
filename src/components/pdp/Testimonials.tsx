@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { useReducedMotion } from "framer-motion";
 import type { SectionComponentProps } from "@/components/sections/registry";
 import type { TestimonialsSettings } from "@/lib/productEditorial";
@@ -20,6 +20,8 @@ export function Testimonials({ settings }: SectionComponentProps) {
   const [paused, setPaused] = useState(false);
   const count = s.quotes?.length ?? 0;
   const interval = s.intervalMs && s.intervalMs >= 2000 ? s.intervalMs : INTERVAL;
+  // Optional admin-chosen font colour → drives every text token in the section via one CSS var.
+  const colorStyle = (s.color ? { "--testimonial-ink": s.color } : undefined) as CSSProperties | undefined;
 
   useEffect(() => {
     if (reduce || paused || count < 2) return;
@@ -39,7 +41,7 @@ export function Testimonials({ settings }: SectionComponentProps) {
   // Reduced motion — a quiet static list, no auto-advance.
   if (reduce) {
     return (
-      <div className="testimonials">
+      <div className="testimonials" style={colorStyle}>
         {head}
         <ul className="testimonials__list">
           {s.quotes.map((q, i) => (
@@ -57,6 +59,7 @@ export function Testimonials({ settings }: SectionComponentProps) {
   return (
     <div
       className="testimonials"
+      style={colorStyle}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocusCapture={() => setPaused(true)}
