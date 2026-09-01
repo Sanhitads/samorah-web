@@ -22,7 +22,8 @@
 .acc__order-status[data-s="delivered"] { background: rgba(60,120,70,0.14); color: #2f6b3c; }
 .acc__order-status[data-s="cancelled"], .acc__order-status[data-s="returned"], .acc__order-status[data-s="rto"] { background: rgba(107,98,89,0.14); color: #6b6259; }
 .acc__order-total { font-family: var(--font-serif); font-size: 1rem; text-align: right; }
-.acc__empty { font-family: var(--font-sans); font-size: 14px; color: var(--smoke, #6b6259); }
+.acc__empty { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; font-family: var(--font-sans); font-size: 14px; color: var(--smoke, #6b6259); }
+.acc__empty-line { margin: 0; }
 
 .acc__detail { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
 .acc__panel { border: 1px solid rgba(31,26,22,0.12); border-radius: 4px; padding: 22px; }
@@ -81,9 +82,38 @@
 .acc-connected__row { display: flex; justify-content: space-between; align-items: center; font-family: var(--font-sans); font-size: 14px; color: var(--ink, #1f1a16); padding: 8px 0; border-bottom: 1px solid rgba(31,26,22,0.06); }
 .acc-sessions { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .acc-sessions__row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid rgba(31,26,22,0.08); border-radius: 6px; font-family: var(--font-sans); font-size: 13px; }
-.acc-sessions__dev { flex: 1; color: var(--ink, #1f1a16); }
+.acc-sessions__dev { flex: 1; color: var(--ink, #1f1a16); display: flex; align-items: center; gap: 8px; }
 .acc-sessions__meta { color: var(--smoke, #6b6b6b); font-size: 12px; }
 .acc-sessions__when { color: var(--smoke, #6b6b6b); font-size: 12px; }
+
+/* Top bar — explicit way home (account is outside the store chrome) */
+.acc__topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: clamp(20px, 3vw, 32px); }
+.acc__home { font-family: var(--font-sans); font-size: 13px; letter-spacing: 0.02em; color: var(--ink, #1f1a16); text-decoration: none; }
+.acc__home:hover { color: var(--gold, #c9a96e); }
+.acc__topnav { display: flex; gap: 18px; }
+.acc__toplink { font-family: var(--font-sans); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--smoke, #6b6259); text-decoration: none; }
+.acc__toplink:hover { color: var(--ink, #1f1a16); }
+
+/* Sections need breathing room (previously undefined → headings collided) */
+.acc__section { margin-bottom: clamp(32px, 5vw, 48px); }
+.acc__section:last-child { margin-bottom: 0; }
+
+/* Soft card wrapper for settings / connected / security panels */
+.acc__card { border: 1px solid rgba(31,26,22,0.08); border-radius: 8px; background: #fff; padding: clamp(18px, 3vw, 24px); }
+.acc-connected.acc__card { gap: 0; }
+
+/* Tabs — Devices / Recent sign-ins */
+.acc-tabs__bar { display: flex; gap: 4px; border-bottom: 1px solid rgba(31,26,22,0.1); margin-bottom: 16px; }
+.acc-tab { appearance: none; background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -1px; padding: 8px 4px; cursor: pointer;
+  font-family: var(--font-sans); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--smoke, #6b6259); transition: color 0.2s ease, border-color 0.2s ease; }
+.acc-tab:hover { color: var(--ink, #1f1a16); }
+.acc-tab--on { color: var(--ink, #1f1a16); border-bottom-color: var(--gold, #c9a96e); }
+.acc-tabs__panel { min-height: 60px; }
+
+@media (max-width: 520px) {
+  .acc__topbar { flex-wrap: wrap; }
+  .acc-sessions__row { flex-wrap: wrap; }
+}
 
 /* Wishlist grid */
 .wl-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }

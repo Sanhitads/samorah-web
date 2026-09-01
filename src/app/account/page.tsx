@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser, getMyOrders, getAccountProfile } from "@/services/accountService";
 import { AccountSettings } from "@/components/account/AccountSettings";
-import { DeviceSessions } from "@/components/account/DeviceSessions";
+import { SessionsTabs } from "@/components/account/SessionsTabs";
 
 /** Account center — the customer's home. Middleware gates /account (auth). */
 export const metadata: Metadata = { title: "Your Account", robots: { index: false } };
@@ -24,6 +24,15 @@ export default async function AccountPage() {
 
   return (
     <main className="acc">
+      {/* Top bar — /account sits outside the store chrome, so give an explicit way home */}
+      <div className="acc__topbar">
+        <Link href="/" className="acc__home">← Back to Samorah</Link>
+        <nav className="acc__topnav" aria-label="Quick links">
+          <Link href="/shop" className="acc__toplink">Shop</Link>
+          <Link href="/account/orders" className="acc__toplink">Orders</Link>
+        </nav>
+      </div>
+
       {/* Profile header */}
       <header className="acc__profile">
         <div className="acc__avatar">
@@ -76,19 +85,26 @@ export default async function AccountPage() {
               </li>
             ))}
           </ul>
-        ) : <p className="acc__empty">No orders yet. <Link href="/shop" className="text-link">Begin with the collection →</Link></p>}
+        ) : (
+          <div className="acc__empty">
+            <p className="acc__empty-line">No orders yet.</p>
+            <Link href="/shop" className="text-link">Begin with the collection →</Link>
+          </div>
+        )}
       </section>
 
       {/* Profile & preferences */}
       <section className="acc__section">
         <div className="acc__section-head"><h2 className="acc__section-title">Profile & preferences</h2></div>
-        <AccountSettings initialName={profile?.fullName ?? ""} initialConsent={profile?.marketingConsent ?? false} />
+        <div className="acc__card">
+          <AccountSettings initialName={profile?.fullName ?? ""} initialConsent={profile?.marketingConsent ?? false} />
+        </div>
       </section>
 
       {/* Connected accounts */}
       <section className="acc__section">
         <div className="acc__section-head"><h2 className="acc__section-title">Connected accounts</h2></div>
-        <div className="acc-connected">
+        <div className="acc-connected acc__card">
           {["google", "email"].map((p) => {
             const linked = profile?.providers?.includes(p);
             return (
@@ -104,22 +120,10 @@ export default async function AccountPage() {
 
       {/* Devices & sessions */}
       <section className="acc__section">
-        <div className="acc__section-head"><h2 className="acc__section-title">Devices & sessions</h2></div>
-        <DeviceSessions devices={profile?.devices ?? []} />
-        {profile?.logins?.length ? (
-          <>
-            <p className="acc__note" style={{ marginTop: 16 }}>Recent sign-ins</p>
-            <ul className="acc-sessions">
-              {profile.logins.map((l, i) => (
-                <li key={i} className="acc-sessions__row">
-                  <span className="acc-sessions__dev">{l.browser} · {l.device}</span>
-                  <span className="acc-sessions__meta">{PROVIDER_LABEL[l.provider ?? ""] ?? "email"}{l.country ? ` · ${l.country}` : ""}</span>
-                  <span className="acc-sessions__when">{ago(l.createdAt)}</span>
-                </li>
-              ))}
-            </ul>
-          </>
-        ) : null}
+        <div className="acc__section-head"><h2 className="acc__section-title">Security & devices</h2></div>
+        <div className="acc__card">
+          <SessionsTabs devices={profile?.devices ?? []} logins={profile?.logins ?? []} />
+        </div>
       </section>
     </main>
   );
