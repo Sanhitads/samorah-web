@@ -14,7 +14,7 @@ import { getTestimonials } from "@/config/testimonials";
 import type { ProductCardModel } from "@/components/ui/ProductCard";
 import { imageMedia, type MediaContent } from "@/lib/presentation";
 import { freeShippingLabel, shippingPolicySentence, SHIPPING } from "@/config/commerce";
-import { effectivePrice, formatINR, type Priceable } from "@/lib/pricing";
+import { effectivePrice, formatINR, fromVariantPrice, type Priceable, type VariantPriceable } from "@/lib/pricing";
 import { primaryImage, productBadge, type ImageLike } from "@/lib/product";
 
 // ── Editorial block settings (the contracts each block component reads) ──────
@@ -136,6 +136,7 @@ export interface RelatedProductInput extends Priceable {
   is_hero?: boolean | null;
   is_featured?: boolean | null;
   product_images?: ImageLike[] | null;
+  variants?: VariantPriceable[] | null; // for the "From" price = lowest active variant (100g)
   edition?: string | null; // "NO. I.2" — the shared chapter numbering, shown on the card
   collectionType?: string | null; // "Core Collection" — the card's meta line
 }
@@ -234,7 +235,8 @@ const stripVolume = (chapter: string): string => {
 
 function toCard(p: RelatedProductInput): ProductCardModel {
   const img = primaryImage(p.product_images);
-  const price = effectivePrice(p);
+  // "From" = the lowest active variant (the 100g size), not the product's base price.
+  const price = fromVariantPrice(p);
   return {
     slug: p.slug,
     name: p.name,
@@ -245,7 +247,7 @@ function toCard(p: RelatedProductInput): ProductCardModel {
     media: imageMedia(img?.url ?? "gradient:grad-chai", img?.alt_text ?? p.name, "portrait"),
     priceLabel: `From ${formatINR(price)}`,
     commerce: {
-      priceRange: { min: price, max: p.price, display: formatINR(price) },
+      priceRange: { min: price, max: Math.max(price, p.price), display: formatINR(price) },
       badge: productBadge({ is_hero: p.is_hero, is_featured: p.is_featured, is_bestseller: (p as { is_bestseller?: boolean | null }).is_bestseller, price: p.price, sale_price: p.sale_price }) ?? undefined,
     },
   };

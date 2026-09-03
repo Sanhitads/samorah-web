@@ -85,6 +85,24 @@ export function priceRange(items: Priceable[]): PriceRange {
   };
 }
 
+/**
+ * The "from" price a customer can actually start paying — the lowest effective price across a
+ * product's ACTIVE, priced variants (the smallest size, e.g. 100g). Falls back to the product's own
+ * price only when it carries no usable variants. Use this for every card "From ₹X" so the label is
+ * always variant-derived, never the product's base/random price.
+ */
+// Loose on price so callers whose variant rows omit it (e.g. shop cards that only load vessel_type)
+// still type-check — such rows are simply skipped and the product price is used.
+export type VariantPriceable = { price?: number | null; sale_price?: number | null; is_active?: boolean | null };
+export function fromVariantPrice(
+  product: Priceable & { variants?: VariantPriceable[] | null },
+): number {
+  const prices = (product.variants ?? [])
+    .filter((v) => v && v.is_active !== false && Number(v.price) > 0)
+    .map((v) => (v.sale_price != null && (v.sale_price as number) < (v.price as number) ? (v.sale_price as number) : (v.price as number)));
+  return prices.length ? Math.min(...prices) : effectivePrice(product);
+}
+
 export interface GstBreakdown {
   /** Pre-tax taxable value extracted from the inclusive amount. */
   taxable: number;

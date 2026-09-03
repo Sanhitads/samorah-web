@@ -3,7 +3,7 @@ import { getEditionMap } from "@/services/collectionService";
 
 // Columns needed to render a product card (listings, rails, recommendations).
 const CARD_FIELDS =
-  "id, slug, name, tagline, scent_group, fragrance_family, price, sale_price, is_featured, is_hero, is_bestseller, mood_tags, product_images(url, alt_text, is_primary, sort_order)";
+  "id, slug, name, tagline, scent_group, fragrance_family, price, sale_price, is_featured, is_hero, is_bestseller, mood_tags, variants(price, sale_price, is_active), product_images(url, alt_text, is_primary, sort_order)";
 
 export interface ProductFilter {
   fragranceFamily?: string;

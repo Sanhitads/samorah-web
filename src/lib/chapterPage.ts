@@ -15,7 +15,7 @@ import type { ProductCommerceProjection } from "@/platform/commerce";
 import type { ThemeToken, EditorialMood } from "@/platform/primitives";
 import type { SeoMeta } from "@/platform/content";
 import type { EditorialVoice } from "@/config/voices";
-import { formatPrice, effectivePrice, formatINR, type Priceable } from "@/lib/pricing";
+import { formatPrice, effectivePrice, formatINR, fromVariantPrice, type Priceable, type VariantPriceable } from "@/lib/pricing";
 import { primaryImage, productBadge, type ImageLike } from "@/lib/product";
 import { chapterTitle } from "@/lib/collection";
 import { buildCustomSection } from "@/lib/productEditorial";
@@ -50,6 +50,7 @@ export interface ChapterProductInput extends Priceable {
   chapterImage?: string | null;
   /** An explicit "From" price for the card (rupees) — e.g. the 100g price (else the product price). */
   chapterFromPrice?: number | null;
+  variants?: VariantPriceable[] | null; // for the "From" price = lowest active variant (100g)
 }
 
 export interface ChapterSummary {
@@ -353,7 +354,7 @@ export function toProjection(p: ChapterProductInput): ProductCommerceProjection 
     productId: p.id,
     slug: p.slug,
     currency: "INR",
-    priceRange: { min: effectivePrice(p), max: p.price, display: price.current },
+    priceRange: { min: fromVariantPrice(p), max: Math.max(fromVariantPrice(p), p.price), display: price.current },
     // Card projections carry no variant stock; treated as available until a
     // later beat enriches with inventory. badge still surfaces sale/hero.
     inStock: true,
@@ -379,7 +380,7 @@ function toProductView(p: ChapterProductInput, edition: string): ChapterProductV
     tagline: p.tagline ?? null,
     edition,
     collectionType: p.collection_type ?? "Core Collection",
-    priceLabel: p.chapterFromPrice ? `From ${formatINR(p.chapterFromPrice)}` : `From ${formatPrice(p).current}`,
+    priceLabel: `From ${formatINR(p.chapterFromPrice ?? fromVariantPrice(p))}`,
     media: imageMedia(url, alt, "portrait"),
     commerce: toProjection(p),
   };
