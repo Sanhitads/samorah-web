@@ -203,6 +203,10 @@ export interface CandlePdpContent {
   testimonialInterval?: number; // crossfade seconds between voices (default 5.5)
   testimonialColor?: string; // optional font colour for the testimonials section (else the theme ink)
   hideTestimonials?: boolean; // hide the "In their words" section entirely (even if chapter voices exist)
+  // Two optional custom cards in the character grid, shown after "Theme" (e.g. the sub-category within a
+  // theme — "Mood Library → Loved & Romantic"). Each shows only when it has a value and isn't hidden.
+  moodCard1Label?: string; moodCard1Value?: string; moodCard1Hidden?: boolean;
+  moodCard2Label?: string; moodCard2Value?: string; moodCard2Hidden?: boolean;
   collectionType?: string; // hero meta — "Core Collection" | "Limited Collection" | "Seasonal Collection" | "Archive"
   edition?: string; // hero edition override — "NO. I.1" (else the shared chapter numbering)
   burnTimes?: Record<string, string>; // size label -> burn time, e.g. { "100g": "~25 hours" }
@@ -321,6 +325,12 @@ export function buildCandleEditorial({ view, artist, related, content, freeShipp
   if (view.mood.persona) moodCards.push({ label: "Flame Persona", value: view.mood.persona });
   if (view.scentGroup) moodCards.push({ label: "Scent Group", value: view.scentGroup });
   if (view.chapterName) moodCards.push({ label: "Theme", value: stripVolume(view.chapterName) });
+  // Optional custom character cards near Theme (e.g. the mood within a theme). Shown only when set + not hidden.
+  const pushMoodCard = (label: string | undefined, value: string | undefined, hidden: boolean | undefined, fallback: string) => {
+    if (!hidden && value?.trim()) moodCards.push({ label: label?.trim() || fallback, value: value.trim() });
+  };
+  pushMoodCard(content?.moodCard1Label, content?.moodCard1Value, content?.moodCard1Hidden, "Mood");
+  pushMoodCard(content?.moodCard2Label, content?.moodCard2Value, content?.moodCard2Hidden, "Character");
 
   const waxValue = view.details.find((d) => d.label === "Wax")?.value ?? "Natural coconut & soy blend";
   const wickValue = view.details.find((d) => d.label === "Wick")?.value ?? "Lead-free cotton";

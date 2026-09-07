@@ -111,6 +111,8 @@ type Core = {
   cTestimonialInterval: string; // crossfade seconds
   cTestimonialColor: string; // testimonials font colour (blank = theme ink)
   cTestimonialsHidden: boolean; // hide the "In their words" section on the page
+  cMoodCard1Label: string; cMoodCard1Value: string; cMoodCard1Hidden: boolean; // custom character card near Theme
+  cMoodCard2Label: string; cMoodCard2Value: string; cMoodCard2Hidden: boolean;
   cEdition: string; // hero edition override "NO. I.1"
   cCollectionType: string; // "Core Collection" | "Limited Collection" | "Seasonal Collection" | "Archive"
   cBurnTimes: Record<string, string>; // size label -> burn time
@@ -269,6 +271,8 @@ function assembleCandleContent(core: Core) {
     testimonialInterval: Number(core.cTestimonialInterval) > 0 ? Number(core.cTestimonialInterval) : undefined,
     testimonialColor: core.cTestimonialColor || undefined,
     hideTestimonials: core.cTestimonialsHidden || undefined,
+    moodCard1Label: core.cMoodCard1Label || undefined, moodCard1Value: core.cMoodCard1Value || undefined, moodCard1Hidden: core.cMoodCard1Hidden || undefined,
+    moodCard2Label: core.cMoodCard2Label || undefined, moodCard2Value: core.cMoodCard2Value || undefined, moodCard2Hidden: core.cMoodCard2Hidden || undefined,
     collectionType: core.cCollectionType || undefined,
     edition: core.cEdition.trim() || undefined,
     burnTimes: (() => {
@@ -377,7 +381,7 @@ export function ProductEditor({ productId, collections, categories, allProducts 
         "cStoryEyebrow" | "cJourneyEyebrow" | "cJourneyHeading" | "cJourneyIntro" | "cMoodEyebrow" | "cMoodHeading" | "cCraftEyebrow" | "cCraftHeading" | "cArtistEyebrow" |
         "cLifestyleEyebrow" | "cLifestyleHeading" | "cTestimonialsEyebrow" | "cTestimonialsHeading" | "cMemoryLine" | "cContinueEyebrow" |
         "cStoryImage" | "cLifestyleImage" | "cArtworkImage" | "cStoryImageFocal" | "cLifestyleImageFocal" | "cArtworkImageFocal" | "cTestimonials" |
-        "cTestimonialInterval" | "cTestimonialColor" | "cTestimonialsHidden" | "cEdition" | "cCollectionType" | "cBurnTimes" | "cLifestyleMoments" | "cCraft" | "cSpecs" | "cSpecsHeading"> => {
+        "cTestimonialInterval" | "cTestimonialColor" | "cTestimonialsHidden" | "cMoodCard1Label" | "cMoodCard1Value" | "cMoodCard1Hidden" | "cMoodCard2Label" | "cMoodCard2Value" | "cMoodCard2Hidden" | "cEdition" | "cCollectionType" | "cBurnTimes" | "cLifestyleMoments" | "cCraft" | "cSpecs" | "cSpecsHeading"> => {
         const pc = (p.pdp_content ?? {}) as Record<string, unknown>;
         const clb = (pc.labels ?? {}) as Record<string, unknown>;
         return {
@@ -403,6 +407,8 @@ export function ProductEditor({ productId, collections, categories, allProducts 
           cTestimonials: Array.isArray(pc.testimonials) ? (pc.testimonials as { quote?: string; attribution?: string }[]).map((t) => ({ quote: sv(t.quote), attribution: sv(t.attribution) })) : [],
           cTestimonialInterval: pc.testimonialInterval != null ? String(pc.testimonialInterval) : "",
           cTestimonialColor: sv(pc.testimonialColor), cTestimonialsHidden: bv(pc.hideTestimonials),
+          cMoodCard1Label: sv(pc.moodCard1Label), cMoodCard1Value: sv(pc.moodCard1Value), cMoodCard1Hidden: bv(pc.moodCard1Hidden),
+          cMoodCard2Label: sv(pc.moodCard2Label), cMoodCard2Value: sv(pc.moodCard2Value), cMoodCard2Hidden: bv(pc.moodCard2Hidden),
           cEdition: sv(pc.edition), cCollectionType: sv(pc.collectionType),
           cBurnTimes: (pc.burnTimes && typeof pc.burnTimes === "object") ? Object.fromEntries(Object.entries(pc.burnTimes as Record<string, unknown>).map(([k, v]) => [k, sv(v)])) : {},
           cLifestyleMoments: Array.isArray(pc.lifestyleMoments) ? (pc.lifestyleMoments as string[]).join("\n") : "",
@@ -955,6 +961,20 @@ export function ProductEditor({ productId, collections, categories, allProducts 
           <div className="cfg-grid" data-anchor="mood">
             <label className="cfg-field"><span>Flame persona</span><input value={core.flamePersona} onChange={(e) => set({ flamePersona: e.target.value })} placeholder="The Storyteller" /></label>
             <label className="cfg-field"><span>Mood tags <em className="om-field__hint">comma-separated</em></span><input value={core.moodTags} onChange={(e) => set({ moodTags: e.target.value })} placeholder="Warm, Comforting, Cozy" /></label>
+          </div>
+          <div data-anchor="mood" style={{ marginTop: 6 }}>
+            <p className="om-field__hint" style={{ margin: "0 0 6px", fontWeight: 600 }}>Character cards — extra (shown after &ldquo;Theme&rdquo;)</p>
+            <p className="om-field__hint" style={{ margin: "0 0 8px" }}>Two optional cards beside Flame Persona / Scent Group / Theme — e.g. the mood within a theme (&ldquo;Mood Library → Loved &amp; Romantic&rdquo;). Each shows only when it has a value; untick <b>Show</b> to hide it.</p>
+            {([
+              { lk: "cMoodCard1Label", vk: "cMoodCard1Value", hk: "cMoodCard1Hidden", lph: "Mood", vph: "Loved & Romantic" },
+              { lk: "cMoodCard2Label", vk: "cMoodCard2Value", hk: "cMoodCard2Hidden", lph: "Character", vph: "—" },
+            ] as const).map(({ lk, vk, hk, lph, vph }, i) => (
+              <div key={lk} className="cfg-grid" style={{ alignItems: "end", marginBottom: 8, gridTemplateColumns: "1fr 1.4fr auto" }}>
+                <label className="cfg-field"><span>Card {i + 1} — label</span><input value={core[lk]} onChange={(e) => set({ [lk]: e.target.value } as Partial<Core>)} placeholder={lph} /></label>
+                <label className="cfg-field"><span>Value</span><input value={core[vk]} onChange={(e) => set({ [vk]: e.target.value } as Partial<Core>)} placeholder={vph} /></label>
+                <label className="om-check" style={{ paddingBottom: 10 }}><input type="checkbox" checked={!core[hk]} onChange={(e) => set({ [hk]: !e.target.checked } as Partial<Core>)} /><span>Show</span></label>
+              </div>
+            ))}
           </div>
           <label className="cfg-field" data-anchor="lifestyle"><span>Lifestyle (Living With It)</span><textarea value={core.lifestyleUse} onChange={(e) => set({ lifestyleUse: e.target.value })} rows={3} /></label>
           <label className="cfg-field" data-anchor="cultural"><span>Centre quote (cultural reference)</span><input value={core.culturalReference} onChange={(e) => set({ culturalReference: e.target.value })} /></label>
