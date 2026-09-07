@@ -90,11 +90,14 @@ export function CandleProductDetail({
 
           <div className="pdp__info">
             {p.chapterName ? (
-              p.chapterHref ? (
-                <Link href={p.chapterHref} className="pdp__chapter">{p.chapterName}</Link>
-              ) : (
-                <p className="pdp__chapter">{p.chapterName}</p>
-              )
+              <div className="pdp__chaprow">
+                {p.chapterHref ? (
+                  <Link href={p.chapterHref} className="pdp__chapter">{p.chapterName}</Link>
+                ) : (
+                  <span className="pdp__chapter">{p.chapterName}</span>
+                )}
+                {p.themeMood ? <span className="pdp__chapter-mood">{p.themeMood}</span> : null}
+              </div>
             ) : null}
             {p.edition ? <p className="pdp__edition">{p.edition}</p> : null}
             <h1 className="pdp__name">{p.name}</h1>

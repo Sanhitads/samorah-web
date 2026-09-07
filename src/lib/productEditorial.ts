@@ -80,6 +80,7 @@ export interface TestimonialsSettings {
 export interface MoodCard {
   label: string;
   value: string;
+  sub?: string; // an optional second value shown in the SAME ROW (e.g. Theme → "Mood Library · Loved & Romantic")
 }
 export interface MoodGridSettings {
   eyebrow: string;
@@ -149,6 +150,8 @@ export function applyCandleViewOverrides(p: ProductPageView, content?: CandlePdp
   if (content.edition) p.edition = content.edition;
   if (content.collectionType) p.collectionType = content.collectionType;
   if (content.burnTimes) p.variants = p.variants.map((v) => ({ ...v, burnTime: content.burnTimes?.[v.size] || v.burnTime }));
+  // Mood-within-theme shown beside the hero chapter eyebrow (unless hidden there).
+  p.themeMood = content.themeMood?.trim() && !content.hideThemeMoodTop ? content.themeMood.trim() : null;
   return p;
 }
 
@@ -207,6 +210,11 @@ export interface CandlePdpContent {
   // theme — "Mood Library → Loved & Romantic"). Each shows only when it has a value and isn't hidden.
   moodCard1Label?: string; moodCard1Value?: string; moodCard1Hidden?: boolean;
   moodCard2Label?: string; moodCard2Value?: string; moodCard2Hidden?: boolean;
+  // The mood WITHIN a theme (e.g. "Loved & Romantic"). Shown in-row beside the hero chapter eyebrow
+  // (VOL. III — MOOD LIBRARY) and beside the Theme card — each place independently show/hide-able.
+  themeMood?: string;
+  hideThemeMoodTop?: boolean; // hide it beside the hero chapter eyebrow
+  hideThemeMoodTheme?: boolean; // hide it beside the Theme card
   collectionType?: string; // hero meta — "Core Collection" | "Limited Collection" | "Seasonal Collection" | "Archive"
   edition?: string; // hero edition override — "NO. I.1" (else the shared chapter numbering)
   burnTimes?: Record<string, string>; // size label -> burn time, e.g. { "100g": "~25 hours" }
@@ -324,7 +332,11 @@ export function buildCandleEditorial({ view, artist, related, content, freeShipp
   if (view.mood.tags.length) moodCards.push({ label: "Mood", value: view.mood.tags.join(" · ") });
   if (view.mood.persona) moodCards.push({ label: "Flame Persona", value: view.mood.persona });
   if (view.scentGroup) moodCards.push({ label: "Scent Group", value: view.scentGroup });
-  if (view.chapterName) moodCards.push({ label: "Theme", value: stripVolume(view.chapterName) });
+  if (view.chapterName) {
+    // The Theme card can carry the mood-within-the-theme as an in-row second value ("Mood Library · Loved & Romantic").
+    const themeSub = content?.themeMood?.trim() && !content?.hideThemeMoodTheme ? content.themeMood.trim() : undefined;
+    moodCards.push({ label: "Theme", value: stripVolume(view.chapterName), sub: themeSub });
+  }
   // Optional custom character cards near Theme (e.g. the mood within a theme). Shown only when set + not hidden.
   const pushMoodCard = (label: string | undefined, value: string | undefined, hidden: boolean | undefined, fallback: string) => {
     if (!hidden && value?.trim()) moodCards.push({ label: label?.trim() || fallback, value: value.trim() });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildCandleEditorial, type CandlePdpContent } from "@/lib/productEditorial";
+import { buildCandleEditorial, applyCandleViewOverrides, type CandlePdpContent } from "@/lib/productEditorial";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -49,6 +49,44 @@ describe("PDP character grid — custom cards near Theme", () => {
   it("falls back to a default label when the label is blank", () => {
     const cards = cardsOf(build({ moodCard1Value: "Loved & Romantic" }));
     expect(cards.some((c) => c.label === "Mood" && c.value === "Loved & Romantic")).toBe(true);
+  });
+});
+
+describe("Mood within the theme — same-row in two places, each show/hide", () => {
+  const themeCard = (content: CandlePdpContent) => cardsOf(build(content)).find((c) => c.label === "Theme") as { label: string; value: string; sub?: string };
+
+  it("Theme card shows the mood as an in-row second value (sub) when set + shown", () => {
+    expect(themeCard({ themeMood: "Loved & Romantic" })).toEqual({ label: "Theme", value: "Mood Library", sub: "Loved & Romantic" });
+  });
+
+  it("Theme card hides the mood (no sub) when 'By Theme card' is off", () => {
+    expect(themeCard({ themeMood: "Loved & Romantic", hideThemeMoodTheme: true }).sub).toBeUndefined();
+  });
+
+  it("hero eyebrow gets p.themeMood when shown, and null when hidden or blank", () => {
+    const view = () => ({ chapterName: "Vol. III — Mood Library", variants: [] } as any);
+    expect(applyCandleViewOverrides(view(), { themeMood: "Loved & Romantic" }).themeMood).toBe("Loved & Romantic");
+    expect(applyCandleViewOverrides(view(), { themeMood: "Loved & Romantic", hideThemeMoodTop: true }).themeMood).toBeNull();
+    expect(applyCandleViewOverrides(view(), { themeMood: "   " }).themeMood).toBeNull();
+  });
+
+  it("the two placements toggle independently", () => {
+    // shown at top only
+    expect(applyCandleViewOverrides({ chapterName: "Vol. III — Mood Library", variants: [] } as any, { themeMood: "X", hideThemeMoodTheme: true }).themeMood).toBe("X");
+    expect(themeCard({ themeMood: "X", hideThemeMoodTheme: true }).sub).toBeUndefined();
+    // shown by Theme card only
+    expect(themeCard({ themeMood: "X", hideThemeMoodTop: true }).sub).toBe("X");
+    expect(applyCandleViewOverrides({ chapterName: "Vol. III — Mood Library", variants: [] } as any, { themeMood: "X", hideThemeMoodTop: true }).themeMood).toBeNull();
+  });
+});
+
+describe("character grid — duplicate labels are allowed (no key collision)", () => {
+  it("an auto 'Mood' card and a custom 'Mood' card can co-exist", () => {
+    const cards = cardsOf(buildCandleEditorial({
+      view: makeView({ mood: { tags: ["Warm", "Cozy"], persona: "The Confidant", story: "", cultural: "", lifestyle: "" } }),
+      artist: null as any, related: [], content: { moodCard1Label: "Mood", moodCard1Value: "Loved & Romantic" },
+    }));
+    expect(cards.filter((c) => c.label === "Mood")).toHaveLength(2); // rendered with index-based keys, no collision
   });
 });
 

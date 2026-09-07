@@ -532,6 +532,8 @@
   line-height: 1.25;
   color: var(--ink);
 }
+/* Mood-within-theme shown in the SAME ROW as the Theme value ("Mood Library · Loved & Romantic") */
+.mood-card__sub { color: var(--accent, var(--gold)); }
 
 /* ── CraftDetails ── */
 .craft__head { text-align: center; margin-bottom: clamp(36px, 5vw, 60px); }

@@ -113,6 +113,7 @@ type Core = {
   cTestimonialsHidden: boolean; // hide the "In their words" section on the page
   cMoodCard1Label: string; cMoodCard1Value: string; cMoodCard1Hidden: boolean; // custom character card near Theme
   cMoodCard2Label: string; cMoodCard2Value: string; cMoodCard2Hidden: boolean;
+  cThemeMood: string; cThemeMoodHideTop: boolean; cThemeMoodHideTheme: boolean; // mood within theme (eyebrow + Theme card)
   cEdition: string; // hero edition override "NO. I.1"
   cCollectionType: string; // "Core Collection" | "Limited Collection" | "Seasonal Collection" | "Archive"
   cBurnTimes: Record<string, string>; // size label -> burn time
@@ -273,6 +274,7 @@ function assembleCandleContent(core: Core) {
     hideTestimonials: core.cTestimonialsHidden || undefined,
     moodCard1Label: core.cMoodCard1Label || undefined, moodCard1Value: core.cMoodCard1Value || undefined, moodCard1Hidden: core.cMoodCard1Hidden || undefined,
     moodCard2Label: core.cMoodCard2Label || undefined, moodCard2Value: core.cMoodCard2Value || undefined, moodCard2Hidden: core.cMoodCard2Hidden || undefined,
+    themeMood: core.cThemeMood || undefined, hideThemeMoodTop: core.cThemeMoodHideTop || undefined, hideThemeMoodTheme: core.cThemeMoodHideTheme || undefined,
     collectionType: core.cCollectionType || undefined,
     edition: core.cEdition.trim() || undefined,
     burnTimes: (() => {
@@ -381,7 +383,7 @@ export function ProductEditor({ productId, collections, categories, allProducts 
         "cStoryEyebrow" | "cJourneyEyebrow" | "cJourneyHeading" | "cJourneyIntro" | "cMoodEyebrow" | "cMoodHeading" | "cCraftEyebrow" | "cCraftHeading" | "cArtistEyebrow" |
         "cLifestyleEyebrow" | "cLifestyleHeading" | "cTestimonialsEyebrow" | "cTestimonialsHeading" | "cMemoryLine" | "cContinueEyebrow" |
         "cStoryImage" | "cLifestyleImage" | "cArtworkImage" | "cStoryImageFocal" | "cLifestyleImageFocal" | "cArtworkImageFocal" | "cTestimonials" |
-        "cTestimonialInterval" | "cTestimonialColor" | "cTestimonialsHidden" | "cMoodCard1Label" | "cMoodCard1Value" | "cMoodCard1Hidden" | "cMoodCard2Label" | "cMoodCard2Value" | "cMoodCard2Hidden" | "cEdition" | "cCollectionType" | "cBurnTimes" | "cLifestyleMoments" | "cCraft" | "cSpecs" | "cSpecsHeading"> => {
+        "cTestimonialInterval" | "cTestimonialColor" | "cTestimonialsHidden" | "cMoodCard1Label" | "cMoodCard1Value" | "cMoodCard1Hidden" | "cMoodCard2Label" | "cMoodCard2Value" | "cMoodCard2Hidden" | "cThemeMood" | "cThemeMoodHideTop" | "cThemeMoodHideTheme" | "cEdition" | "cCollectionType" | "cBurnTimes" | "cLifestyleMoments" | "cCraft" | "cSpecs" | "cSpecsHeading"> => {
         const pc = (p.pdp_content ?? {}) as Record<string, unknown>;
         const clb = (pc.labels ?? {}) as Record<string, unknown>;
         return {
@@ -409,6 +411,7 @@ export function ProductEditor({ productId, collections, categories, allProducts 
           cTestimonialColor: sv(pc.testimonialColor), cTestimonialsHidden: bv(pc.hideTestimonials),
           cMoodCard1Label: sv(pc.moodCard1Label), cMoodCard1Value: sv(pc.moodCard1Value), cMoodCard1Hidden: bv(pc.moodCard1Hidden),
           cMoodCard2Label: sv(pc.moodCard2Label), cMoodCard2Value: sv(pc.moodCard2Value), cMoodCard2Hidden: bv(pc.moodCard2Hidden),
+          cThemeMood: sv(pc.themeMood), cThemeMoodHideTop: bv(pc.hideThemeMoodTop), cThemeMoodHideTheme: bv(pc.hideThemeMoodTheme),
           cEdition: sv(pc.edition), cCollectionType: sv(pc.collectionType),
           cBurnTimes: (pc.burnTimes && typeof pc.burnTimes === "object") ? Object.fromEntries(Object.entries(pc.burnTimes as Record<string, unknown>).map(([k, v]) => [k, sv(v)])) : {},
           cLifestyleMoments: Array.isArray(pc.lifestyleMoments) ? (pc.lifestyleMoments as string[]).join("\n") : "",
@@ -961,6 +964,15 @@ export function ProductEditor({ productId, collections, categories, allProducts 
           <div className="cfg-grid" data-anchor="mood">
             <label className="cfg-field"><span>Flame persona</span><input value={core.flamePersona} onChange={(e) => set({ flamePersona: e.target.value })} placeholder="The Storyteller" /></label>
             <label className="cfg-field"><span>Mood tags <em className="om-field__hint">comma-separated</em></span><input value={core.moodTags} onChange={(e) => set({ moodTags: e.target.value })} placeholder="Warm, Comforting, Cozy" /></label>
+          </div>
+          <div data-anchor="mood" style={{ marginTop: 8 }}>
+            <p className="om-field__hint" style={{ margin: "0 0 6px", fontWeight: 600 }}>Mood within the theme <em className="om-field__hint">— e.g. Mood Library → &ldquo;Loved &amp; Romantic&rdquo;</em></p>
+            <p className="om-field__hint" style={{ margin: "0 0 8px" }}>Shown on the same row beside the chapter title (top of the page) and beside the Theme card. Untick a box to hide it in that place; leave the value blank to show nothing.</p>
+            <div className="cfg-grid" style={{ alignItems: "end", gridTemplateColumns: "1.6fr auto auto" }}>
+              <label className="cfg-field"><span>Theme mood</span><input value={core.cThemeMood} onChange={(e) => set({ cThemeMood: e.target.value })} placeholder="Loved & Romantic" /></label>
+              <label className="om-check" style={{ paddingBottom: 10 }}><input type="checkbox" checked={!core.cThemeMoodHideTop} onChange={(e) => set({ cThemeMoodHideTop: !e.target.checked })} /><span>By chapter title</span></label>
+              <label className="om-check" style={{ paddingBottom: 10 }}><input type="checkbox" checked={!core.cThemeMoodHideTheme} onChange={(e) => set({ cThemeMoodHideTheme: !e.target.checked })} /><span>By Theme card</span></label>
+            </div>
           </div>
           <div data-anchor="mood" style={{ marginTop: 6 }}>
             <p className="om-field__hint" style={{ margin: "0 0 6px", fontWeight: 600 }}>Character cards — extra (shown after &ldquo;Theme&rdquo;)</p>

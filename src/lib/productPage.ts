@@ -85,6 +85,7 @@ export interface ProductPageView {
   chapterName: string | null;
   chapterSlug: string | null;
   chapterHref: string | null;
+  themeMood?: string | null; // "Loved & Romantic" — the mood within the theme, shown beside the eyebrow
   collectionType: string; // "Core Collection" | "Limited Collection"
   edition: string; // "VOL. III.1" — set by the route from the collection position
   scentGroup: string | null;

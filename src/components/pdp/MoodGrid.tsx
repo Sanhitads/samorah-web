@@ -17,10 +17,13 @@ export function MoodGrid({ settings }: SectionComponentProps) {
         {s.heading ? <h2 className="mood-grid__heading">{s.heading}</h2> : null}
       </div>
       <div className="mood-grid__cards">
-        {s.cards.map((card) => (
-          <div key={card.label} className="mood-card">
+        {s.cards.map((card, i) => (
+          <div key={`${card.label}-${i}`} className="mood-card">
             <p className="mood-card__label">{card.label}</p>
-            <p className="mood-card__value">{card.value}</p>
+            <p className="mood-card__value">
+              {card.value}
+              {card.sub ? <span className="mood-card__sub"> · {card.sub}</span> : null}
+            </p>
           </div>
         ))}
       </div>
