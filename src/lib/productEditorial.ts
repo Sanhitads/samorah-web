@@ -202,6 +202,7 @@ export interface CandlePdpContent {
   testimonials?: { quote: string; attribution: string }[];
   testimonialInterval?: number; // crossfade seconds between voices (default 5.5)
   testimonialColor?: string; // optional font colour for the testimonials section (else the theme ink)
+  hideTestimonials?: boolean; // hide the "In their words" section entirely (even if chapter voices exist)
   collectionType?: string; // hero meta — "Core Collection" | "Limited Collection" | "Seasonal Collection" | "Archive"
   edition?: string; // hero edition override — "NO. I.1" (else the shared chapter numbering)
   burnTimes?: Record<string, string>; // size label -> burn time, e.g. { "100g": "~25 hours" }
@@ -439,7 +440,7 @@ export function buildCandleEditorial({ view, artist, related, content, freeShipp
         intervalMs: content?.testimonialInterval ? Math.max(2, content.testimonialInterval) * 1000 : undefined,
         color: content?.testimonialColor || undefined,
       } satisfies TestimonialsSettings,
-      { visibility: testimonialQuotes.length > 0 },
+      { visibility: !content?.hideTestimonials && testimonialQuotes.length > 0 },
     ),
     fill("divider-close", {} satisfies EditorialDividerSettings),
     fill(

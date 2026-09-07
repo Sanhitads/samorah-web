@@ -110,6 +110,7 @@ type Core = {
   cTestimonials: { quote: string; attribution: string }[]; // In their words — per-product
   cTestimonialInterval: string; // crossfade seconds
   cTestimonialColor: string; // testimonials font colour (blank = theme ink)
+  cTestimonialsHidden: boolean; // hide the "In their words" section on the page
   cEdition: string; // hero edition override "NO. I.1"
   cCollectionType: string; // "Core Collection" | "Limited Collection" | "Seasonal Collection" | "Archive"
   cBurnTimes: Record<string, string>; // size label -> burn time
@@ -267,6 +268,7 @@ function assembleCandleContent(core: Core) {
     testimonials: testimonials.length ? testimonials : undefined,
     testimonialInterval: Number(core.cTestimonialInterval) > 0 ? Number(core.cTestimonialInterval) : undefined,
     testimonialColor: core.cTestimonialColor || undefined,
+    hideTestimonials: core.cTestimonialsHidden || undefined,
     collectionType: core.cCollectionType || undefined,
     edition: core.cEdition.trim() || undefined,
     burnTimes: (() => {
@@ -375,7 +377,7 @@ export function ProductEditor({ productId, collections, categories, allProducts 
         "cStoryEyebrow" | "cJourneyEyebrow" | "cJourneyHeading" | "cJourneyIntro" | "cMoodEyebrow" | "cMoodHeading" | "cCraftEyebrow" | "cCraftHeading" | "cArtistEyebrow" |
         "cLifestyleEyebrow" | "cLifestyleHeading" | "cTestimonialsEyebrow" | "cTestimonialsHeading" | "cMemoryLine" | "cContinueEyebrow" |
         "cStoryImage" | "cLifestyleImage" | "cArtworkImage" | "cStoryImageFocal" | "cLifestyleImageFocal" | "cArtworkImageFocal" | "cTestimonials" |
-        "cTestimonialInterval" | "cTestimonialColor" | "cEdition" | "cCollectionType" | "cBurnTimes" | "cLifestyleMoments" | "cCraft" | "cSpecs" | "cSpecsHeading"> => {
+        "cTestimonialInterval" | "cTestimonialColor" | "cTestimonialsHidden" | "cEdition" | "cCollectionType" | "cBurnTimes" | "cLifestyleMoments" | "cCraft" | "cSpecs" | "cSpecsHeading"> => {
         const pc = (p.pdp_content ?? {}) as Record<string, unknown>;
         const clb = (pc.labels ?? {}) as Record<string, unknown>;
         return {
@@ -400,7 +402,7 @@ export function ProductEditor({ productId, collections, categories, allProducts 
           cStoryImageFocal: sv(pc.storyImageFocal), cLifestyleImageFocal: sv(pc.lifestyleImageFocal), cArtworkImageFocal: sv(pc.artworkImageFocal),
           cTestimonials: Array.isArray(pc.testimonials) ? (pc.testimonials as { quote?: string; attribution?: string }[]).map((t) => ({ quote: sv(t.quote), attribution: sv(t.attribution) })) : [],
           cTestimonialInterval: pc.testimonialInterval != null ? String(pc.testimonialInterval) : "",
-          cTestimonialColor: sv(pc.testimonialColor),
+          cTestimonialColor: sv(pc.testimonialColor), cTestimonialsHidden: bv(pc.hideTestimonials),
           cEdition: sv(pc.edition), cCollectionType: sv(pc.collectionType),
           cBurnTimes: (pc.burnTimes && typeof pc.burnTimes === "object") ? Object.fromEntries(Object.entries(pc.burnTimes as Record<string, unknown>).map(([k, v]) => [k, sv(v)])) : {},
           cLifestyleMoments: Array.isArray(pc.lifestyleMoments) ? (pc.lifestyleMoments as string[]).join("\n") : "",
@@ -1256,8 +1258,12 @@ export function ProductEditor({ productId, collections, categories, allProducts 
             </details>
 
             <details className="pe-sec" style={{ marginTop: 12 }} data-anchor="testimonials">
-              <summary>In their words ({core.cTestimonials.length}) — testimonials</summary>
-              <p className="om-field__hint" style={{ margin: "0 0 8px" }}>Per-product testimonials. Leave empty to use the chapter&rsquo;s shared voices. Two or more auto-rotate as a crossfade.</p>
+              <summary>In their words ({core.cTestimonials.length}) — testimonials{core.cTestimonialsHidden ? " · hidden" : ""}</summary>
+              <label className="om-check" style={{ marginBottom: 6 }} data-anchor="testimonials">
+                <input type="checkbox" checked={!core.cTestimonialsHidden} onChange={(e) => set({ cTestimonialsHidden: !e.target.checked })} />
+                <span>Show the &ldquo;In their words&rdquo; section on this product&rsquo;s page</span>
+              </label>
+              <p className="om-field__hint" style={{ margin: "0 0 8px" }}>Per-product testimonials. Leave empty to use the chapter&rsquo;s shared voices. Two or more auto-rotate as a crossfade. <b>Uncheck the box above to hide this section entirely</b> — e.g. when there are no letters to show.</p>
               <label className="cfg-field" style={{ maxWidth: 260, marginBottom: 8 }}><span>Rotation seconds <em className="om-field__hint">between voices (blank = 5.5)</em></span><input type="number" min={2} value={core.cTestimonialInterval} onChange={(e) => set({ cTestimonialInterval: e.target.value })} placeholder="5.5" /></label>
               <div className="cfg-field" style={{ marginBottom: 10 }}>
                 <span>Font colour <em className="om-field__hint">for this section (blank = theme default)</em></span>
