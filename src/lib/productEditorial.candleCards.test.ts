@@ -80,6 +80,21 @@ describe("Mood within the theme — same-row in two places, each show/hide", () 
   });
 });
 
+describe("Continue rail — collection-type label (Core / Limited …)", () => {
+  const railCards = (related: any[]) => {
+    const s = buildCandleEditorial({ view: makeView(), artist: null as any, related, content: {} }).find((x) => x.id === "related");
+    return (s!.settings as any).products as { slug: string; collectionType?: string }[];
+  };
+  it("shows the product's own collection type (e.g. Limited Collection), not a hardcoded Core", () => {
+    const [card] = railCards([{ slug: "exotic", name: "Exotic", price: 520, collectionType: "Limited Collection", variants: [{ price: 520, is_active: true }] }]);
+    expect(card.collectionType).toBe("Limited Collection");
+  });
+  it("defaults to Core Collection only when the product genuinely has none", () => {
+    const [card] = railCards([{ slug: "x", name: "X", price: 500, variants: [{ price: 500, is_active: true }] }]);
+    expect(card.collectionType).toBe("Core Collection");
+  });
+});
+
 describe("custom section position — 'After Cultural Reference'", () => {
   const orderOf = (secs: any[], id: string) => secs.find((s) => s.id === id)?.order as number;
 

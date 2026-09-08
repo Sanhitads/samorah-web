@@ -109,7 +109,12 @@ export default async function ProductRoute({
     4,
   )) as unknown as RelatedProductInput[];
   // Number the "Continue the Chapter" cards with the same shared edition map as everything else.
-  for (const r of related) r.edition = editions.get(r.slug)?.edition ?? r.edition ?? null;
+  for (const r of related) {
+    r.edition = editions.get(r.slug)?.edition ?? r.edition ?? null;
+    // Collection-type label (Core / Limited …) lives in pdp_content — same source as the hero.
+    const raw = r as unknown as { pdp_content?: { collectionType?: string | null } | null };
+    r.collectionType = raw.pdp_content?.collectionType || r.collectionType || null;
+  }
   const artist = buildProductArtist(product);
   const pdpContent = ((product as { pdp_content?: CandlePdpContent | null }).pdp_content) ?? undefined;
   applyCandleViewOverrides(p, pdpContent); // edition / collection-type / per-size burn time overrides

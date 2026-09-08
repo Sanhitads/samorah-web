@@ -4,6 +4,11 @@ import { getEditionMap } from "@/services/collectionService";
 // Columns needed to render a product card (listings, rails, recommendations).
 const CARD_FIELDS =
   "id, slug, name, tagline, scent_group, fragrance_family, price, sale_price, is_featured, is_hero, is_bestseller, mood_tags, variants(price, sale_price, is_active), product_images(url, alt_text, is_primary, sort_order)";
+// Continue-the-Chapter cards also need the collection-type label (Core / Limited …), which lives in
+// pdp_content.collectionType — same source the PDP hero resolves.
+// Typed as `string` (not a literal) so the client uses the loose select overload — pdp_content is a real
+// column but isn't in the generated types; the results are cast where used (as the surrounding code does).
+const RELATED_CARD_FIELDS: string = `${CARD_FIELDS}, pdp_content`;
 
 export interface ProductFilter {
   fragranceFamily?: string;
@@ -90,7 +95,7 @@ export async function getCandleSiblings(collectionId: string, excludeProductId: 
     const [{ data }, editions] = await Promise.all([
       db
         .from("products")
-        .select("id, slug, name, tagline, price, product_type, display_order, product_images(url, is_primary, sort_order)")
+        .select("id, slug, name, tagline, price, product_type, display_order, pdp_content, variants(price, sale_price, is_active), product_images(url, is_primary, sort_order)")
         .eq("collection_id", collectionId)
         .neq("id", excludeProductId)
         .order("display_order"),
@@ -101,7 +106,7 @@ export async function getCandleSiblings(collectionId: string, excludeProductId: 
       .filter((p: any) => !AIR_PRODUCT_TYPES.includes(p.product_type))
       .slice(0, 4)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .map((p: any) => ({ ...p, edition: editions.get(p.slug)?.edition ?? null }));
+      .map((p: any) => ({ ...p, edition: editions.get(p.slug)?.edition ?? null, collectionType: p.pdp_content?.collectionType || null }));
   } catch {
     return [];
   }
@@ -189,32 +194,34 @@ export async function getRelatedProducts(
   limit = 4,
 ) {
   const db = createPublicClient();
+  // Loose row shape — RELATED_CARD_FIELDS pulls pdp_content, which isn't in the generated column types.
+  type CardRow = { id: string; slug: string } & Record<string, unknown>;
 
   // 1) Curated overrides (admin → related_products), in their saved order. Additive: with no override
   //    rows this branch contributes nothing and the result is identical to the family/collection query.
-  const picks: Awaited<ReturnType<typeof runAlgo>> = [];
+  const picks: CardRow[] = [];
   try {
     const { data: rel } = await db.from("related_products").select("related_product_id,sort_order").eq("product_id", product.id).order("sort_order");
     const ids = (rel ?? []).map((r) => (r as { related_product_id: string }).related_product_id);
     if (ids.length) {
-      const { data: cards } = await db.from("products").select(CARD_FIELDS).in("id", ids);
-      const byId = new Map((cards ?? []).map((c) => [(c as { id: string }).id, c]));
+      const { data: cards } = await db.from("products").select(RELATED_CARD_FIELDS).in("id", ids);
+      const byId = new Map(((cards ?? []) as unknown as CardRow[]).map((c) => [c.id, c]));
       for (const id of ids) { const c = byId.get(id); if (c) picks.push(c); } // preserve curated order
     }
   } catch { /* related_products optional — fall through to the algorithm */ }
   if (picks.length >= limit) return picks.slice(0, limit);
 
   // 2) Fill the remaining slots with the same-family / same-collection algorithm, excluding the picks.
-  async function runAlgo() {
-    let query = db.from("products").select(CARD_FIELDS).neq("id", product.id);
+  async function runAlgo(): Promise<CardRow[]> {
+    let query = db.from("products").select(RELATED_CARD_FIELDS).neq("id", product.id);
     if (product.fragrance_family) query = query.eq("fragrance_family", product.fragrance_family);
     else if (product.collection_id) query = query.eq("collection_id", product.collection_id);
     // Follow the admin's chosen order (Continue-the-Chapter should read in display order), created_at as tiebreak.
     query = query.order("display_order", { ascending: true }).order("created_at", { ascending: true }).limit(limit + picks.length);
     const { data, error } = await query;
     if (error) throw error;
-    return data ?? [];
+    return (data ?? []) as unknown as CardRow[];
   }
-  const rest = (await runAlgo()).filter((d) => !picks.some((p) => (p as { id: string }).id === (d as { id: string }).id));
+  const rest = (await runAlgo()).filter((d) => !picks.some((p) => p.id === d.id));
   return [...picks, ...rest].slice(0, limit);
 }
