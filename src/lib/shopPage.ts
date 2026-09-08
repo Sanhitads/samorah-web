@@ -57,6 +57,7 @@ export interface ShopProductInput extends Priceable {
   is_bestseller?: boolean | null;
   is_new_arrival?: boolean | null;
   created_at?: string | null;
+  display_order?: number | null; // the admin's product order; the default listing follows it (ascending)
   /** Reserved for future product-type filtering; absent today → treated as candle. */
   product_type?: string | null;
   collection?: { slug: string; name: string; volume: string | null } | null;
@@ -196,6 +197,11 @@ const matchesVessel = (p: ShopProductInput, vessel: string) =>
 function sortProducts(list: ShopProductInput[], sort: ShopSort): ShopProductInput[] {
   const byNewest = (a: ShopProductInput, b: ShopProductInput) =>
     (b.created_at ?? "").localeCompare(a.created_at ?? "");
+  // The admin's display order (ascending) is the natural listing order; oldest-first breaks any tie so
+  // a chapter reads Vol I.1 → I.2 → I.3 …, never reversed.
+  const disp = (p: ShopProductInput) => (typeof p.display_order === "number" ? p.display_order : 0);
+  const byOrder = (a: ShopProductInput, b: ShopProductInput) =>
+    disp(a) - disp(b) || (a.created_at ?? "").localeCompare(b.created_at ?? "");
   const out = [...list];
   switch (sort) {
     case "newest":
@@ -208,7 +214,7 @@ function sortProducts(list: ShopProductInput[], sort: ShopSort): ShopProductInpu
     default:
       return out.sort((a, b) => {
         const rank = (p: ShopProductInput) => (p.is_hero ? 0 : p.is_featured ? 1 : 2);
-        return rank(a) - rank(b) || byNewest(a, b);
+        return rank(a) - rank(b) || byOrder(a, b);
       });
   }
 }

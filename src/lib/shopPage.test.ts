@@ -31,6 +31,32 @@ const CATALOG: ShopProductInput[] = [
   spray("fresh-fold", "linen_spray"),
 ];
 
+describe("shop PLP — default order follows display_order (Vol I.1 → I.4, never reversed)", () => {
+  const air = (slug: string, order: number, createdAt: string): ShopProductInput => ({
+    id: slug, slug, name: slug, price: 599, sale_price: null, product_type: "room_spray",
+    is_hero: false, is_featured: false, created_at: createdAt, display_order: order,
+    collection: { slug: "the-everyday", name: "The Everyday", volume: "Vol. I" },
+    variants: [], product_images: [],
+  });
+  it("orders by display_order ascending in the default (featured) view", () => {
+    // Given newest-first would reverse them (open-window is oldest), display_order must win.
+    const catalog = [
+      air("after-lights", 4, "2026-04-01"),
+      air("fresh-fold", 3, "2026-03-01"),
+      air("slow-evening", 2, "2026-02-01"),
+      air("open-window", 1, "2026-01-01"),
+    ];
+    const slugs = buildShopPage(catalog, {}).cards.map((c) => c.slug);
+    expect(slugs).toEqual(["open-window", "slow-evening", "fresh-fold", "after-lights"]);
+  });
+  it("falls back to oldest-first (not newest-first) when display_order ties", () => {
+    const catalog = [
+      air("d", 0, "2026-04-01"), air("c", 0, "2026-03-01"), air("b", 0, "2026-02-01"), air("a", 0, "2026-01-01"),
+    ];
+    expect(buildShopPage(catalog, {}).cards.map((c) => c.slug)).toEqual(["a", "b", "c", "d"]);
+  });
+});
+
 describe("shop PLP — 'From' price uses the lowest variant (not the base price)", () => {
   const priced = (slug: string, type: "candle" | "room_spray" | "linen_spray", base: number, variantPrices: number[]): ShopProductInput => ({
     id: slug, slug, name: slug, price: base, sale_price: null, product_type: type,
