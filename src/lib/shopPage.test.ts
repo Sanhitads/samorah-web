@@ -31,6 +31,34 @@ const CATALOG: ShopProductInput[] = [
   spray("fresh-fold", "linen_spray"),
 ];
 
+describe("shop PLP — 'From' price uses the lowest variant (not the base price)", () => {
+  const priced = (slug: string, type: "candle" | "room_spray" | "linen_spray", base: number, variantPrices: number[]): ShopProductInput => ({
+    id: slug, slug, name: slug, price: base, sale_price: null, product_type: type,
+    collection: { slug: "c", name: "C", volume: "Vol. I" },
+    variants: variantPrices.map((price) => ({ vessel_type: "glass", is_active: true, price, sale_price: null })),
+    product_images: [],
+  });
+  const cardFor = (p: ShopProductInput) => buildShopPage([p], {}).cards.find((c) => c.slug === p.slug);
+
+  it("candle card shows the 100g (cheapest active variant), not ₹899", () => {
+    expect(cardFor(priced("wf", "candle", 899, [899, 580, 720]))?.priceLabel).toBe("From ₹580");
+  });
+  it("Room Freshener card is variant-derived too", () => {
+    expect(cardFor(priced("rf", "room_spray", 650, [650, 420]))?.priceLabel).toBe("From ₹420");
+  });
+  it("Linen Freshener card is variant-derived too", () => {
+    expect(cardFor(priced("lf", "linen_spray", 700, [700, 480]))?.priceLabel).toBe("From ₹480");
+  });
+  it("a product with no priced variants falls back to its own price", () => {
+    expect(cardFor(priced("x", "candle", 599, []))?.priceLabel).toBe("From ₹599");
+  });
+  it("a sale price on a variant wins for that variant", () => {
+    const p = priced("s", "candle", 899, [899]);
+    p.variants![0].sale_price = 499;
+    expect(cardFor(p)?.priceLabel).toBe("From ₹499");
+  });
+});
+
 describe("shop PLP — type × chapter × vessel filters", () => {
   it("All — every published type shows (candles + sprays)", () => {
     const v = buildShopPage(CATALOG, {});

@@ -17,7 +17,7 @@ export async function getEditionMap(): Promise<Map<string, ProductEdition>> {
   const { data, error } = await db
     .from("collections")
     .select(
-      "name, volume, hero_product_id, products:products!products_collection_id_fkey(id, slug, is_hero, created_at)",
+      "name, volume, hero_product_id, products:products!products_collection_id_fkey(id, slug, is_hero, created_at, chapter_position)",
     );
   if (error) throw error;
 
@@ -26,7 +26,7 @@ export async function getEditionMap(): Promise<Map<string, ProductEdition>> {
     name: string;
     volume: string | null;
     hero_product_id: string | null;
-    products: { id: string; slug: string; is_hero: boolean | null; created_at: string | null }[] | null;
+    products: { id: string; slug: string; is_hero: boolean | null; created_at: string | null; chapter_position: string | null }[] | null;
   }[]) {
     const prods = c.products ?? [];
     const heroId = c.hero_product_id ?? prods.find((p) => p.is_hero)?.id ?? prods[0]?.id;
@@ -35,7 +35,13 @@ export async function getEditionMap(): Promise<Map<string, ProductEdition>> {
       .sort((a, b) => (a.created_at ?? "").localeCompare(b.created_at ?? ""));
     const ordered = [...prods.filter((p) => p.id === heroId), ...rest];
     const chapterLabel = c.volume ? `${c.volume} — ${c.name}` : c.name;
-    ordered.forEach((p, i) => map.set(p.slug, { edition: editionLabel(c.volume, i + 1), chapterLabel }));
+    // The admin's stored chapter_position IS the edition number ("renders No. 2"); fall back to the
+    // positional index only when a product has none, so numbering matches the editor everywhere.
+    ordered.forEach((p, i) => {
+      const pos = Number(p.chapter_position);
+      const n = Number.isFinite(pos) && pos > 0 ? pos : i + 1;
+      map.set(p.slug, { edition: editionLabel(c.volume, n), chapterLabel });
+    });
   }
   return map;
 }
@@ -64,7 +70,7 @@ export async function getCollectionBySlug(slug: string) {
   const { data, error } = await db
     .from("collections")
     .select(
-      "*, products:products!products_collection_id_fkey(id, slug, name, tagline, scent_group, fragrance_family, price, sale_price, is_hero, is_featured, created_at, product_type, air_content, pdp_content, variants(price, sale_price, is_active), product_images(url, alt_text, is_primary)), hero:products!collections_hero_product_id_fkey(id, slug, name, tagline)",
+      "*, products:products!products_collection_id_fkey(id, slug, name, tagline, scent_group, fragrance_family, price, sale_price, is_hero, is_featured, created_at, chapter_position, product_type, air_content, pdp_content, variants(price, sale_price, is_active), product_images(url, alt_text, is_primary)), hero:products!collections_hero_product_id_fkey(id, slug, name, tagline)",
     )
     .eq("slug", slug)
     .maybeSingle();

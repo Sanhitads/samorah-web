@@ -5,7 +5,7 @@
  * (no I/O); structural input types keep it decoupled from the generated DB Row
  * types. Honors the commerce boundary — cards carry a ProductCommerceProjection.
  */
-import { effectivePrice, formatPrice, type Priceable } from "@/lib/pricing";
+import { formatINR, fromVariantPrice, type Priceable } from "@/lib/pricing";
 import { primaryImage, type ImageLike } from "@/lib/product";
 import { toProjection } from "@/lib/chapterPage";
 import type { ProductCardModel } from "@/components/ui/ProductCard";
@@ -43,6 +43,8 @@ const VESSEL_TYPES = new Set(["all", "candle"]);
 export interface ShopVariantLike {
   vessel_type: string | null;
   is_active: boolean;
+  price?: number | null;
+  sale_price?: number | null;
 }
 
 export interface ShopProductInput extends Priceable {
@@ -199,9 +201,9 @@ function sortProducts(list: ShopProductInput[], sort: ShopSort): ShopProductInpu
     case "newest":
       return out.sort(byNewest);
     case "price-asc":
-      return out.sort((a, b) => effectivePrice(a) - effectivePrice(b));
+      return out.sort((a, b) => fromVariantPrice(a) - fromVariantPrice(b));
     case "price-desc":
-      return out.sort((a, b) => effectivePrice(b) - effectivePrice(a));
+      return out.sort((a, b) => fromVariantPrice(b) - fromVariantPrice(a));
     case "featured":
     default:
       return out.sort((a, b) => {
@@ -231,7 +233,8 @@ function toCard(p: ShopProductInput, editions?: ReadonlyMap<string, { edition: s
     // mixed Shop listing reads clearly (candles omit it; their chapter suffices).
     productTypeLabel:
       type === "room_spray" || type === "linen_spray" ? PRODUCT_TYPE_LABEL[type] : undefined,
-    priceLabel: formatPrice(p).current,
+    // "From" = the lowest active variant (the smallest size, e.g. 100g / 100ml), not the base price.
+    priceLabel: `From ${formatINR(fromVariantPrice(p))}`,
     cta: { label: "View", href: `/shop/${p.slug}` },
   };
 }

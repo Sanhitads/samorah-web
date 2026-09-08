@@ -43,6 +43,7 @@ export interface ChapterProductInput extends Priceable {
   is_hero?: boolean | null;
   is_featured?: boolean | null;
   created_at?: string | null;
+  chapter_position?: string | null; // the admin's edition number ("2" → NO. III.2); else positional fallback
   /** "Core Collection" | "Limited Collection" | "Seasonal" | … (defaults to Core). */
   collection_type?: string | null;
   product_images?: ImageLike[] | null;
@@ -579,9 +580,14 @@ export function buildChapterPage(
     chapterContext,
     a11y: { headingLevel: 2, landmark: "region" },
   };
-  // Chapter numbering — hero is .1, supporting continue .2, .3, … (brand identity).
-  const featuredProduct = heroProduct ? toProductView(heroProduct, editionLabel(chapter.volume, 1)) : null;
-  const supportingViews = supporting.map((p, i) => toProductView(p, editionLabel(chapter.volume, i + 2)));
+  // Chapter numbering — the admin's stored chapter_position IS the edition number; else the positional
+  // fallback (hero .1, supporting .2, .3, …). Keeps the card numbers matching the editor everywhere.
+  const num = (p: ChapterProductInput, fallback: number) => {
+    const pos = Number(p.chapter_position);
+    return Number.isFinite(pos) && pos > 0 ? pos : fallback;
+  };
+  const featuredProduct = heroProduct ? toProductView(heroProduct, editionLabel(chapter.volume, num(heroProduct, 1))) : null;
+  const supportingViews = supporting.map((p, i) => toProductView(p, editionLabel(chapter.volume, num(p, i + 2))));
 
   const featured: ChapterFeaturedSettings = {
     eyebrow: L.signatureEyebrow || "The signature of this chapter",

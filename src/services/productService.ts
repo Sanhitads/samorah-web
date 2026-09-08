@@ -31,7 +31,7 @@ export async function getProducts(filter: ProductFilter = {}) {
 // Card fields + collection (chapter) + variants (vessels) + created_at —
 // everything the Shop PLP needs to show, filter (chapter × vessel), and sort.
 const SHOP_FIELDS =
-  "id, slug, name, tagline, scent_group, fragrance_family, price, sale_price, is_featured, is_hero, is_bestseller, is_new_arrival, product_type, created_at, mood_tags, collection:collections!products_collection_id_fkey(slug, name, volume), variants(vessel_type, is_active), product_images(url, alt_text, is_primary, sort_order)";
+  "id, slug, name, tagline, scent_group, fragrance_family, price, sale_price, is_featured, is_hero, is_bestseller, is_new_arrival, product_type, created_at, mood_tags, collection:collections!products_collection_id_fkey(slug, name, volume), variants(vessel_type, is_active, price, sale_price), product_images(url, alt_text, is_primary, sort_order)";
 
 /** Active products for the Shop PLP, with their chapter — filtered/sorted in the
  *  page builder (pure) so the query stays a simple "all active products" read. */
@@ -206,9 +206,11 @@ export async function getRelatedProducts(
 
   // 2) Fill the remaining slots with the same-family / same-collection algorithm, excluding the picks.
   async function runAlgo() {
-    let query = db.from("products").select(CARD_FIELDS).neq("id", product.id).limit(limit + picks.length);
+    let query = db.from("products").select(CARD_FIELDS).neq("id", product.id);
     if (product.fragrance_family) query = query.eq("fragrance_family", product.fragrance_family);
     else if (product.collection_id) query = query.eq("collection_id", product.collection_id);
+    // Follow the admin's chosen order (Continue-the-Chapter should read in display order), created_at as tiebreak.
+    query = query.order("display_order", { ascending: true }).order("created_at", { ascending: true }).limit(limit + picks.length);
     const { data, error } = await query;
     if (error) throw error;
     return data ?? [];
