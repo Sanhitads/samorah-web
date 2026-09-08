@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildCandleEditorial, applyCandleViewOverrides, type CandlePdpContent } from "@/lib/productEditorial";
+import { buildCandleEditorial, applyCandleViewOverrides, CANDLE_SECTION_POSITIONS, type CandlePdpContent } from "@/lib/productEditorial";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -77,6 +77,36 @@ describe("Mood within the theme — same-row in two places, each show/hide", () 
     // shown by Theme card only
     expect(themeCard({ themeMood: "X", hideThemeMoodTop: true }).sub).toBe("X");
     expect(applyCandleViewOverrides({ chapterName: "Vol. III — Mood Library", variants: [] } as any, { themeMood: "X", hideThemeMoodTop: true }).themeMood).toBeNull();
+  });
+});
+
+describe("custom section position — 'After Cultural Reference'", () => {
+  const orderOf = (secs: any[], id: string) => secs.find((s) => s.id === id)?.order as number;
+
+  it("the dropdown includes an 'After Cultural Reference' option", () => {
+    const opt = CANDLE_SECTION_POSITIONS.find((p) => p.value === "after-cultural");
+    expect(opt).toBeTruthy();
+    expect(opt!.label).toBe("After Cultural Reference");
+  });
+
+  it("does not remove or renumber any existing position", () => {
+    const byValue = Object.fromEntries(CANDLE_SECTION_POSITIONS.map((p) => [p.value, p.order]));
+    // every previously-existing option is still present with its original order
+    expect(byValue).toMatchObject({
+      top: 0.5, "after-story": 1.5, "after-journey": 2.5, "after-mood": 4.5, "after-craft": 5.5,
+      "after-artist": 8.5, "after-lifestyle": 9.5, "after-testimonials": 11.5, end: 14.5,
+    });
+  });
+
+  it("a custom section positioned 'after-cultural' orders AFTER Cultural Reference and BEFORE In Their Words", () => {
+    const content: CandlePdpContent = { customSections: [{ type: "quote", position: "after-cultural", body: "A note about the market." }] as any };
+    const secs = buildCandleEditorial({
+      view: makeView({ mood: { tags: [], persona: "P", story: "s", cultural: "Khari Baoli, Old Delhi", lifestyle: "L" } }),
+      artist: null as any, related: [], content,
+    });
+    const custom = orderOf(secs, "candle-custom-0");
+    expect(custom).toBeGreaterThan(orderOf(secs, "cultural"));   // after Cultural Reference (order 10)
+    expect(custom).toBeLessThan(orderOf(secs, "testimonials"));  // before In Their Words (order 11)
   });
 });
 

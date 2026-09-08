@@ -569,6 +569,7 @@ export const CANDLE_SECTION_POSITIONS: { value: string; label: string; order: nu
   { value: "after-craft", label: "After Craft & Composition", order: 5.5 },
   { value: "after-artist", label: "After The Artist", order: 8.5 },
   { value: "after-lifestyle", label: "After Living With It", order: 9.5 },
+  { value: "after-cultural", label: "After Cultural Reference", order: 10.5 },
   { value: "after-testimonials", label: "After In Their Words", order: 11.5 },
   { value: "end", label: "End — after Continue the Chapter", order: 14.5 },
 ];
