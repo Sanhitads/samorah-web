@@ -209,10 +209,17 @@
   margin-bottom: 28px;
 }
 .pdp--air #the-hour .estatement__body { max-width: 560px; margin-inline: auto; }
+/* The reason LEADS — a fuller italic line; the story reads clearly subordinate beneath it. */
+.pdp--air #the-hour .estatement__lead {
+  font-size: clamp(1.3rem, 2.7vw, 1.7rem);
+  line-height: 1.55;
+  color: var(--ink);
+  margin-bottom: 24px;
+}
 .pdp--air #the-hour .estatement__para {
   font-family: var(--font-serif);
-  font-size: clamp(1.15rem, 2.2vw, 1.4rem);
-  line-height: 1.75;
+  font-size: clamp(1.05rem, 2vw, 1.3rem);
+  line-height: 1.8;
   color: var(--ink-soft, var(--smoke));
 }
 .pdp--air #the-hour .estatement__para + .estatement__para { margin-top: 18px; }
@@ -226,16 +233,18 @@
 /* The Experience — larger, so it doesn't disappear between sections */
 .pdp--air #experience { padding-top: clamp(96px, 12vw, 152px); }
 .pdp--air #experience .estatement__body { max-width: 640px; margin-inline: auto; }
+/* Match the body rhythm elsewhere on the page (was oversized + uneven per sentence-line). */
 .pdp--air #experience .estatement__para {
   font-family: var(--font-serif);
-  font-size: clamp(1.35rem, 3vw, 2rem);
-  line-height: 1.75;
-  color: var(--ink);
+  font-size: clamp(1.1rem, 2.1vw, 1.35rem);
+  line-height: 1.8;
+  color: var(--ink-soft, var(--smoke));
 }
-.pdp--air #experience .estatement__para + .estatement__para { margin-top: 20px; }
+.pdp--air #experience .estatement__para + .estatement__para { margin-top: 18px; }
 
+/* Signature — the same scale as the candle PDP's editorial quote (no bespoke enlargement). */
 .pdp--air #signature .equote__quote {
-  font-size: clamp(2rem, 5vw, 3.4rem);
+  font-size: clamp(1.7rem, 4vw, 2.8rem);
 }
 
 /* Hero name — a touch more presence (~5%) */
@@ -296,6 +305,15 @@
   color: var(--ink-soft, var(--smoke));
 }
 .estatement__para + .estatement__para { margin-top: 16px; }
+/* Optional lead line — reads as distinct from the body paragraphs (a fuller, italic serif). */
+.estatement__lead {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: clamp(1.15rem, 2.4vw, 1.5rem);
+  line-height: 1.5;
+  color: var(--ink);
+}
+.estatement__lead + .estatement__para { margin-top: 22px; }
 
 /* ── FragrancePyramid ── */
 .pyramid__head {

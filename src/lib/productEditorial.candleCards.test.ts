@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildCandleEditorial, applyCandleViewOverrides, CANDLE_SECTION_POSITIONS, type CandlePdpContent } from "@/lib/productEditorial";
+import { buildCandleEditorial, buildAirEditorial, applyCandleViewOverrides, CANDLE_SECTION_POSITIONS, type CandlePdpContent } from "@/lib/productEditorial";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -132,6 +132,33 @@ describe("character grid — duplicate labels are allowed (no key collision)", (
       artist: null as any, related: [], content: { moodCard1Label: "Mood", moodCard1Value: "Loved & Romantic" },
     }));
     expect(cards.filter((c) => c.label === "Mood")).toHaveLength(2); // rendered with index-based keys, no collision
+  });
+});
+
+describe("Air PDP — The Hour reason vs story are distinct sections", () => {
+  const air = (hour: Record<string, unknown>) =>
+    buildAirEditorial({ hour: { feels: [], scent: [], placement: [], experience: "", signature: "", ...hour } as any, volume: { title: "The Everyday", slug: "the-everyday", volume: "Vol. I" } as any, others: [] });
+  const theHour = (hour: Record<string, unknown>) => air(hour).find((s) => s.id === "the-hour");
+
+  it("puts the short reason in `lead` and the story paragraphs in `body` (so they read differently)", () => {
+    const s = theHour({ time: "07:10", hourReason: "The bed is made and the day hasn't started.", hourStory: "At 07:10, the house is getting going.\n\nThe bed has clean sheets." });
+    expect((s!.settings as any).lead).toBe("The bed is made and the day hasn't started.");
+    expect((s!.settings as any).body).toEqual(["At 07:10, the house is getting going.", "The bed has clean sheets."]);
+  });
+
+  it("shows the section with just the reason (story empty) — lead present, body empty", () => {
+    const s = theHour({ time: "07:10", hourReason: "Just the reason.", hourStory: "" });
+    expect(s!.visibility).toBe(true);
+    expect((s!.settings as any).lead).toBe("Just the reason.");
+    expect((s!.settings as any).body).toEqual([]);
+  });
+
+  it("Experience keeps sentence-per-line; Signature is a handwritten quote", () => {
+    const secs = air({ time: "07:10", experience: "A room settles. Light softens. Rest arrives.", signature: "Rest well." });
+    expect((secs.find((s) => s.id === "experience")!.settings as any).body).toEqual(["A room settles.", "Light softens.", "Rest arrives."]);
+    const sig = secs.find((s) => s.id === "signature")!.settings as any;
+    expect(sig.quote).toBe("Rest well.");
+    expect(sig.variant).toBe("handwritten");
   });
 });
 

@@ -28,7 +28,7 @@ function withBreaks(text: string) {
 export function EditorialStatement({ settings, context }: SectionComponentProps) {
   const s = settings as unknown as EditorialStatementSettings;
   const reduce = useReducedMotion();
-  if (!s.body?.length) return null;
+  if (!s.body?.length && !s.lead) return null;
   const withMedia = Boolean(s.media?.src) && s.align !== "none";
 
   const container: Variants = {
@@ -54,7 +54,8 @@ export function EditorialStatement({ settings, context }: SectionComponentProps)
       >
         {s.eyebrow ? <motion.p className="estatement__eyebrow" variants={item}>{s.eyebrow}</motion.p> : null}
         {s.heading ? <motion.h2 className="estatement__heading" variants={item}>{s.heading}</motion.h2> : null}
-        {s.body.map((p, i) => (
+        {s.lead ? <motion.p className="estatement__lead" variants={item}>{withBreaks(s.lead)}</motion.p> : null}
+        {(s.body ?? []).map((p, i) => (
           <motion.p key={i} className="estatement__para" variants={item}>{withBreaks(p)}</motion.p>
         ))}
       </motion.div>

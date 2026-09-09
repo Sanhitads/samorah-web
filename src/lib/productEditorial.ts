@@ -24,6 +24,7 @@ export type EditorialAlign = "image-left" | "image-right" | "none";
 export interface EditorialStatementSettings {
   eyebrow: string;
   heading?: string;
+  lead?: string; // an optional lead line, rendered distinct from the body (e.g. The Hour's short reason)
   body: string[];
   media?: MediaContent;
   align: EditorialAlign;
@@ -607,11 +608,10 @@ export function buildAirEditorial({ hour, volume, others, freeShippingThresholdI
   // Every heading/eyebrow can be overridden per product (labels); a blank falls back to the house
   // default, so nothing on the air PDP is truly hard-coded — it is all editable in the admin.
   const L = hour.labels ?? {};
-  // The Hour — the short reason leads, the long story follows. Both render when both are filled
-  // (the reason is no longer hidden behind the story), so every field the admin types is visible.
-  const hourBody = [hour.hourReason, ...(hour.hourStory ? hour.hourStory.split(/\n{2,}/) : [])]
-    .map((t) => t.trim())
-    .filter(Boolean);
+  // The Hour — the short reason LEADS (its own distinct treatment), the long story follows as body,
+  // so the two read as clearly different things and every field the admin types is visible.
+  const hourLead = hour.hourReason?.trim() || "";
+  const hourStoryParas = (hour.hourStory ? hour.hourStory.split(/\n{2,}/) : []).map((t) => t.trim()).filter(Boolean);
   // Details accordion — admin-defined rows when present (rename / reorder / add / remove),
   // otherwise the house defaults (Composition + Shipping).
   const accordionItems = hour.accordion?.length ? hour.accordion : airAccordion(hour.productDetails, freeShippingThresholdInr);
@@ -620,9 +620,10 @@ export function buildAirEditorial({ hour, volume, others, freeShippingThresholdI
     fill("the-hour", {
       eyebrow: L.hourEyebrow || "The Hour",
       heading: hour.time,
-      body: hourBody,
+      lead: hourLead || undefined,
+      body: hourStoryParas,
       align: "none",
-    } satisfies EditorialStatementSettings, { visibility: hourBody.length > 0 }),
+    } satisfies EditorialStatementSettings, { visibility: Boolean(hourLead) || hourStoryParas.length > 0 }),
     // Fragrance Journey — Opening / Heart / Lingering (the brand's perfumery
     // language; lighter under the air palette). "The Effect" as the lead line.
     fill("smells-like", {
