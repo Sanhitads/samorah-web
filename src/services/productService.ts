@@ -75,7 +75,7 @@ export async function getAirSiblings(collectionId: string, excludeProductId: str
   try {
     const { data } = await db
       .from("products")
-      .select("id, slug, name, tagline, price, air_content, product_type, display_order, product_images(url, is_primary, sort_order)")
+      .select("id, slug, name, tagline, price, air_content, chapter_position, product_type, display_order, product_images(url, is_primary, sort_order)")
       .eq("collection_id", collectionId)
       .in("product_type", AIR_PRODUCT_TYPES)
       .neq("id", excludeProductId)
@@ -122,7 +122,7 @@ export async function getAirVolumeData(slug: string) {
     if (!col) return null;
     const { data: products } = await db
       .from("products")
-      .select("id, slug, name, tagline, price, air_content, product_type, display_order, product_images(url, is_primary, sort_order)")
+      .select("id, slug, name, tagline, price, air_content, chapter_position, product_type, display_order, product_images(url, is_primary, sort_order)")
       .eq("collection_id", col.id)
       .in("product_type", AIR_PRODUCT_TYPES)
       .eq("status", "active")
@@ -152,7 +152,7 @@ export async function getAirChapterProducts(collectionId: string) {
     if (!col) return { products: [], nextCol: undefined };
     const { data: products } = await db
       .from("products")
-      .select("id, slug, name, tagline, price, air_content, product_type, display_order, product_images(url, is_primary, sort_order)")
+      .select("id, slug, name, tagline, price, air_content, chapter_position, product_type, display_order, product_images(url, is_primary, sort_order)")
       .eq("collection_id", collectionId)
       .in("product_type", AIR_PRODUCT_TYPES)
       .eq("status", "active")
