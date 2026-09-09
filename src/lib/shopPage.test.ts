@@ -31,6 +31,22 @@ const CATALOG: ShopProductInput[] = [
   spray("fresh-fold", "linen_spray"),
 ];
 
+describe("shop PLP — a 'Loved' (bestseller) product sorts up with featured", () => {
+  const p = (slug: string, order: number, extra: Partial<ShopProductInput> = {}): ShopProductInput => ({
+    id: slug, slug, name: slug, price: 599, sale_price: null, product_type: "room_spray",
+    is_hero: false, is_featured: false, is_bestseller: false, created_at: "2026-01-01", display_order: order,
+    collection: { slug: "e", name: "E", volume: "Vol. I" }, variants: [], product_images: [], ...extra,
+  });
+  it("ranks the Loved product first even when its display_order is last", () => {
+    const catalog = [p("a", 1), p("loved", 9, { is_bestseller: true }), p("b", 2)];
+    expect(buildShopPage(catalog, {}).cards.map((c) => c.slug)).toEqual(["loved", "a", "b"]);
+  });
+  it("hero still leads over a Loved product", () => {
+    const catalog = [p("loved", 1, { is_bestseller: true }), p("hero", 9, { is_hero: true })];
+    expect(buildShopPage(catalog, {}).cards.map((c) => c.slug)).toEqual(["hero", "loved"]);
+  });
+});
+
 describe("shop PLP — default order follows display_order (Vol I.1 → I.4, never reversed)", () => {
   const air = (slug: string, order: number, createdAt: string): ShopProductInput => ({
     id: slug, slug, name: slug, price: 599, sale_price: null, product_type: "room_spray",

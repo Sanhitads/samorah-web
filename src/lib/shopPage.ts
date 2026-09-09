@@ -58,6 +58,7 @@ export interface ShopProductInput extends Priceable {
   is_new_arrival?: boolean | null;
   created_at?: string | null;
   display_order?: number | null; // the admin's product order; the default listing follows it (ascending)
+  chapter_position?: string | null; // the admin's edition/volume number (air uses it for "VOL. I.n")
   /** Reserved for future product-type filtering; absent today → treated as candle. */
   product_type?: string | null;
   collection?: { slug: string; name: string; volume: string | null } | null;
@@ -213,7 +214,8 @@ function sortProducts(list: ShopProductInput[], sort: ShopSort): ShopProductInpu
     case "featured":
     default:
       return out.sort((a, b) => {
-        const rank = (p: ShopProductInput) => (p.is_hero ? 0 : p.is_featured ? 1 : 2);
+        // Hero first, then Featured / "Loved" (is_bestseller) — matching the card badge — then the rest.
+        const rank = (p: ShopProductInput) => (p.is_hero ? 0 : p.is_featured || p.is_bestseller ? 1 : 2);
         return rank(a) - rank(b) || byOrder(a, b);
       });
   }

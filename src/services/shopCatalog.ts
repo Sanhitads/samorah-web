@@ -1,6 +1,6 @@
 import { getShopProducts } from "@/services/productService";
 import { getEditionMap, type ProductEdition } from "@/services/collectionService";
-import { getAirVolumes, airEditionOf, airProductType } from "@/config/theHours";
+import { getAirVolumes, airEditionLabel, airProductType } from "@/config/theHours";
 import type { ShopProductInput } from "@/lib/shopPage";
 
 /**
@@ -16,14 +16,20 @@ export async function getShopCatalog(): Promise<{
 }> {
   const [candles, editions] = await Promise.all([getShopProducts(), getEditionMap()]);
 
+  // The admin's chapter_position drives the air "VOL. I.n" number when set (else the config position).
+  const airDbPosition = new Map<string, string>();
+  for (const c of candles as unknown as { slug: string; chapter_position?: string | null }[]) {
+    if (c.chapter_position) airDbPosition.set(c.slug, c.chapter_position);
+  }
+
   // Config gradient + edition per air hour — used to enrich DB air products (which have no photo yet)
-  // and to set the "NO. I.4" edition on their cards. Also the source for air volumes not yet in the DB.
+  // and to set the "VOL. I.n" edition on their cards. Also the source for air volumes not yet in the DB.
   const airGradient = new Map<string, string>();
   for (const volume of getAirVolumes()) {
     for (const group of volume.groups) {
       for (const h of group.hours) {
         airGradient.set(h.productSlug, h.gradient);
-        editions.set(h.productSlug, { edition: airEditionOf(volume, h.productSlug), chapterLabel: `The Hours · ${volume.title}` });
+        editions.set(h.productSlug, { edition: airEditionLabel(volume, airDbPosition.get(h.productSlug), h.productSlug), chapterLabel: `The Hours · ${volume.title}` });
       }
     }
   }

@@ -8,7 +8,7 @@ import type { SectionInstance } from "@/platform/section";
 import { composeSections } from "@/platform/template";
 import { CANDLE_PDP_TEMPLATE, AIR_PDP_TEMPLATE } from "@/platform/coreTemplates";
 import type { ProductPageView } from "@/lib/productPage";
-import { airEditionOf, AIR_SECTION_POSITIONS, type AirVolume, type HourEntry, type CustomSection } from "@/config/theHours";
+import { airEditionLabel, AIR_SECTION_POSITIONS, type AirVolume, type HourEntry, type CustomSection } from "@/config/theHours";
 import { getArtist, type Artist } from "@/config/artist";
 import { getTestimonials } from "@/config/testimonials";
 import type { ProductCardModel } from "@/components/ui/ProductCard";
@@ -523,7 +523,7 @@ function toHourCard(h: HourEntry, volume: AirVolume): ProductCardModel {
     slug: h.productSlug,
     name: h.name,
     tagline: h.feels[0] ?? h.scent.join(" · "),
-    edition: airEditionOf(volume, h.productSlug), // "VOL. I.3"
+    edition: airEditionLabel(volume, h.chapterPosition, h.productSlug), // "VOL. I.3" — admin position when set
     media: imageMedia(h.gradient, h.name, "portrait"),
     priceLabel: h.priceLabel,
     commerce: { priceRange: { min: h.price, max: h.price, display: h.priceLabel } },

@@ -7,7 +7,7 @@
 import type { Page } from "@/platform/page";
 import type { SectionInstance } from "@/platform/section";
 import type { SeoMeta } from "@/platform/content";
-import { airEditionOf, type AirVolume, type HourGroup, type HourGroupKind } from "@/config/theHours";
+import { airEditionLabel, type AirVolume, type HourGroup, type HourGroupKind } from "@/config/theHours";
 import type { ChapterHeroSettings } from "@/lib/chapterPage";
 import {
   imageMedia,
@@ -64,7 +64,7 @@ function toHourBlock(
 ): HourBlockView {
   return {
     hourLabel: `HOUR ${h.time}`,
-    edition: airEditionOf(volume, h.productSlug),
+    edition: airEditionLabel(volume, h.chapterPosition, h.productSlug),
     moment: h.moment,
     name: h.name,
     category: categoryOf(kind),

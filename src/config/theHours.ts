@@ -275,6 +275,14 @@ export function airEditionOf(volume: AirVolume, productSlug: string): string {
   return `${volume.volume.replace(/volume/i, "Vol.").toUpperCase()}.${Math.max(0, idx) + 1}`;
 }
 
+/** Air edition label honouring the admin's chapter position when set (e.g. "1.4" → "VOL. I.4"),
+ *  falling back to the config position. Mirrors the air PDP hero so every air surface agrees. */
+export function airEditionLabel(volume: AirVolume, chapterPosition: string | null | undefined, productSlug: string): string {
+  const seq = chapterPosition?.split(".").pop()?.trim();
+  if (seq) return `${volume.volume.replace(/volume/i, "Vol.").toUpperCase()}.${seq}`;
+  return airEditionOf(volume, productSlug);
+}
+
 /** The product-type key for an Hour's group (room → room_spray, linen → linen_spray). */
 export function airProductType(kind: HourGroupKind): "room_spray" | "linen_spray" {
   return kind === "room" ? "room_spray" : "linen_spray";
