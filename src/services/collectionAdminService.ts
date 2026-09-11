@@ -144,9 +144,20 @@ export async function updateCollection(id: string, input: CollectionInput, actor
   const db = loose();
   const row = collectionRow(input);
   let { error } = await db.from("collections").update(row).eq("id", id);
-  if (error && /could not find|does not exist|schema cache|PGRST204/i.test(error.message)) {
-    const safe = { ...row }; for (const c of CMS_COLUMNS) delete safe[c];
-    ({ error } = await db.from("collections").update(safe).eq("id", id));
+  // Some CMS columns are added by later migrations that may not be applied yet in a given
+  // environment. When one is missing PostgREST rejects the whole update — but we must strip
+  // ONLY the offending column and retry, never blanket-drop every CMS column (that silently
+  // loses unrelated editorial content like chapter_content / intro on every save). The error
+  // names the missing column; if it doesn't, we remove one candidate at a time so the retry
+  // still converges. The guard caps iterations at the number of strippable columns.
+  let guard = 0;
+  while (error && /could not find|does not exist|schema cache|PGRST204/i.test(error.message) && guard < CMS_COLUMNS.length) {
+    const named = CMS_COLUMNS.find((c) => c in row && error!.message.includes(c));
+    const key = named ?? CMS_COLUMNS.find((c) => c in row);
+    if (!key) break; // no strippable CMS column left → surface the real error
+    delete row[key];
+    guard++;
+    ({ error } = await db.from("collections").update(row).eq("id", id));
   }
   if (error) return { ok: false, reason: /duplicate|unique/i.test(error.message) ? "slug already exists" : error.message };
   await logEvent({ entityType: "collection", entityId: id, event: "collection.updated", actorType: actorId ? "staff" : "system", actorId, notes: input.name });
