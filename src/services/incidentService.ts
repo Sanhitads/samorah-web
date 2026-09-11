@@ -7,6 +7,7 @@
  */
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail, emailConfigured } from "@/lib/email";
+import { canonicalOrigin } from "@/config/site";
 import { notifyOps } from "@/lib/notifications/opsEngine";
 import type { OpsPayload } from "@/lib/notifications/opsTypes";
 import type { OpsChannelKey, OpsEvent } from "@/config/notifications";
@@ -117,7 +118,7 @@ async function emitIncidentOpened(number: string, category: string, rootCauseSys
   };
   const opsEvent = EVENT_FOR[category];
   if (!opsEvent) return;
-  const base = process.env.NEXT_PUBLIC_SITE_URL || "";
+  const base = canonicalOrigin();
   try {
     await notifyOps(opsEvent, {
       title: `${INCIDENT_CATEGORY_LABEL[category as IncidentCategory] ?? category} incident opened`,
@@ -804,7 +805,7 @@ async function dispatchEscalation(inc: any, level: { notify: "manager" | "admin"
   // Real multi-channel dispatch through the operational notification engine. The escalation
   // policy's channels (in_app/email/slack/sms) map 1:1 to ops channel keys. SMS only fires when the
   // incident severity is critical (the SMS channel enforces this), keeping SMS for true emergencies.
-  const base = process.env.NEXT_PUBLIC_SITE_URL || "";
+  const base = canonicalOrigin();
   const emails = level.channels.includes("email") ? (await recipientsForRole(level.notify)).map((r) => r.email) : undefined;
   const payload: OpsPayload = {
     title: `Incident ${inc.number} escalated (L${(inc.escalation_level ?? 0)})`,

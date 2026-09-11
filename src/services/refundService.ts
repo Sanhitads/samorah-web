@@ -15,6 +15,7 @@
  */
 import { callRpc } from "@/lib/supabase/rpc";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { canonicalOrigin } from "@/config/site";
 import { createRazorpayRefund } from "@/lib/razorpayApi";
 import { logEvent } from "@/services/auditService";
 import { toPaise } from "@/lib/money";
@@ -137,7 +138,7 @@ export async function issueRefund(input: IssueRefundInput): Promise<IssueRefundR
     });
     // Operational alert — best-effort; must never affect the refund outcome returned to the caller.
     try {
-      const base = process.env.NEXT_PUBLIC_SITE_URL || "";
+      const base = canonicalOrigin();
       await notifyOps("refund.failed", {
         title: "Refund Failed",
         message: "A gateway refund failed and needs review.",

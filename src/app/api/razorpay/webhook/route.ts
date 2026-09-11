@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { RAZORPAY } from "@/config/commerce";
+import { canonicalOrigin } from "@/config/site";
 import { verifyWebhookSignature } from "@/lib/razorpaySignature";
 import { persistOrder, recordPaymentAttempt } from "@/services/orderService";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -13,7 +14,7 @@ async function emitOrderPlaced(razorpayOrderId: string): Promise<void> {
   const { data: o } = await db.from("orders").select("order_number,ship_full_name,email,total_amount,payment_status,is_cod").eq("razorpay_order_id", razorpayOrderId).maybeSingle();
   if (!o) return;
   const amount = Number(o.total_amount ?? 0);
-  const base = process.env.NEXT_PUBLIC_SITE_URL || "";
+  const base = canonicalOrigin();
   const highValue = amount >= HIGH_VALUE_ORDER_INR;
   await notifyOps(highValue ? "order.high_value" : "order.placed", {
     title: highValue ? "High-Value Order" : "New Order",
@@ -152,7 +153,7 @@ export async function POST(request: Request) {
 
 /** Order finalization failed despite a captured payment — money moved, the order didn't. */
 async function emitOrderFailed(razorpayOrderId: string, reason: string): Promise<void> {
-  const base = process.env.NEXT_PUBLIC_SITE_URL || "";
+  const base = canonicalOrigin();
   await notifyOps("order.failed", {
     title: "Order Failed After Payment",
     message: "A payment was captured but the order could not be finalized — needs review now.",
@@ -164,7 +165,7 @@ async function emitOrderFailed(razorpayOrderId: string, reason: string): Promise
 
 /** Webhook processing threw — the authoritative path is broken. */
 async function emitWebhookFailed(eventType: string, razorpayOrderId: string | undefined, reason: string): Promise<void> {
-  const base = process.env.NEXT_PUBLIC_SITE_URL || "";
+  const base = canonicalOrigin();
   await notifyOps("webhook.failed", {
     title: "Razorpay Webhook Failed",
     message: "Webhook processing threw — Razorpay will retry, but the order may be unfinalized.",

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { cronAuthorized } from "@/lib/cronAuth";
+import { canonicalOrigin } from "@/config/site";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyOps } from "@/lib/notifications/opsEngine";
 
@@ -23,7 +24,7 @@ export async function POST(request: Request) {
     const low = ((data ?? []) as any[]).filter((v) => Number(v.stock) <= Number(v.low_stock_threshold ?? 0)); // eslint-disable-line @typescript-eslint/no-explicit-any
     if (!low.length) return NextResponse.json({ ok: true, lowStock: 0, alerted: 0 });
 
-    const base = process.env.NEXT_PUBLIC_SITE_URL || "";
+    const base = canonicalOrigin();
     let alerted = 0, suppressed = 0;
     for (const v of low) {
       const out = Number(v.stock) <= 0;

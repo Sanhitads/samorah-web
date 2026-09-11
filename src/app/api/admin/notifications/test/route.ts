@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireStaff } from "@/lib/auth/requireStaff";
+import { canonicalOrigin } from "@/config/site";
 import { notifyOps } from "@/lib/notifications/opsEngine";
 import { TEST_PRESETS, type OpsChannelKey } from "@/config/notifications";
 import type { OpsPayload } from "@/lib/notifications/opsTypes";
@@ -12,7 +13,7 @@ import type { OpsPayload } from "@/lib/notifications/opsTypes";
  */
 export const runtime = "nodejs";
 
-const base = () => process.env.NEXT_PUBLIC_SITE_URL || "";
+const base = () => canonicalOrigin();
 
 /** Real-shaped payloads matching each event's production formatting. */
 const PRESET_PAYLOAD: Record<string, OpsPayload> = {

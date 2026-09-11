@@ -12,6 +12,7 @@
  */
 import { createAdminClient } from "@/lib/supabase/admin";
 import { callRpc } from "@/lib/supabase/rpc";
+import { canonicalOrigin } from "@/config/site";
 import { toRupees } from "@/lib/money";
 import { COMMERCE } from "@/config/commerce";
 import { validateRazorpayPayment } from "@/lib/razorpayApi";
@@ -268,7 +269,7 @@ export async function recordPaymentAttempt(a: {
   // finalization. Dedup collapses a burst of these into one Slack post with a counter.
   if (a.status === "failed") {
     try {
-      const base = process.env.NEXT_PUBLIC_SITE_URL || "";
+      const base = canonicalOrigin();
       await notifyOps("payment.failed", {
         title: "Payment Failure",
         message: "A payment could not be captured and needs review.",
