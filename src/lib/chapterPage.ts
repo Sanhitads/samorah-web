@@ -451,8 +451,21 @@ export function selectSupporting(
       list.sort((a, b) => effectivePrice(b) - effectivePrice(a));
       break;
     case "curated":
-    default:
-      break; // input order
+    default: {
+      // Cards are numbered by the admin's chapter_position (NO. III.2, III.3, …). Order the
+      // supporting set to MATCH that numbering so the sequence reads left-to-right instead of
+      // in the DB's arbitrary embed order. Products without a position keep their input order
+      // AFTER the numbered ones. (Fixes the reversed "Also in this chapter" ordering.)
+      const rank = (p: ChapterProductInput) => {
+        const pos = Number(p.chapter_position);
+        return Number.isFinite(pos) && pos > 0 ? pos : Number.POSITIVE_INFINITY;
+      };
+      list = list
+        .map((p, i) => ({ p, i }))
+        .sort((a, b) => rank(a.p) - rank(b.p) || a.i - b.i) // explicit index tiebreak = stable
+        .map((x) => x.p);
+      break;
+    }
   }
   if (rules.limit != null) list = list.slice(0, rules.limit);
   return list;
