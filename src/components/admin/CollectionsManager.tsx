@@ -117,7 +117,7 @@ export function CollectionsManager({ collections }: { collections: CollectionRow
 
 type CEdit = {
   name: string; slug: string; volume: string; tagline: string; poeticLine: string; description: string; intro: string; storyLong: string;
-  coverImageUrl: string; heroMobileUrl: string; heroProductId: string; seoTitle: string; seoDescription: string; seoOgImage: string;
+  coverImageUrl: string; heroMobileUrl: string; heroProductId: string; seoTitle: string; seoDescription: string; seoOgImage: string; seoCanonical: string;
   sortOrder: string; isActive: boolean; isComingSoon: boolean;
   // Air chapter CMS (Room / Linen sprays) — blanks use the house wording.
   airHeroEyebrow: string;
@@ -180,7 +180,7 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
     setC({
       name: sv(x.name), slug: sv(x.slug), volume: sv(x.volume), tagline: sv(x.tagline), poeticLine: sv(x.poetic_line), description: sv(x.description),
       intro: sv(x.intro), storyLong: sv(x.story_long), coverImageUrl: sv(x.cover_image_url), heroMobileUrl: sv(x.hero_mobile_url), heroProductId: sv(x.hero_product_id),
-      seoTitle: sv(x.seo_title), seoDescription: sv(x.seo_description), seoOgImage: sv(x.seo_og_image),
+      seoTitle: sv(x.seo_title), seoDescription: sv(x.seo_description), seoOgImage: sv(x.seo_og_image), seoCanonical: sv(x.seo_canonical),
       sortOrder: x.sort_order != null ? String(x.sort_order) : "0", isActive: Boolean(x.is_active), isComingSoon: Boolean(x.is_coming_soon),
       airHeroEyebrow: sv(ch.heroEyebrow),
       airRoomLabel: sv(ch.room?.label), airRoomTitle: sv(ch.room?.title), airRoomNote: sv(ch.room?.note),
@@ -492,6 +492,7 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
             <label className="cfg-field"><span>SEO title</span><input value={c.seoTitle} onChange={(e) => set({ seoTitle: e.target.value })} maxLength={70} /></label>
             <label className="cfg-field"><span>OG image URL</span><input value={c.seoOgImage} onChange={(e) => set({ seoOgImage: e.target.value })} /></label>
           </div>
+          <label className="cfg-field"><span>Canonical URL <em className="om-field__hint">blank = this page&rsquo;s own URL</em></span><input value={c.seoCanonical} onChange={(e) => set({ seoCanonical: e.target.value })} placeholder="https://samorahstudio.com/chapters/dessert-chapter" /></label>
           <label className="cfg-field"><span>Meta description</span><textarea value={c.seoDescription} onChange={(e) => set({ seoDescription: e.target.value })} rows={2} maxLength={200} /></label>
           <div className="pe-preview"><span className="pe-preview__title">{c.seoTitle || c.name}</span><span className="pe-preview__url">samorah.in/chapters/{c.slug}</span><span className="pe-preview__desc">{c.seoDescription || c.tagline || "—"}</span></div>
         </details>

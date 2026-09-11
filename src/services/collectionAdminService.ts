@@ -104,13 +104,13 @@ async function mergeProductAir(productId: string, patch: Record<string, unknown>
 export interface CollectionInput {
   name?: string; slug?: string; volume?: string; tagline?: string; poeticLine?: string; description?: string;
   intro?: string; storyLong?: string; coverImageUrl?: string; heroMobileUrl?: string; heroProductId?: string | null;
-  seoTitle?: string; seoDescription?: string; seoOgImage?: string; sortOrder?: number; isActive?: boolean; isComingSoon?: boolean;
+  seoTitle?: string; seoDescription?: string; seoOgImage?: string; seoCanonical?: string; sortOrder?: number; isActive?: boolean; isComingSoon?: boolean;
   airChapter?: Record<string, unknown> | null; // air chapter CMS config (group headings/notes, teaser, hero eyebrow, colours)
   chapterContent?: Record<string, unknown> | null; // candle chapter CMS extras (palette, gradient, section headings, poetic lines)
 }
 
 // Columns added by later CMS migrations — stripped on retry if the migration isn't applied yet.
-const CMS_COLUMNS = ["hero_mobile_url", "intro", "story_long", "seo_og_image", "air_chapter", "chapter_content"];
+const CMS_COLUMNS = ["hero_mobile_url", "intro", "story_long", "seo_og_image", "seo_canonical", "air_chapter", "chapter_content"];
 
 function collectionRow(i: CollectionInput): Record<string, unknown> {
   const r: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -119,7 +119,7 @@ function collectionRow(i: CollectionInput): Record<string, unknown> {
   if (i.slug !== undefined) r.slug = i.slug.trim();
   s("volume", i.volume); s("tagline", i.tagline); s("poetic_line", i.poeticLine); s("description", i.description);
   s("intro", i.intro); s("story_long", i.storyLong); s("cover_image_url", i.coverImageUrl); s("hero_mobile_url", i.heroMobileUrl);
-  s("seo_title", i.seoTitle); s("seo_description", i.seoDescription); s("seo_og_image", i.seoOgImage);
+  s("seo_title", i.seoTitle); s("seo_description", i.seoDescription); s("seo_og_image", i.seoOgImage); s("seo_canonical", i.seoCanonical);
   if (i.heroProductId !== undefined) r.hero_product_id = i.heroProductId || null;
   if (i.sortOrder !== undefined) r.sort_order = i.sortOrder;
   if (i.isActive !== undefined) r.is_active = i.isActive;

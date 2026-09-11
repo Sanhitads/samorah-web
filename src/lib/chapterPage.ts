@@ -90,6 +90,7 @@ export interface ChapterSeoInput {
 }
 
 export interface ChapterInput extends ChapterSummary {
+  seo_canonical?: string | null; // admin-set canonical URL for this chapter/collection page
   poetic_line?: string | null;
   description?: string | null;
   intro?: string | null; // the "Introduction" — renders as the opening intro line
@@ -502,7 +503,7 @@ function buildSeo(chapter: ChapterInput, title: string, description: string): Se
     title: `${title} · Samorah`,
     description: seo.summary ?? description,
     keywords: seo.keywords,
-    canonical: seo.canonical,
+    canonical: seo.canonical ?? (chapter.seo_canonical || undefined),
     ogImage: chapter.cover_image_url ?? undefined,
     twitterCard: "summary_large_image",
     structuredData: seo.faq?.length ? faqSchema(seo.faq) : undefined,
