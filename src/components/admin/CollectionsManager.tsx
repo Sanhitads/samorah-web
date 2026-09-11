@@ -6,6 +6,7 @@ import type { CollectionRow } from "@/services/collectionAdminService";
 import { LivePreviewPanel } from "@/components/admin/LivePreviewPanel";
 import type { CustomSection } from "@/config/theHours";
 import { CHAPTER_SECTION_POSITIONS } from "@/lib/chapterPage";
+import { SITE_CONFIG } from "@/config/site";
 
 /** Assemble the air_chapter config from the editor fields — used by BOTH save and the live preview. */
 // Assemble the chapter_content JSON from the flat candle-chapter fields — used by BOTH save and the
@@ -494,7 +495,7 @@ function CollectionEditor({ id, onClose, onSaved }: { id: string; onClose: () =>
           </div>
           <label className="cfg-field"><span>Canonical URL <em className="om-field__hint">blank = this page&rsquo;s own URL</em></span><input value={c.seoCanonical} onChange={(e) => set({ seoCanonical: e.target.value })} placeholder="https://samorahstudio.com/chapters/dessert-chapter" /></label>
           <label className="cfg-field"><span>Meta description</span><textarea value={c.seoDescription} onChange={(e) => set({ seoDescription: e.target.value })} rows={2} maxLength={200} /></label>
-          <div className="pe-preview"><span className="pe-preview__title">{c.seoTitle || c.name}</span><span className="pe-preview__url">samorah.in/chapters/{c.slug}</span><span className="pe-preview__desc">{c.seoDescription || c.tagline || "—"}</span></div>
+          <div className="pe-preview"><span className="pe-preview__title">{c.seoTitle || c.name}</span><span className="pe-preview__url">{SITE_CONFIG.primaryDomain}/chapters/{c.slug}</span><span className="pe-preview__desc">{c.seoDescription || c.tagline || "—"}</span></div>
         </details>
 
         <details className="pe-sec">

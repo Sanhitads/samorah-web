@@ -7,6 +7,7 @@ import { FocalPicker } from "@/components/admin/FocalPicker";
 import { buildVariantSavePayload } from "@/lib/inventory/variantSavePayload";
 import { AIR_ACCORDION_DEFAULTS, AIR_SECTION_POSITIONS, type CustomSection } from "@/config/theHours";
 import { CANDLE_SECTION_POSITIONS } from "@/lib/productEditorial";
+import { SITE_CONFIG } from "@/config/site";
 
 /** A textarea that grows to fit its content, so long editorial text (the Hour story, etc.) is fully
  *  visible while editing instead of scrolling inside a fixed box. */
@@ -791,7 +792,7 @@ export function ProductEditor({ productId, collections, categories, allProducts 
             <label className="cfg-field"><span>Canonical URL</span><input value={core.seoCanonical} onChange={(e) => set({ seoCanonical: e.target.value })} /></label>
           </div>
           <label className="cfg-field"><span>Meta description <em className="om-field__hint">{core.seoDescription.length}/160</em></span><textarea value={core.seoDescription} onChange={(e) => set({ seoDescription: e.target.value })} rows={2} maxLength={200} /></label>
-          <div className="pe-preview"><span className="pe-preview__title">{core.seoTitle || core.name}</span><span className="pe-preview__url">samorah.in/shop/{core.slug}</span><span className="pe-preview__desc">{core.seoDescription || core.tagline || "—"}</span></div>
+          <div className="pe-preview"><span className="pe-preview__title">{core.seoTitle || core.name}</span><span className="pe-preview__url">{SITE_CONFIG.primaryDomain}/shop/{core.slug}</span><span className="pe-preview__desc">{core.seoDescription || core.tagline || "—"}</span></div>
         </details>
 
         {(() => {
@@ -810,7 +811,7 @@ export function ProductEditor({ productId, collections, categories, allProducts 
                 <div className="seo-prev__card">
                   <span className="seo-prev__badge">Google</span>
                   <div className="seo-serp">
-                    <div className="seo-serp__crumbs">samorah.in <span>›</span> shop <span>›</span> {core.slug || "…"}</div>
+                    <div className="seo-serp__crumbs">{SITE_CONFIG.primaryDomain} <span>›</span> shop <span>›</span> {core.slug || "…"}</div>
                     <div className="seo-serp__title">{title}</div>
                     <div className="seo-serp__desc">{desc || "No description — add a meta description so the snippet reads well."}</div>
                   </div>
@@ -828,7 +829,7 @@ export function ProductEditor({ productId, collections, categories, allProducts 
                   <span className="seo-prev__badge">X · Twitter</span>
                   <div className="seo-tw">
                     {ogImage ? (/* eslint-disable-next-line @next/next/no-img-element */ <img src={ogImage} alt="" className="seo-tw__img" />) : <div className="seo-tw__img seo-tw__img--empty">No image</div>}
-                    <div className="seo-tw__body"><span className="seo-tw__title">{title}</span><span className="seo-tw__desc">{desc || "—"}</span><span className="seo-tw__domain">samorah.in</span></div>
+                    <div className="seo-tw__body"><span className="seo-tw__title">{title}</span><span className="seo-tw__desc">{desc || "—"}</span><span className="seo-tw__domain">{SITE_CONFIG.primaryDomain}</span></div>
                   </div>
                 </div>
               </div>
