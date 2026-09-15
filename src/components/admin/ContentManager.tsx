@@ -74,15 +74,28 @@ export function ContentManager({ pages, initialSlug, supportEmail, contact }: { 
   };
   const refresh = () => startTransition(() => router.refresh());
 
+  // Snapshot of the editor form as it was opened, so we can detect unsaved edits and never
+  // discard them on an accidental close (backdrop click / Cancel). Set whenever the editor opens.
+  const pristine = useRef<string | null>(null);
+  const openForm = (form: PageForm) => { pristine.current = JSON.stringify(form); setEdit(form); };
+  const isDirty = () => edit != null && pristine.current != null && JSON.stringify(edit) !== pristine.current;
+  /** Close the editor, guarding against silent loss of unsaved work. */
+  const requestCloseEdit = () => {
+    if (busy) return;
+    if (isDirty() && !window.confirm("You have unsaved changes to this page. Discard them and close the editor?")) return;
+    pristine.current = null;
+    setEdit(null);
+  };
+
   const open = async (slug: string) => {
     setErr("");
     const d = await post({ action: "get", slug });
     if (d?.page) {
       const p = d.page;
-      setEdit({ slug: p.slug, title: p.title, eyebrow: p.eyebrow ?? "", intro: p.intro ?? "", sections: p.sections ?? [], seo: p.seo ?? {}, status: p.status ?? "published", publishAt: toLocal(p.publishAt), unpublishAt: toLocal(p.unpublishAt), form: p.form ?? {} });
+      openForm({ slug: p.slug, title: p.title, eyebrow: p.eyebrow ?? "", intro: p.intro ?? "", sections: p.sections ?? [], seo: p.seo ?? {}, status: p.status ?? "published", publishAt: toLocal(p.publishAt), unpublishAt: toLocal(p.unpublishAt), form: p.form ?? {} });
     }
   };
-  const newPage = () => { setErr(""); setEdit({ slug: "", title: "", eyebrow: "", intro: "", sections: [{ heading: "", body: [""] }], seo: {}, status: "published", publishAt: "", unpublishAt: "", form: {} }); };
+  const newPage = () => { setErr(""); openForm({ slug: "", title: "", eyebrow: "", intro: "", sections: [{ heading: "", body: [""] }], seo: {}, status: "published", publishAt: "", unpublishAt: "", form: {} }); };
   const save = async () => {
     if (!edit) return;
     const page = {
@@ -107,7 +120,7 @@ export function ContentManager({ pages, initialSlug, supportEmail, contact }: { 
       seo: edit.seo, status: edit.status, publishAt: fromLocal(edit.publishAt), unpublishAt: fromLocal(edit.unpublishAt),
       form: edit.form,
     };
-    if (await post({ action: "save", page })) { setEdit(null); refresh(); }
+    if (await post({ action: "save", page })) { pristine.current = null; setEdit(null); refresh(); }
   };
   const del = async (slug: string) => { if (await post({ action: "delete", slug })) refresh(); };
   const openRevs = async (slug: string) => { const d = await post({ action: "revisions", slug }); if (d?.revisions) setRevs({ slug, list: d.revisions }); };
@@ -303,7 +316,7 @@ export function ContentManager({ pages, initialSlug, supportEmail, contact }: { 
       </table>
 
       {edit ? (
-        <div className="om-modal" role="dialog" aria-modal="true" onClick={() => !busy && setEdit(null)}>
+        <div className="om-modal" role="dialog" aria-modal="true" onClick={requestCloseEdit}>
           <div className="om-modal__card om-modal__card--wide cms-edit-card" onClick={(e) => e.stopPropagation()}>
             <h2 className="om-modal__title">{edit.slug ? `Edit /${edit.slug}` : "New page"}</h2>
             <div className="cms-edit">
@@ -562,7 +575,7 @@ export function ContentManager({ pages, initialSlug, supportEmail, contact }: { 
 
             {err ? <p className="ff-err">{err}</p> : null}
             <div className="om-modal__actions">
-              <button type="button" className="ff-btn" disabled={busy} onClick={() => setEdit(null)}>Cancel</button>
+              <button type="button" className="ff-btn" disabled={busy} onClick={requestCloseEdit}>Cancel</button>
               <button type="button" className="ff-btn" disabled={!edit.slug.trim()} onClick={() => window.open(`/${edit.slug.trim()}`, "_blank", "noopener")}>Open live ↗</button>
               <button type="button" className="ff-btn ff-btn--primary" disabled={busy || !edit.slug.trim() || !edit.title.trim() || (edit.status === "scheduled" && !edit.publishAt)} onClick={save}>{busy ? "Saving…" : "Save page"}</button>
             </div>
