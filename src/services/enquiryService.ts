@@ -3,12 +3,18 @@
  * Customer-enquiry service — stores messages from the /contact form and powers the admin
  * "Customer Enquiries" module (list · detail · status workflow · assignment · internal notes).
  * Mirrors returnService: service-role reads/writes, a typed status machine, an events timeline,
- * and audit logging. NO outbound email (reply-by-email is a future phase) — enquiries are stored.
+ * and audit logging. A new enquiry is STORED (authoritative), raises an in-app notification, AND
+ * — best-effort, never blocking the save — emails the business support inbox with Reply-To set to
+ * the customer so staff can respond directly. Staff-to-customer reply threads remain a future phase.
  */
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logEvent } from "@/services/auditService";
 import { emitNotification } from "@/services/notificationCenterService";
 import { assertEnquiryTransition, ENQUIRY_STATUS_LABEL, type EnquiryStatus } from "@/lib/enquiries/state";
+import { emailConfigured, sendEmail } from "@/lib/email";
+import { getSiteSettings } from "@/services/siteSettingsService";
+import { canonicalOrigin } from "@/config/site";
+import { COMMERCE } from "@/config/commerce";
 
 export interface EnquiryRow {
   id: string; number: string; status: EnquiryStatus;
@@ -34,6 +40,29 @@ export interface CreateEnquiryInput {
   subject: string; orderNumber?: string; message: string; consent: boolean; meta?: Record<string, unknown>;
 }
 
+const esc = (s: string) => s.replace(/[<>&]/g, (c) => (c === "<" ? "&lt;" : c === ">" ? "&gt;" : "&amp;"));
+
+/** Internal notification email for a new enquiry (deterministic → unit-testable). Addressed to the
+ *  business inbox; Reply-To (set by the caller) is the customer so staff reply straight from email. */
+export function buildEnquiryEmail(input: CreateEnquiryInput, number: string, adminUrl?: string): { subject: string; html: string; text: string } {
+  const name = `${input.firstName} ${input.lastName ?? ""}`.trim();
+  const rows: Array<[string, string]> = [
+    ["Name", name], ["Email", input.email], ["Phone", input.phone || "—"],
+    ["Subject", input.subject], ["Order #", input.orderNumber || "—"],
+  ];
+  const rowsHtml = rows.map(([k, v]) => `<tr><td style="padding:4px 12px 4px 0;color:#6b6259">${esc(k)}</td><td style="padding:4px 0"><b>${esc(v)}</b></td></tr>`).join("");
+  const subject = `New contact enquiry · ${input.subject} (#${number})`;
+  const html = `<div style="font-family:sans-serif;max-width:560px">
+    <p style="font-size:16px"><b>New customer enquiry</b> · #${esc(number)}</p>
+    <table style="font-size:14px;border-collapse:collapse">${rowsHtml}</table>
+    <p style="font-size:14px;white-space:pre-wrap;margin-top:12px;padding:12px;background:#faf7f2;border-radius:6px">${esc(input.message)}</p>
+    ${adminUrl ? `<p style="margin-top:14px"><a href="${adminUrl}">Open in admin →</a></p>` : ""}
+    <p style="color:#9a8f82;font-size:12px;margin-top:16px">Reply to this email to respond to ${esc(name)} directly.</p>
+  </div>`;
+  const text = `New customer enquiry #${number}\n\n${rows.map(([k, v]) => `${k}: ${v}`).join("\n")}\n\nMessage:\n${input.message}${adminUrl ? `\n\nAdmin: ${adminUrl}` : ""}`;
+  return { subject, html, text };
+}
+
 /** Public form submission → a stored enquiry + an Operations notification. Non-throwing on the
  *  notification/audit side; the insert result is authoritative. */
 export async function createEnquiry(input: CreateEnquiryInput): Promise<{ ok: boolean; id?: string; number?: string; reason?: string }> {
@@ -51,6 +80,25 @@ export async function createEnquiry(input: CreateEnquiryInput): Promise<{ ok: bo
     body: `${input.firstName} · ${input.subject}`.slice(0, 140), href: `/admin/enquiries/${data.id}`,
     entityType: "enquiry", entityId: data.id,
   });
+
+  // Email the business support inbox so an enquiry is never missed — best-effort: a failure here
+  // (or email simply not configured) must NEVER fail the stored submission. Reply-To is the
+  // customer, so staff reply directly from their inbox. Destination = the same support address the
+  // /contact page shows (Site Settings → support.email), falling back to the commerce default.
+  try {
+    if (emailConfigured()) {
+      const to = (await getSiteSettings().then((s) => s.support.email, () => "")).trim() || COMMERCE.support.email;
+      if (to) {
+        const base = canonicalOrigin();
+        const mail = buildEnquiryEmail(input, data.number, base ? `${base}/admin/enquiries/${data.id}` : undefined);
+        const r = await sendEmail({ to, subject: mail.subject, html: mail.html, text: mail.text, replyTo: input.email });
+        if (!r.sent) console.error("enquiry notification email failed (non-fatal):", r.reason);
+      }
+    }
+  } catch (e) {
+    console.error("enquiry notification email error (non-fatal):", e);
+  }
+
   return { ok: true, id: data.id, number: data.number };
 }
 
