@@ -36,6 +36,10 @@ export const SECTION_DEFS: Record<SectionType, SectionDefinition> = {
         { key: "ctaEnabled", label: "Show call-to-action button", type: "boolean", default: true },
         { key: "ctaLabel", label: "Button label", type: "text", maxLength: 24, required: true, showIf: { field: "ctaEnabled", truthy: true } },
         { key: "ctaHref", label: "Button URL", type: "url", required: true, showIf: { field: "ctaEnabled", truthy: true } },
+        // Optional secondary line + secondary CTA (all additive; blank → nothing rendered).
+        { key: "secondaryLine", label: "Secondary line", type: "text", maxLength: 120, help: "Optional line under the subheading — e.g. fragrance notes: Green Tea · Cardamom · Rose · Sweet Milk · Sandalwood" },
+        { key: "secondaryCtaLabel", label: "Secondary button label", type: "text", maxLength: 24, help: "Optional second button, e.g. Explore the Chapter. Shows only when both this label and the URL below are filled." },
+        { key: "secondaryCtaHref", label: "Secondary button URL", type: "url", help: "e.g. /chapters/dessert-chapter" },
         { key: "heroImage", label: "Background image", type: "media", help: "Media URL or gradient:name placeholder" },
         { key: "imageFit", label: "Image fit", type: "select", help: "Fill crops to cover the hero (use the focal point to choose what stays); Fit shows the whole image (letterboxed for wide/tall images)", options: [
           { value: "cover", label: "Fill the space (crop — use focal point)" },
@@ -63,7 +67,7 @@ export const SECTION_DEFS: Record<SectionType, SectionDefinition> = {
     },
     defaults: () => {
       const c = getActiveCampaign();
-      return { eyebrow: c.eyebrow, heading: c.heading, subheading: c.subheading, ctaEnabled: true, ctaLabel: c.ctaLabel, ctaHref: c.ctaHref, heroImage: c.heroImage, imageFit: "cover", videoUrl: "", theme: c.theme, align: "left", overlayStyle: "scrim", buttonStyle: "ghost", animate: true, showScroll: true };
+      return { eyebrow: c.eyebrow, heading: c.heading, subheading: c.subheading, ctaEnabled: true, ctaLabel: c.ctaLabel, ctaHref: c.ctaHref, secondaryLine: c.secondaryLine ?? "", secondaryCtaLabel: c.secondaryCtaLabel ?? "", secondaryCtaHref: c.secondaryCtaHref ?? "", heroImage: c.heroImage, imageFit: "cover", videoUrl: "", theme: c.theme, align: "left", overlayStyle: "scrim", buttonStyle: "ghost", animate: true, showScroll: true };
     },
   },
   "brand-story": {

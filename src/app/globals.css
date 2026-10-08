@@ -3767,7 +3767,22 @@ h1, h2, h3, h4 {
   max-width: 420px;
   margin-bottom: 44px;
 }
-.home-hero__cta-row { display: flex; }
+.home-hero__cta-row { display: flex; gap: 24px; flex-wrap: wrap; align-items: center; }
+
+/* Optional secondary line (e.g. fragrance notes) + secondary CTA — additive; absent → unchanged */
+.home-hero__notes {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 300;
+  letter-spacing: 0.14em;
+  line-height: 1.7;
+  color: rgba(250, 247, 242, 0.6);
+  max-width: 420px;
+  margin: -28px 0 40px;
+}
+.home-hero__cta--secondary { border-color: transparent; padding-inline: 0; text-decoration: underline; text-underline-offset: 6px; }
+.home-hero[data-align="center"] .home-hero__notes { margin-inline: auto; }
+.home-hero[data-align="right"] .home-hero__notes { margin-left: auto; }
 
 /* Phase 5 · point 24 — optional hero treatment controls (absent → the original look) */
 .home-hero__video { width: 100%; height: 100%; object-fit: cover; }

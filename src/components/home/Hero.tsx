@@ -104,11 +104,23 @@ export function Hero({ campaign }: { campaign: HeroCampaign }) {
           <motion.p className="home-hero__sub" {...reveal(0.22)}>
             {campaign.subheading}
           </motion.p>
-          {campaign.ctaLabel && campaign.ctaHref ? (
+          {campaign.secondaryLine ? (
+            <motion.p className="home-hero__notes" {...reveal(0.28)}>
+              {campaign.secondaryLine}
+            </motion.p>
+          ) : null}
+          {(campaign.ctaLabel && campaign.ctaHref) || (campaign.secondaryCtaLabel && campaign.secondaryCtaHref) ? (
             <motion.div className="home-hero__cta-row" {...reveal(0.34)}>
-              <Link href={safeHref(campaign.ctaHref)} className="btn btn-ghost home-hero__cta" data-style={buttonStyle}>
-                {campaign.ctaLabel}
-              </Link>
+              {campaign.ctaLabel && campaign.ctaHref ? (
+                <Link href={safeHref(campaign.ctaHref)} className="btn btn-ghost home-hero__cta" data-style={buttonStyle}>
+                  {campaign.ctaLabel}
+                </Link>
+              ) : null}
+              {campaign.secondaryCtaLabel && campaign.secondaryCtaHref ? (
+                <Link href={safeHref(campaign.secondaryCtaHref)} className="btn btn-ghost home-hero__cta home-hero__cta--secondary">
+                  {campaign.secondaryCtaLabel}
+                </Link>
+              ) : null}
             </motion.div>
           ) : null}
         </div>

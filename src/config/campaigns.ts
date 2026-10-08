@@ -25,6 +25,13 @@ export interface HeroCampaign {
   subheading: string;
   ctaLabel: string;
   ctaHref: string;
+  /** Optional secondary line under the subheading — e.g. fragrance notes
+   *  ("Green Tea · Cardamom · Rose · Sweet Milk · Sandalwood"). Rendered only when set. */
+  secondaryLine?: string;
+  /** Optional second CTA (e.g. "Explore the Chapter" → /chapters/dessert-chapter).
+   *  Renders beside the primary CTA only when BOTH label and href are set. */
+  secondaryCtaLabel?: string;
+  secondaryCtaHref?: string;
   /** Colour mood / editorial atmosphere (future: tints scrim/accents). */
   theme: string;
   /**
