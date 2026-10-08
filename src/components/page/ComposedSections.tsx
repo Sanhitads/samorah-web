@@ -40,16 +40,20 @@ export function ComposedSections({ sections, anchors = false, track = false }: {
   const secondaryHero = sections.find(
     (s) => s.type === "secondary-hero" && s.enabled && sectionScheduleOk(s.settings) && s.settings?.visible !== false,
   );
+  // The slider runs on the real storefront only. In the admin preview (`anchors`) the two heroes render
+  // STACKED — each in its own clickable anchor — so editing the secondary hero shows immediately and the
+  // arrows (which the preview would read as a section click) never fight the editor. Storefront = slider.
+  const useHeroSlider = !anchors && heroPresent && !!secondaryHero;
 
   const REGISTRY: Record<string, (s: ComposedSection) => ReactNode> = {
     hero: (s) =>
-      secondaryHero
-        ? <HeroSlider slides={[merged(campaign, s) as HeroCampaign, merged(campaign, secondaryHero) as HeroCampaign]} />
+      useHeroSlider
+        ? <HeroSlider slides={[merged(campaign, s) as HeroCampaign, merged(campaign, secondaryHero!) as HeroCampaign]} />
         : <Hero campaign={merged(campaign, s) as HeroCampaign} />,
-    // Rendered standalone only when there is NO primary hero to slide with; otherwise it is consumed
-    // into the slider above (rendering nothing in its own slot).
+    // Storefront with a slider: consumed into the hero slot (renders nothing here). Otherwise — the admin
+    // preview (stacked), or when there is no primary hero — it renders as its own <Hero>, unless hidden.
     "secondary-hero": (s) =>
-      heroPresent ? null : (s.settings?.visible === false ? null : <Hero campaign={merged(campaign, s) as HeroCampaign} />),
+      useHeroSlider ? null : (s.settings?.visible === false ? null : <Hero campaign={merged(campaign, s) as HeroCampaign} />),
     chapters: (s) => <SignatureChapters chapters={chaptersFromSettings(s)} label={sstr(s.settings.label) || undefined} heading={sstr(s.settings.heading) || undefined} sub={sstr(s.settings.sub) || undefined} />,
     "brand-story": (s) => <BrandStory story={merged(getBrandStory(), s) as BrandStoryType} />,
     atmosphere: (s) => <Atmosphere experiences={experiencesFromSettings(s, campaign.id)} heading={sstr(s.settings.heading) || undefined} />,

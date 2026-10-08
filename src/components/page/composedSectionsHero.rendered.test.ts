@@ -54,4 +54,21 @@ describe("ComposedSections — hero slider wiring", () => {
     expect(screen.getByTestId("hero")).toBeTruthy();
     expect(screen.queryByTestId("slider")).toBeNull();
   });
+
+  // Admin preview (anchors): heroes render STACKED (each editable/clickable), never as a slider —
+  // so editing the secondary hero is visible immediately and arrows can't fight the editor.
+  it("anchors (preview): hero + visible secondary → BOTH heroes stacked, no slider", () => {
+    render(h(ComposedSections, { sections: [sec("hero", { heading: "Main" }), sec("secondary-hero", { heading: "Second" })], anchors: true }));
+    const heroes = screen.getAllByTestId("hero");
+    expect(heroes).toHaveLength(2);
+    expect(heroes.map((el) => el.getAttribute("data-heading")).sort()).toEqual(["Main", "Second"]);
+    expect(screen.queryByTestId("slider")).toBeNull(); // never a slider in preview
+  });
+
+  it("anchors (preview): hidden secondary → only the primary hero shows", () => {
+    render(h(ComposedSections, { sections: [sec("hero", { heading: "Main" }), sec("secondary-hero", { heading: "Second", visible: false })], anchors: true }));
+    const heroes = screen.getAllByTestId("hero");
+    expect(heroes).toHaveLength(1);
+    expect(heroes[0].getAttribute("data-heading")).toBe("Main");
+  });
 });
