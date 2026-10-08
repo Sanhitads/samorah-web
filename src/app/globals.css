@@ -3784,6 +3784,33 @@ h1, h2, h3, h4 {
 .home-hero[data-align="center"] .home-hero__notes { margin-inline: auto; }
 .home-hero[data-align="right"] .home-hero__notes { margin-left: auto; }
 
+/* Hero slider — two or more heroes with ‹ › arrows (single hero → no slider markup at all) */
+.hero-slider { position: relative; overflow: hidden; }
+.hero-slider__track { display: flex; transition: transform 0.6s cubic-bezier(0, 0, 0.2, 1); }
+.hero-slider__slide { flex: 0 0 100%; min-width: 100%; }
+.hero-slider__arrow {
+  position: absolute; top: 50%; transform: translateY(-50%); z-index: 3;
+  width: 46px; height: 46px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: rgba(250, 247, 242, 0.14); border: 1px solid rgba(250, 247, 242, 0.35);
+  color: var(--ivory, #faf7f2); font-size: 26px; line-height: 1; cursor: pointer;
+  backdrop-filter: blur(4px); transition: background 0.2s ease, border-color 0.2s ease;
+}
+.hero-slider__arrow:hover { background: rgba(250, 247, 242, 0.28); border-color: rgba(250, 247, 242, 0.6); }
+.hero-slider__arrow:focus-visible { outline: 2px solid var(--ivory, #faf7f2); outline-offset: 2px; }
+.hero-slider__arrow span { margin-top: -3px; } /* optical centering of the chevron glyph */
+.hero-slider__arrow--prev { left: 24px; }
+.hero-slider__arrow--next { right: 24px; }
+.hero-slider__dots { position: absolute; left: 0; right: 0; bottom: 22px; z-index: 3; display: flex; gap: 9px; justify-content: center; }
+.hero-slider__dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(250, 247, 242, 0.4); transition: background 0.2s ease; }
+.hero-slider__dot.is-active { background: rgba(250, 247, 242, 0.95); }
+@media (max-width: 640px) {
+  .hero-slider__arrow { width: 38px; height: 38px; font-size: 22px; }
+  .hero-slider__arrow--prev { left: 10px; }
+  .hero-slider__arrow--next { right: 10px; }
+}
+@media (prefers-reduced-motion: reduce) { .hero-slider__track { transition: none; } }
+
 /* Phase 5 · point 24 — optional hero treatment controls (absent → the original look) */
 .home-hero__video { width: 100%; height: 100%; object-fit: cover; }
 .home-hero[data-align="center"] .home-hero__inner { text-align: center; }

@@ -6,7 +6,7 @@
  * DB-editable; list-based sections are `sourced` (their items come from their own
  * config until the Page Builder generalises them).
  */
-import type { SectionSchema } from "@/lib/cms/sectionSchema";
+import type { SectionSchema, FieldDef } from "@/lib/cms/sectionSchema";
 import { ALIGN_OPTIONS } from "@/lib/cms/sectionSchema";
 import { registerPageType, type SectionDefinition } from "@/lib/cms/pageRegistry";
 import type { SectionType } from "@/services/homepageService";
@@ -24,51 +24,68 @@ const IMPORTANCE_OPTIONS = ["Opening", "Ritual", "Detail", "Still Life", "Closin
 // Featured-content picker (point 28): copy these entity data keys → the section's display fields on pick.
 const FEATURED_FILL = { title: "title", image: "image", imageAlt: "imageAlt", href: "href", blurb: "blurb" };
 
+// The Hero's editable fields — SHARED by the primary Hero and the Secondary Hero so the two stay in
+// exact parity (the second slide offers the same options). Secondary Hero appends a `visible` toggle.
+const HERO_FIELDS: FieldDef[] = [
+  { key: "eyebrow", label: "Eyebrow", type: "text", maxLength: 40 },
+  { key: "heading", label: "Headline", type: "text", required: true, maxLength: 60, help: "Keep it short — long headlines wrap awkwardly on mobile" },
+  { key: "subheading", label: "Subheading", type: "textarea", maxLength: 180 },
+  // Conditional CTA (points 2 + 5): toggle reveals + requires the button fields.
+  { key: "ctaEnabled", label: "Show call-to-action button", type: "boolean", default: true },
+  { key: "ctaLabel", label: "Button label", type: "text", maxLength: 24, required: true, showIf: { field: "ctaEnabled", truthy: true } },
+  { key: "ctaHref", label: "Button URL", type: "url", required: true, showIf: { field: "ctaEnabled", truthy: true } },
+  // Optional secondary line + secondary CTA (all additive; blank → nothing rendered).
+  { key: "secondaryLine", label: "Secondary line", type: "text", maxLength: 120, help: "Optional line under the subheading — e.g. fragrance notes: Green Tea · Cardamom · Rose · Sweet Milk · Sandalwood" },
+  { key: "secondaryCtaLabel", label: "Secondary button label", type: "text", maxLength: 24, help: "Optional second button, e.g. Explore the Chapter. Shows only when both this label and the URL below are filled." },
+  { key: "secondaryCtaHref", label: "Secondary button URL", type: "url", help: "e.g. /chapters/dessert-chapter" },
+  { key: "heroImage", label: "Background image", type: "media", help: "Media URL or gradient:name placeholder" },
+  { key: "imageFit", label: "Image fit", type: "select", help: "Fill crops to cover the hero (use the focal point to choose what stays); Fit shows the whole image (letterboxed for wide/tall images)", options: [
+    { value: "cover", label: "Fill the space (crop — use focal point)" },
+    { value: "contain", label: "Show the whole image (no cropping)" },
+  ] },
+  { key: "videoUrl", label: "Background video (optional)", type: "media", help: "MP4 / Cloudinary video URL — plays muted behind the hero and overrides the image", allowedMime: ["video/mp4", "video/webm"] },
+  { key: "theme", label: "Theme", type: "select", options: [{ value: "dark", label: "Dark" }, { value: "light", label: "Light" }] },
+  // Phase 5 · point 24 — hero treatment controls (all additive; omitted → the original look).
+  { key: "align", label: "Content alignment", type: "align", options: ALIGN_OPTIONS },
+  { key: "overlayStyle", label: "Image overlay", type: "select", help: "Darkens the image so text stays legible", options: [
+    { value: "scrim", label: "Editorial scrim (default)" },
+    { value: "dark", label: "Even darken" },
+    { value: "gradient", label: "Bottom-up gradient" },
+    { value: "none", label: "None" },
+  ] },
+  { key: "overlayOpacity", label: "Overlay strength (%)", type: "number", min: 0, max: 100, help: "0 = no darkening, 100 = strongest" },
+  { key: "buttonStyle", label: "Button style", type: "select", options: [
+    { value: "ghost", label: "Ghost / outline (default)" },
+    { value: "solid", label: "Solid" },
+    { value: "underline", label: "Underline" },
+  ] },
+  { key: "animate", label: "Entrance animation", type: "boolean", default: true },
+  { key: "showScroll", label: "Show scroll indicator", type: "boolean", default: true },
+];
+
+const heroDefaults = (): Record<string, unknown> => {
+  const c = getActiveCampaign();
+  return { eyebrow: c.eyebrow, heading: c.heading, subheading: c.subheading, ctaEnabled: true, ctaLabel: c.ctaLabel, ctaHref: c.ctaHref, secondaryLine: c.secondaryLine ?? "", secondaryCtaLabel: c.secondaryCtaLabel ?? "", secondaryCtaHref: c.secondaryCtaHref ?? "", heroImage: c.heroImage, imageFit: "cover", videoUrl: "", theme: c.theme, align: "left", overlayStyle: "scrim", buttonStyle: "ghost", animate: true, showScroll: true };
+};
+
 export const SECTION_DEFS: Record<SectionType, SectionDefinition> = {
   hero: {
+    schema: { type: "hero", label: "Hero", note: "The opening threshold", fields: HERO_FIELDS },
+    defaults: heroDefaults,
+  },
+  // Secondary Hero — a SECOND slide for the homepage hero. Same options as the Hero (shared fields),
+  // plus a Visible toggle. When present + visible, the storefront shows ‹ › arrows that slide between
+  // the two heroes; when absent or hidden, the homepage shows only the primary Hero (unchanged).
+  "secondary-hero": {
     schema: {
-      type: "hero", label: "Hero", note: "The opening threshold",
+      type: "secondary-hero", label: "Secondary Hero",
+      note: "A second hero shown as a slide — same options as the Hero, with ‹ › arrows to slide between them",
       fields: [
-        { key: "eyebrow", label: "Eyebrow", type: "text", maxLength: 40 },
-        { key: "heading", label: "Headline", type: "text", required: true, maxLength: 60, help: "Keep it short — long headlines wrap awkwardly on mobile" },
-        { key: "subheading", label: "Subheading", type: "textarea", maxLength: 180 },
-        // Conditional CTA (points 2 + 5): toggle reveals + requires the button fields.
-        { key: "ctaEnabled", label: "Show call-to-action button", type: "boolean", default: true },
-        { key: "ctaLabel", label: "Button label", type: "text", maxLength: 24, required: true, showIf: { field: "ctaEnabled", truthy: true } },
-        { key: "ctaHref", label: "Button URL", type: "url", required: true, showIf: { field: "ctaEnabled", truthy: true } },
-        // Optional secondary line + secondary CTA (all additive; blank → nothing rendered).
-        { key: "secondaryLine", label: "Secondary line", type: "text", maxLength: 120, help: "Optional line under the subheading — e.g. fragrance notes: Green Tea · Cardamom · Rose · Sweet Milk · Sandalwood" },
-        { key: "secondaryCtaLabel", label: "Secondary button label", type: "text", maxLength: 24, help: "Optional second button, e.g. Explore the Chapter. Shows only when both this label and the URL below are filled." },
-        { key: "secondaryCtaHref", label: "Secondary button URL", type: "url", help: "e.g. /chapters/dessert-chapter" },
-        { key: "heroImage", label: "Background image", type: "media", help: "Media URL or gradient:name placeholder" },
-        { key: "imageFit", label: "Image fit", type: "select", help: "Fill crops to cover the hero (use the focal point to choose what stays); Fit shows the whole image (letterboxed for wide/tall images)", options: [
-          { value: "cover", label: "Fill the space (crop — use focal point)" },
-          { value: "contain", label: "Show the whole image (no cropping)" },
-        ] },
-        { key: "videoUrl", label: "Background video (optional)", type: "media", help: "MP4 / Cloudinary video URL — plays muted behind the hero and overrides the image", allowedMime: ["video/mp4", "video/webm"] },
-        { key: "theme", label: "Theme", type: "select", options: [{ value: "dark", label: "Dark" }, { value: "light", label: "Light" }] },
-        // Phase 5 · point 24 — hero treatment controls (all additive; omitted → the original look).
-        { key: "align", label: "Content alignment", type: "align", options: ALIGN_OPTIONS },
-        { key: "overlayStyle", label: "Image overlay", type: "select", help: "Darkens the image so text stays legible", options: [
-          { value: "scrim", label: "Editorial scrim (default)" },
-          { value: "dark", label: "Even darken" },
-          { value: "gradient", label: "Bottom-up gradient" },
-          { value: "none", label: "None" },
-        ] },
-        { key: "overlayOpacity", label: "Overlay strength (%)", type: "number", min: 0, max: 100, help: "0 = no darkening, 100 = strongest" },
-        { key: "buttonStyle", label: "Button style", type: "select", options: [
-          { value: "ghost", label: "Ghost / outline (default)" },
-          { value: "solid", label: "Solid" },
-          { value: "underline", label: "Underline" },
-        ] },
-        { key: "animate", label: "Entrance animation", type: "boolean", default: true },
-        { key: "showScroll", label: "Show scroll indicator", type: "boolean", default: true },
+        ...HERO_FIELDS,
+        { key: "visible", label: "Visible (show as a second slide)", type: "boolean", default: true, help: "Uncheck to hide the second hero — the homepage then shows only the primary hero, with no slider arrows." },
       ],
     },
-    defaults: () => {
-      const c = getActiveCampaign();
-      return { eyebrow: c.eyebrow, heading: c.heading, subheading: c.subheading, ctaEnabled: true, ctaLabel: c.ctaLabel, ctaHref: c.ctaHref, secondaryLine: c.secondaryLine ?? "", secondaryCtaLabel: c.secondaryCtaLabel ?? "", secondaryCtaHref: c.secondaryCtaHref ?? "", heroImage: c.heroImage, imageFit: "cover", videoUrl: "", theme: c.theme, align: "left", overlayStyle: "scrim", buttonStyle: "ghost", animate: true, showScroll: true };
-    },
+    defaults: () => ({ ...heroDefaults(), visible: true }),
   },
   "brand-story": {
     schema: {
@@ -324,6 +341,8 @@ SECTION_DEFS.hero.schema.validate = (c) => {
   const h = String(c.heading ?? "").trim().toLowerCase();
   return h === "title" || h === "headline" ? ['Replace the placeholder headline before publishing'] : [];
 };
+// The Secondary Hero reuses the same placeholder-headline guard.
+SECTION_DEFS["secondary-hero"].schema.validate = SECTION_DEFS.hero.schema.validate;
 
 export const SECTION_SCHEMAS = Object.fromEntries(Object.entries(SECTION_DEFS).map(([t, d]) => [t, d.schema])) as Record<SectionType, SectionSchema>;
 

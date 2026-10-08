@@ -16,6 +16,7 @@ export interface SectionTemplateDef {
 
 export const SECTION_TEMPLATES: SectionTemplateDef[] = [
   { id: "hero", label: "Hero", description: "Full-bleed opening — headline, sub, and a call-to-action.", type: "hero" },
+  { id: "secondary-hero", label: "Secondary Hero", description: "A second hero slide — same options as the Hero, with ‹ › arrows to slide between them. Toggle ‘Visible’ to show or hide it.", type: "secondary-hero" },
   { id: "image-quote", label: "Image + Quote", description: "An editorial image beside a short pull-quote.", type: "brand-story", overrides: { quote: "Before it is a fragrance, it is a memory." } },
   { id: "editorial", label: "Editorial", description: "The art-directed magazine photo spread.", type: "editorial-world" },
   { id: "gallery", label: "Gallery", description: "A grid of images with hover captions.", type: "editorial-world" },

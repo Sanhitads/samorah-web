@@ -16,11 +16,12 @@ export const PAGE_KEY = "homepage";
 /** The sections that compose the DEFAULT homepage (the current hand-built order). */
 export const DEFAULT_ORDER = ["hero", "chapters", "brand-story", "atmosphere", "invitations", "words", "editorial-world", "letters"] as const;
 /** All section types the homepage can render (default set + optional add-ons). */
-export const SECTION_TYPES = [...DEFAULT_ORDER, "testimonials", "content-blocks", "featured-content"] as const;
+export const SECTION_TYPES = [...DEFAULT_ORDER, "testimonials", "content-blocks", "featured-content", "secondary-hero"] as const;
 export type SectionType = (typeof SECTION_TYPES)[number];
 
 export const SECTION_META: Record<SectionType, { label: string; note: string }> = {
   hero: { label: "Hero", note: "Campaign-driven opening" },
+  "secondary-hero": { label: "Secondary Hero", note: "A second campaign hero — same options, with a show / hide toggle" },
   chapters: { label: "Signature Chapters", note: "Editorial chapter rail" },
   "brand-story": { label: "Brand Story", note: "The maker's quiet" },
   atmosphere: { label: "Featured Atmosphere", note: "Selectable fragrances — each with its own image; pull from a product or write your own" },

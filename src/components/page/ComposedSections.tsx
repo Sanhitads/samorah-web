@@ -1,5 +1,6 @@
 import { Fragment, type ReactNode } from "react";
 import { Hero } from "@/components/home/Hero";
+import { HeroSlider } from "@/components/home/HeroSlider";
 import { SignatureChapters } from "@/components/home/SignatureChapters";
 import { BrandStory } from "@/components/home/BrandStory";
 import { Atmosphere } from "@/components/home/Atmosphere";
@@ -32,8 +33,23 @@ export function ComposedSections({ sections, anchors = false, track = false }: {
   const voice = getEditorialVoice(campaign.id);
   const merged = <T,>(base: T, s: ComposedSection): T => ({ ...base, ...((s.settings ?? {}) as Partial<T>) });
 
+  // Hero slider (point: secondary hero): when a visible "secondary-hero" section exists, the primary
+  // Hero + the secondary become a two-slide slider with ‹ › arrows. With no visible secondary hero the
+  // Hero renders exactly as before (single, no slider) — so an un-edited homepage is unchanged.
+  const heroPresent = sections.some((s) => s.type === "hero" && s.enabled && sectionScheduleOk(s.settings));
+  const secondaryHero = sections.find(
+    (s) => s.type === "secondary-hero" && s.enabled && sectionScheduleOk(s.settings) && s.settings?.visible !== false,
+  );
+
   const REGISTRY: Record<string, (s: ComposedSection) => ReactNode> = {
-    hero: (s) => <Hero campaign={merged(campaign, s) as HeroCampaign} />,
+    hero: (s) =>
+      secondaryHero
+        ? <HeroSlider slides={[merged(campaign, s) as HeroCampaign, merged(campaign, secondaryHero) as HeroCampaign]} />
+        : <Hero campaign={merged(campaign, s) as HeroCampaign} />,
+    // Rendered standalone only when there is NO primary hero to slide with; otherwise it is consumed
+    // into the slider above (rendering nothing in its own slot).
+    "secondary-hero": (s) =>
+      heroPresent ? null : (s.settings?.visible === false ? null : <Hero campaign={merged(campaign, s) as HeroCampaign} />),
     chapters: (s) => <SignatureChapters chapters={chaptersFromSettings(s)} label={sstr(s.settings.label) || undefined} heading={sstr(s.settings.heading) || undefined} sub={sstr(s.settings.sub) || undefined} />,
     "brand-story": (s) => <BrandStory story={merged(getBrandStory(), s) as BrandStoryType} />,
     atmosphere: (s) => <Atmosphere experiences={experiencesFromSettings(s, campaign.id)} heading={sstr(s.settings.heading) || undefined} />,
