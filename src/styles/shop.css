@@ -288,3 +288,43 @@
 @media (max-width: 720px) {
   .plp__grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
 }
+
+/* ── The Archive — editorial empty state (never an error message) ──
+   A permanent page: when nothing is archived yet, this quiet, whitespace-led panel stands in for the
+   product grid. Reuses the house type/colour tokens; no illustrations, icons or error styling. */
+.archive-empty {
+  max-width: 540px;
+  margin-inline: auto;
+  padding-block: clamp(80px, 18vh, 200px);
+  text-align: center;
+}
+.archive-empty__title {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: clamp(1.6rem, 3.2vw, 2.4rem);
+  line-height: 1.2;
+  color: var(--ink, #1f1a16);
+  margin: 0 0 18px;
+}
+.archive-empty__copy {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: clamp(1.05rem, 1.8vw, 1.3rem);
+  line-height: 1.6;
+  color: var(--ink-soft, var(--smoke, #6b6259));
+  max-width: 42ch;
+  margin: 0 auto clamp(40px, 6vh, 64px);
+}
+.archive-empty__cta {
+  display: inline-block;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink, #1f1a16);
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--accent, var(--gold, #c9a96e));
+  transition: opacity 0.3s ease;
+}
+.archive-empty__cta:hover { opacity: 0.65; }

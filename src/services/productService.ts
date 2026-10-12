@@ -1,4 +1,5 @@
 import { createPublicClient } from "@/lib/supabase/public";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getEditionMap } from "@/services/collectionService";
 
 // Columns needed to render a product card (listings, rails, recommendations).
@@ -46,6 +47,22 @@ export async function getShopProducts() {
     .from("products")
     .select(SHOP_FIELDS)
     .order("created_at", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+/** Archived products for the Samorah Archive page. Public read is RLS-gated to status='active',
+ *  so archived rows are fetched server-side with the admin client (they are meant to be publicly
+ *  visible on the Archive, just no longer in the current collection). Same shape as the Shop, so the
+ *  listing reuses buildShopPage + ProductCard. Newest first. */
+export async function getArchivedProducts() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = createAdminClient() as any;
+  const { data, error } = await db
+    .from("products")
+    .select(SHOP_FIELDS)
+    .eq("status", "archived")
+    .order("created_at", { ascending: false });
   if (error) throw error;
   return data ?? [];
 }
