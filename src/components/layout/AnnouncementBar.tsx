@@ -4,90 +4,76 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { safeHref } from "@/lib/safeHref";
 
-// Editorial luxury signals — a quiet rotation, not a promotional ticker
-// (SDD-VISUAL §1: static, centred, NO marquee). This curated rotation is the
-// DEFAULT; an admin can override it with a single custom message from
-// Admin → Settings → Announcement bar (see AnnouncementConfig below).
-const MESSAGES = [
-  "Crafted to transform atmosphere into ritual",
-  "Handcrafted in India · Composed with intention",
-  "Soy-coconut wax · Lead-free cotton wicks",
+/**
+ * Announcement bar — a quiet, centred rotation (SDD-VISUAL §1: static, NO marquee).
+ *
+ * The rotating lines are admin-managed (Admin → Settings → "Announcement bar"): set any number of
+ * `messages` and they rotate; leave them empty and the built-in DEFAULT_MESSAGES below show instead,
+ * so the bar is never blank. An optional `link` makes the whole bar clickable; `hidden` removes it.
+ */
+const DEFAULT_MESSAGES = [
+  "Fragrance inspired by places, memories and everyday life",
+  "Made in India · In small batches",
+  "Coconut-based wax blend · Cotton wicks",
 ] as const;
 
 const ROTATE_MS = 5000;
 const EASE_OUT = [0, 0, 0.2, 1] as const; // --ease-out (SDD §8.1)
 
-/**
- * Site Settings announcement (Admin → Settings → "Announcement bar").
- * When `active` is on AND `text` is non-empty, that single message OVERRIDES the curated rotation
- * (optionally linked). Otherwise the rotation shows — so the bar is never empty and existing
- * behaviour is preserved for stores that haven't set a custom message.
- */
 export interface AnnouncementConfig {
-  text?: string;
+  messages?: string[];
   link?: string;
-  active?: boolean;
-  /** Hide the announcement bar entirely (Admin → Settings). The layout drops its 38px offset to match. */
   hidden?: boolean;
 }
+
+// Only honour a link that actually looks like a destination (not stray copy pasted into the field).
+// safeHref then neutralises any unsafe scheme.
+const LOOKS_LIKE_LINK = /^(https?:\/\/|\/|#|mailto:|tel:)/i;
 
 export function AnnouncementBar({ announcement }: { announcement?: AnnouncementConfig }) {
   const reduceMotion = useReducedMotion();
   const [index, setIndex] = useState(0);
 
-  const custom = announcement?.active && announcement.text?.trim() ? announcement.text.trim() : null;
+  const custom = (announcement?.messages ?? []).map((m) => (m ?? "").trim()).filter(Boolean);
+  const lines: readonly string[] = custom.length ? custom : DEFAULT_MESSAGES;
 
   useEffect(() => {
-    // No rotation when a custom message is set, under reduced-motion, or with a single message.
-    if (custom || reduceMotion || MESSAGES.length < 2) return;
-    const id = setInterval(
-      () => setIndex((i) => (i + 1) % MESSAGES.length),
-      ROTATE_MS,
-    );
+    // Rotate only when there are 2+ lines and motion is allowed.
+    if (reduceMotion || lines.length < 2) return;
+    const id = setInterval(() => setIndex((i) => (i + 1) % lines.length), ROTATE_MS);
     return () => clearInterval(id);
-  }, [custom, reduceMotion]);
+  }, [reduceMotion, lines.length]);
 
   // Fully hidden (admin opt-in) — render nothing. (Hooks above still run, so this is hook-safe.)
   if (announcement?.hidden) return null;
 
-  // Admin-set announcement — a single, still message (no rotation), optionally linked.
-  if (custom) {
-    const href = announcement?.link?.trim() ? safeHref(announcement.link.trim()) : null;
-    return (
-      <div className="announcement-bar">
-        {href && href !== "#" ? (
-          <a className="announcement-bar__message announcement-bar__message--link" href={href}>{custom}</a>
-        ) : (
-          <span className="announcement-bar__message">{custom}</span>
-        )}
-      </div>
-    );
-  }
+  const idx = index % lines.length;
+  const rawLink = announcement?.link?.trim();
+  const sanitized = rawLink && LOOKS_LIKE_LINK.test(rawLink) ? safeHref(rawLink) : null;
+  const href = sanitized && sanitized !== "#" ? sanitized : null;
+  const cls = `announcement-bar__message${href ? " announcement-bar__message--link" : ""}`;
 
-  // A single still signal — no rotation, no fade — whenever there's nothing to rotate
-  // (reduced-motion preference, or only one message). Otherwise a fade rotation.
-  const still = reduceMotion || MESSAGES.length < 2;
+  // A single rotating slide (optionally a link). mode="wait" keeps two messages from overlapping.
+  const slide = (text: string) =>
+    href ? (
+      <motion.a key={idx} href={href} className={cls} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.6, ease: EASE_OUT }}>
+        {text}
+      </motion.a>
+    ) : (
+      <motion.span key={idx} className={cls} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.6, ease: EASE_OUT }}>
+        {text}
+      </motion.span>
+    );
+
+  // Static (one line, or reduced motion) → no rotation, no fade.
+  const still = reduceMotion || lines.length < 2;
 
   return (
     <div className="announcement-bar">
       {still ? (
-        <span className="announcement-bar__message">{MESSAGES[0]}</span>
+        href ? <a className={cls} href={href}>{lines[0]}</a> : <span className={cls}>{lines[0]}</span>
       ) : (
-        // mode="wait": the outgoing message fully fades out BEFORE the next mounts, so two
-        // messages are never on screen at once (no ghosting/overlap). Both are absolutely
-        // positioned + centred, so there is never a layout jump between messages.
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.span
-            key={index}
-            className="announcement-bar__message"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.6, ease: EASE_OUT }}
-          >
-            {MESSAGES[index]}
-          </motion.span>
-        </AnimatePresence>
+        <AnimatePresence mode="wait" initial={false}>{slide(lines[idx])}</AnimatePresence>
       )}
     </div>
   );

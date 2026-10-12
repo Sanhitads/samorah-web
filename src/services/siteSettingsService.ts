@@ -21,7 +21,9 @@ export interface SiteSettings {
   social: { instagram: string; pinterest: string; spotify: string; facebook: string };
   seo: { titleSuffix: string; defaultDescription: string; ogImageUrl: string };
   analytics: { gaId: string };
-  announcement: { text: string; active: boolean; link: string; hidden: boolean };
+  // Announcement bar: `messages` are the rotating lines (admin-managed; empty = the built-in default
+  // lines). `link` (optional) makes the whole bar clickable. `hidden` removes the bar entirely.
+  announcement: { messages: string[]; link: string; hidden: boolean };
   features: Record<FeatureKey, boolean>;
   maintenance: { enabled: boolean; message: string };
   storeNotice: { text: string; active: boolean };
@@ -42,7 +44,7 @@ function defaults(): SiteSettings {
     social: { instagram: "", pinterest: "", spotify: "", facebook: "" },
     seo: { titleSuffix: ` · ${COMMERCE.brandName}`, defaultDescription: "", ogImageUrl: "" },
     analytics: { gaId: process.env.NEXT_PUBLIC_GA_ID ?? "" },
-    announcement: { text: "", active: false, link: "", hidden: false },
+    announcement: { messages: [], link: "", hidden: false },
     features: Object.fromEntries(FEATURE_KEYS.map((k) => [k, false])) as Record<FeatureKey, boolean>,
     maintenance: { enabled: false, message: "We're making a few improvements. Back very soon." },
     storeNotice: { text: "", active: false },

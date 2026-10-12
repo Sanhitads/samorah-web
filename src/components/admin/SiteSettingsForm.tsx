@@ -27,6 +27,8 @@ export function SiteSettingsForm({ settings }: { settings: SiteSettings }) {
 
   const g = <K extends keyof SiteSettings>(group: K, key: keyof SiteSettings[K], v: string | boolean) =>
     setS((p) => ({ ...p, [group]: { ...p[group], [key]: v } }));
+  // Announcement rotating lines (admin-managed).
+  const setMessages = (next: string[]) => setS((p) => ({ ...p, announcement: { ...p.announcement, messages: next } }));
 
   // Unsaved-changes warning — reuse the Bundle-CMS guard (browser close/refresh + in-app navigation).
   useEffect(() => {
@@ -147,12 +149,26 @@ export function SiteSettingsForm({ settings }: { settings: SiteSettings }) {
 
       <p className="cfg-sub">Announcement bar</p>
       <label className="om-check"><input type="checkbox" checked={s.announcement.hidden} onChange={(e) => g("announcement", "hidden", e.target.checked)} /><span>Hide the announcement bar entirely</span></label>
-      <label className="cfg-field"><span>Text</span><input value={s.announcement.text} onChange={(e) => g("announcement", "text", e.target.value)} placeholder="Complimentary shipping over ₹1,499" /></label>
-      <div className="cfg-grid">
-        <label className="cfg-field"><span>Link (optional)</span><input value={s.announcement.link} onChange={(e) => g("announcement", "link", e.target.value)} /></label>
+      <p className="cfg-hint">The lines below rotate every few seconds in the top bar. Add as many as you like, one per row. Leave the list empty to show the built-in default lines.</p>
+      {s.announcement.messages.length === 0 ? (
+        <p className="admin__muted" style={{ fontSize: 13, margin: "4px 0 10px" }}>No custom lines — the default lines are showing.</p>
+      ) : null}
+      {s.announcement.messages.map((m, i) => (
+        <div key={i} className="cfg-grid" style={{ gridTemplateColumns: "1fr auto", gap: 8, alignItems: "center", marginBottom: 8 }}>
+          <input
+            value={m}
+            onChange={(e) => setMessages(s.announcement.messages.map((x, j) => (j === i ? e.target.value : x)))}
+            placeholder={`Line ${i + 1} — e.g. Complimentary shipping over ₹1,499`}
+            aria-label={`Announcement line ${i + 1}`}
+          />
+          <button type="button" className="ff-btn" onClick={() => setMessages(s.announcement.messages.filter((_, j) => j !== i))} aria-label={`Remove line ${i + 1}`}>Remove</button>
+        </div>
+      ))}
+      <div style={{ margin: "4px 0 14px" }}>
+        <button type="button" className="ff-btn" onClick={() => setMessages([...s.announcement.messages, ""])}>+ Add line</button>
       </div>
-      <label className="om-check"><input type="checkbox" checked={s.announcement.active} onChange={(e) => g("announcement", "active", e.target.checked)} /><span>Show this custom message (otherwise the default rotation shows)</span></label>
-      <p className="cfg-hint">Leave “Hide” unchecked to keep the bar. When a custom message is set and shown, it replaces the default rotating lines; otherwise the default rotation appears.</p>
+      <label className="cfg-field"><span>Link <span className="admin__muted">· optional, makes the whole bar clickable</span></span><input value={s.announcement.link} onChange={(e) => g("announcement", "link", e.target.value)} placeholder="/shop or https://…" /></label>
+      <p className="cfg-hint">The Link must be a URL or site path (e.g. <span className="admin__mono">/shop</span>) — stray text is ignored. Leave “Hide” unchecked to keep the bar visible.</p>
 
       <div className="cfg-actions">
         <button type="button" className="ff-btn ff-btn--primary" disabled={busy || pending} onClick={save}>{busy ? "Saving…" : "Save settings"}</button>
