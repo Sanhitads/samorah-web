@@ -29,20 +29,26 @@ export function AnnouncementBar() {
     return () => clearInterval(id);
   }, [reduceMotion]);
 
+  // A single still signal — no rotation, no fade — whenever there's nothing to rotate
+  // (reduced-motion preference, or only one message). Otherwise a fade rotation.
+  const still = reduceMotion || MESSAGES.length < 2;
+
   return (
     <div className="announcement-bar">
-      {reduceMotion ? (
-        // Reduced motion: a single, still signal — no rotation, no fade.
+      {still ? (
         <span className="announcement-bar__message">{MESSAGES[0]}</span>
       ) : (
-        <AnimatePresence>
+        // mode="wait": the outgoing message fully fades out BEFORE the next mounts, so two
+        // messages are never on screen at once (no ghosting/overlap). Both are absolutely
+        // positioned + centred, so there is never a layout jump between messages.
+        <AnimatePresence mode="wait" initial={false}>
           <motion.span
             key={index}
             className="announcement-bar__message"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.8, ease: EASE_OUT }}
+            transition={{ duration: 0.6, ease: EASE_OUT }}
           >
             {MESSAGES[index]}
           </motion.span>
