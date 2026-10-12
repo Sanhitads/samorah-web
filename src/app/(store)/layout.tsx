@@ -59,7 +59,7 @@ export default async function StoreLayout({
         <div className="store-notice" role="status">{settings.storeNotice.text}</div>
       ) : null}
       <JsonLd data={siteStructuredData()} />
-      <AnnouncementBar />
+      <AnnouncementBar announcement={settings.announcement} />
       <PromoBanner banner={banner} />
       <AccountSync />
       <StoreChrome branches={nav.branches} />

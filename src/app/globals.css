@@ -309,6 +309,9 @@ h1, h2, h3, h4 {
   text-overflow: ellipsis;
   color: rgba(250, 247, 242, 0.9);
 }
+/* Admin-set announcement with a link — inherits the message styling; a quiet underline on hover. */
+.announcement-bar__message--link { text-decoration: none; }
+.announcement-bar__message--link:hover { text-decoration: underline; text-underline-offset: 3px; }
 
 /* ─── Header ─── */
 .header {
