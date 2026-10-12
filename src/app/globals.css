@@ -3613,7 +3613,7 @@ h1, h2, h3, h4 {
   font-size: clamp(18px, 2vw, 24px);
   line-height: 1.4;
   letter-spacing: -0.01em;
-  color: rgba(250, 247, 242, 0.55);
+  color: rgba(250, 247, 242, 0.62); /* micro-polish: slightly more readable, still visually secondary (was 0.55) */
   max-width: 40ch;
   margin-inline: auto;
 }
@@ -3632,7 +3632,7 @@ h1, h2, h3, h4 {
   font-weight: 500;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: rgba(250, 247, 242, 0.4);
+  color: rgba(250, 247, 242, 0.55); /* micro-polish: the 10px column headings were faint (3.6:1); lift just enough to read, links unchanged */
   margin-bottom: 20px;
 }
 
@@ -4283,6 +4283,7 @@ h1, h2, h3, h4 {
   --atmos-ink: var(--ivory);
   --atmos-soft: rgba(250, 247, 242, 0.82);
   --atmos-faint: rgba(250, 247, 242, 0.62);
+  --atmos-select: rgba(250, 247, 242, 0.68); /* non-selected selector items — a touch above faint, still clearly below the active name */
   --atmos-line: rgba(250, 247, 242, 0.16);
   --atmos-rule: rgba(201, 169, 110, 0.55); /* the Atmosphere-Index leader line — visible gold on dark */
 }
@@ -4290,6 +4291,7 @@ h1, h2, h3, h4 {
   --atmos-ink: var(--deep-charcoal);
   --atmos-soft: rgba(42, 42, 42, 0.82);
   --atmos-faint: rgba(42, 42, 42, 0.64);
+  --atmos-select: rgba(42, 42, 42, 0.70); /* non-selected selector items — a touch above faint */
   --atmos-line: rgba(42, 42, 42, 0.14);
   --atmos-rule: rgba(120, 88, 44, 0.6); /* darker so the leader line stays readable on a light field */
 }
@@ -4502,7 +4504,7 @@ h1, h2, h3, h4 {
   font-family: var(--font-serif);
   font-size: clamp(15px, 1.3vw, 18px);
   letter-spacing: 0.02em;
-  color: var(--atmos-faint);
+  color: var(--atmos-select, var(--atmos-faint)); /* non-selected: slightly lifted so the list reads, active still strongest */
   white-space: nowrap;
   transition: color 0.6s var(--ease-luxury);
 }
