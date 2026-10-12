@@ -19,6 +19,15 @@
   --gold-dark: #A8843C;
   --white: #FFFFFF;
 
+  /* Semantic text tokens (readability pass). Warm, so they preserve the editorial feel, but tuned to
+     WCAG AA: secondary ≈ 6.3–7:1 and tertiary ≈ 4.5–5:1 on the cream/beige family. Headlines keep
+     using --deep-charcoal/--charcoal (strongest); these are for secondary body/sub and tertiary
+     eyebrows/labels/metadata — a measured upgrade from the too-faint --muted (3.1:1 on cream). */
+  --text-secondary-on-light: #5B544B;   /* body / sub-lines — comfortable reading */
+  --text-tertiary-on-light: #786857;    /* eyebrows / labels / metadata — secondary but legible */
+  --text-secondary-on-dark: rgba(250, 247, 242, 0.82);
+  --text-tertiary-on-dark: rgba(250, 247, 242, 0.62);
+
   /* next/font (layout.tsx) exposes --font-cormorant / --font-dm-sans on <html>;
      fall back to the literal family, then a system serif/sans. */
   --font-serif: var(--font-cormorant), 'Cormorant Garamond', Georgia, serif;
@@ -286,13 +295,19 @@ h1, h2, h3, h4 {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 20px;
+  padding: 0 44px; /* clear of the viewport edges; long copy truncates rather than touching */
   text-align: center;
   font-family: var(--font-sans);
   font-size: 11px;
   font-weight: 300;
+  line-height: 1; /* fixed line box → the 38px bar never shifts between messages */
   letter-spacing: 0.1em;
-  color: rgba(250, 247, 242, 0.85);
+  /* single, controlled line — clipped by the bar's overflow:hidden, never wrapping or overlapping */
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: rgba(250, 247, 242, 0.9);
 }
 
 /* ─── Header ─── */
@@ -1347,7 +1362,7 @@ h1, h2, h3, h4 {
 
 .footer__statement-sub {
   font-size: 13px;
-  color: rgba(250,247,242,0.45);
+  color: rgba(250,247,242,0.62); /* readability pass: footer italic brand line */
   font-style: italic;
   font-family: var(--font-serif);
 }
@@ -1370,7 +1385,7 @@ h1, h2, h3, h4 {
 
 .footer__brand-col p {
   font-size: 13px;
-  color: rgba(250,247,242,0.45);
+  color: rgba(250,247,242,0.6); /* readability pass: footer brand paragraph */
   line-height: 1.8;
   max-width: 240px;
 }
@@ -1379,7 +1394,7 @@ h1, h2, h3, h4 {
   font-size: 9px;
   letter-spacing: 0.25em;
   text-transform: uppercase;
-  color: rgba(250,247,242,0.4);
+  color: rgba(250,247,242,0.6); /* readability pass: footer column headings */
   margin-bottom: 20px;
   font-weight: 500;
 }
@@ -1405,7 +1420,7 @@ h1, h2, h3, h4 {
 
 .footer__copyright {
   font-size: 11px;
-  color: rgba(250,247,242,0.3);
+  color: rgba(250,247,242,0.5); /* readability pass: copyright — quiet but legible */
   letter-spacing: 0.05em;
 }
 
@@ -1418,7 +1433,7 @@ h1, h2, h3, h4 {
   font-size: 11px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(250,247,242,0.4);
+  color: rgba(250,247,242,0.58); /* readability pass: footer social links */
   transition: color 0.3s;
 }
 
@@ -3724,9 +3739,12 @@ h1, h2, h3, h4 {
 .home-hero__scrim {
   position: absolute;
   inset: 0;
+  /* Localized readability overlay — a WARM near-black gradient strongest behind the (left) copy
+     column, fading out by ~72% so the photographic subject on the right stays untouched. Scaled by
+     the CMS Overlay Strength (overlayOpacity) when set. Warm tone keeps it editorial, not a dark banner. */
   background:
-    linear-gradient(to right, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.12) 55%, transparent 82%),
-    linear-gradient(to bottom, rgba(0, 0, 0, 0.32) 0%, transparent 22%);
+    linear-gradient(95deg, rgba(10, 7, 4, 0.58) 0%, rgba(10, 7, 4, 0.34) 30%, rgba(10, 7, 4, 0.12) 54%, rgba(10, 7, 4, 0) 72%),
+    linear-gradient(to bottom, rgba(10, 7, 4, 0.34) 0%, rgba(10, 7, 4, 0) 24%);
 }
 .home-hero__inner {
   position: relative;
@@ -3763,11 +3781,14 @@ h1, h2, h3, h4 {
   font-size: 15px;
   font-weight: 300;
   line-height: 1.8;
-  color: rgba(250, 247, 242, 0.72);
+  color: rgba(250, 247, 242, 0.88); /* readable tagline over the localized overlay (was 0.72) */
   max-width: 420px;
   margin-bottom: 44px;
 }
 .home-hero__cta-row { display: flex; gap: 24px; flex-wrap: wrap; align-items: center; }
+/* outlined primary CTA — keep it clearly readable without out-weighing the title (text stays ivory;
+   only the border firms up from the global ghost default so the outline survives bright photo areas) */
+.home-hero__cta { border-color: rgba(250, 247, 242, 0.7); }
 
 /* Optional secondary line (e.g. fragrance notes) + secondary CTA — additive; absent → unchanged */
 .home-hero__notes {
@@ -3776,7 +3797,7 @@ h1, h2, h3, h4 {
   font-weight: 300;
   letter-spacing: 0.14em;
   line-height: 1.7;
-  color: rgba(250, 247, 242, 0.6);
+  color: rgba(250, 247, 242, 0.8); /* fragrance-note line — readable but still below the tagline (was 0.6) */
   max-width: 420px;
   margin: -28px 0 40px;
 }
@@ -3788,26 +3809,45 @@ h1, h2, h3, h4 {
 .hero-slider { position: relative; overflow: hidden; }
 .hero-slider__track { display: flex; transition: transform 0.6s cubic-bezier(0, 0, 0.2, 1); }
 .hero-slider__slide { flex: 0 0 100%; min-width: 100%; }
+/* Nav arrows — positioned on the SLIDER container (not the content column), vertically centred, held
+   close to the outer edges. Translucent DARK disc + thin light border + ivory chevron → legible over
+   both dark and light hero photography, without a bright-white button look. */
 .hero-slider__arrow {
-  position: absolute; top: 50%; transform: translateY(-50%); z-index: 3;
-  width: 46px; height: 46px; border-radius: 50%;
+  position: absolute; top: 50%; transform: translateY(-50%); z-index: 4;
+  width: 44px; height: 44px; border-radius: 50%;
   display: grid; place-items: center;
-  background: rgba(250, 247, 242, 0.14); border: 1px solid rgba(250, 247, 242, 0.35);
-  color: var(--ivory, #faf7f2); font-size: 26px; line-height: 1; cursor: pointer;
-  backdrop-filter: blur(4px); transition: background 0.2s ease, border-color 0.2s ease;
+  background: rgba(20, 14, 10, 0.34); border: 1px solid rgba(250, 247, 242, 0.55);
+  color: var(--ivory, #faf7f2); font-size: 24px; line-height: 1; cursor: pointer;
+  -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+  transition: background 0.25s ease, border-color 0.25s ease;
 }
-.hero-slider__arrow:hover { background: rgba(250, 247, 242, 0.28); border-color: rgba(250, 247, 242, 0.6); }
+/* Expand the tap target to ~56px without enlarging the visible disc (comfortable on touch). */
+.hero-slider__arrow::before { content: ""; position: absolute; inset: -6px; border-radius: 50%; }
+.hero-slider__arrow:hover { background: rgba(20, 14, 10, 0.5); border-color: rgba(250, 247, 242, 0.82); }
 .hero-slider__arrow:focus-visible { outline: 2px solid var(--ivory, #faf7f2); outline-offset: 2px; }
 .hero-slider__arrow span { margin-top: -3px; } /* optical centering of the chevron glyph */
 .hero-slider__arrow--prev { left: 24px; }
 .hero-slider__arrow--next { right: 24px; }
-.hero-slider__dots { position: absolute; left: 0; right: 0; bottom: 22px; z-index: 3; display: flex; gap: 9px; justify-content: center; }
-.hero-slider__dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(250, 247, 242, 0.4); transition: background 0.2s ease; }
+.hero-slider__dots { position: absolute; left: 0; right: 0; bottom: 22px; z-index: 4; display: flex; gap: 9px; justify-content: center; }
+.hero-slider__dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(250, 247, 242, 0.45); transition: background 0.2s ease; }
 .hero-slider__dot.is-active { background: rgba(250, 247, 242, 0.95); }
-@media (max-width: 640px) {
-  .hero-slider__arrow { width: 38px; height: 38px; font-size: 22px; }
-  .hero-slider__arrow--prev { left: 10px; }
-  .hero-slider__arrow--next { right: 10px; }
+@media (max-width: 900px) {
+  .hero-slider__arrow--prev { left: 18px; }
+  .hero-slider__arrow--next { right: 18px; }
+}
+@media (max-width: 600px) {
+  .hero-slider__arrow { width: 40px; height: 40px; font-size: 22px; }
+  .hero-slider__arrow--prev { left: 14px; }
+  .hero-slider__arrow--next { right: 14px; }
+}
+/* Mobile crops can place bright image areas behind the copy — strengthen the readability overlay a
+   touch so hero text stays comfortable, without darkening the whole frame. */
+@media (max-width: 768px) {
+  .home-hero__scrim {
+    background:
+      linear-gradient(100deg, rgba(10, 7, 4, 0.62) 0%, rgba(10, 7, 4, 0.42) 46%, rgba(10, 7, 4, 0.18) 74%, rgba(10, 7, 4, 0.04) 100%),
+      linear-gradient(to bottom, rgba(10, 7, 4, 0.4) 0%, rgba(10, 7, 4, 0) 30%);
+  }
 }
 @media (prefers-reduced-motion: reduce) { .hero-slider__track { transition: none; } }
 
@@ -3901,7 +3941,7 @@ h1, h2, h3, h4 {
   font-weight: 500;
   letter-spacing: 0.25em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--text-tertiary-on-light);
   margin-bottom: 9px;
 }
 .home-chapters__heading {
@@ -3917,7 +3957,7 @@ h1, h2, h3, h4 {
   font-style: italic;
   font-size: 15px;
   line-height: 1.7;
-  color: var(--smoke);
+  color: var(--text-secondary-on-light); /* readability pass: lift the faint italic sub-line (kept below the heading) */
 }
 
 /* ── Editorial Chapter Rail (reusable) ── */
@@ -4176,7 +4216,7 @@ h1, h2, h3, h4 {
   font-weight: 500;
   letter-spacing: 0.25em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--text-tertiary-on-light);
   margin-bottom: 22px;
 }
 .home-story__heading {
@@ -4192,7 +4232,7 @@ h1, h2, h3, h4 {
   font-family: var(--font-serif);
   font-size: 18px;
   line-height: 1.8;
-  color: var(--smoke);
+  color: var(--text-secondary-on-light); /* readability pass: comfortable body copy on the cream panel */
   margin-bottom: 52px; /* let the CTA breathe */
 }
 /* Optional single editorial sentence (campaign alternative to the body) */
@@ -4237,17 +4277,19 @@ h1, h2, h3, h4 {
   min-height: 92vh;
   overflow: hidden;
   isolation: isolate;
-  /* copy reads on a dark field by default */
+  /* copy reads on a dark field by default. Readability pass: soft/faint lifted so secondary copy
+     (scene/memory, type, chapter) and tertiary metadata (labels, the right-hand selector) stay
+     clearly readable over photography — hierarchy preserved: ink > soft > faint. */
   --atmos-ink: var(--ivory);
-  --atmos-soft: rgba(250, 247, 242, 0.72);
-  --atmos-faint: rgba(250, 247, 242, 0.46);
+  --atmos-soft: rgba(250, 247, 242, 0.82);
+  --atmos-faint: rgba(250, 247, 242, 0.62);
   --atmos-line: rgba(250, 247, 242, 0.16);
   --atmos-rule: rgba(201, 169, 110, 0.55); /* the Atmosphere-Index leader line — visible gold on dark */
 }
 .home-atmosphere[data-scheme="on-light"] {
   --atmos-ink: var(--deep-charcoal);
-  --atmos-soft: rgba(42, 42, 42, 0.74);
-  --atmos-faint: rgba(42, 42, 42, 0.5);
+  --atmos-soft: rgba(42, 42, 42, 0.82);
+  --atmos-faint: rgba(42, 42, 42, 0.64);
   --atmos-line: rgba(42, 42, 42, 0.14);
   --atmos-rule: rgba(120, 88, 44, 0.6); /* darker so the leader line stays readable on a light field */
 }
@@ -4605,7 +4647,7 @@ h1, h2, h3, h4 {
 .home-living__line {
   font-family: var(--font-serif);
   font-style: italic;
-  color: var(--smoke);
+  color: var(--text-secondary-on-light); /* readability pass: the italic plate caption */
   margin-top: 14px;
   line-height: 1.5;
 }
@@ -4689,7 +4731,7 @@ h1, h2, h3, h4 {
   font-size: 11px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--text-tertiary-on-light); /* readability pass: the small "— Samorah" attribution, still quiet */
   text-align: right;
 }
 
@@ -4775,6 +4817,20 @@ h1, h2, h3, h4 {
   width: 100%;
   overflow: hidden;
 }
+/* Readability pass: a subtle local gradient at the bottom-left, fading in ONLY with the hover caption
+   (image stays clean at rest). Keeps the hover label legible over light photographs without a heavy
+   text-shadow or darkening the whole image. */
+.home-editorial__frame::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 46%;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.44) 0%, rgba(0, 0, 0, 0) 100%);
+  opacity: 0;
+  transition: opacity 0.6s var(--ease-luxury);
+  pointer-events: none;
+}
+.home-editorial__plate:hover .home-editorial__frame::after { opacity: 1; }
 .home-editorial__reveal { position: absolute; inset: 0; }
 .home-editorial__image {
   position: absolute;
@@ -4795,7 +4851,8 @@ h1, h2, h3, h4 {
   font-size: 12px;
   letter-spacing: 0.04em;
   color: var(--ivory);
-  text-shadow: 0 1px 16px rgba(0, 0, 0, 0.45);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5); /* light halo; the local hover gradient does the real lifting */
+  z-index: 1; /* sits above the frame's hover gradient (::after) */
   opacity: 0;
   transition: opacity 0.6s var(--ease-luxury);
   pointer-events: none;
@@ -4890,7 +4947,7 @@ h1, h2, h3, h4 {
   font-family: var(--font-serif);
   font-size: clamp(15px, 1.3vw, 17px);
   line-height: 1.6;
-  color: var(--muted);
+  color: var(--text-secondary-on-light); /* readability pass: newsletter explanatory copy */
 }
 
 .home-letters__form {
@@ -4925,7 +4982,7 @@ h1, h2, h3, h4 {
   color: var(--charcoal);
   transition: border-color 0.55s var(--ease-luxury);
 }
-.home-letters__input::placeholder { color: var(--muted); }
+.home-letters__input::placeholder { color: var(--text-tertiary-on-light); }
 /* on focus, only the underline shifts from muted grey to warm gold */
 .home-letters__input:focus { outline: none; border-bottom-color: var(--gold); }
 
@@ -4956,8 +5013,8 @@ h1, h2, h3, h4 {
   font-family: var(--font-sans);
   font-size: 11px;
   letter-spacing: 0.12em;
-  color: var(--muted);
-  opacity: 0.8;
+  color: var(--text-tertiary-on-light); /* readability pass: the tiny promise — quiet but no longer disappearing */
+  opacity: 0.9;
 }
 
 /* the inline confirmation that replaces the form (fades in only) */
