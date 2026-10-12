@@ -75,7 +75,7 @@ export default async function ProductRoute({
   if (!product) {
     // Air products live in config/theHours (no DB rows yet) — same UI + builder.
     const air = getHourBySlug(slug);
-    if (!air) notFound();
+    if (!air) notFound(); // unknown slug → 404 (not a soft-404)
     const others = air.volume.groups
       .flatMap((g) => g.hours)
       .filter((h) => h.productSlug !== slug);
