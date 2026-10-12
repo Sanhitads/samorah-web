@@ -24,7 +24,8 @@ export function HeroSlider({ slides }: { slides: HeroCampaign[] }) {
     <div className="hero-slider" role="region" aria-roledescription="carousel" aria-label="Homepage hero">
       <div className="hero-slider__track" style={{ transform: `translateX(-${idx * 100}%)` }}>
         {slides.map((s, k) => (
-          <div className="hero-slider__slide" key={s.id ?? k} aria-hidden={k !== idx}>
+          // key by index: both slides merge the SAME active campaign, so s.id is identical — index is the stable, unique key
+          <div className="hero-slider__slide" key={k} aria-hidden={k !== idx}>
             <Hero campaign={s} />
           </div>
         ))}
@@ -37,7 +38,7 @@ export function HeroSlider({ slides }: { slides: HeroCampaign[] }) {
       </button>
       <div className="hero-slider__dots" aria-hidden="true">
         {slides.map((s, k) => (
-          <span key={s.id ?? k} className={`hero-slider__dot${k === idx ? " is-active" : ""}`} />
+          <span key={k} className={`hero-slider__dot${k === idx ? " is-active" : ""}`} />
         ))}
       </div>
     </div>
