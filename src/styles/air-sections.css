@@ -2,6 +2,12 @@
    system as Candle Chapters; its own atmosphere via the monsoon palette. The
    page reads like another chapter of the same library, not another website. */
 
+/* Readability note: the small label/metadata colours below deepen the chapter accent/ink via
+   color-mix (accent→ink, ink→surface). This assumes the air-chapter palette invariant — a LIGHT
+   --surface with a DARK --ink and an accent lighter than the mix target (held by airChapterVars in
+   src/lib/airFromProduct.ts; today only the-everyday / monsoon). If a future air volume ships a
+   dark/inverted or atypically-light palette, spot-check these mixes for that palette. */
+
 .hours-group,
 .future-volume__inner {
   width: min(var(--container), 100% - 48px);
@@ -49,7 +55,9 @@ main[data-experience="air-chapters"] #hours-linen {
   font-size: 11px;
   letter-spacing: 0.3em;
   text-transform: uppercase;
-  color: var(--accent, var(--gold));
+  /* readability: deepen the accent toward ink for this small label so it stops disappearing on the
+     pale surface (2.3→~4.7:1), keeping the chapter's accent hue — soft, not loud. */
+  color: color-mix(in srgb, var(--accent, var(--gold)) 55%, var(--ink, #2a2a2a));
   margin-bottom: 16px;
 }
 .hours-group__title {
@@ -117,21 +125,23 @@ main[data-experience="air-chapters"] #hours-linen {
   font-size: 12px;
   letter-spacing: 0.3em;
   text-transform: uppercase;
-  color: var(--accent, var(--gold));
+  color: color-mix(in srgb, var(--accent, var(--gold)) 55%, var(--ink, #2a2a2a)); /* readability: deepened accent */
   margin-bottom: 6px;
 }
 .hour-block__edition {
   font-family: var(--font-sans);
   font-size: 12px;
   letter-spacing: 0.14em;
-  color: var(--accent, var(--gold));
+  color: color-mix(in srgb, var(--accent, var(--gold)) 55%, var(--ink, #2a2a2a)); /* readability: deepened accent */
   margin-bottom: 14px;
 }
 .hour-block__moment {
   font-family: var(--font-serif);
   font-style: italic;
   font-size: 14px;
-  color: var(--ink-muted, var(--muted));
+  /* readability: the "moment" line was the faintest copy (2.9:1) — lift to a readable-but-still-soft
+     tone (~4.6:1), kept below --ink-soft so it stays the quietest tier. */
+  color: color-mix(in srgb, var(--ink, #2a2a2a) 66%, var(--surface, #faf7f2));
   margin-bottom: 18px;
 }
 .hour-block__name {
@@ -145,7 +155,7 @@ main[data-experience="air-chapters"] #hours-linen {
   font-size: 11px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--ink-muted, var(--muted));
+  color: color-mix(in srgb, var(--ink, #2a2a2a) 66%, var(--surface, #faf7f2)); /* readability: lift the product-type label out of near-invisibility */
   margin-top: 12px;
 }
 .hour-block__scent {
