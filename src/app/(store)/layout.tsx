@@ -48,12 +48,16 @@ export default async function StoreLayout({
   const footerMeta = await getFooterMeta();
   const banner = await getPromoBanner();
   const showBanner = banner.enabled && !!banner.message;
+  // Top-bar offset the FLOATING header + hero sit below. Each visible bar is 38px: the announcement
+  // bar (unless hidden in Settings) + the promo banner when shown. Injected explicitly so hiding the
+  // announcement bar correctly removes its 38px (no gap) — default stays 38px (announcement only).
+  const topBars = (settings.announcement.hidden ? 0 : 38) + (showBanner ? 38 : 0);
 
   return (
     <ShippingConfigProvider freeShippingThresholdInr={settings.shipping.freeThreshold}>
-      {/* When the promo banner shows, widen the top-bars offset so the FLOATING header sits under BOTH
-          the announcement bar and the banner (each 38px) instead of overlapping the banner. */}
-      {showBanner ? <style dangerouslySetInnerHTML={{ __html: ":root{--top-bars:76px}" }} /> : null}
+      {/* Top-bars offset for the FLOATING header + hero — accounts for the announcement bar (unless
+          hidden) and the promo banner (each 38px). Injected explicitly so hiding the bar removes its gap. */}
+      <style dangerouslySetInnerHTML={{ __html: `:root{--top-bars:${topBars}px}` }} />
       {preview ? <div className="store-notice" role="status" style={{ background: "#8a3d2f", color: "#fff" }}>Previewing draft navigation — not live.{" "}<ClearPreviewLink cookie="nav_preview">Exit preview</ClearPreviewLink></div> : null}
       {settings.storeNotice.active && settings.storeNotice.text ? (
         <div className="store-notice" role="status">{settings.storeNotice.text}</div>

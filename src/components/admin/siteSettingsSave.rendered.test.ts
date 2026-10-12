@@ -13,7 +13,7 @@ const settings: SiteSettings = {
   social: { instagram: "", pinterest: "", spotify: "", facebook: "" },
   seo: { titleSuffix: " · S", defaultDescription: "", ogImageUrl: "" },
   analytics: { gaId: "" },
-  announcement: { text: "", active: false, link: "" },
+  announcement: { text: "", active: false, link: "", hidden: false },
   features: Object.fromEntries(FEATURE_KEYS.map((k) => [k, false])) as SiteSettings["features"],
   maintenance: { enabled: false, message: "" },
   storeNotice: { text: "", active: false },

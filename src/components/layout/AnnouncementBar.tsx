@@ -27,6 +27,8 @@ export interface AnnouncementConfig {
   text?: string;
   link?: string;
   active?: boolean;
+  /** Hide the announcement bar entirely (Admin → Settings). The layout drops its 38px offset to match. */
+  hidden?: boolean;
 }
 
 export function AnnouncementBar({ announcement }: { announcement?: AnnouncementConfig }) {
@@ -44,6 +46,9 @@ export function AnnouncementBar({ announcement }: { announcement?: AnnouncementC
     );
     return () => clearInterval(id);
   }, [custom, reduceMotion]);
+
+  // Fully hidden (admin opt-in) — render nothing. (Hooks above still run, so this is hook-safe.)
+  if (announcement?.hidden) return null;
 
   // Admin-set announcement — a single, still message (no rotation), optionally linked.
   if (custom) {

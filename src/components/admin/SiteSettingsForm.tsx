@@ -146,11 +146,13 @@ export function SiteSettingsForm({ settings }: { settings: SiteSettings }) {
       <p className="cfg-hint">The single source of truth for free shipping — this same amount drives the checkout charge, the cart’s “free shipping remaining” hint, and the Shipping Policy copy. Set to 0 to ship everything free.</p>
 
       <p className="cfg-sub">Announcement bar</p>
+      <label className="om-check"><input type="checkbox" checked={s.announcement.hidden} onChange={(e) => g("announcement", "hidden", e.target.checked)} /><span>Hide the announcement bar entirely</span></label>
       <label className="cfg-field"><span>Text</span><input value={s.announcement.text} onChange={(e) => g("announcement", "text", e.target.value)} placeholder="Complimentary shipping over ₹1,499" /></label>
       <div className="cfg-grid">
         <label className="cfg-field"><span>Link (optional)</span><input value={s.announcement.link} onChange={(e) => g("announcement", "link", e.target.value)} /></label>
       </div>
-      <label className="om-check"><input type="checkbox" checked={s.announcement.active} onChange={(e) => g("announcement", "active", e.target.checked)} /><span>Show announcement bar</span></label>
+      <label className="om-check"><input type="checkbox" checked={s.announcement.active} onChange={(e) => g("announcement", "active", e.target.checked)} /><span>Show this custom message (otherwise the default rotation shows)</span></label>
+      <p className="cfg-hint">Leave “Hide” unchecked to keep the bar. When a custom message is set and shown, it replaces the default rotating lines; otherwise the default rotation appears.</p>
 
       <div className="cfg-actions">
         <button type="button" className="ff-btn ff-btn--primary" disabled={busy || pending} onClick={save}>{busy ? "Saving…" : "Save settings"}</button>

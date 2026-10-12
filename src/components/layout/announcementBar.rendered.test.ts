@@ -55,4 +55,11 @@ describe("AnnouncementBar — settings-driven content", () => {
     const el = screen.getByText("Bad link");
     expect(el.tagName).toBe("SPAN");
   });
+
+  it("hidden → renders nothing at all (bar removed)", () => {
+    const { container } = render(h(AnnouncementBar, { announcement: { hidden: true, active: true, text: "Should not show", link: "" } }));
+    expect(container.querySelector(".announcement-bar")).toBeNull();
+    expect(screen.queryByText("Should not show")).toBeNull();
+    expect(screen.queryByText(ROTATION_FIRST)).toBeNull();
+  });
 });
