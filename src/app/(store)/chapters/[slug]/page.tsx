@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import type { CSSProperties } from "react";
 import { getCollectionBySlug, getCollections } from "@/services/collectionService";
+import { candleChaptersOnly, isAirCollectionSlug } from "@/config/theHours";
 import { buildChapterPage, chapterContentVars, chapterAccentCss, chapterGradientCss, type ChapterInput, type ChapterSummary, type ChapterContent } from "@/lib/chapterPage";
 import { isPagePublished } from "@/platform/pageResolver";
 import { PageView, buildPageMetadata } from "@/components/page";
@@ -20,13 +21,18 @@ export const dynamicParams = true;
 export async function generateStaticParams() {
   try {
     const collections = await getCollections();
-    return collections.filter((c) => !c.is_coming_soon).map((c) => ({ slug: c.slug }));
+    // Candle chapters only — the air "The Hours" collections live at /collections/[slug], not here.
+    return candleChaptersOnly(collections.filter((c) => !c.is_coming_soon)).map((c) => ({ slug: c.slug }));
   } catch {
     return []; // DB unreachable at build → render on demand (dynamicParams)
   }
 }
 
 async function loadChapterPage(slug: string) {
+  // The air "The Hours" collections (e.g. The Everyday) are NOT candle chapters — they render at
+  // /collections/[slug] via the air builder. Reject them here so /chapters/<air-slug> 404s instead of
+  // serving the air collection through the candle template (mirrors /collections rejecting candle slugs).
+  if (isAirCollectionSlug(slug)) return null;
   const [collection, all] = await Promise.all([getCollectionBySlug(slug), getCollections()]);
   if (!collection) return null;
   const content = ((collection as { chapter_content?: ChapterContent | null }).chapter_content) ?? undefined;
@@ -39,7 +45,10 @@ async function loadChapterPage(slug: string) {
     const pc = p.pdp_content ?? {};
     return { ...p, chapterImage: ac.chapterImage ?? null, chapterFromPrice: ac.chapterFromPrice != null ? Number(ac.chapterFromPrice) : null, collection_type: pc.collectionType ?? p.collection_type };
   });
-  const page = buildChapterPage({ ...raw, products } as unknown as ChapterInput, all as unknown as ChapterSummary[], {}, content);
+  // The candle chapter navigation + "Next in The Fragrance Library" rail is CANDLE-only: drop the air
+  // "The Hours" collections (e.g. The Everyday) so they don't appear alongside the candle chapters.
+  const candleChapters = candleChaptersOnly(all as unknown as ChapterSummary[]);
+  const page = buildChapterPage({ ...raw, products } as unknown as ChapterInput, candleChapters, {}, content);
   return { page, content };
 }
 

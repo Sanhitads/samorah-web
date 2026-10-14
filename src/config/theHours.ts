@@ -297,6 +297,24 @@ export function getAirVolume(slug: string): AirVolume | undefined {
   return AIR_VOLUMES.find((v) => v.slug === slug);
 }
 
+/** Slugs of the air "The Hours" collections (room / linen sprays). These are NOT candle chapters, so
+ *  they're excluded from every candle surface — the "Next in The Fragrance Library" rail, the
+ *  /chapters route, and the chapters sitemap. The set is the launched AIR_VOLUMES PLUS any air volume
+ *  that exists as a DB collection but isn't a full AIR_VOLUMES entry yet (e.g. the still-coming-soon
+ *  Volume II "the-intimate") — so an air chapter can never leak onto a candle surface, even the day an
+ *  admin flips its is_coming_soon flag. Add new air collection slugs here (or to AIR_VOLUMES). */
+export const AIR_COLLECTION_SLUGS: ReadonlySet<string> = new Set<string>([
+  ...AIR_VOLUMES.map((v) => v.slug), // launched air volumes (the-everyday)
+  "the-intimate", // Volume II — air, still coming soon (not yet a full AIR_VOLUMES entry)
+]);
+export const isAirCollectionSlug = (slug: string | null | undefined): boolean => !!slug && AIR_COLLECTION_SLUGS.has(slug);
+
+/** Keep only candle chapters — drop the air "The Hours" collections. Used to build the candle
+ *  chapter navigation + the "Next in The Fragrance Library" rail from the full collection list. */
+export function candleChaptersOnly<T extends { slug: string }>(chapters: T[]): T[] {
+  return chapters.filter((c) => !isAirCollectionSlug(c.slug));
+}
+
 /** Resolve a single Hour (an air "product") by its productSlug, with its volume
  *  and group — the temporary data source for the Air PDP until real air products
  *  exist. The PDP UI + builder are identical, so the source can swap later. */

@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 import { canonicalUrl } from "@/config/site";
 import { getShopCatalog } from "@/services/shopCatalog";
 import { getCollections } from "@/services/collectionService";
-import { getAirVolumes } from "@/config/theHours";
+import { getAirVolumes, isAirCollectionSlug } from "@/config/theHours";
 import { listSeoOverrides } from "@/services/seoRedirectService";
 import { getRedirectMap, normalizePath } from "@/lib/redirects";
 import { applySitemapSeo, type SitemapEntry } from "@/lib/seo/sitemap";
@@ -34,8 +34,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       getRedirectMap(),
     ]);
     for (const p of products) base.push({ path: `/shop/${p.slug}`, changeFrequency: "weekly", priority: 0.7 });
-    // Exclude coming-soon chapters locally in the sitemap (storefront lifecycle services are unchanged).
-    for (const c of cols) if (!c.is_coming_soon) base.push({ path: `/chapters/${c.slug}`, changeFrequency: "monthly", priority: 0.6 });
+    // Candle chapters only: exclude coming-soon AND the air "The Hours" collections (they're already
+    // listed above under their canonical /collections/<slug> URL, never /chapters/).
+    for (const c of cols) if (!c.is_coming_soon && !isAirCollectionSlug(c.slug)) base.push({ path: `/chapters/${c.slug}`, changeFrequency: "monthly", priority: 0.6 });
 
     const isRedirectSource = (key: string) => redirectMap.has(normalizePath(key));
     return applySitemapSeo(base, overrides, isRedirectSource).map((e) => ({ url: canonicalUrl(e.path), changeFrequency: e.changeFrequency, priority: e.priority }));

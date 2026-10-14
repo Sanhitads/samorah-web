@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { PageView } from "@/components/page";
 import { buildChapterPage, chapterContentVars, chapterAccentCss, chapterGradientCss, type ChapterInput, type ChapterSummary, type ChapterContent } from "@/lib/chapterPage";
+import { candleChaptersOnly } from "@/config/theHours";
 
 /**
  * Live candle-chapter preview surface (review: visual CMS). Rendered inside an <iframe> by the
@@ -63,7 +64,8 @@ export default function CandleChapterPreviewRoute() {
 
   try {
     const content = (draft.chapter?.chapter_content ?? undefined) as ChapterContent | undefined;
-    const page = buildChapterPage(draft.chapter as ChapterInput, (draft.allChapters ?? []) as ChapterSummary[], {}, content);
+    // Match the storefront: the candle rail excludes the air "The Hours" collections.
+    const page = buildChapterPage(draft.chapter as ChapterInput, candleChaptersOnly((draft.allChapters ?? []) as ChapterSummary[]), {}, content);
     const vars = chapterContentVars(content);
     const cid = `chapter-${page.slug}`;
     const scoped = [chapterAccentCss(content, cid), chapterGradientCss(content, cid)].filter(Boolean).join("");
