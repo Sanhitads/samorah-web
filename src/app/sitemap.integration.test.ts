@@ -43,11 +43,18 @@ d("generated sitemap URL correctness (invariant A)", () => {
     expect(new Set(urls).size).toBe(urls.length);
   });
 
-  it("includes home, shop and a representative product / chapter / air-volume", () => {
+  it("includes home, shop, editorial/service pages and a representative product / chapter / air-volume", () => {
     expect(urls).toContain(ORIGIN);            // homepage (bare canonical origin)
     expect(urls).toContain(`${ORIGIN}/shop`);  // shop listing
-    expect(urls).toContain(`${ORIGIN}/about`);   // editorial page (P0-4)
-    expect(urls).toContain(`${ORIGIN}/journal`); // editorial page (P0-4)
+    // Indexable editorial / support pages (SEO Phase 11 — unique metadata + self-canonical).
+    expect(urls).toContain(`${ORIGIN}/our-story`);
+    expect(urls).toContain(`${ORIGIN}/faq`);
+    expect(urls).toContain(`${ORIGIN}/returns-policy`);
+    // /about and /journal are orphan/noindex now and must NOT be advertised; nor must noindex legal pages.
+    expect(urls).not.toContain(`${ORIGIN}/about`);
+    expect(urls).not.toContain(`${ORIGIN}/journal`);
+    expect(urls).not.toContain(`${ORIGIN}/privacy`);
+    expect(urls).not.toContain(`${ORIGIN}/terms`);
     const shape = (re: RegExp) => urls.some((u) => re.test(u));
     // At least one of the data-driven route families should be present in a live DB.
     expect(

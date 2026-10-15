@@ -25,7 +25,9 @@ import { siteStructuredData } from "@/lib/seo/siteLd";
 export default async function StoreLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const settings = await getSiteSettings();
+  // Independent reads run in parallel to cut TTFB (an LCP input): site settings + the cookie jar are
+  // always needed up front (settings gates maintenance; the jar gates draft-nav preview).
+  const [settings, jar] = await Promise.all([getSiteSettings(), cookies()]);
 
   // Maintenance mode (R14) — storefront-only lockout; admin remains accessible.
   // (Fetch nav only when the store actually renders — skip it during a lockout.)
@@ -42,11 +44,9 @@ export default async function StoreLayout({
   // Draft navigation preview (review point 3) — staff-only, gated by a short-lived
   // cookie set from the Navigation admin. Bypasses the nav cache to show the draft.
   let preview = false;
-  const jar = await cookies();
   if (jar.get("nav_preview")) preview = (await requireStaff("editor")).ok;
-  const nav = await getNavigation({ preview });
-  const footerMeta = await getFooterMeta();
-  const banner = await getPromoBanner();
+  // nav depends on `preview`; footer + banner are independent — fetch all three together (was serial).
+  const [nav, footerMeta, banner] = await Promise.all([getNavigation({ preview }), getFooterMeta(), getPromoBanner()]);
   const showBanner = banner.enabled && !!banner.message;
   // Top-bar offset the FLOATING header + hero sit below. Each visible bar is 38px: the announcement
   // bar (unless hidden in Settings) + the promo banner when shown. Injected explicitly so hiding the
@@ -62,7 +62,7 @@ export default async function StoreLayout({
       {settings.storeNotice.active && settings.storeNotice.text ? (
         <div className="store-notice" role="status">{settings.storeNotice.text}</div>
       ) : null}
-      <JsonLd data={siteStructuredData()} />
+      <JsonLd data={siteStructuredData({ description: settings.seo.defaultDescription || undefined })} />
       <AnnouncementBar announcement={settings.announcement} />
       <PromoBanner banner={banner} />
       <AccountSync />

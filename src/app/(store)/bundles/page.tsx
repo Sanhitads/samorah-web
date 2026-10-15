@@ -17,10 +17,12 @@ export function generateMetadata(): Promise<Metadata> {
   return withRouteSeo("/bundles", {
     title: "Build Your Collection",
     description: `Compose a set of three candles and save ${BUNDLE_DISCOUNT_PCT}% — a curated atmosphere, as personal as the rooms you live in.`,
+    alternates: { canonical: "/bundles" },
     openGraph: {
       title: "Build Your Collection · Samorah",
       description: `Choose any three candles and save ${BUNDLE_DISCOUNT_PCT}% on your signature set.`,
       type: "website",
+      url: "/bundles",
     },
   });
 }

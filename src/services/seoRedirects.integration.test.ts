@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 
 /**
@@ -22,8 +22,15 @@ const H = { apikey: KEY!, Authorization: `Bearer ${KEY!}`, "Content-Type": "appl
 const del = (table: string, q: string) => fetch(`${URL}/rest/v1/${table}?${q}`, { method: "DELETE", headers: H });
 
 let svc: typeof import("@/services/seoRedirectService");
-const OLD = "/seo-it-old", MID = "/seo-it-mid", FIN = "/seo-it-final", ROUTE = "/seo-it-route";
-const IDA = "/seo-it-id-a", IDA2 = "/seo-it-id-a2", IDB = "/seo-it-id-b";
+const OLD = "/seo-it-old", ROUTE = "/seo-it-route";
+// Multi-segment namespaced sandbox paths. A SINGLE-segment redirect DESTINATION is (correctly) read as a
+// CMS page slug and rejected when that page doesn't exist; multi-segment paths classify as "unknown" (a
+// soft warning), so these sandbox destinations don't trip the production broken-destination guard.
+const EA = "/seo-it/edit/a", EA_MOVED = "/seo-it/edit/a-moved", EB = "/seo-it/edit/b";
+const ED1 = "/seo-it/edit/dest-1", ED2 = "/seo-it/edit/dest-2";
+const COLD = "/seo-it/chain/old", CMID = "/seo-it/chain/mid", CFIN = "/seo-it/chain/final";
+const VSRC = "/seo-it/validate/src";
+const NONEXISTENT_PAGE = "/seo-it-nonexistent-page-xyz"; // single-segment slug with no CMS page → must be rejected
 const rest = (table: string, q: string) => fetch(`${URL}/rest/v1/${table}?${q}`, { headers: H }).then((r) => r.json());
 const patch = (table: string, q: string, body: unknown) => fetch(`${URL}/rest/v1/${table}?${q}`, { method: "PATCH", headers: { ...H, Prefer: "return=minimal" }, body: JSON.stringify(body) });
 
@@ -33,7 +40,7 @@ const patch = (table: string, q: string, body: unknown) => fetch(`${URL}/rest/v1
 // one active product to make this suite SELF-CONTAINED; without it the "BLOCKS a nonexistent internal
 // destination" assertion silently depended on another test's leftover catalog rows in the shared DB.
 const FX = `seo-it-${Date.now()}`;
-let fxCategoryId = "", fxProductId = "";
+let fxCategoryId = "", fxProductId = "", fxPageSlug = "";
 const insOne = async (table: string, row: unknown) => {
   const r = await fetch(`${URL}/rest/v1/${table}`, { method: "POST", headers: { ...H, Prefer: "return=representation" }, body: JSON.stringify(row) });
   if (!r.ok) throw new Error(`${table} ${await r.text()}`);
@@ -47,14 +54,19 @@ beforeAll(async () => {
   fxCategoryId = cat.id;
   const prod = await insOne("products", { name: FX, slug: `${FX}-prod`, base_sku: FX, category_id: cat.id, status: "active", product_type: "candle", hsn_code: "3406", gst_rate: 12, price: 500, tagline: "t" });
   fxProductId = prod.id;
+  // Seed one CMS page so the destination index is non-empty — makes the single-segment-page rejection
+  // test deterministic (verdictFor only flags a missing page slug when cms_pages is non-empty).
+  fxPageSlug = `${FX}-page`;
+  await insOne("cms_pages", { slug: fxPageSlug, title: FX });
 });
 const WRS = "/seo-it-wrs";
 afterAll(async () => {
   if (!RUN) return;
-  await del("redirects", `from_path=in.(${[OLD, MID, FIN, IDA, IDA2, IDB].join(",")})`);
+  await del("redirects", `from_path=in.(${[OLD, EA, EA_MOVED, EB, COLD, CMID, CFIN, VSRC].join(",")})`);
   await del("seo_overrides", `path=in.(${[ROUTE, WRS, "/about", "/journal"].join(",")})`);
   if (fxProductId) await del("products", `id=eq.${fxProductId}`);
   if (fxCategoryId) await del("categories", `id=eq.${fxCategoryId}`);
+  if (fxPageSlug) await del("cms_pages", `slug=eq.${fxPageSlug}`);
 });
 
 d("custom JSON-LD (mechanism A) reaches the storefront emitter for about/journal (P0-6)", () => {
@@ -119,7 +131,7 @@ d("storefront withRouteSeo override round-trip (P0-1, Invariant 1 at the storefr
     // Add an override — the ACTUAL storefront mapping must change (not just getRouteSeo).
     await svc.upsertSeoOverride({ path: WRS, title: "Override Title", description: "Override description", canonical: `https://samorahstudio.com${WRS}`, robots: "noindex", ogImage: "https://cdn.example/override-og.jpg" }, { confirmed: true });
     const overridden = await svc.withRouteSeo(WRS, base);
-    expect(overridden.title).toBe("Override Title");                       // title override wins
+    expect(overridden.title).toEqual({ absolute: "Override Title" });      // explicit override title wins, marked absolute (template won't append the brand)
     expect(overridden.description).toBe("Override description");            // description override wins
     expect(canon(overridden)).toBe(`https://samorahstudio.com${WRS}`);     // canonical → alternates.canonical
     expect(overridden.robots).toBe("noindex");                             // robots override
@@ -137,39 +149,58 @@ d("storefront withRouteSeo override round-trip (P0-1, Invariant 1 at the storefr
 });
 
 d("redirect editing preserves identity + re-validates the graph (P1)", () => {
+  // SELF-CONTAINED: each test creates its own redirects; this clears them so nothing leaks between tests.
+  afterEach(async () => { await del("redirects", `from_path=in.(${[EA, EA_MOVED, EB].join(",")})`); });
+
   it("editing updates the row by id (id + hits preserved), never inserts a duplicate", async () => {
-    expect((await svc.upsertRedirect({ fromPath: IDA, toPath: "/x" }, { confirmed: true })).ok).toBe(true);
-    const created = (await rest("redirects", `from_path=eq.${IDA}&select=id,hits`))[0];
+    expect((await svc.upsertRedirect({ fromPath: EA, toPath: ED1 }, { confirmed: true })).ok).toBe(true);
+    const created = (await rest("redirects", `from_path=eq.${EA}&select=id,hits`))[0];
     await patch("redirects", `id=eq.${created.id}`, { hits: 7 }); // simulate accrued history
 
     // Edit the destination via update-by-id.
-    expect((await svc.upsertRedirect({ id: created.id, fromPath: IDA, toPath: "/y" }, { confirmed: true })).ok).toBe(true);
-    const afterEdit = (await rest("redirects", `from_path=eq.${IDA}&select=id,to_path,hits`))[0];
+    expect((await svc.upsertRedirect({ id: created.id, fromPath: EA, toPath: ED2 }, { confirmed: true })).ok).toBe(true);
+    const afterEdit = (await rest("redirects", `from_path=eq.${EA}&select=id,to_path,hits`))[0];
     expect(afterEdit.id).toBe(created.id);   // identity preserved
     expect(afterEdit.hits).toBe(7);          // history preserved (an insert would reset to 0)
-    expect(afterEdit.to_path).toBe("/y");
-    expect((await rest("redirects", `from_path=eq.${IDA}&select=id`)).length).toBe(1); // no duplicate row
+    expect(afterEdit.to_path).toBe(ED2);
+    expect((await rest("redirects", `from_path=eq.${EA}&select=id`)).length).toBe(1); // no duplicate row
   });
 
   it("editing the SOURCE path keeps the same id (identity), and re-runs graph validation", async () => {
-    const row = (await rest("redirects", `from_path=eq.${IDA}&select=id`))[0];
-    expect((await svc.upsertRedirect({ id: row.id, fromPath: IDA2, toPath: "/y" }, { confirmed: true })).ok).toBe(true);
-    expect((await rest("redirects", `from_path=eq.${IDA}&select=id`)).length).toBe(0); // old source gone
-    const moved = (await rest("redirects", `from_path=eq.${IDA2}&select=id`))[0];
+    // Create our OWN row (no reliance on a previous test).
+    expect((await svc.upsertRedirect({ fromPath: EA, toPath: ED1 }, { confirmed: true })).ok).toBe(true);
+    const row = (await rest("redirects", `from_path=eq.${EA}&select=id`))[0];
+    expect((await svc.upsertRedirect({ id: row.id, fromPath: EA_MOVED, toPath: ED1 }, { confirmed: true })).ok).toBe(true);
+    expect((await rest("redirects", `from_path=eq.${EA}&select=id`)).length).toBe(0); // old source gone
+    const moved = (await rest("redirects", `from_path=eq.${EA_MOVED}&select=id`))[0];
     expect(moved.id).toBe(row.id); // same identity, source changed
 
     // A source edit that collides with another redirect's source is blocked by the graph analyzer.
-    await svc.upsertRedirect({ fromPath: IDB, toPath: "/z" }, { confirmed: true });
-    const collide = await svc.upsertRedirect({ id: moved.id, fromPath: IDB, toPath: "/y" }, { confirmed: true });
+    await svc.upsertRedirect({ fromPath: EB, toPath: ED2 }, { confirmed: true });
+    const collide = await svc.upsertRedirect({ id: moved.id, fromPath: EB, toPath: ED1 }, { confirmed: true });
     expect(collide.ok).toBe(false);
     expect(collide.analysis?.errors.some((e) => /already sends/i.test(e))).toBe(true);
   });
 });
 
 d("redirect analysis + destination lifecycle (real DB)", () => {
-  it("BLOCKS a nonexistent internal destination", async () => {
+  // SELF-CONTAINED: the chain/loop tests each establish their own CMID→CFIN edge; clear it after each test.
+  afterEach(async () => { await del("redirects", `from_path=in.(${[COLD, CMID, CFIN, VSRC].join(",")})`); });
+
+  it("BLOCKS a nonexistent internal destination (a /shop/<slug> product that doesn't exist)", async () => {
     const a = await svc.analyzeRedirect({ fromPath: OLD, toPath: "/shop/definitely-not-a-real-slug-zzz" });
     expect(a.errors.some((e) => /doesn't resolve|broken/i.test(e))).toBe(true);
+  });
+
+  it("BLOCKS a redirect to a nonexistent SINGLE-SEGMENT CMS page slug (protects the production guard that exposed the bad test data)", async () => {
+    // A single-segment destination is interpreted as a CMS page slug; when no such page exists it MUST be
+    // rejected — this is exactly the correct production behaviour the old single-segment test paths tripped.
+    const a = await svc.analyzeRedirect({ fromPath: VSRC, toPath: NONEXISTENT_PAGE });
+    expect(a.errors.some((e) => /doesn't resolve|broken/i.test(e))).toBe(true);
+    // …and it cannot be persisted even with confirmed:true (errors are not bypassable).
+    const up = await svc.upsertRedirect({ fromPath: VSRC, toPath: NONEXISTENT_PAGE }, { confirmed: true });
+    expect(up.ok).toBe(false);
+    expect((await rest("redirects", `from_path=eq.${VSRC}&select=id`)).length).toBe(0); // nothing written
   });
 
   it("allows a valid live destination (a static storefront route)", async () => {
@@ -190,15 +221,17 @@ d("redirect analysis + destination lifecycle (real DB)", () => {
   });
 
   it("detects a chain and resolves the final destination (warn + flatten)", async () => {
-    expect((await svc.upsertRedirect({ fromPath: MID, toPath: FIN }, { confirmed: true })).ok).toBe(true);
-    const a = await svc.analyzeRedirect({ fromPath: OLD, toPath: MID });
-    expect(a.warnings.some((w) => new RegExp(`already redirects to ${FIN}`, "i").test(w))).toBe(true);
-    expect(a.finalDestination).toBe(FIN);
+    // Self-contained: establish CMID→CFIN ourselves, then COLD→CMID chains through to CFIN.
+    expect((await svc.upsertRedirect({ fromPath: CMID, toPath: CFIN }, { confirmed: true })).ok).toBe(true);
+    const a = await svc.analyzeRedirect({ fromPath: COLD, toPath: CMID });
+    expect(a.warnings.some((w) => new RegExp(`already redirects to ${CFIN}`, "i").test(w))).toBe(true);
+    expect(a.finalDestination).toBe(CFIN);
   });
 
   it("BLOCKS an indirect loop against the live graph", async () => {
-    // MID→FIN exists; adding FIN→MID would loop.
-    const a = await svc.analyzeRedirect({ fromPath: FIN, toPath: MID });
+    // Self-contained: establish CMID→CFIN ourselves; adding CFIN→CMID would then loop.
+    expect((await svc.upsertRedirect({ fromPath: CMID, toPath: CFIN }, { confirmed: true })).ok).toBe(true);
+    const a = await svc.analyzeRedirect({ fromPath: CFIN, toPath: CMID });
     expect(a.errors.some((e) => /loop/i.test(e))).toBe(true);
   });
 });

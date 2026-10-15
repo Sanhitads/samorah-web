@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { ProductPurchasePanel } from "@/components/product/ProductPurchasePanel";
+import { RetiredNotice } from "@/components/product/RetiredNotice";
 import { ProductGallery } from "@/components/product/ProductGallery";
 import { SectionRenderer } from "@/components/sections/SectionRenderer";
 import { bootstrapPlatform } from "@/components/page/bootstrap";
@@ -23,6 +24,7 @@ export function AirProductDetail({
   others,
   preview = false,
   freeShippingThresholdInr,
+  retired = false,
 }: {
   hour: HourEntry;
   group: HourGroup;
@@ -30,6 +32,8 @@ export function AirProductDetail({
   others: HourEntry[];
   preview?: boolean;
   freeShippingThresholdInr?: number;
+  /** Archived/retired product — the historic page stays live (HTTP 200) but is no longer purchasable. */
+  retired?: boolean;
 }) {
   bootstrapPlatform();
   const editorial = buildAirEditorial({ hour, volume, others, freeShippingThresholdInr });
@@ -72,7 +76,7 @@ export function AirProductDetail({
 
   return (
     <main className="pdp pdp--air" data-theme="warm-ivory" data-cid={scopeId} style={mainStyle}>
-      {!preview ? <JsonLd data={airProductLd(hour, volume.tagline)} /> : null}
+      {!preview ? <JsonLd data={airProductLd(hour, volume.tagline, { discontinued: retired })} /> : null}
       {!preview ? <JsonLd data={productBreadcrumb(hour.name, hour.productSlug)} /> : null}
       {hour.customGradientCss ? (
         <style dangerouslySetInnerHTML={{ __html: `[data-cid="${scopeId}"] .pdp__layout .asset-image{background:${hour.customGradientCss} !important}` }} />
@@ -103,22 +107,26 @@ export function AirProductDetail({
           <p className="pdp__meta">{category}</p>
           {hour.scent.length ? <p className="pdp__meta pdp__meta--notes">{hour.scent.join(" · ")}</p> : null}
 
-          <ProductPurchasePanel
-            product={{
-              id: hour.id,
-              slug: hour.productSlug,
-              name: hour.name,
-              chapterName: `The Hours · ${volume.title}`,
-              edition,
-              hour: hour.time,
-              productType: category,
-              vessels: [],
-              sizes: [],
-              variants: [variant],
-              defaultVariantId: hour.id,
-              priceLabel: hour.priceLabel,
-            }}
-          />
+          {retired ? (
+            <RetiredNotice />
+          ) : (
+            <ProductPurchasePanel
+              product={{
+                id: hour.id,
+                slug: hour.productSlug,
+                name: hour.name,
+                chapterName: `The Hours · ${volume.title}`,
+                edition,
+                hour: hour.time,
+                productType: category,
+                vessels: [],
+                sizes: [],
+                variants: [variant],
+                defaultVariantId: hour.id,
+                priceLabel: hour.priceLabel,
+              }}
+            />
+          )}
         </div>
         </div>
       </div>

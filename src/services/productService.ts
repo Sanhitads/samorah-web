@@ -60,14 +60,17 @@ export async function getArchivedProducts() {
   const db = createAdminClient() as any;
   const { data, error } = await db
     .from("products")
-    .select(SHOP_FIELDS)
+    // + visibility/coming-soon so callers can decide sitemap/index eligibility (indexableArchivedProducts).
+    .select(`${SHOP_FIELDS}, is_coming_soon, visible_website`)
     .eq("status", "archived")
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data ?? [];
 }
 
-/** Full product detail: collection + variants + images + fragrance notes. */
+/** Full product detail: collection + variants + images + fragrance notes. Public (anon) client, so RLS
+ *  returns only status='active' rows — archived/draft products resolve to null here (see
+ *  getArchivedProductBySlug for the Archive PDP). */
 export async function getProductBySlug(slug: string) {
   const db = createPublicClient();
   const { data, error } = await db
@@ -76,6 +79,25 @@ export async function getProductBySlug(slug: string) {
       "*, collection:collections!products_collection_id_fkey(id, name, slug, volume, tagline, cover_image_url, is_coming_soon), variants(*), product_images(*), fragrance_notes(layer, note, sort_order)",
     )
     .eq("slug", slug)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+/** Full detail for an ARCHIVED product (the Samorah Archive PDP keeps the historic /shop/[slug] URL live
+ *  as a retired page). Public RLS hides non-active rows, so this uses the SERVER-ONLY admin client (the
+ *  service-role key never reaches the client). Same shape as getProductBySlug, so the PDP builders work
+ *  unchanged. Returns null when no archived product has that slug. */
+export async function getArchivedProductBySlug(slug: string) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = createAdminClient() as any;
+  const { data, error } = await db
+    .from("products")
+    .select(
+      "*, collection:collections!products_collection_id_fkey(id, name, slug, volume, tagline, cover_image_url, is_coming_soon), variants(*), product_images(*), fragrance_notes(layer, note, sort_order)",
+    )
+    .eq("slug", slug)
+    .eq("status", "archived")
     .maybeSingle();
   if (error) throw error;
   return data;

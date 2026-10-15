@@ -8,7 +8,10 @@ import { withRouteSeo, getRouteStructuredData } from "@/services/seoRedirectServ
 
 /** Journal — consumer #3 of the Composable Page framework. Identical wiring to About. */
 export const dynamic = "force-dynamic";
-export const generateMetadata = (): Promise<Metadata> => withRouteSeo("/journal", { title: "Journal" });
+// /journal is an orphan page (nothing links it in the default build) and is not a confirmed launched
+// customer surface — noindex,follow and out of the sitemap until it is launched + linked. An admin
+// seo_override "Set to Index" still wins (via withRouteSeo).
+export const generateMetadata = (): Promise<Metadata> => withRouteSeo("/journal", { title: "Journal", robots: { index: false, follow: true } });
 
 export default async function JournalPage({ searchParams }: { searchParams: Promise<{ preview?: string }> }) {
   const sp = await searchParams;

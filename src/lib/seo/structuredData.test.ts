@@ -8,21 +8,26 @@ import { faqSchema } from "@/lib/chapterPage";
  * and well-formed, and that the emitter never outputs empty/malformed schema. All builders are canonical
  * (commerce/content-derived) — no schema is hand-authored here.
  */
-describe("global Organization + WebSite/SearchAction (siteStructuredData)", () => {
+describe("global Organization + WebSite (siteStructuredData)", () => {
   const g = (siteStructuredData()["@graph"] as Record<string, unknown>[]);
-  it("emits an Organization node", () => {
+  it("emits an Organization node (no logo until a real asset exists — never a 404 reference)", () => {
     const org = g.find((n) => n["@type"] === "Organization")!;
     expect(org).toBeTruthy();
     expect(org.name).toBeTruthy();
     expect(String(org.url)).toMatch(/^https?:\/\//);
     expect(String(org["@id"])).toContain("#organization");
+    expect(org.logo).toBeUndefined(); // omitted: no crawlable logo asset exists yet
   });
-  it("emits a WebSite node with a SearchAction sitelinks searchbox", () => {
+  it("emits a WebSite node with NO SearchAction (there is no public /search route to target)", () => {
     const site = g.find((n) => n["@type"] === "WebSite")!;
     expect(site).toBeTruthy();
-    const action = site.potentialAction as Record<string, unknown>;
-    expect(action["@type"]).toBe("SearchAction");
-    expect(String((action.target as Record<string, unknown>).urlTemplate)).toContain("{search_term_string}");
+    expect(site.potentialAction).toBeUndefined();
+    expect(JSON.stringify(site)).not.toContain("/search");
+  });
+  it("uses the provided (admin/settings) description when supplied", () => {
+    const g2 = (siteStructuredData({ description: "Candles and home fragrance, handmade in India." })["@graph"] as Record<string, unknown>[]);
+    const org = g2.find((n) => n["@type"] === "Organization")!;
+    expect(org.description).toBe("Candles and home fragrance, handmade in India.");
   });
 });
 

@@ -24,6 +24,8 @@ export async function generateMetadata(): Promise<Metadata> {
     title,
     description,
     alternates: { canonical: "/terms" },
+    // Legal page: noindex, follow (kept out of the sitemap too). An admin seo_override can flip it.
+    robots: { index: false, follow: true },
     openGraph: {
       title,
       description,

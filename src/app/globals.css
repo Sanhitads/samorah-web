@@ -3726,16 +3726,20 @@ h1, h2, h3, h4 {
   inset: 0;
   /* .grad-* paints the placeholder atmosphere; --photo carries a real image */
 }
+/* --photo / --mobile now carry a real <img> (SEO/LCP) instead of a CSS background: object-fit + object-
+   position reproduce the previous cover-crop + focal framing exactly, so the look is unchanged. */
 .home-hero__bg--photo {
-  background-size: cover;
-  background-position: var(--focal-d, center);
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: var(--focal-d, center);
 }
-/* Art-directed mobile crop (#21) — a separately-cropped mobile background, shown only on phones and only
+/* Art-directed mobile crop (#21) — a separately-cropped mobile image, shown only on phones and only
    when one is set (`--has-mobile`), so heroes without a mobile crop are unchanged. */
-.home-hero__bg--mobile { display: none; background-size: cover; background-position: center; }
-/* Per-breakpoint focal (#21) — reframe the hero background on phones when a mobile focal is set. */
+.home-hero__bg--mobile { display: none; width: 100%; height: 100%; object-fit: cover; object-position: center; }
+/* Per-breakpoint focal (#21) — reframe the hero image on phones when a mobile focal is set. */
 @media (max-width: 768px) {
-  .home-hero__bg--photo { background-position: var(--focal-m, var(--focal-d, center)); }
+  .home-hero__bg--photo { object-position: var(--focal-m, var(--focal-d, center)); }
   .home-hero__bg--has-mobile { display: none; }
   .home-hero__bg--mobile { display: block; }
 }

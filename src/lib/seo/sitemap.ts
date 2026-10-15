@@ -22,6 +22,17 @@ export function isValidPriority(n: number): boolean { return Number.isFinite(n) 
 export interface SitemapEntry { path: string; changeFrequency: ChangeFreq; priority: number }
 export interface SeoOverrideLite { path: string; robots: string; sitemapPriority: string; changeFreq: string }
 
+/**
+ * Which archived products belong in the sitemap (and on the public Archive). The Archive keeps a
+ * genuinely-published, retired product live at its historic /shop/[slug] (HTTP 200, self-canonical,
+ * indexable), so those URLs are eligible. Input is already status='archived' (so drafts/unpublished
+ * never reach here); this additionally drops anything hidden from the website (`visible_website === false`)
+ * or still coming-soon, and anything without a slug. Pure + unit-testable.
+ */
+export function indexableArchivedProducts<T extends { slug?: string | null; is_coming_soon?: boolean | null; visible_website?: boolean | null }>(products: T[]): T[] {
+  return (products ?? []).filter((p) => !!p?.slug && p.visible_website !== false && !p.is_coming_soon);
+}
+
 /** Normalized sitemap key — folds "" (home) and "/" together so it matches an override stored as "/". */
 const keyOf = (p: string): string => normalizePath(p) || "/";
 

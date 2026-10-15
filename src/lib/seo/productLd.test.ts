@@ -24,6 +24,56 @@ describe("productLd — candle Product + Offer schema (P0-7)", () => {
     const ld = productLd({ name: "X", slug: "x", gallery: [{ src: "gradient:grad-air" }], priceLabel: "", variants: [{ price: 599, inStock: true }] });
     expect(ld.image).toBeUndefined();
   });
+
+  it("truthfulness: an UNPRICED / coming-soon product emits NO Offer and never ₹0 + InStock", () => {
+    const ld = productLd({ name: "Coming Soon", slug: "coming-soon", gallery: [], priceLabel: "", variants: [] });
+    expect(ld["@type"]).toBe("Product");
+    expect(ld.offers).toBeUndefined(); // no ₹0 Offer
+    expect(JSON.stringify(ld)).not.toContain("InStock"); // no fabricated availability
+  });
+
+  it("truthfulness: a priced product with every variant out of stock reports OutOfStock (no fabricated InStock)", () => {
+    const ld = productLd({ name: "Sold Out", slug: "sold-out", gallery: [], priceLabel: "₹999", variants: [{ price: 999, inStock: false }] });
+    const offers = ld.offers as Record<string, unknown>;
+    expect(offers.price).toBe(999);
+    expect(offers.availability).toBe("https://schema.org/OutOfStock");
+  });
+
+  it("archived/discontinued: emits NO Offer at all (no price, no availability, no InStock) — the retired page shows none", () => {
+    const ld = productLd({ name: "Retired Edition", slug: "retired", gallery: [], priceLabel: "₹1,200", variants: [{ price: 1200, inStock: true }], discontinued: true });
+    expect(ld["@type"]).toBe("Product");
+    expect(ld.offers).toBeUndefined(); // no commercial offer on a non-purchasable page
+    const s = JSON.stringify(ld);
+    expect(s).not.toContain("Offer");
+    expect(s).not.toContain("InStock");
+    expect(s).not.toContain("1200"); // never an invented/historical price
+    // the Product itself stays intact (name/url/brand) so the retired page still carries valid markup
+    expect(ld.name).toBe("Retired Edition");
+    expect(String(ld.url)).toMatch(/\/shop\/retired$/);
+    expect((ld.brand as Record<string, unknown>).name).toBe("Samorah");
+  });
+
+  it("emits absolute product url, itemCondition and the canonical 'Samorah' brand casing", () => {
+    const ld = productLd({ name: "Amber", slug: "amber", gallery: [], priceLabel: "₹1,000", variants: [{ price: 1000, inStock: true }], sku: "SAM-AMBER-200" });
+    expect(ld.sku).toBe("SAM-AMBER-200");
+    expect(String(ld.url)).toMatch(/\/shop\/amber$/);
+    expect((ld.brand as Record<string, unknown>).name).toBe("Samorah"); // not all-caps COMMERCE casing
+    expect((ld.offers as Record<string, unknown>).itemCondition).toBe("https://schema.org/NewCondition");
+  });
+});
+
+describe("productLd — SKU is optional and never invented (item 4)", () => {
+  const base = { name: "X", slug: "x", gallery: [], priceLabel: "₹999", variants: [{ price: 999, inStock: true }] };
+  it("omits `sku` for null / undefined / empty / whitespace-only values", () => {
+    for (const sku of [null, undefined, "", "   ", "\t\n "] as (string | null | undefined)[]) {
+      const ld = productLd({ ...base, sku });
+      expect(ld.sku, `sku=${JSON.stringify(sku)}`).toBeUndefined();
+      expect(JSON.stringify(ld)).not.toContain('"sku"');
+    }
+  });
+  it("renders a genuine SKU value unchanged", () => {
+    expect(productLd({ ...base, sku: "SAM-CAN-007" }).sku).toBe("SAM-CAN-007");
+  });
 });
 
 describe("airProductLd — air/room/linen Product schema via the SHARED builder (P0-7)", () => {

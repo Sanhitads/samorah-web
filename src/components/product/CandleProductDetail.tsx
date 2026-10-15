@@ -6,6 +6,7 @@ import type { CandlePdpContent } from "@/lib/productEditorial";
 import { TrackEvent } from "@/components/analytics/TrackEvent";
 import { productBreadcrumb } from "@/lib/seo/breadcrumbLd";
 import { ProductPurchasePanel } from "@/components/product/ProductPurchasePanel";
+import { RetiredNotice } from "@/components/product/RetiredNotice";
 import { ProductGallery } from "@/components/product/ProductGallery";
 import { SectionRenderer } from "@/components/sections/SectionRenderer";
 import { bootstrapPlatform } from "@/components/page/bootstrap";
@@ -24,6 +25,7 @@ export function CandleProductDetail({
   ld,
   content,
   preview = false,
+  retired = false,
 }: {
   p: ProductPageView;
   editorial: SectionInstance[];
@@ -31,6 +33,8 @@ export function CandleProductDetail({
   ld?: object;
   content?: CandlePdpContent;
   preview?: boolean;
+  /** Archived/retired product — the historic page stays live (HTTP 200) but is no longer purchasable. */
+  retired?: boolean;
 }) {
   bootstrapPlatform(); // register the section library so SectionRenderer resolves each type (also in preview)
 
@@ -108,21 +112,25 @@ export function CandleProductDetail({
               {p.scentGroup ?? ""}
             </p>
 
-            <ProductPurchasePanel
-              product={{
-                id: p.id,
-                slug: p.slug,
-                name: p.name,
-                chapterName: p.chapterName,
-                edition: p.edition,
-                vessels: p.vessels,
-                sizes: p.sizes,
-                variants: p.variants,
-                defaultVariantId: p.defaultVariantId,
-                priceLabel: p.priceLabel,
-                image: p.gallery[0]?.src ?? "",
-              }}
-            />
+            {retired ? (
+              <RetiredNotice />
+            ) : (
+              <ProductPurchasePanel
+                product={{
+                  id: p.id,
+                  slug: p.slug,
+                  name: p.name,
+                  chapterName: p.chapterName,
+                  edition: p.edition,
+                  vessels: p.vessels,
+                  sizes: p.sizes,
+                  variants: p.variants,
+                  defaultVariantId: p.defaultVariantId,
+                  priceLabel: p.priceLabel,
+                  image: p.gallery[0]?.src ?? "",
+                }}
+              />
+            )}
           </div>
         </div>
       </div>

@@ -13,9 +13,12 @@ import { withRouteSeo, getRouteStructuredData } from "@/services/seoRedirectServ
  */
 export const dynamic = "force-dynamic";
 
-/** Metadata reads DB SEO overrides (slice 6) layered over the natural defaults. */
+/** Metadata reads DB SEO overrides (slice 6) layered over the natural defaults. /about is an orphan hub
+ *  (the nav routes "About" to the dedicated /our-story, /craft-materials, /the-people-behind-samorah,
+ *  /contact pages, which carry the real content) — so it is noindex,follow and kept out of the sitemap to
+ *  avoid a thin/duplicate indexed page. An admin seo_override can flip this; a "Set to Index" there wins. */
 export async function generateMetadata(): Promise<Metadata> {
-  return withRouteSeo("/about", { title: "About" });
+  return withRouteSeo("/about", { title: "About", robots: { index: false, follow: true } });
 }
 
 export default async function AboutPage({ searchParams }: { searchParams: Promise<{ preview?: string }> }) {

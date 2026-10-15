@@ -27,6 +27,11 @@ export default (phase: string): NextConfig => ({
   reactStrictMode: true,
   async redirects() {
     return [
+      // Legacy product URL structure → the canonical /shop/[slug]. A single pattern rule (no public
+      // /products route exists, so there is zero collision) 301s every old product URL in one hop to its
+      // canonical target, which is itself never a redirect source — no chains. Not a launch blocker (no
+      // confirmed historic equity on /products), but cheap and safe insurance for any stray/legacy link.
+      { source: "/products/:slug", destination: "/shop/:slug", statusCode: 301 },
       // Returns consolidation — the old short /returns page is retired in favour of the
       // full CMS-managed Returns & Refund Policy. 301 preserves any existing links/SEO.
       { source: "/returns", destination: "/returns-policy", statusCode: 301 },

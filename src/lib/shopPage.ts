@@ -170,10 +170,12 @@ const SORT_LABEL: Record<ShopSort, string> = {
 const isSort = (v: string | undefined): v is ShopSort =>
   v === "featured" || v === "newest" || v === "price-asc" || v === "price-desc";
 
-/** Canonical `/shop` URL for a set of (possibly aliased) params — for rel=canonical. */
+/** Canonical `/shop` URL for a set of (possibly aliased) params — for rel=canonical. Sort order does NOT
+ *  create a genuinely unique indexable page (same products, reordered), so it is dropped from the canonical
+ *  — `/shop?sort=newest` canonicalises to the filtered base. Type/chapter/vessel/tag DO change the product
+ *  set and are kept. */
 export function canonicalShopUrl(params: { type?: string; chapter?: string; vessel?: string; sort?: string; tag?: string }): string {
-  const sort: ShopSort = isSort(params.sort) ? params.sort : "featured";
-  return href(resolveType(params.type), resolveChapter(params.chapter), params.vessel ?? "all", sort, resolveTag(params.tag));
+  return href(resolveType(params.type), resolveChapter(params.chapter), params.vessel ?? "all", "featured", resolveTag(params.tag));
 }
 
 /** Build a `/shop` query string, dropping defaults (type/chapter/vessel/tag=all, sort=featured). */

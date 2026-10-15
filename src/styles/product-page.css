@@ -536,3 +536,21 @@
   .pdp__layout { grid-template-columns: 1fr; gap: 36px; }
   .pdp__info { position: static; }
 }
+
+/* Archived / retired product — shown in place of the purchase panel (SEO Phase 8). Theme-neutral: it
+   borrows the current ink colour so it sits correctly under any PDP palette, no new design tokens. */
+.pdp__retired {
+  border: 1px solid color-mix(in srgb, currentColor 16%, transparent);
+  border-radius: 10px;
+  padding: 1.25rem 1.4rem;
+  margin-top: 0.5rem;
+}
+.pdp__retired-eyebrow {
+  margin: 0 0 0.5rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.68;
+}
+.pdp__retired-copy { margin: 0 0 0.9rem; line-height: 1.6; }
+.pdp__retired-link { display: inline-block; text-decoration: underline; text-underline-offset: 3px; }

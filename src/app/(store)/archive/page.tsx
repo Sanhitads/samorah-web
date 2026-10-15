@@ -3,8 +3,12 @@ import type { Metadata } from "next";
 import { getArchivedProducts } from "@/services/productService";
 import { getEditionMap } from "@/services/collectionService";
 import { buildShopPage, type ShopProductInput } from "@/lib/shopPage";
+import { indexableArchivedProducts } from "@/lib/seo/sitemap";
 import { ProductCard } from "@/components/ui/ProductCard";
 import { withRouteSeo } from "@/services/seoRedirectService";
+
+// Shape the eligibility filter reads (status='archived' rows carry these visibility flags).
+type ArchivedRow = { slug?: string | null; is_coming_soon?: boolean | null; visible_website?: boolean | null };
 
 /**
  * The Samorah Archive — `/archive`. A PERMANENT page: it exists whether or not any product has been
@@ -16,11 +20,21 @@ import { withRouteSeo } from "@/services/seoRedirectService";
 export const revalidate = 300;
 
 export async function generateMetadata(): Promise<Metadata> {
+  // An EMPTY archive is a valid 200 page but thin content → noindex, follow (and it stays out of the
+  // sitemap). Once it holds archived products it becomes index/follow (the root default). An admin
+  // seo_override still wins over this via withRouteSeo.
+  let hasArchived = false;
+  try {
+    hasArchived = indexableArchivedProducts((await getArchivedProducts()) as ArchivedRow[]).length > 0;
+  } catch {
+    hasArchived = false;
+  }
   return withRouteSeo("/archive", {
     title: "The Archive",
     description: "Fragrances that have left the current collection — the Samorah Archive.",
     alternates: { canonical: "/archive" },
     openGraph: { title: "The Archive · Samorah", description: "Fragrances that have left the current collection.", type: "website" },
+    ...(hasArchived ? {} : { robots: { index: false, follow: true } }),
   });
 }
 
@@ -28,7 +42,9 @@ export default async function ArchiveRoute() {
   // Never throw the page into a 404 — a data hiccup degrades to the (valid) empty state.
   let cards: ReturnType<typeof buildShopPage>["cards"] = [];
   try {
-    const [products, editions] = await Promise.all([getArchivedProducts(), getEditionMap()]);
+    const [archived, editions] = await Promise.all([getArchivedProducts(), getEditionMap()]);
+    // Show only publicly-eligible archived products (hidden / coming-soon excluded) — same set the sitemap uses.
+    const products = indexableArchivedProducts(archived as ArchivedRow[]);
     cards = buildShopPage(products as unknown as ShopProductInput[], {}, editions).cards;
   } catch {
     cards = [];

@@ -249,27 +249,83 @@ export async function getEffectiveSeo(path: string): Promise<EffectiveSeo> {
 
 /** Resolved SEO for a route — per-path override layered over global defaults. */
 export interface RouteSeo { title?: string; description?: string; ogImage?: string; robots?: string; canonical?: string; sitemapPriority?: number; changeFreq?: string }
-export async function getRouteSeo(path: string): Promise<RouteSeo> {
+
+/** The per-route override (from the seo_overrides row) and the site-wide defaults, kept SEPARATE so the
+ *  metadata precedence can be explicit. An override row wins over the page's own metadata; the page's own
+ *  metadata wins over the site default; the site default only fills a gap (it must never overwrite a real
+ *  page-/product-specific value). */
+export interface RouteSeoOverride { title?: string; description?: string; ogImage?: string; robots?: string; canonical?: string; sitemapPriority?: number; changeFreq?: string }
+interface RouteSeoLayers { override: RouteSeoOverride; siteDefault: { description?: string; ogImage?: string } }
+
+async function getRouteSeoLayers(path: string): Promise<RouteSeoLayers> {
   const settings = await getSiteSettings();
-  const base: RouteSeo = { description: settings.seo.defaultDescription || undefined, ogImage: settings.seo.ogImageUrl || undefined };
+  const siteDefault = { description: settings.seo.defaultDescription || undefined, ogImage: settings.seo.ogImageUrl || undefined };
+  let override: RouteSeoOverride = {};
   try {
     const db = createAdminClient() as any;
     const { data } = await db.from("seo_overrides").select("*").eq("path", cleanPath(path)).maybeSingle();
-    if (data) return { title: data.title || base.title, description: data.description || base.description, ogImage: data.og_image || base.ogImage, robots: data.robots || undefined, canonical: data.canonical || undefined, sitemapPriority: data.sitemap_priority ?? undefined, changeFreq: data.change_freq || undefined };
-  } catch { /* fall back to defaults */ }
-  return base;
+    if (data) override = { title: data.title || undefined, description: data.description || undefined, ogImage: data.og_image || undefined, robots: data.robots || undefined, canonical: data.canonical || undefined, sitemapPriority: data.sitemap_priority ?? undefined, changeFreq: data.change_freq || undefined };
+  } catch { /* fall back to site defaults only */ }
+  return { override, siteDefault };
 }
 
-/** Overlay a route's DB SEO override onto its natural metadata (override wins). One
- *  line per route: `return withRouteSeo("/shop/"+slug, base)` in generateMetadata. */
-export async function withRouteSeo(path: string, base: Metadata = {}): Promise<Metadata> {
-  const s = await getRouteSeo(path);
+/** Public resolver (unchanged contract): the override merged over the site default. The admin
+ *  "Resolved SEO" panel (getEffectiveSeo) reads from this. */
+export async function getRouteSeo(path: string): Promise<RouteSeo> {
+  const { override, siteDefault } = await getRouteSeoLayers(path);
+  return {
+    title: override.title,
+    description: override.description || siteDefault.description,
+    ogImage: override.ogImage || siteDefault.ogImage,
+    robots: override.robots,
+    canonical: override.canonical,
+    sitemapPriority: override.sitemapPriority,
+    changeFreq: override.changeFreq,
+  };
+}
+
+/** PURE metadata-precedence applier (exported for unit tests). Highest priority first:
+ *   1. per-route override (seo_overrides row)
+ *   2. the page's own generated/CMS base metadata (product/chapter/collection/page SEO, then generated fallback)
+ *   3. site-wide default (description / OG image)
+ *  (4. the framework/root-layout fallback is applied by Next itself and is untouched here.)
+ *  The site default NEVER overwrites a real page-supplied value — it only fills a gap. */
+/** Title policy (SEO): an explicit SEO title — a route override, or a page/product/chapter/collection
+ *  title that already carries the brand — is the COMPLETE intended title, so it is marked `absolute` and
+ *  the root `"%s | Samorah"` template does NOT append the brand again. A bare generated fallback (no brand)
+ *  stays a plain string so the template adds the brand exactly once. Centralized here so every route that
+ *  goes through withRouteSeo gets one consistent policy (no per-page {absolute} patching). */
+export function finalizeTitle(overrideTitle: string | undefined, baseTitle: Metadata["title"]): Metadata["title"] {
+  if (overrideTitle && overrideTitle.trim()) return { absolute: overrideTitle };
+  if (typeof baseTitle === "string") {
+    const hasBrand = new RegExp(`\\b${SITE_CONFIG.brandName}\\b`, "i").test(baseTitle);
+    return hasBrand ? { absolute: baseTitle } : baseTitle;
+  }
+  return baseTitle; // already {absolute}/{default,template} or undefined — leave untouched
+}
+
+export function applyRouteSeo(base: Metadata, override: RouteSeoOverride, siteDefault: { description?: string; ogImage?: string } = {}): Metadata {
+  const baseDescription = base.description as string | undefined;
+  const description = override.description || baseDescription || siteDefault.description;
+  const canonical = override.canonical || ((base.alternates as any)?.canonical as string | undefined);
+  const baseImages = (base.openGraph as any)?.images;
+  const ogImages = override.ogImage ? [override.ogImage] : (baseImages ?? (siteDefault.ogImage ? [siteDefault.ogImage] : undefined));
+  const openGraph = ogImages ? { ...((base.openGraph as any) ?? {}), images: ogImages } : base.openGraph;
+  const twitter = base.twitter ? { ...(base.twitter as any), ...(ogImages ? { images: ogImages } : {}) } : base.twitter;
   return {
     ...base,
-    title: s.title || base.title,
-    description: s.description || (base.description as string | undefined),
-    alternates: s.canonical ? { ...(base.alternates ?? {}), canonical: s.canonical } : base.alternates,
-    openGraph: s.ogImage ? { ...(base.openGraph ?? {}), images: [s.ogImage] } : base.openGraph,
-    robots: s.robots || base.robots,
+    title: finalizeTitle(override.title, base.title),
+    description,
+    alternates: canonical ? { ...(base.alternates ?? {}), canonical } : base.alternates,
+    openGraph,
+    twitter,
+    robots: override.robots || base.robots,
   };
+}
+
+/** Overlay a route's DB SEO override onto its natural metadata, applying the documented precedence. One
+ *  line per route: `return withRouteSeo("/shop/"+slug, base)` in generateMetadata. */
+export async function withRouteSeo(path: string, base: Metadata = {}): Promise<Metadata> {
+  const { override, siteDefault } = await getRouteSeoLayers(path);
+  return applyRouteSeo(base, override, siteDefault);
 }

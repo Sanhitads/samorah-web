@@ -26,7 +26,9 @@ export function HeroSlider({ slides }: { slides: HeroCampaign[] }) {
         {slides.map((s, k) => (
           // key by index: both slides merge the SAME active campaign, so s.id is identical — index is the stable, unique key
           <div className="hero-slider__slide" key={k} aria-hidden={k !== idx}>
-            <Hero campaign={s} />
+            {/* Only the first slide is the page <h1> and the eager/high-priority LCP image; later slides
+                are <h2> and lazy so they neither create a second H1 nor contend with the LCP. */}
+            <Hero campaign={s} headingLevel={k === 0 ? 1 : 2} priority={k === 0} />
           </div>
         ))}
       </div>

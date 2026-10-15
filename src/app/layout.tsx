@@ -43,7 +43,9 @@ export const metadata: Metadata = {
   metadataBase: new URL(canonicalOrigin()),
   title: {
     default: "Samorah — Luxury Handmade Scented Candles",
-    template: "%s · Samorah",
+    // Bare/unbranded page titles get the brand appended exactly once ("%s | Samorah"). Titles that already
+    // carry the brand are marked `absolute` upstream (finalizeTitle), so the template never doubles them.
+    template: "%s | Samorah",
   },
   description:
     "Editorial luxury candles, handmade in India. Fragrance stories steeped in memory, ritual, and craft.",

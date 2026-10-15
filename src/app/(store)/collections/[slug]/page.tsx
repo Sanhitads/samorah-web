@@ -35,7 +35,12 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const vol = await loadAirVolume(slug);
-  return withRouteSeo(`/collections/${slug}`, vol ? buildPageMetadata(buildAirVolumePage(vol)) : {});
+  if (!vol) return withRouteSeo(`/collections/${slug}`, {});
+  const base = buildPageMetadata(buildAirVolumePage(vol));
+  // Self-referencing canonical for the indexable collection page (default when the builder set none). The
+  // builder's branded title is marked absolute centrally by finalizeTitle, so the template won't double it.
+  const canonical = (base.alternates as { canonical?: string } | undefined)?.canonical ?? `/collections/${slug}`;
+  return withRouteSeo(`/collections/${slug}`, { ...base, alternates: { ...(base.alternates ?? {}), canonical } });
 }
 
 export default async function CollectionRoute({

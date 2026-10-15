@@ -87,7 +87,9 @@ export const MENU_BRANCHES: MenuBranch[] = [
     id: "collections",
     label: "Collections",
     items: [
-      { label: "The Hours Collection", href: "/collections/the-hours", tier: "parent" },
+      // TEMP: /collections/the-hours (the Hours umbrella) has no page yet — point at the one live Hours
+      // volume (The Everyday) so the nav never dead-ends. A dedicated Hours umbrella landing is deferred.
+      { label: "The Hours Collection", href: "/collections/the-everyday", tier: "parent" },
       { label: "Volume I — The Everyday", href: "/collections/the-everyday", tier: "child" },
       {
         label: "Volume II — The Intimate",
@@ -95,13 +97,16 @@ export const MENU_BRANCHES: MenuBranch[] = [
         isComingSoon: true,
         tier: "child",
       },
-      { label: "Discover The Collection", href: "/collections", tier: "cta" },
+      // TEMP: there is no /collections index page — point the CTA at the live Hours volume so it never
+      // 404s. Replace with a real /collections (Hours umbrella) landing when one is built.
+      { label: "Discover The Collection", href: "/collections/the-everyday", tier: "cta" },
     ],
     campaign: {
       eyebrow: "The Air Chapters",
       title: "The Hours Collection",
       description: "Fragrance for the unnoticed hours of a day.",
-      href: "/collections/the-hours",
+      // TEMP: no Hours umbrella page yet — link the campaign tile to the live Hours volume (The Everyday).
+      href: "/collections/the-everyday",
       gradient: "grad-air",
     },
   },

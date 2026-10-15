@@ -75,7 +75,12 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const result = await loadChapterPage(slug);
-  return withRouteSeo(`/chapters/${slug}`, result ? buildPageMetadata(result.page) : {});
+  if (!result) return withRouteSeo(`/chapters/${slug}`, {});
+  const base = buildPageMetadata(result.page);
+  // Self-referencing canonical for the indexable chapter page (default when the builder set none). The
+  // builder's branded title is marked absolute centrally by finalizeTitle, so the template won't double it.
+  const canonical = (base.alternates as { canonical?: string } | undefined)?.canonical ?? `/chapters/${slug}`;
+  return withRouteSeo(`/chapters/${slug}`, { ...base, alternates: { ...(base.alternates ?? {}), canonical } });
 }
 
 export default async function ChapterRoute({

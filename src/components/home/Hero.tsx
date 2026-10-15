@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { gradientClass, isGradientPlaceholder } from "@/lib/product";
+import { cldUrl, cldSrcSet } from "@/lib/cloudinaryUrl";
 import { safeHref } from "@/lib/safeHref";
 import type { HeroCampaign } from "@/config/campaigns";
 
@@ -32,9 +33,12 @@ function overlayStyleCss(style: string, op: number | null): CSSProperties | unde
   return op !== null ? { opacity: op } : undefined;
 }
 
-export function Hero({ campaign }: { campaign: HeroCampaign }) {
+export function Hero({ campaign, headingLevel = 1, priority = true }: { campaign: HeroCampaign; headingLevel?: 1 | 2; priority?: boolean }) {
   const reduceMotion = useReducedMotion();
   const animate = campaign.animate !== false && !reduceMotion;
+  // Exactly one logical <h1> per page: when the Hero is a secondary slide (HeroSlider), its heading is
+  // demoted to <h2> with the SAME class, so it is visually identical but doesn't create a second H1.
+  const Heading = headingLevel === 2 ? motion.h2 : motion.h1;
 
   const reveal = (delay: number) =>
     !animate
@@ -70,22 +74,43 @@ export function Hero({ campaign }: { campaign: HeroCampaign }) {
         <div className={`home-hero__bg ${gradientClass(campaign.heroImage) ?? ""}`} aria-hidden="true" />
       ) : (
         <>
-          <div
+          {/* Real <img> layer (SEO + LCP): a Cloudinary-optimized, responsive, preload-scanner-visible
+              image that reproduces the previous background-cover crop via object-fit + object-position
+              (the same focal CSS vars). Decorative (alt="" + aria-hidden) — there is no CMS hero-alt field
+              yet (reported as a content gap). Only the above-the-fold hero is eager/high priority; secondary
+              slides lazy-load so they don't contend with the LCP. Gradient placeholders still render as a
+              div (no <img>), so heroes without real photography are visually unchanged. */}
+          <img
             className={`home-hero__bg home-hero__bg--photo${campaign.heroImage__mobile ? " home-hero__bg--has-mobile" : ""}`}
+            src={cldUrl(campaign.heroImage)}
+            srcSet={cldSrcSet(campaign.heroImage)}
+            sizes="100vw"
+            alt=""
+            aria-hidden="true"
+            decoding="async"
+            loading={priority ? "eager" : "lazy"}
+            fetchPriority={priority ? "high" : "auto"}
             style={{
-              backgroundImage: `url(${campaign.heroImage})`,
-              // Per-breakpoint focal (#21): CSS vars so a media query can reframe on phones (inline
-              // background-position couldn't be overridden by a media query). Absent → center (unchanged).
+              // Per-breakpoint focal (#21): CSS vars a media query can reframe on phones. Absent → center.
               "--focal-d": campaign.heroImage__focal || "center",
               "--focal-m": campaign.heroImage__focalMobile || campaign.heroImage__focal || "center",
-              // "contain" shows the whole image (no crop); it must not tile, so disable repeat.
-              ...(campaign.imageFit === "contain" ? { backgroundSize: "contain", backgroundRepeat: "no-repeat" } : null),
+              // "contain" shows the whole image (no crop) instead of cover.
+              ...(campaign.imageFit === "contain" ? { objectFit: "contain" } : null),
             } as CSSProperties}
-            aria-hidden="true"
           />
           {/* Art-directed mobile crop (#21) — a separately-shaped image shown only on phones. */}
           {campaign.heroImage__mobile ? (
-            <div className="home-hero__bg home-hero__bg--mobile" style={{ backgroundImage: `url(${campaign.heroImage__mobile})` }} aria-hidden="true" />
+            <img
+              className="home-hero__bg home-hero__bg--mobile"
+              src={cldUrl(campaign.heroImage__mobile)}
+              srcSet={cldSrcSet(campaign.heroImage__mobile)}
+              sizes="100vw"
+              alt=""
+              aria-hidden="true"
+              decoding="async"
+              loading={priority ? "eager" : "lazy"}
+              fetchPriority={priority ? "high" : "auto"}
+            />
           ) : null}
         </>
       )}
@@ -98,9 +123,9 @@ export function Hero({ campaign }: { campaign: HeroCampaign }) {
           <motion.p className="home-hero__eyebrow" {...reveal(0)}>
             {campaign.eyebrow}
           </motion.p>
-          <motion.h1 className="home-hero__heading" {...reveal(0.1)}>
+          <Heading className="home-hero__heading" {...reveal(0.1)}>
             {campaign.heading}
-          </motion.h1>
+          </Heading>
           <motion.p className="home-hero__sub" {...reveal(0.22)}>
             {campaign.subheading}
           </motion.p>
