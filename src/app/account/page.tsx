@@ -3,7 +3,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser, getMyOrders, getAccountProfile } from "@/services/accountService";
 import { AccountSettings } from "@/components/account/AccountSettings";
-import { SessionsTabs } from "@/components/account/SessionsTabs";
 
 /** Account center — the customer's home. Middleware gates /account (auth). */
 export const metadata: Metadata = { title: "Your Account", robots: { index: false } };
@@ -118,13 +117,14 @@ export default async function AccountPage() {
         </div>
       </section>
 
-      {/* Devices & sessions */}
-      <section className="acc__section">
-        <div className="acc__section-head"><h2 className="acc__section-title">Security & devices</h2></div>
-        <div className="acc__card">
-          <SessionsTabs devices={profile?.devices ?? []} logins={profile?.logins ?? []} />
-        </div>
-      </section>
+      {/* "Security & devices" (active devices + sign-in history) is intentionally HIDDEN for now — it reads
+          too technical for this audience. The backend device/login tracking stays (security hygiene) and the
+          one security action customers use, "Change password", remains under Connected accounts above. To
+          re-enable, restore the SessionsTabs import and render:
+          <section className="acc__section">
+            <div className="acc__section-head"><h2 className="acc__section-title">Security & devices</h2></div>
+            <div className="acc__card"><SessionsTabs devices={profile?.devices ?? []} logins={profile?.logins ?? []} /></div>
+          </section> */}
     </main>
   );
 }
