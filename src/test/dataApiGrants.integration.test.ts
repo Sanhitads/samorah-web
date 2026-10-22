@@ -35,12 +35,17 @@ const ANON_DENIED = [
 const anonGet = (t: string) =>
   fetch(`${URL}/rest/v1/${t}?select=*&limit=1`, { headers: { apikey: ANON, Authorization: `Bearer ${ANON}` } });
 
-describe("Data API grants — explicit anon surface (Oct-30 compatibility)", () => {
+// Env-gated like every *.integration.test.ts: runs only against a LOCAL Supabase (the integration-guard
+// throws first on any hosted URL). With NO env — e.g. GitHub Actions CI — RUN is false and the suite
+// SKIPS cleanly instead of failing (matches sitemap/redirects/bundle/coupon integration suites).
+const RUN = !!(URL && ANON && SVC && /^https?:\/\/(127\.0\.0\.1|localhost)/.test(URL));
+const d = RUN ? describe : describe.skip;
+
+d("Data API grants — explicit anon surface (Oct-30 compatibility)", () => {
   let allTables: string[] = [];
   let readable: string[] = [];
 
   beforeAll(async () => {
-    expect(URL, "integration env must be LOCAL").toMatch(/^https?:\/\/(127\.0\.0\.1|localhost)/);
     const res = await fetch(`${URL}/rest/v1/`, { headers: { apikey: SVC, Authorization: `Bearer ${SVC}`, Accept: "application/openapi+json" } });
     const oa = await res.json();
     allTables = Object.keys(oa.paths ?? {}).filter((p) => /^\/[a-z]/.test(p) && p !== "/" && !p.startsWith("/rpc/")).map((p) => p.slice(1));
