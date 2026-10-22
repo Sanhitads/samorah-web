@@ -1,15 +1,26 @@
 /**
- * Seed a ready-made set of Phase-1 TEST coupons (every code tagged "[TEST] …" in its description).
- * Idempotent: removes any prior [TEST] coupons first (cascade-drops their targets), then re-creates them
- * against your REAL catalogue (Candles category, Dessert Chapter, Kashmiri Chai, etc).
+ * Seed a ready-made set of TEST coupons (every code tagged "[TEST] …" in its description) into the
+ * LOCAL Supabase catalogue for manual QA. Idempotent: removes any prior [TEST] coupons first, then
+ * re-creates them. LOCAL-ONLY — it refuses any non-local target and has no hosted override.
  *
- *   Seed / re-seed:  node --env-file=.env.local scripts/seed-test-coupons.mjs
- *   Remove them:     node --env-file=.env.local scripts/seed-test-coupons.mjs --clean
+ *   Start local first:  npm run db:start && npm run db:reset
+ *   Seed / re-seed:      node --env-file=.env.test.local scripts/seed-test-coupons.mjs   (local creds)
+ *   Remove them:         node --env-file=.env.test.local scripts/seed-test-coupons.mjs --clean
  *
- * Safe: only ever touches coupons whose description starts with "[TEST]". Never a real coupon.
+ * Safe: local-only, and only ever touches coupons whose description starts with "[TEST]".
  */
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL, KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!URL || !KEY) { console.error("Missing Supabase env — run with --env-file=.env.local"); process.exit(1); }
+// LOCAL-ONLY, no override. This writes synthetic [TEST] coupons and must NEVER be able to modify a
+// hosted/production project — there is intentionally no `--allow-hosted` escape hatch. If you ever need
+// test coupons in a hosted staging environment, do it through a separate, deliberately-written tool, not
+// this script.
+const hostOf = (u) => { try { return new URL(u).host; } catch { return "unknown"; } };
+if (!/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?(\/|$)/i.test(URL)) {
+  console.error(`✗ Refusing to seed [TEST] coupons into a non-local Supabase (${hostOf(URL)}).`);
+  console.error("  This script is LOCAL-ONLY. Point NEXT_PUBLIC_SUPABASE_URL at http://127.0.0.1:54321 (npm run db:start).");
+  process.exit(1);
+}
 const H = { apikey: KEY, Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" };
 const rest = (p, i = {}) => fetch(`${URL}/rest/v1/${p}`, { ...i, headers: { ...H, ...(i.headers || {}) } });
 const clean = process.argv.includes("--clean");

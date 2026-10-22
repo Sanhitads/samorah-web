@@ -33,7 +33,7 @@ export const slackChannel: OpsChannel = {
     const url = webhookFor(chan);
     if (!url) return { channel: "slack", status: "skipped", error: "no webhook configured" };
     try {
-      const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(buildSlackMessage(event, payload, severity)) });
+      const res = await fetch(url, { method: "POST", signal: AbortSignal.timeout(8000), headers: { "Content-Type": "application/json" }, body: JSON.stringify(buildSlackMessage(event, payload, severity)) });
       const body = await res.text();
       return res.ok
         ? { channel: "slack", status: "sent", target: chan }

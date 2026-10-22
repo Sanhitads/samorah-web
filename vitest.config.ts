@@ -35,13 +35,16 @@ export default defineConfig({
         },
       },
       {
-        // Integration suites hit the shared local database — serialized (never parallel)
-        // so they cannot race each other on shared rows or exhaust the connection pool.
+        // Integration suites hit a shared LOCAL database — serialized (never parallel) so they cannot
+        // race each other on shared rows or exhaust the connection pool. The integration-guard setup
+        // runs FIRST (before any suite / Supabase client is imported) and FAILS CLOSED if the effective
+        // environment points at a hosted / production database — so these can never touch production.
         extends: true,
         test: {
           name: "integration",
           include: [INTEGRATION_GLOB],
           fileParallelism: false,
+          setupFiles: ["./src/test/integration-guard.ts", "./src/test/setup.ts"],
         },
       },
     ],

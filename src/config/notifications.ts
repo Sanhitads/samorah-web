@@ -238,7 +238,10 @@ export const AUTO_REPLAY = {
   healthLookbackMinutes: 15, // window used to judge "the channel is back"
   minSuccesses: 2,           // …this many recent deliveries, and
   maxRecentFailures: 0,      // …no recent failures
-  maxAgeHours: 72,           // don't resurrect ancient alerts nobody cares about any more
+  // Kept BELOW Resend's 24h idempotency-key window (with margin): an auto-replay of an uncertain
+  // delivery older than that could no longer be de-duped by the provider and might send a duplicate.
+  // Dead letters older than this are left for deliberate MANUAL reconciliation, not auto-replayed.
+  maxAgeHours: 20,
 };
 
 /** Channel presentation — icon + label (tiny UX win; the label stays for a11y/tooltips). */

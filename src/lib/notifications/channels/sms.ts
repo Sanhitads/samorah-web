@@ -34,6 +34,7 @@ export const smsChannel: OpsChannel = {
     try {
       const res = await fetch("https://control.msg91.com/api/v5/flow/", {
         method: "POST",
+        signal: AbortSignal.timeout(8000),
         headers: { "Content-Type": "application/json", authkey: AUTH() as string },
         body: JSON.stringify({ template_id: TEMPLATE(), short_url: 0, recipients: recipients.map((m) => ({ mobiles: m, [varName]: text })) }),
       });

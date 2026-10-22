@@ -1,0 +1,65 @@
+name: CI
+
+# Free GitHub Actions gate. Runs the deterministic checks that need no database
+# or secrets — the test suite mocks Supabase, and `next build` tolerates an
+# unreachable database (DB reads at build time are caught; the credential-free,
+# DB-less build was verified to produce 117 pages with only dummy NEXT_PUBLIC
+# placeholders). So every step here is fully reproducible and secret-free.
+#
+# NOTE: 117 is the DB-less page count. The 10 database-backed product detail
+# pages (and other ISR/dynamic DB routes) are rendered at runtime from the hosted
+# catalogue, NOT at build here, so they are NOT part of this 117. They are a
+# SEPARATE post-deployment check: `npm run verify:catalogue` against the prod env
+# + spot-checking the 10 PDPs render with correct price/variants/images
+# (LAUNCH_CHECKLIST.md §9).
+#
+# SECURITY: no secrets are referenced. The build step uses throwaway dummy
+# NEXT_PUBLIC values only, so this workflow is safe to run on pull requests from
+# forks (which never receive repo secrets anyway). Never add production secrets
+# to this workflow. Vercel's per-PR Preview Deployment remains the runtime gate
+# (it builds with the real env and actually boots the app).
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - replatform/nextjs
+
+# Cancel superseded runs on the same ref to save Actions minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: typecheck · lint · test · build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node (from .nvmrc)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build (no secrets — dummy public env only)
+        run: npm run build
+        env:
+          # Throwaway placeholders so the Supabase browser client can initialise.
+          # NOT secrets, NOT production values. Build does not need a reachable DB.
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:9
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy-anon-key-for-ci-build

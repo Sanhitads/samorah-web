@@ -11,17 +11,36 @@
 import { readFileSync } from "node:fs";
 import { PostgrestClient } from "@supabase/postgrest-js";
 
-// ── Load .env.local (CRLF-safe) ───────────────────────────────────────────────
-for (const line of readFileSync(".env.local", "utf8").split("\n")) {
-  const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
-  if (m) process.env[m[1]] = m[2].replace(/\r$/, "").trim();
-}
+// ── Load .env.local (CRLF-safe), WITHOUT clobbering a real shell/env value ────
+try {
+  for (const line of readFileSync(".env.local", "utf8").split("\n")) {
+    const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
+    if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].replace(/\r$/, "").trim();
+  }
+} catch { /* no .env.local — fall back to process env */ }
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!url || !serviceKey) {
   console.error("✗ Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env.local");
   process.exit(1);
+}
+
+// PRODUCTION GUARD — local dev runs freely; a HOSTED/non-local target is BLOCKED BY DEFAULT. This script
+// upserts the catalogue from src/data/*.json and RESETS product_images per product, so an accidental run
+// could revert live catalogue edits. To seed a hosted project ON PURPOSE, pass --allow-hosted AND set
+// SEED_CATALOG_ALLOW_HOSTED to the exact target host (both required). Runs before any DB client is created.
+const hostOf = (u) => { try { return new URL(u).host; } catch { return "unknown"; } };
+if (!/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?(\/|$)/i.test(url)) {
+  const host = hostOf(url);
+  const authorized = process.argv.includes("--allow-hosted") && process.env.SEED_CATALOG_ALLOW_HOSTED === host;
+  if (!authorized) {
+    console.error(`✗ Refusing to seed the catalogue into a non-local Supabase (${host}).`);
+    console.error("  Local dev: point NEXT_PUBLIC_SUPABASE_URL at http://127.0.0.1:54321 (npm run db:start).");
+    console.error(`  To seed ${host} ON PURPOSE: pass --allow-hosted AND set SEED_CATALOG_ALLOW_HOSTED=${host} (both).`);
+    process.exit(1);
+  }
+  console.warn(`⚠  Seeding the catalogue into HOSTED ${host} — explicitly authorized (overwrites catalogue fields + resets product_images).`);
 }
 // DB-only client (no Realtime/WebSocket). Service-role headers bypass RLS.
 const supabase = new PostgrestClient(`${url}/rest/v1`, {

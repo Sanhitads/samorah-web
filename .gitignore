@@ -15,6 +15,9 @@ build/
 .env.development.local
 .env.test.local
 .env.production.local
+# Blanket guard for any *.local env file (e.g. .env.preview.local) — never commit secrets.
+# .env.local.example (committed template, no secrets) is NOT matched: it ends in .example.
+.env*.local
 
 # Logs
 *.log

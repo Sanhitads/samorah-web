@@ -89,7 +89,7 @@ async function resolveCorrelation(event: OpsEvent, payload: OpsPayload, nowMs: n
  *  visible rather than vanishing. Returns the row id to finalise. */
 async function openLog(c: LogCtx, channel: OpsChannelKey, status: DeliveryStatus): Promise<string | null> {
   try {
-    const { data } = await db().from("notification_log").insert({
+    const { data, error } = await db().from("notification_log").insert({
       group_id: c.groupId, event: c.event, channel, severity: c.severity, category: c.category,
       title: c.payload.title, status,
       payload: { message: c.payload.message ?? null, fields: c.payload.fields ?? [], url: c.payload.url ?? null },
@@ -98,6 +98,9 @@ async function openLog(c: LogCtx, channel: OpsChannelKey, status: DeliveryStatus
       retention_class: c.retentionClass, expires_at: c.expiresAt,
       correlation_id: c.correlationId, correlation_key: c.correlationKey, dedup_key: c.dedupKey,
     }).select("id").single();
+    // supabase-js reports a DB failure in `error` WITHOUT throwing — surface it. A null id means the
+    // dispatch proceeds un-logged (closeLog becomes a no-op), which is visible rather than a crash.
+    if (error) console.error("openLog: notification_log insert failed", channel, error);
     return data?.id ?? null;
   } catch (e) { console.error("openLog failed", e); return null; }
 }
@@ -112,10 +115,14 @@ async function closeLog(logId: string | null, r: OpsDispatchResult, deliveryMs: 
       status, target: r.target ?? null, provider_message_id: r.providerMessageId ?? null,
       error: r.error ?? null, delivery_ms: deliveryMs, last_attempt_at: new Date().toISOString(),
     };
+    if (r.deliveredRecipients) patch.delivered_recipients = r.deliveredRecipients; // who got it (multi-recipient)
     if (status === "failed" && RETRY_POLICY.autoRetryChannels.includes(r.channel)) {
       patch.next_retry_at = new Date(Date.now() + backoffFor(1) * 60000).toISOString();
     }
-    await db().from("notification_log").update(patch).eq("id", logId);
+    // Surface a rejected finalise write (returned in `error`, not thrown). If it fails the row stays
+    // `sending` and the claim RPC's stranded-`sending` recovery re-dispatches it (idempotency-key safe).
+    const { error } = await db().from("notification_log").update(patch).eq("id", logId);
+    if (error) console.error("closeLog: status write failed", logId, error);
   } catch (e) { console.error("closeLog failed", e); }
 }
 
@@ -213,14 +220,19 @@ export async function notifyOps(event: OpsEvent, payload: OpsPayload, opts?: { c
     const rl = await rateLimited(key, severity, Date.now());
     if (rl.limited) {
       const id = await openLog(ctx, key, "queued");
-      if (id) await db().from("notification_log").update({ error: rl.reason, next_retry_at: rl.retryAt }).eq("id", id);
+      if (id) {
+        const { error } = await db().from("notification_log").update({ error: rl.reason, next_retry_at: rl.retryAt }).eq("id", id);
+        if (error) console.error("notifyOps: queued-state write failed", id, error);
+      }
       results.push({ channel: key, status: "skipped", error: rl.reason });
       continue;
     }
     const logId = await openLog(ctx, key, "sending");   // visible in-flight
     const t0 = Date.now();
     let r: OpsDispatchResult;
-    try { r = await channel.send(event, payload, severity); }
+    // Thread the row id as a stable idempotency key: the retry worker re-dispatches this SAME row, so
+    // initial + retries share the key → the email provider de-dups a crash-after-accept resend.
+    try { r = await channel.send(event, logId ? { ...payload, idempotencyKey: logId } : payload, severity); }
     catch (e) { r = { channel: key, status: "failed", error: e instanceof Error ? e.message : "channel error" }; }
     await closeLog(logId, r, Date.now() - t0);
     results.push(r);
@@ -258,21 +270,32 @@ function payloadFromRow(row: any): OpsPayload { // eslint-disable-line @typescri
     severity: row.severity, entityType: row.entity_type ?? undefined, entityRef: row.entity_ref ?? undefined,
     emailTo: row.channel === "email" && row.target ? String(row.target).split(",") : undefined,
     smsTo: row.channel === "sms" && row.target ? String(row.target).split(",") : undefined,
+    idempotencyKey: row.id,   // same key as the initial dispatch → provider-side de-dup across retries
+    deliveredRecipients: Array.isArray(row.delivered_recipients) ? row.delivered_recipients : [], // retry skips these
   };
 }
 
 /** The one attempt path shared by manual retry, the auto-retry worker and DLQ replay. On failure it
  *  either schedules the next backoff or — when the policy is exhausted — moves the row to the DLQ. */
-async function attemptDispatch(row: any, actor: string): Promise<{ status: DeliveryStatus; error?: string }> { // eslint-disable-line @typescript-eslint/no-explicit-any
+async function attemptDispatch(row: any, actor: string): Promise<{ status: DeliveryStatus; error?: string; writeError?: boolean }> { // eslint-disable-line @typescript-eslint/no-explicit-any
   const channel = OPS_CHANNELS[row.channel as OpsChannelKey];
-  if (!channel) return { status: row.status, error: "channel not registered" };
-  if (!channel.configured()) return { status: row.status, error: "channel not configured" };
-
-  await db().from("notification_log").update({ status: "retrying" as DeliveryStatus, last_attempt_at: new Date().toISOString() }).eq("id", row.id);
   const t0 = Date.now();
   let r: OpsDispatchResult;
-  try { r = await channel.send(row.event as OpsEvent, payloadFromRow(row), row.severity as OpsSeverity); }
-  catch (e) { r = { channel: row.channel, status: "failed", error: e instanceof Error ? e.message : "channel error" }; }
+  if (!channel || !channel.configured()) {
+    // A missing/unconfigured channel is a DELIVERY FAILURE, not a no-op. Returning early here (as before)
+    // would leave a worker-CLAIMED row's lease (claimed_at) un-released AND never advance `attempts`, so
+    // the row spins on the 15-min stale-reclaim forever and never reaches the DLQ. Treat it as a failed
+    // attempt so it flows through the terminal write below — which releases the lease, schedules backoff,
+    // and DLQs it once exhausted, surfacing a persistently-misconfigured channel to an operator.
+    r = { channel: row.channel, status: "failed", error: channel ? "channel not configured" : "channel not registered" };
+  } else {
+    // `retrying` is a progress marker; a rejected write is logged (not fatal) because the terminal write
+    // below is the authoritative one. Still surface it — it is returned in `error`, not thrown.
+    const { error: markErr } = await db().from("notification_log").update({ status: "retrying" as DeliveryStatus, last_attempt_at: new Date().toISOString() }).eq("id", row.id);
+    if (markErr) console.error("attemptDispatch: 'retrying' marker write failed", row.id, markErr);
+    try { r = await channel.send(row.event as OpsEvent, payloadFromRow(row), row.severity as OpsSeverity); }
+    catch (e) { r = { channel: row.channel, status: "failed", error: e instanceof Error ? e.message : "channel error" }; }
+  }
 
   const status = toStatus(r.status);
   const attempts = (row.attempts ?? 1) + 1;
@@ -280,14 +303,25 @@ async function attemptDispatch(row: any, actor: string): Promise<{ status: Deliv
   const patch: any = { // eslint-disable-line @typescript-eslint/no-explicit-any
     status, error: r.error ?? null, provider_message_id: r.providerMessageId ?? row.provider_message_id,
     attempts, delivery_ms: Date.now() - t0, last_attempt_at: new Date().toISOString(),
-    retry_history: history, next_retry_at: null,
+    retry_history: history, next_retry_at: null, claimed_at: null,   // release the retry-worker lease; backoff in next_retry_at governs the next attempt
+    ...(r.deliveredRecipients ? { delivered_recipients: r.deliveredRecipients } : {}),   // carry per-recipient delivery across retries
   };
   if (status === "failed") {
     if (attempts >= RETRY_POLICY.maxAttempts) { patch.status = "dead"; patch.dead_at = new Date().toISOString(); patch.dead_reason = r.error ?? "retry policy exhausted"; }
     else patch.next_retry_at = new Date(Date.now() + backoffFor(attempts) * 60000).toISOString();
   } else if (status === "delivered") { patch.dead_at = null; patch.dead_reason = null; }   // recovered out of the DLQ
-  await db().from("notification_log").update(patch).eq("id", row.id);
-  return { status: patch.status as DeliveryStatus, error: r.error };
+  // AUTHORITATIVE write — persists the terminal status, delivered_recipients, and RELEASES the lease
+  // (claimed_at=null). supabase-js returns a DB failure in `error` WITHOUT throwing, so check it: without
+  // this a rejected persist would be reported to the caller as a clean success while the row is stranded
+  // in 'retrying' (a FALSE SUCCESS). On failure we surface it in `error` + `writeError`; the stale-lease
+  // reclaim (15m) re-dispatches the row, and the per-recipient idempotency key makes that resend safe.
+  const { error: writeErr } = await db().from("notification_log").update(patch).eq("id", row.id);
+  if (writeErr) console.error("attemptDispatch: terminal status write failed", row.id, writeErr);
+  return {
+    status: patch.status as DeliveryStatus,
+    error: r.error ?? (writeErr ? `delivery status not persisted: ${writeErr.message}` : undefined),
+    writeError: !!writeErr,
+  };
 }
 
 /** Manual retry from the drawer (e.g. Slack was briefly down). Appends to retry_history; never
@@ -298,31 +332,54 @@ export async function retryDispatch(logId: string, actor: string): Promise<{ ok:
     if (!row) return { ok: false, error: "not found" };
     if (row.status === "delivered") return { ok: false, error: "already delivered" };
     const r = await attemptDispatch(row, actor);
-    return { ok: r.status === "delivered", status: r.status, error: r.error };
+    // Not a clean success if the durable status write was rejected — the send may have gone out, but the
+    // state is unrecorded, so report ok:false with the reason rather than a false success.
+    return { ok: r.status === "delivered" && !r.writeError, status: r.status, error: r.error };
   } catch (e) { return { ok: false, error: e instanceof Error ? e.message : "retry failed" }; }
 }
 
-/** AUTO-RETRY WORKER (cron) — walks due failures with backoff and retires exhausted ones to the DLQ. */
-export async function runRetryWorker(limit = 50): Promise<{ retried: number; delivered: number; dead: number }> {
-  let retried = 0, delivered = 0, dead = 0;
+/** AUTO-RETRY WORKER (cron) — walks due failures with backoff and retires exhausted ones to the DLQ.
+ *  Failures are SURFACED, never swallowed: `claimError` is true when the atomic claim RPC itself fails
+ *  (or the run throws), so the cron reports a hard failure instead of a healthy-looking idle run; and
+ *  `writeErrors` counts every lease-release / DLQ-transition / terminal write the DB rejected (supabase-js
+ *  returns these in `error` without throwing). The route alerts on both. */
+export async function runRetryWorker(limit = 50): Promise<{ retried: number; delivered: number; dead: number; claimError: boolean; writeErrors: number }> {
+  let retried = 0, delivered = 0, dead = 0, writeErrors = 0, claimError = false;
   try {
     const nowIso = new Date().toISOString();
-    // `failed` → backoff retries; `queued` → rate-limited dispatches waiting for their window.
-    const { data } = await db().from("notification_log").select("*").in("status", ["failed", "queued"]).not("next_retry_at", "is", null).lte("next_retry_at", nowIso).order("next_retry_at", { ascending: true }).limit(limit);
+    // CLAIM due rows atomically (FOR UPDATE SKIP LOCKED in claim_due_notifications) so two overlapping
+    // */5 runs get DISJOINT batches and no notification is ever dispatched twice. The claim only stamps
+    // a lease (`claimed_at`); it leaves status/next_retry_at intact, so the pure retryDecision() below
+    // is unchanged. `failed` → backoff retries; `queued` → rate-limited dispatches awaiting their window.
+    //
+    // CHECK THE ERROR EXPLICITLY: a permission-denied / RPC failure is returned in `error` (NOT thrown),
+    // so without this it would be indistinguishable from "nothing was due" — a silent stall reported as a
+    // healthy empty run. On a claim failure we abort and report claimError so the cron can alert.
+    const { data, error: claimErr } = await db().rpc("claim_due_notifications", { p_limit: limit });
+    if (claimErr) { console.error("runRetryWorker: claim_due_notifications failed", claimErr); return { retried, delivered, dead, claimError: true, writeErrors }; }
     for (const row of (data ?? []) as any[]) { // eslint-disable-line @typescript-eslint/no-explicit-any
       const d = retryDecision({ status: row.status, attempts: row.attempts ?? 1, channel: row.channel, nextRetryAt: row.next_retry_at, error: row.error }, Date.now());
-      if (d.action === "wait") continue;
+      if (d.action === "wait") {
+        const { error } = await db().from("notification_log").update({ claimed_at: null }).eq("id", row.id); // release the lease
+        if (error) { console.error("runRetryWorker: lease release failed", row.id, error); writeErrors++; }  // stale-lease reclaim (15m) recovers it
+        continue;
+      }
       if (d.action === "dead") {
-        await db().from("notification_log").update({ status: "dead", dead_at: nowIso, dead_reason: d.reason ?? "retry policy exhausted", next_retry_at: null }).eq("id", row.id);
-        dead++; continue;
+        const { error } = await db().from("notification_log").update({ status: "dead", dead_at: nowIso, dead_reason: d.reason ?? "retry policy exhausted", next_retry_at: null, claimed_at: null }).eq("id", row.id);
+        // Only count it as DLQ'd if the transition actually persisted — a rejected write leaves the lease
+        // in place and the row is reclaimed next run, so reporting it as `dead` would be a false success.
+        if (error) { console.error("runRetryWorker: DLQ transition write failed", row.id, error); writeErrors++; }
+        else dead++;
+        continue;
       }
       const r = await attemptDispatch(row, "retry-worker");
       retried++;
+      if (r.writeError) writeErrors++;         // dispatch may have gone out, but its state did not persist
       if (r.status === "delivered") delivered++;
       if (r.status === "dead") dead++;
     }
-  } catch (e) { console.error("retry worker failed", e); }
-  return { retried, delivered, dead };
+  } catch (e) { console.error("retry worker failed", e); claimError = true; }   // an unexpected throw = the run did not complete
+  return { retried, delivered, dead, claimError, writeErrors };
 }
 
 /** DLQ REPLAY — manually re-send a dead letter. One attempt: success revives it, failure returns it
@@ -332,9 +389,10 @@ export async function replayDeadLetter(logId: string, actor: string): Promise<{ 
     const { data: row } = await db().from("notification_log").select("*").eq("id", logId).maybeSingle();
     if (!row) return { ok: false, error: "not found" };
     if (row.status !== "dead") return { ok: false, error: "not a dead letter" };
-    await db().from("notification_log").update({ replayed_at: new Date().toISOString(), replayed_by: actor }).eq("id", logId);
+    const { error: stampErr } = await db().from("notification_log").update({ replayed_at: new Date().toISOString(), replayed_by: actor }).eq("id", logId);
+    if (stampErr) console.error("replayDeadLetter: replay-stamp write failed", logId, stampErr);
     const r = await attemptDispatch(row, `${actor} (replay)`);
-    return { ok: r.status === "delivered", status: r.status, error: r.error };
+    return { ok: r.status === "delivered" && !r.writeError, status: r.status, error: r.error };
   } catch (e) { return { ok: false, error: e instanceof Error ? e.message : "replay failed" }; }
 }
 

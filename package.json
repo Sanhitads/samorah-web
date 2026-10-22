@@ -11,8 +11,21 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "node scripts/require-local-db.mjs && vitest run --project integration",
     "send-emails": "node scripts/send-emails.mjs",
-    "dispatch": "node scripts/dispatch.mjs"
+    "dispatch": "node scripts/dispatch.mjs",
+    "verify:catalogue": "node scripts/verify-catalogue.mjs",
+    "verify:prod-security": "node scripts/verify-prod-security.mjs",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:status": "supabase status",
+    "db:reset": "supabase db reset",
+    "db:diff": "supabase db diff",
+    "db:new": "supabase migration new"
+  },
+  "engines": {
+    "node": "24.x"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -37,7 +50,7 @@
     "@tailwindcss/postcss": "^4.0.1",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
-    "@types/node": "^20.17.0",
+    "@types/node": "^24.19.2",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.7.0",

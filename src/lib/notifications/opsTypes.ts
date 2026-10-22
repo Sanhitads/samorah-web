@@ -20,6 +20,8 @@ export interface OpsPayload {
   emailTo?: string[];            // operational email recipients (defaults to admins)
   smsTo?: string[];              // SMS recipients (defaults to configured alert numbers)
   whatsappTo?: string[];         // WhatsApp recipients (future; defaults to configured numbers)
+  idempotencyKey?: string;       // stable per-notification key → provider-side de-dup (Resend) across retries
+  deliveredRecipients?: string[]; // recipients already delivered on a prior attempt — a retry skips them
 }
 
 export interface OpsDispatchResult {
@@ -28,6 +30,10 @@ export interface OpsDispatchResult {
   target?: string;               // where it went (channel key / number / email)
   providerMessageId?: string;
   error?: string;
+  // Multi-recipient channels report the FULL set delivered so far (prior + this attempt). A retry
+  // skips these, so a partial failure re-sends ONLY the still-failed recipients. `status` is "sent"
+  // only when every intended recipient is in this set.
+  deliveredRecipients?: string[];
 }
 
 export interface OpsChannel {

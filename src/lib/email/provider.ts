@@ -13,7 +13,13 @@ export interface EmailMessage {
   text?: string; // plain-text alternative (multipart) — better spam score + a11y
   from?: string; // defaults to emailFrom()
   replyTo?: string; // defaults to emailReplyTo()
+  // Stable key for provider-side de-duplication. When set, Resend treats repeat sends with the same
+  // key (within 24h) as ONE send — so a retry after a crash-between-accept-and-record never double-sends.
+  idempotencyKey?: string;
 }
+
+/** Per-send network timeout — a hung provider must not consume the whole worker/function duration. */
+const EMAIL_TIMEOUT_MS = 10_000;
 export interface EmailSendResult {
   sent: boolean;
   reason?: string;
@@ -36,7 +42,13 @@ class ResendProvider implements EmailProvider {
     try {
       const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(EMAIL_TIMEOUT_MS),
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+          // Resend de-duplicates sends that share this key for 24h → at-most-once for email.
+          ...(msg.idempotencyKey ? { "Idempotency-Key": msg.idempotencyKey } : {}),
+        },
         body: JSON.stringify({
           from: msg.from ?? emailFrom(),
           to: msg.to,

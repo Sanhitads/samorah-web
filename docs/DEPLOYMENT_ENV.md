@@ -16,12 +16,23 @@ which is what actually matters.
 
 ## Cron routes — verified present ✅
 
-`vercel.json` schedules three crons; all route files exist with GET+POST handlers, so the jobs
-will run (each guarded by `CRON_SECRET`, which Vercel Cron sends as `Authorization: Bearer`):
+`vercel.json` schedules **11 crons**; all route files exist, so the jobs will run (each guarded by
+`CRON_SECRET`, which Vercel Cron sends as `Authorization: Bearer`). Five run at minute-level
+granularity (`*/5`), so **Vercel Pro is required** — Hobby only permits once-daily crons.
 
-- `src/app/api/cron/fulfillment/route.ts` → `/api/cron/fulfillment` (`*/5 * * * *`)
-- `src/app/api/cron/reservations/route.ts` → `/api/cron/reservations` (`*/5 * * * *`)
-- `src/app/api/cron/retention/route.ts` → `/api/cron/retention` (`0 3 * * *`)
+| Path | Schedule |
+|---|---|
+| `/api/cron/fulfillment` | `*/5 * * * *` |
+| `/api/cron/reservations` | `*/5 * * * *` |
+| `/api/cron/incidents` | `*/5 * * * *` |
+| `/api/cron/notifications-retry` | `*/5 * * * *` |
+| `/api/cron/cms-schedule` | `*/5 * * * *` |
+| `/api/cron/analytics-refresh` | `*/15 * * * *` |
+| `/api/cron/inventory-alerts` | `*/30 * * * *` |
+| `/api/cron/retention` | `0 3 * * *` |
+| `/api/cron/notifications-daily` | `30 3 * * *` |
+| `/api/cron/notifications-purge` | `0 20 * * *` |
+| `/api/cron/notifications-digest` | `30 12 * * *` |
 
 ---
 

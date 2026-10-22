@@ -36,8 +36,20 @@ export const opsEmailChannel: OpsChannel = {
     if (!to.length) return { channel: "email", status: "skipped", error: "no recipients" };
     const subject = `[Samorah${severity === "critical" ? " · CRITICAL" : ""}] ${payload.title}`;
     const html = buildOpsEmailHtml(payload, severity);
-    let sent = 0; let lastErr: string | undefined;
-    for (const addr of to) { const r = await sendEmail({ to: addr, subject, html, text: payload.title }); if (r.sent) sent++; else lastErr = r.reason; }
-    return sent > 0 ? { channel: "email", status: "sent", target: to.join(",") } : { channel: "email", status: "failed", target: to.join(","), error: lastErr ?? "send failed" };
+    // Recipients already delivered on a prior attempt are SKIPPED — a retry re-sends only the ones that
+    // still failed, so a success is never re-sent (the per-recipient idempotency key is a second line of
+    // defence). `status` is "sent" only when EVERY intended recipient has been delivered.
+    const delivered = new Set((payload.deliveredRecipients ?? []).filter((a) => to.includes(a)));
+    let lastErr: string | undefined;
+    for (const addr of to) {
+      if (delivered.has(addr)) continue; // already delivered on an earlier attempt
+      const idempotencyKey = payload.idempotencyKey ? `${payload.idempotencyKey}:${addr}` : undefined;
+      const r = await sendEmail({ to: addr, subject, html, text: payload.title, idempotencyKey });
+      if (r.sent) delivered.add(addr); else lastErr = r.reason;
+    }
+    const all = to.every((a) => delivered.has(a));
+    return all
+      ? { channel: "email", status: "sent", target: to.join(","), deliveredRecipients: [...delivered] }
+      : { channel: "email", status: "failed", target: to.join(","), error: lastErr ?? "send failed", deliveredRecipients: [...delivered] };
   },
 };

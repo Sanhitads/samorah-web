@@ -204,14 +204,19 @@ export async function correlateIncidents(): Promise<CorrelationResult> {
       const tmpl = INCIDENT_TEMPLATES[rule.category as IncidentCategory];
       const priority = applyPriorityFloor(priorityFrom(severity, impactLevel), tmpl.priorityFloor);
       const slaMin = slaTargetFor(priority);
-      const { data: newInc } = await db().from("incidents").insert({
+      // Duplicate-incident races are prevented by SERIALIZING the correlation cron with a run-lock
+      // (see src/app/api/cron/incidents/route.ts + withCronLock), NOT by a unique constraint — a
+      // constraint would wrongly absorb a legitimate post-quiet-period new incident (mergeWindowMinutes)
+      // into a stale still-open one.
+      const { data: newInc, error: insErr } = await db().from("incidents").insert({
         title: incidentTitle(rule, notifs.length), category: rule.category, severity, status: "open",
         root_cause: rule.rootCauseLabel, source_system: rule.sourceSystem, rule_id: rule.id, team: CATEGORY_TEAM[rule.category as IncidentCategory],
         root_cause_system: rc.system, subsystem, detected_at: detectedAt,
         confidence: conf.score, confidence_reasons: conf.reasons, priority, impact_level: impactLevel,
         sla_target_min: slaMin, sla_due_at: new Date(now + slaMin * 60000).toISOString(),
         description: `Correlated by rule "${rule.id}" — ${rows.length} events within ${rule.windowMinutes} min (threshold ${eff.threshold}, ${eff.context}).`,
-      }).select("id").single();
+      }).select("id,number").single();
+      if (insErr || !newInc) throw new Error(`incident creation failed for rule ${rule.id}: ${insErr?.message ?? "no row returned"}`);
       incidentId = newInc.id;
       if (tmpl.seedChecklist) await seedChecklist(incidentId, rule.category as IncidentCategory);
       if (tmpl.seedRunbook) await seedRunbook(incidentId, rule.category as IncidentCategory);
