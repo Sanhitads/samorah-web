@@ -5,6 +5,10 @@
 .checkout {
   --co-hairline: rgba(31, 26, 22, 0.14);
   --co-gold: var(--accent, var(--gold, #c9a96e));
+  /* Darken the muted tone for the dense small-caps labels / summary rows on this page so they read
+     clearly (the global --smoke #6B6B6B is borderline at 10–11px). Scoped to .checkout — all muted
+     text here inherits it; the cart and other screens keep the global token untouched. */
+  --smoke: #4f4840;
   max-width: var(--container-wide, 1280px);
   margin-inline: auto;
   padding: clamp(40px, 6vw, 88px) clamp(24px, 5vw, 80px) clamp(64px, 9vw, 120px);
@@ -73,6 +77,8 @@
 }
 .checkout-field__input:focus { outline: none; border-bottom-color: var(--ink, #1f1a16); }
 .checkout-field__input[aria-invalid="true"] { border-bottom-color: #a8443a; }
+/* Legible placeholders (browsers default to a faint ~50% grey that was hard to read here). */
+.checkout-field__input::placeholder { color: #756c63; opacity: 1; }
 select.checkout-field__input { cursor: pointer; }
 .checkout-field__error {
   font-family: var(--font-sans);

@@ -44,8 +44,24 @@ export function ProductPurchasePanel({ product }: { product: PurchaseProduct }) 
     [product.variants, vessel, size],
   );
 
+  /** Sizes OFFERED for the currently-selected vessel only. A vessel+size with no variant must not appear
+   *  (e.g. Ceramic = 100g/150g, Glass = 100g/190g — 190g must not show under Ceramic, nor 150g under Glass).
+   *  We HIDE unavailable combos rather than showing them disabled, so the customer only sees buyable options. */
+  const sizesForVessel = useMemo(
+    () => product.sizes.filter((s) => product.variants.some((v) => v.vessel === vessel && v.size === s)),
+    [product.sizes, product.variants, vessel],
+  );
+
   // Variant selection (review point 6) — informs pricing/size demand ("140g added, 180g ignored").
-  const chooseVessel = (v: string) => { setVessel(v); trackSelectVariant(product.slug, [v, size].filter(Boolean).join(" · ")); };
+  const chooseVessel = (v: string) => {
+    // Keep the current size if the new vessel offers it; otherwise snap to its first available size, so
+    // switching vessel can never land on an unavailable combo (and the Size list below always matches).
+    const offered = product.sizes.filter((s) => product.variants.some((x) => x.vessel === v && x.size === s));
+    const nextSize = offered.includes(size) ? size : (offered[0] ?? "");
+    setVessel(v);
+    setSize(nextSize);
+    trackSelectVariant(product.slug, [v, nextSize].filter(Boolean).join(" · "));
+  };
   const chooseSize = (s: string) => { setSize(s); trackSelectVariant(product.slug, [vessel, s].filter(Boolean).join(" · ")); };
 
   const handleAdd = () => {
@@ -108,11 +124,11 @@ export function ProductPurchasePanel({ product }: { product: PurchaseProduct }) 
         </div>
       ) : null}
 
-      {product.sizes.length > 0 ? (
+      {sizesForVessel.length > 0 ? (
         <div className="purchase__group">
           <p className="purchase__label">Size</p>
           <div className="purchase__options">
-            {product.sizes.map((s) => (
+            {sizesForVessel.map((s) => (
               <button
                 key={s}
                 type="button"
