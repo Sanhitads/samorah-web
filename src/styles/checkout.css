@@ -3,7 +3,9 @@
 
 .checkout-page { background: var(--surface, var(--ivory)); }
 .checkout {
-  --co-hairline: rgba(31, 26, 22, 0.14);
+  /* Stronger hairline so the separators, summary rules and form-field underlines read clearly
+     (0.14 was almost invisible on the ivory ground). Scoped to .checkout only. */
+  --co-hairline: rgba(31, 26, 22, 0.24);
   --co-gold: var(--accent, var(--gold, #c9a96e));
   /* Darken the muted tone for the dense small-caps labels / summary rows on this page so they read
      clearly (the global --smoke #6B6B6B is borderline at 10–11px). Scoped to .checkout — all muted
@@ -14,6 +16,10 @@
   padding: clamp(40px, 6vw, 88px) clamp(24px, 5vw, 80px) clamp(64px, 9vw, 120px);
   min-height: 55vh;
   color: var(--ink, #1f1a16);
+  /* Medium base weight so the editorial type reads comfortably at the small label sizes. Both fonts
+     load a 500 face (Cormorant 300/400/500/600, DM Sans 300/400/500), so this renders — it doesn't
+     fall back to 400. Scoped to .checkout; cart + other screens keep their weight. */
+  font-weight: 500;
 }
 .checkout--loading { min-height: 60vh; }
 
