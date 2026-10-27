@@ -5494,9 +5494,9 @@ video.asset-image {
 .auth-divider { display: flex; align-items: center; gap: 14px; margin: 20px 0; color: var(--smoke, #6B6B6B);
   font-family: var(--font-sans); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; }
 .auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: rgba(31,26,22,0.1); }
-.auth-msg { font-family: var(--font-sans); font-size: 13px; text-align: center; margin: 16px 0 0; }
-.auth-msg--error { color: #a8443a; }
-.auth-msg--info { color: #2f6b3c; }
+.auth-msg { font-family: var(--font-sans); font-size: 13px; font-weight: 500; text-align: center; margin: 16px 0 0; padding: 10px 14px; border-radius: 6px; border: 1px solid transparent; }
+.auth-msg--error { color: #8a3d2f; background: rgba(168, 68, 58, 0.09); border-color: rgba(168, 68, 58, 0.32); }
+.auth-msg--info { color: #2f6b3c; background: rgba(47, 107, 60, 0.11); border-color: rgba(47, 107, 60, 0.34); }
 .auth-foot { font-family: var(--font-sans); font-size: 13px; text-align: center; color: var(--smoke, #6B6B6B); margin: 22px 0 0; }
 .auth-foot a { color: var(--gold-dark, #A8843C); text-decoration: none; }
 .auth-foot a:hover { text-decoration: underline; }
