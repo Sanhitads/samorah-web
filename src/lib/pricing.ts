@@ -112,8 +112,8 @@ export interface GstBreakdown {
 
 /**
  * Extract the GST component from a GST-inclusive amount (the storefront shows
- * inclusive MRP; the invoice shows the embedded tax). e.g. ₹1,299 @ 12% ->
- * taxable ₹1,159.82, gst ₹139.18. CGST/SGST vs IGST split happens at invoicing.
+ * inclusive MRP; the invoice shows the embedded tax). e.g. ₹1,149 @ 5% ->
+ * taxable ₹1,094.29, gst ₹54.71. CGST/SGST vs IGST split happens at invoicing.
  */
 export function gstBreakdown(inclusiveAmount: number, gstRate: number): GstBreakdown {
   const taxable = inclusiveAmount / (1 + gstRate / 100);

@@ -19,7 +19,7 @@ const coupon = (over: Partial<Coupon> = {}): Coupon => ({
 const meta = (over: Partial<PromotionMeta> = {}): PromotionMeta => ({
   code: "M", label: "M", campaign: "c", version: "v", priority: 20, stackable: true, exclusive: false, combinableWith: [], ...over,
 });
-// A ₹1000 candle (12% GST class) carrying every targeting identifier, and a ₹500 spray (18%).
+// A ₹1000 candle (5% GST class) carrying every targeting identifier, and a ₹500 spray (18%).
 const CANDLE: PromoLine = { key: "candle", unitPrice: 1000, qty: 1, categoryId: "cat-candle", collectionId: "chap-glow", productType: "candle", productId: "p-candle", variantId: "v-candle" };
 const SPRAY: PromoLine = { key: "spray", unitPrice: 500, qty: 1, categoryId: "cat-spray", collectionId: "chap-air", productType: "room_spray", productId: "p-spray", variantId: "v-spray" };
 const disc = (lines: PromoLine[], c: Coupon, code = c.code) => computePromotions(lines, code, [c]).discount;
@@ -156,7 +156,7 @@ describe("Phase 4 · GST after discount + line-level allocation", () => {
     const candle = t.lines[0];
     expect(candle.discount).toBe(15_000);
     expect(candle.netInclusive).toBe(85_000); // ₹850 after ₹150 off
-    expect(candle.taxableValue).toBe(Math.round(85_000 / 1.12)); // 12% extracted from the discounted price
+    expect(candle.taxableValue).toBe(Math.round(85_000 / 1.05)); // 5% extracted from the discounted price
   });
   it("line-level allocation reconciles EXACTLY (Σ line discount = header; taxable + GST = total)", () => {
     const lines: CommerceLine[] = [

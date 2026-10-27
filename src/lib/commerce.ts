@@ -97,7 +97,7 @@ const classOf = (taxClass: string) => TAX_CLASSES[taxClass] ?? TAX_CLASSES[DEFAU
 
 /** Shipping GST rate = the HIGHEST rate present in the cart. Freight bundled with
  *  mixed-rate goods is a composite/mixed supply that attracts the highest rate
- *  (conservative + matches the tax matrix): all-candle → 12%, candle+spray → 18%. */
+ *  (conservative + matches the tax matrix): all-candle → 5%, candle+spray → 18%. */
 function shippingRate(lines: LineBreakdown[]): number {
   if (lines.length === 0) return classOf(DEFAULT_TAX_CLASS).gstRate;
   return Math.max(...lines.map((l) => l.gstRate));

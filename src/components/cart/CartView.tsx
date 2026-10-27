@@ -261,7 +261,9 @@ export function CartView() {
             <span>Total</span>
             <span>{formatPaise(summary.total)}</span>
           </div>
-          <p className="cart-summary__tax">Inclusive of GST ({summary.gstRate}%) · {formatPaise(summary.gst)}</p>
+          <p className="cart-summary__tax">
+            {summary.mixedGst ? "Inclusive of all applicable GST" : `Inclusive of GST (${summary.gstRate}%)`} · {formatPaise(summary.gst)}
+          </p>
 
           <Link href="/checkout" className="atc-btn cart-summary__checkout">Proceed to Checkout</Link>
           <Link href="/shop" className="cart-summary__continue">Continue Exploring</Link>

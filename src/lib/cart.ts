@@ -23,7 +23,8 @@ export interface CartSummary {
   shipping: number;
   freeShipping: boolean;
   freeShippingRemaining: number;
-  gstRate: number; // principal rate (display)
+  gstRate: number; // principal (highest) rate — display only, for a SINGLE-rate cart
+  mixedGst: boolean; // true when lines carry >1 GST rate (e.g. candle 5% + spray 18%) → don't show a single rate
   gst: number; // GST embedded in (goods + shipping)
   total: number; // goodsTotal + shipping
 }
@@ -41,6 +42,7 @@ export function buildCartSummary(items: SummaryLine[], freeThresholdInr: number 
     freeShipping: t.freeShipping,
     freeShippingRemaining: t.freeShippingRemaining,
     gstRate: t.gstRate,
+    mixedGst: new Set(t.lines.map((l) => l.gstRate)).size > 1,
     gst: t.gst,
     total: t.total,
   };

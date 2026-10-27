@@ -117,7 +117,7 @@ describe("free-shipping coupon (point 1) — shipping only, never product taxabl
 });
 
 describe("targeting keeps GST correct on excluded lines (computeOrderTotals)", () => {
-  it("excluded spray keeps full price + full 18% GST; candle is discounted at 12%", () => {
+  it("excluded spray keeps full price + full 18% GST; candle is discounted at 5%", () => {
     const lines: CommerceLine[] = [
       { key: "candle", name: "Candle", unitPrice: 1000, qty: 1, taxClass: "candle", categoryId: "cat-candle" },
       { key: "spray", name: "Spray", unitPrice: 500, qty: 1, taxClass: "room_spray", categoryId: "cat-spray" },
@@ -131,10 +131,10 @@ describe("targeting keeps GST correct on excluded lines (computeOrderTotals)", (
     expect(spray.netInclusive).toBe(50000);
     expect(spray.taxableValue + spray.gst).toBe(50000);
     expect(spray.taxableValue).toBe(Math.round(50000 / 1.18));
-    // Candle discounted ₹150 → ₹850 inclusive, GST at 12%.
+    // Candle discounted ₹150 → ₹850 inclusive, GST at 5%.
     expect(candle.discount).toBe(15000);
     expect(candle.netInclusive).toBe(85000);
-    expect(candle.taxableValue).toBe(Math.round(85000 / 1.12));
+    expect(candle.taxableValue).toBe(Math.round(85000 / 1.05));
     // Header reconciliation: discount is only the candle's; Taxable + GST = Total (incl. shipping).
     expect(t.discount).toBe(15000);
     expect(t.taxableValue + t.gst).toBe(t.total);

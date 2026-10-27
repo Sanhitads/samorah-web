@@ -33,18 +33,32 @@ describe("commerce engine — GST-compliant totals (paise)", () => {
     expect(t.commerceVersion).toBe(COMMERCE_ENGINE_VERSION);
   });
 
-  it("single product GST — candle ₹899 @12% (intra-state)", () => {
+  it("single product GST — candle ₹899 @5% (intra-state)", () => {
     const t = computeOrderTotals([line("a", 899)], { state: HOME });
     expect(t.subtotal).toBe(89900);
     // 899 < 1499 → ₹99 shipping applies
     expect(t.freeShipping).toBe(false);
     expect(t.shipping).toBe(9900);
-    // line GST @12% + shipping GST @12% (principal)
-    expect(t.lines[0].gst).toBe(89900 - Math.round(89900 / 1.12)); // 9632
-    expect(t.shippingGst).toBe(9900 - Math.round(9900 / 1.12)); // 1061
+    // line GST @5% + shipping GST @5% (principal)
+    expect(t.lines[0].gst).toBe(89900 - Math.round(89900 / 1.05)); // 4281
+    expect(t.shippingGst).toBe(9900 - Math.round(9900 / 1.05)); // 471
     expect(t.gst).toBe(t.lines[0].gst + t.shippingGst);
     expect(t.cgst + t.sgst).toBe(t.gst); // intra → CGST+SGST = GST
     expect(t.igst).toBe(0);
+  });
+
+  it("candle GST @5% — ₹1,149 inclusive → taxable ₹1,094.29 + GST ₹54.71 (CGST ₹27.36 / SGST ₹27.35)", () => {
+    // The worked example from the 2026 GST reduction (HSN 3406 candles 12% → 5%). Free shipping so the
+    // order is the item only; the 1-paisa CGST/SGST split makes the components sum EXACTLY to ₹1,149.
+    const t = computeOrderTotals([line("a", 1149)], { state: HOME, freeShippingThresholdInr: 0 });
+    expect(t.total).toBe(114900);        // ₹1,149 (inclusive MRP unchanged by the rate correction)
+    expect(t.taxableValue).toBe(109429); // ₹1,094.29
+    expect(t.gst).toBe(5471);            // ₹54.71
+    expect(t.cgst).toBe(2736);           // ₹27.36
+    expect(t.sgst).toBe(2735);           // ₹27.35
+    expect(t.cgst + t.sgst).toBe(t.gst); // components reconcile exactly
+    expect(t.igst).toBe(0);
+    expect(t.lines[0].hsn).toBe("34060010");
   });
 
   it("Discovery Composition — 3 candles ₹580, 15% per line", () => {
@@ -58,7 +72,7 @@ describe("commerce engine — GST-compliant totals (paise)", () => {
     expect(t.promotions[0].amount).toBe(26100); // immutable snapshot
   });
 
-  it("mixed GST rates — candle 12% + two sprays 18% (per-line, not cart-total)", () => {
+  it("mixed GST rates — candle 5% + two sprays 18% (per-line, not cart-total)", () => {
     const t = computeOrderTotals(
       [line("a", 899, "candle"), line("b", 499, "room_spray"), line("c", 499, "linen_spray")],
       { state: HOME },
@@ -66,21 +80,21 @@ describe("commerce engine — GST-compliant totals (paise)", () => {
     // ≥ ₹1,499 → free shipping; pure goods GST
     expect(t.freeShipping).toBe(true);
     expect(t.shipping).toBe(0);
-    // 96.32 + 76.12 + 76.12 = ₹248.56 (extracted per rate)
-    expect(t.gst).toBe(24856);
-    // the WRONG single-rate answer would be ₹203.25 — guard against regressing to it
-    expect(t.gst).not.toBe(20325);
-    expect(t.cgst).toBe(12428);
-    expect(t.sgst).toBe(12428);
+    // 42.81 (candle @5%) + 76.12 + 76.12 (sprays @18%) = ₹195.05 (extracted per rate)
+    expect(t.gst).toBe(19505);
+    // the WRONG single-rate answer (candle 5% applied to all) would be ₹90.33 — guard against it
+    expect(t.gst).not.toBe(9033);
+    expect(t.cgst).toBe(9753); // round(19505/2)
+    expect(t.sgst).toBe(9752); // gst − cgst (1-paisa split so cgst+sgst = gst exactly)
   });
 
-  it("shipping GST — ₹99 shipping is taxable at the principal rate (12%)", () => {
+  it("shipping GST — ₹99 shipping is taxable at the principal rate (5%)", () => {
     const t = computeOrderTotals([line("a", 580), line("b", 520)], { state: AWAY }); // goods 1100 < 1499
     expect(t.freeShipping).toBe(false);
     expect(t.shipping).toBe(9900);
-    expect(t.shippingGstRate).toBe(12);
-    expect(t.shippingTaxable).toBe(8839);
-    expect(t.shippingGst).toBe(1061);
+    expect(t.shippingGstRate).toBe(5);
+    expect(t.shippingTaxable).toBe(9429);
+    expect(t.shippingGst).toBe(471);
     expect(t.igst).toBe(t.gst); // inter-state → all IGST
     expect(t.cgst).toBe(0);
   });

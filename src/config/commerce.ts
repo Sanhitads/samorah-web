@@ -65,17 +65,22 @@ export interface TaxClass {
 
 /**
  * GST tax class per product type. Every line resolves its rate from HERE, so
- * candles (12%) and sprays (18%) are computed correctly in one cart. When product
+ * candles (5%) and sprays (18%) are computed correctly in one cart. When product
  * variants gain their own HSN/rate columns (Beat 2), this becomes the fallback.
  * Confirm all HSN/rates with a CA (BRD §9.1).
+ *
+ * 2026 update — HSN 3406 (candles, tapers and the like) reduced 12% → 5% per the GST
+ * Council. HSN 3307 sprays stay at 18% (NOT reduced). wax_melt / gift_set are also HSN
+ * 3406 and reduced to 5% to keep the heading's rate consistent (both are unused by the
+ * catalogue today; the engine only ever tags DB candles as `candle` and Air as room/linen).
  */
 export const TAX_CLASSES: Record<string, TaxClass> = {
-  candle: { hsn: "3406", gstRate: 12, label: "Scented Candle" },
+  candle: { hsn: "34060010", gstRate: 5, label: "Scented Candle" },
   room_spray: { hsn: "3307", gstRate: 18, label: "Room Spray" },
   linen_spray: { hsn: "3307", gstRate: 18, label: "Linen Spray" },
-  wax_melt: { hsn: "3406", gstRate: 12, label: "Wax Melt" },
+  wax_melt: { hsn: "3406", gstRate: 5, label: "Wax Melt" },
   accessory: { hsn: "9603", gstRate: 18, label: "Accessory" },
-  gift_set: { hsn: "3406", gstRate: 12, label: "Gift Set" },
+  gift_set: { hsn: "3406", gstRate: 5, label: "Gift Set" },
 };
 export const DEFAULT_TAX_CLASS = "candle";
 
@@ -92,7 +97,7 @@ export const SHIPPING_HSN = "9968";
  *   · COMMERCE_ENGINE_VERSION — the calculation ENGINE (lib/commerce.ts). Bump on
  *     any change to the pipeline / rounding / allocation logic (semver).
  */
-export const TAX_VERSION = "GST_2026_01";
+export const TAX_VERSION = "GST_2026_02"; // candle HSN 3406 reduced 12% → 5% (GST Council 2026)
 export const PRICING_VERSION = "PRICE_2026_07";
 export const COMMERCE_ENGINE_VERSION = "1.0";
 
