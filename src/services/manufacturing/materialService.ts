@@ -49,6 +49,13 @@ export async function listMaterials(): Promise<any[]> {
   const { data } = await db().from("materials").select("*").order("material_type").order("name");
   return data ?? [];
 }
+
+export async function listMaterialLots(materialId?: string): Promise<any[]> {
+  let q = db().from("material_lots").select("id,supplier_lot_code,supplier_name,received_qty,uom,material_id,materials(name,material_type)").order("created_at", { ascending: false }).limit(200);
+  if (materialId) q = q.eq("material_id", materialId);
+  const { data } = await q;
+  return data ?? [];
+}
 export async function lotsForBatch(batchId: string): Promise<any[]> {
   const { data } = await db().from("batch_material_consumption")
     .select("qty_consumed, uom, material_lots(id, supplier_lot_code, supplier_name, material_id, materials(name, material_type))")

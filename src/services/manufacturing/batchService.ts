@@ -51,6 +51,14 @@ export async function setProductBatchPrefix(actor: StaffActor, productId: string
   assertCap(actor, "manufacturing.operate");
   const clean = (prefix || "").trim().toUpperCase();
   if (!/^[A-Z0-9]{1,6}$/.test(clean)) throw new Error("batch_prefix must be 1–6 letters/digits.");
+  // Immutable once used: a prefix cannot change after any batch exists for the product
+  // (batch codes already issued from it must stay stable/traceable).
+  const existing = await db().from("products").select("batch_prefix").eq("id", productId).maybeSingle();
+  const current = existing.data?.batch_prefix as string | null | undefined;
+  if (current && current !== clean) {
+    const used = await db().from("manufacturing_batches").select("id", { count: "exact", head: true }).eq("product_id", productId);
+    if ((used.count ?? 0) > 0) throw new Error("batch_prefix is immutable once batches exist for this product.");
+  }
   const { error } = await db().from("products").update({ batch_prefix: clean }).eq("id", productId);
   if (error) throw new Error(error.message);
   await logEvent({ entityType: "product", entityId: productId, event: "product.batch_prefix_set", actorType: "staff", actorId: actor.userId, notes: clean });
@@ -126,4 +134,31 @@ export async function listBatches(opts: { variantId?: string; limit?: number } =
 export async function getBatchTimeline(batchId: string): Promise<any[]> {
   const { data } = await db().from("batch_status_history").select("*").eq("batch_id", batchId).order("created_at", { ascending: true });
   return data ?? [];
+}
+
+/** Variant options for the create-batch form (with product label + whether a batch_prefix is set). */
+export async function listVariantOptions(): Promise<any[]> {
+  const { data } = await db()
+    .from("variants")
+    .select("id,sku,vessel_type,size_label,is_active,products(name,product_type,batch_prefix)")
+    .eq("is_active", true)
+    .order("sku");
+  return data ?? [];
+}
+
+export interface BatchListOpts { q?: string; status?: string; hold?: boolean; limit?: number; offset?: number }
+/** Admin overview list — search (batch code), lifecycle/hold filter, pagination; with product/variant labels. */
+export async function listBatchesAdmin(opts: BatchListOpts = {}): Promise<{ rows: any[]; total: number }> {
+  const limit = Math.min(Math.max(opts.limit ?? 25, 1), 100);
+  const offset = Math.max(opts.offset ?? 0, 0);
+  let q = db()
+    .from("manufacturing_batches")
+    .select("id,batch_code,product_type,lifecycle_status,recall_state,manufacturing_date,planned_qty,produced_qty,pending_inspection_qty,approved_qty,rejected_qty,qc_sampled_destroyed_qty,earliest_release_date,created_at,products(name),variants(sku,vessel_type,size_label)", { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (opts.q) q = q.ilike("batch_code", `%${opts.q}%`);
+  if (opts.status) q = q.eq("lifecycle_status", opts.status);
+  if (opts.hold === true) q = q.eq("recall_state", "on_hold");
+  const { data, count } = await q;
+  return { rows: data ?? [], total: count ?? 0 };
 }

@@ -31,6 +31,31 @@
 .admin__muted { color: var(--smoke, #6b6259); font-size: 12px; }
 .admin__empty { text-align: center; padding: 40px; color: var(--smoke, #6b6259); font-family: var(--font-serif); font-style: italic; }
 
+/* Manufacturing admin generic controls (Phase 5) */
+.admin__section { margin-top: 8px; }
+.admin__card {
+  background: #fff; border: 1px solid var(--ad-hair); border-radius: 4px;
+  padding: 16px 18px; font-family: var(--font-sans); font-size: 13px; color: var(--ink, #1f1a16);
+}
+.admin__card h3 { margin: 0 0 12px; font-family: var(--font-serif); font-size: 15px; font-weight: 500; }
+.admin__card label { display: block; font-size: 12px; color: var(--smoke, #6b6259); }
+.admin__input {
+  font-family: var(--font-sans); font-size: 13px; padding: 7px 10px; margin-top: 3px; width: 100%; box-sizing: border-box;
+  border: 1px solid var(--ad-hair); border-radius: 3px; background: #fff; color: var(--ink, #1f1a16);
+}
+.admin__input:focus { outline: none; border-color: var(--ink, #1f1a16); }
+.admin__btn {
+  font-family: var(--font-sans); font-size: 13px; padding: 7px 14px; cursor: pointer; white-space: nowrap;
+  background: #fff; border: 1px solid var(--ad-hair); border-radius: 3px; color: var(--ink, #1f1a16);
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+.admin__btn:hover:not(:disabled) { background: var(--soft-beige, #efe9e0); }
+.admin__btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.admin__note { font-size: 12px; color: var(--smoke, #6b6259); background: rgba(201, 169, 110, 0.1); border: 1px solid var(--ad-hair); border-radius: 3px; padding: 8px 12px; }
+.admin__note ul { margin: 6px 0 0; padding-left: 18px; }
+.admin__error { color: #8a3d2f; background: rgba(168, 68, 58, 0.09); border: 1px solid rgba(168, 68, 58, 0.32); border-radius: 3px; padding: 8px 12px; font-size: 13px; }
+.admin__filters { gap: 8px; }
+
 .ff-status {
   display: inline-block;
   padding: 3px 9px;

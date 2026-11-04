@@ -139,6 +139,13 @@ d("Manufacturing Phase 3 (identity, records, materials)", () => {
     await expect(recordConsumption(admin, { batchId, materialLotId: "00000000-0000-4000-8000-000000000000", qtyConsumed: 1 })).rejects.toThrow();
   });
 
+  it("makes the product batch_prefix immutable once a batch exists", async () => {
+    // A batch for `productId` already exists (created above), so changing its prefix must fail.
+    await expect(setProductBatchPrefix(admin, productId, "ZZ9")).rejects.toThrow(/immutable/i);
+    // Setting it to the SAME value is a harmless no-op.
+    await setProductBatchPrefix(admin, productId, prefix);
+  });
+
   it("rejects unauthorized writes (capability enforced server-side)", async () => {
     const customer: StaffActor = { userId: "11111111-1111-4000-8000-111111111111", role: "customer" };
     await expect(createBatch(customer, { variantId, idempotencyKey: `UA-${RUNK}` })).rejects.toBeInstanceOf(ForbiddenError);

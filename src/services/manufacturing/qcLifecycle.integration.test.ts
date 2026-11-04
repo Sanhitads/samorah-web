@@ -44,7 +44,9 @@ d("Manufacturing Phase 4 (QC & lifecycle)", () => {
     const vs = await sel("/variants?select=id,product_id,products!inner(product_type)&products.product_type=eq.candle&limit=1");
     variantId = vs?.[0]?.id; productId = vs?.[0]?.product_id;
     prefix = ("Q" + String(productId).replace(/-/g, "").slice(0, 4)).toUpperCase();
-    await setProductBatchPrefix(admin, productId, prefix);
+    // Another suite may already have set (and used) this product's prefix — immutability then
+    // blocks a re-set, which is fine: any valid prefix lets create_batch generate codes.
+    try { await setProductBatchPrefix(admin, productId, prefix); } catch { /* already set & used */ }
   });
 
   it("versions QC templates immutably", async () => {
