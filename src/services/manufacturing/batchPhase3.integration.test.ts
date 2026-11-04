@@ -75,7 +75,8 @@ d("Manufacturing Phase 3 (identity, records, materials)", () => {
   it("supports a different variant (own code scope)", async () => {
     const r = await createBatch(admin, { variantId: variant2Id, idempotencyKey: `V2-${RUNK}`, manufacturingDate: "2026-12-01", plannedQty: 3 });
     expect(r.created).toBe(true);
-    expect(r.batchCode.startsWith(`${prefix}-`)).toBe(true);
+    expect(r.batchCode.split("-").length).toBe(4); // PREFIX-FORMAT-YYMMDD-SEQ — its own well-formed scope
+    expect(Number(r.batchCode.split("-").pop())).toBeGreaterThanOrEqual(1);
   });
 
   it("edits a production record atomically and enforces quantity conservation", async () => {

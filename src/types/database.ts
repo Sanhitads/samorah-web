@@ -788,6 +788,7 @@ export type Database = {
           id: string
           idempotency_key: string
           movement_id: string | null
+          qc_revision: number | null
           qty: number
           release_seq: number
           released_at: string
@@ -799,6 +800,7 @@ export type Database = {
           id?: string
           idempotency_key: string
           movement_id?: string | null
+          qc_revision?: number | null
           qty: number
           release_seq: number
           released_at?: string
@@ -810,6 +812,7 @@ export type Database = {
           id?: string
           idempotency_key?: string
           movement_id?: string | null
+          qc_revision?: number | null
           qty?: number
           release_seq?: number
           released_at?: string
@@ -3277,6 +3280,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      manufacturing_settings: {
+        Row: {
+          allocation_enabled: boolean
+          id: boolean
+          release_enabled: boolean
+          updated_at: string
+        }
+        Insert: {
+          allocation_enabled?: boolean
+          id?: boolean
+          release_enabled?: boolean
+          updated_at?: string
+        }
+        Update: {
+          allocation_enabled?: boolean
+          id?: boolean
+          release_enabled?: boolean
+          updated_at?: string
+        }
+        Relationships: []
       }
       material_lots: {
         Row: {
@@ -6248,6 +6272,63 @@ export type Database = {
         }
         Relationships: []
       }
+      variant_legacy_reconciliation: {
+        Row: {
+          accounting_balance: number
+          created_at: string
+          notes: string | null
+          quarantined_qty: number
+          reconciled_at: string | null
+          reconciled_by: string | null
+          state: string
+          unknown_qty: number
+          updated_at: string
+          variant_id: string
+          verified_eligible_qty: number
+        }
+        Insert: {
+          accounting_balance?: number
+          created_at?: string
+          notes?: string | null
+          quarantined_qty?: number
+          reconciled_at?: string | null
+          reconciled_by?: string | null
+          state?: string
+          unknown_qty?: number
+          updated_at?: string
+          variant_id: string
+          verified_eligible_qty?: number
+        }
+        Update: {
+          accounting_balance?: number
+          created_at?: string
+          notes?: string | null
+          quarantined_qty?: number
+          reconciled_at?: string | null
+          reconciled_by?: string | null
+          state?: string
+          unknown_qty?: number
+          updated_at?: string
+          variant_id?: string
+          verified_eligible_qty?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "variant_legacy_reconciliation_reconciled_by_fkey"
+            columns: ["reconciled_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "variant_legacy_reconciliation_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: true
+            referencedRelation: "variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       variants: {
         Row: {
           barcode: string | null
@@ -6811,6 +6892,7 @@ export type Database = {
       record_qc: { Args: { p: Json }; Returns: Json }
       register_material: { Args: { p: Json }; Returns: Json }
       register_material_lot: { Args: { p: Json }; Returns: Json }
+      release_batch: { Args: { p: Json }; Returns: Json }
       release_coupon: {
         Args: {
           p_actor_id?: string
