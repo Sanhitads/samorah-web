@@ -26,19 +26,25 @@ export const CAPABILITIES = [
   "data.export",
   "users.manage",
   "enquiries.manage", // customer enquiries: change status / assign / notes (CS work, manager+)
+  "manufacturing.operate", // create/edit manufacturing batches, record materials/process (editor+)
+  "manufacturing.qc", // record batch quality-control checks (editor+)
+  "manufacturing.release", // release a QC-passed batch to sellable stock (manager+) — separation of duties from QC
+  "manufacturing.recall", // hold / recall / quarantine a batch (admin+) — production-critical
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];
 
 /** Role → capabilities. Higher roles inherit lower ones by construction. */
-const WAREHOUSE: Capability[] = ["fulfillment.operate", "fulfillment.triage", "returns.operate"];
+const WAREHOUSE: Capability[] = ["fulfillment.operate", "fulfillment.triage", "returns.operate", "manufacturing.operate", "manufacturing.qc"];
 // inventory.view lands at manager+ (view stock levels + movement history, no mutation).
-const CS_FINANCE: Capability[] = [...WAREHOUSE, "order.cancel", "order.refund", "returns.approve", "analytics.view", "data.export", "inventory.view", "enquiries.manage"];
+// manufacturing.release lands at manager+ so the releaser is a DIFFERENT role from the editor who
+// records QC (manufacturing.qc) — separation of duties for the sellable-stock release decision.
+const CS_FINANCE: Capability[] = [...WAREHOUSE, "order.cancel", "order.refund", "returns.approve", "analytics.view", "data.export", "inventory.view", "enquiries.manage", "manufacturing.release"];
 // content.edit and content.publish both land at admin+ so current access is unchanged (admins can edit
 // AND publish). The split is server-enforced and future-ready: to let a lower role PREPARE navigation
 // without deploy authority, add "content.edit" (only) to that role's bundle — publish stays gated here.
 // inventory.adjust is admin+ initially (physical stock mutation is sensitive; managers may view but not adjust).
-const ADMIN: Capability[] = [...CS_FINANCE, "catalog.manage", "content.edit", "content.publish", "rules.manage", "shipping.configure", "users.manage", "inventory.adjust"];
+const ADMIN: Capability[] = [...CS_FINANCE, "catalog.manage", "content.edit", "content.publish", "rules.manage", "shipping.configure", "users.manage", "inventory.adjust", "manufacturing.recall"];
 
 export const ROLE_CAPABILITIES: Record<string, readonly Capability[]> = {
   customer: [],
