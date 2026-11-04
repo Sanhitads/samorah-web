@@ -479,6 +479,102 @@ export type Database = {
         }
         Relationships: []
       }
+      batch_design_validations: {
+        Row: {
+          batch_id: string
+          config_fingerprint: string
+          created_at: string
+          criteria: Json | null
+          deviations: string | null
+          id: string
+          idempotency_key: string | null
+          measurements: Json | null
+          result: string | null
+          revoked_at: string | null
+          revoked_by: string | null
+          revoked_reason: string | null
+          state: string
+          superseded_by: string | null
+          validated_at: string
+          validated_by: string | null
+          variant_id: string
+        }
+        Insert: {
+          batch_id: string
+          config_fingerprint: string
+          created_at?: string
+          criteria?: Json | null
+          deviations?: string | null
+          id?: string
+          idempotency_key?: string | null
+          measurements?: Json | null
+          result?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          revoked_reason?: string | null
+          state?: string
+          superseded_by?: string | null
+          validated_at?: string
+          validated_by?: string | null
+          variant_id: string
+        }
+        Update: {
+          batch_id?: string
+          config_fingerprint?: string
+          created_at?: string
+          criteria?: Json | null
+          deviations?: string | null
+          id?: string
+          idempotency_key?: string | null
+          measurements?: Json | null
+          result?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          revoked_reason?: string | null
+          state?: string
+          superseded_by?: string | null
+          validated_at?: string
+          validated_by?: string | null
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batch_design_validations_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "manufacturing_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_design_validations_revoked_by_fkey"
+            columns: ["revoked_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_design_validations_superseded_by_fkey"
+            columns: ["superseded_by"]
+            isOneToOne: false
+            referencedRelation: "batch_design_validations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_design_validations_validated_by_fkey"
+            columns: ["validated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_design_validations_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       batch_material_consumption: {
         Row: {
           batch_id: string
@@ -526,50 +622,71 @@ export type Database = {
       }
       batch_quality_checks: {
         Row: {
+          approval_notes: string | null
+          approved_delta: number
           batch_id: string
           check_type: string
+          config_fingerprint: string | null
           created_at: string
           criteria: Json | null
           deviations: string | null
           id: string
+          idempotency_key: string | null
+          inspected_qty: number
           inspector_id: string | null
           measurements: Json | null
           performed_at: string | null
+          rejected_delta: number
           result: string | null
           sample_destroyed_qty: number
           sample_size: number
+          sampled_destroyed_delta: number
           template_id: string | null
           template_version: number | null
         }
         Insert: {
+          approval_notes?: string | null
+          approved_delta?: number
           batch_id: string
           check_type: string
+          config_fingerprint?: string | null
           created_at?: string
           criteria?: Json | null
           deviations?: string | null
           id?: string
+          idempotency_key?: string | null
+          inspected_qty?: number
           inspector_id?: string | null
           measurements?: Json | null
           performed_at?: string | null
+          rejected_delta?: number
           result?: string | null
           sample_destroyed_qty?: number
           sample_size?: number
+          sampled_destroyed_delta?: number
           template_id?: string | null
           template_version?: number | null
         }
         Update: {
+          approval_notes?: string | null
+          approved_delta?: number
           batch_id?: string
           check_type?: string
+          config_fingerprint?: string | null
           created_at?: string
           criteria?: Json | null
           deviations?: string | null
           id?: string
+          idempotency_key?: string | null
+          inspected_qty?: number
           inspector_id?: string | null
           measurements?: Json | null
           performed_at?: string | null
+          rejected_delta?: number
           result?: string | null
           sample_destroyed_qty?: number
           sample_size?: number
+          sampled_destroyed_delta?: number
           template_id?: string | null
           template_version?: number | null
         }
@@ -3060,6 +3177,7 @@ export type Database = {
           production_completed_at: string | null
           production_sequence: number | null
           production_started_at: string | null
+          qc_revision: number
           qc_sampled_destroyed_qty: number
           recall_state: string
           rejected_qty: number
@@ -3090,6 +3208,7 @@ export type Database = {
           production_completed_at?: string | null
           production_sequence?: number | null
           production_started_at?: string | null
+          qc_revision?: number
           qc_sampled_destroyed_qty?: number
           recall_state?: string
           rejected_qty?: number
@@ -3120,6 +3239,7 @@ export type Database = {
           production_completed_at?: string | null
           production_sequence?: number | null
           production_started_at?: string | null
+          qc_revision?: number
           qc_sampled_destroyed_qty?: number
           recall_state?: string
           rejected_qty?: number
@@ -6501,6 +6621,7 @@ export type Database = {
     Functions: {
       add_shipment_event: { Args: { p: Json }; Returns: undefined }
       adjust_inventory: { Args: { p: Json }; Returns: Json }
+      advance_batch_lifecycle: { Args: { p: Json }; Returns: Json }
       allocate_invoice_number: { Args: never; Returns: string }
       allocate_order_number: { Args: never; Returns: string }
       analytics_daily_series_v1: {
@@ -6552,6 +6673,10 @@ export type Database = {
       }
       available_stock: { Args: { p_variant_id: string }; Returns: number }
       backfill_opening_balances: { Args: never; Returns: number }
+      batch_config_fingerprint: {
+        Args: { p_batch_id: string }
+        Returns: string
+      }
       batch_format_code: {
         Args: { p_product_type: string; p_size_label: string; p_vessel: string }
         Returns: string
@@ -6679,9 +6804,11 @@ export type Database = {
         Returns: undefined
       }
       record_audit_event: { Args: { p: Json }; Returns: undefined }
+      record_design_validation: { Args: { p: Json }; Returns: Json }
       record_material_consumption: { Args: { p: Json }; Returns: Json }
       record_notification: { Args: { p: Json }; Returns: Json }
       record_payment_attempt: { Args: { p: Json }; Returns: undefined }
+      record_qc: { Args: { p: Json }; Returns: Json }
       register_material: { Args: { p: Json }; Returns: Json }
       register_material_lot: { Args: { p: Json }; Returns: Json }
       release_coupon: {
@@ -6715,6 +6842,7 @@ export type Database = {
         Args: { p_actor_id?: string; p_order_id: string; p_reason: string }
         Returns: Json
       }
+      revoke_design_validation: { Args: { p: Json }; Returns: Json }
       section_analytics: {
         Args: { p_days?: number; p_page_key: string }
         Returns: {
@@ -6725,6 +6853,7 @@ export type Database = {
           views: number
         }[]
       }
+      set_batch_hold: { Args: { p: Json }; Returns: Json }
       set_user_role: {
         Args: {
           new_role: Database["public"]["Enums"]["user_role"]
@@ -6741,6 +6870,7 @@ export type Database = {
         Returns: string
       }
       update_batch: { Args: { p: Json }; Returns: Json }
+      upsert_qc_template: { Args: { p: Json }; Returns: Json }
       variant_batch_reconciliation: {
         Args: { p_variant_id: string }
         Returns: Json

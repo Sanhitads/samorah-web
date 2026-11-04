@@ -38,9 +38,11 @@ describe("capability-based authorization", () => {
     // editor (production floor): create/edit batches + record QC, but may NOT release or recall.
     expect(hasCapability("editor", "manufacturing.operate")).toBe(true);
     expect(hasCapability("editor", "manufacturing.qc")).toBe(true);
+    expect(hasCapability("editor", "manufacturing.qc_approve")).toBe(false); // SoD: inspector can't approve
     expect(hasCapability("editor", "manufacturing.release")).toBe(false);
     expect(hasCapability("editor", "manufacturing.recall")).toBe(false);
-    // manager adds release (a DIFFERENT role from the editor who records QC → separation of duties).
+    // manager adds QC approval + release (a DIFFERENT role from the editor who records QC → separation of duties).
+    expect(hasCapability("manager", "manufacturing.qc_approve")).toBe(true);
     expect(hasCapability("manager", "manufacturing.release")).toBe(true);
     expect(hasCapability("manager", "manufacturing.recall")).toBe(false);
     // recall (production-critical) is admin+; super_admin inherits everything.

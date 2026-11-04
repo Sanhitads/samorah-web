@@ -28,6 +28,7 @@ export const CAPABILITIES = [
   "enquiries.manage", // customer enquiries: change status / assign / notes (CS work, manager+)
   "manufacturing.operate", // create/edit manufacturing batches, record materials/process (editor+)
   "manufacturing.qc", // record batch quality-control checks (editor+)
+  "manufacturing.qc_approve", // approve QC → qc_approved lifecycle (manager+) — distinct from inventory release; SoD vs the inspector
   "manufacturing.release", // release a QC-passed batch to sellable stock (manager+) — separation of duties from QC
   "manufacturing.recall", // hold / recall / quarantine a batch (admin+) — production-critical
 ] as const;
@@ -39,7 +40,7 @@ const WAREHOUSE: Capability[] = ["fulfillment.operate", "fulfillment.triage", "r
 // inventory.view lands at manager+ (view stock levels + movement history, no mutation).
 // manufacturing.release lands at manager+ so the releaser is a DIFFERENT role from the editor who
 // records QC (manufacturing.qc) — separation of duties for the sellable-stock release decision.
-const CS_FINANCE: Capability[] = [...WAREHOUSE, "order.cancel", "order.refund", "returns.approve", "analytics.view", "data.export", "inventory.view", "enquiries.manage", "manufacturing.release"];
+const CS_FINANCE: Capability[] = [...WAREHOUSE, "order.cancel", "order.refund", "returns.approve", "analytics.view", "data.export", "inventory.view", "enquiries.manage", "manufacturing.qc_approve", "manufacturing.release"];
 // content.edit and content.publish both land at admin+ so current access is unchanged (admins can edit
 // AND publish). The split is server-enforced and future-ready: to let a lower role PREPARE navigation
 // without deploy authority, add "content.edit" (only) to that role's bundle — publish stays gated here.
