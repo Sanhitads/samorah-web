@@ -31,6 +31,7 @@ export const CAPABILITIES = [
   "manufacturing.qc_approve", // approve QC → qc_approved lifecycle (manager+) — distinct from inventory release; SoD vs the inspector
   "manufacturing.release", // release a QC-passed batch to sellable stock (manager+) — separation of duties from QC
   "manufacturing.recall", // hold / recall / quarantine a batch (admin+) — production-critical
+  "manufacturing.activate", // flip release/allocation switches + variant tracking_state — super_admin ONLY (not in any bundle)
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];

@@ -6704,6 +6704,10 @@ export type Database = {
       adjust_inventory: { Args: { p: Json }; Returns: Json }
       advance_batch_lifecycle: { Args: { p: Json }; Returns: Json }
       allocate_invoice_number: { Args: never; Returns: string }
+      allocate_order_batches: {
+        Args: { p_actor: string; p_order_id: string }
+        Returns: Json
+      }
       allocate_order_number: { Args: never; Returns: string }
       analytics_daily_series_v1: {
         Args: { p_window_days?: number }
