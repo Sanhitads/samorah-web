@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { mfgAction } from "@/lib/admin/mfgClient";
+import { BatchLabels } from "@/components/admin/BatchLabels";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Caps = { operate: boolean; qc: boolean; approve: boolean };
@@ -67,6 +68,9 @@ export function BatchDetail({ batch, timeline, qc, validations, designValidation
           </div>
         )}
       </section>
+
+      {/* Labels (Phase 10/11A) — reuses /api/admin/labels + LabelPreview; server enforces eligibility */}
+      {caps.operate && <BatchLabels batchId={batch.id} batchCode={batch.batch_code} lifecycle={batch.lifecycle_status} recallState={batch.recall_state} />}
 
       {/* Production record */}
       <section className="admin__card">

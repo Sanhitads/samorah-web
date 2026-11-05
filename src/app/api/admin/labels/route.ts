@@ -3,7 +3,7 @@ import { requireCapability } from "@/lib/auth/requireStaff";
 import type { Capability } from "@/lib/auth/capabilities";
 import type { StaffActor } from "@/services/manufacturing/actor";
 import { ForbiddenError } from "@/services/manufacturing/actor";
-import { listLabelTemplates, batchLabelPayload, generateLabel, labelPrintHistory } from "@/services/manufacturing/labelService";
+import { listLabelTemplates, batchLabelPayload, generateLabel, labelPrintHistory, confirmLabelPrinted } from "@/services/manufacturing/labelService";
 
 /**
  * POST /api/admin/labels — Phase 10 batch-label operations. manufacturing.operate (editor+); actor from the
@@ -20,6 +20,7 @@ const ACTIONS: Record<string, Handler> = {
   payload:   (b) => batchLabelPayload(String(b.batchId), String(b.purpose)),
   generate:  (b, a) => generateLabel(a, { batchId: String(b.batchId), templateId: String(b.templateId), quantity: Number(b.quantity ?? 1) }),
   history:   (b) => labelPrintHistory(String(b.batchId)),
+  confirm_printed: (b, a) => confirmLabelPrinted(a, String(b.jobId)),
 };
 
 export async function POST(request: Request) {

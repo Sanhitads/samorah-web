@@ -24,7 +24,7 @@ import { toCuring, toQualityCheck, approveQc } from "@/services/manufacturing/li
 import { recordRoutineQc, recordDesignValidation } from "@/services/manufacturing/qcService";
 import { releaseBatch } from "@/services/manufacturing/releaseService";
 import { setReleaseEnabled, setVariantTracking } from "@/services/manufacturing/activationService";
-import { listLabelTemplates, generateLabel, batchLabelPayload, labelPrintHistory } from "@/services/manufacturing/labelService";
+import { listLabelTemplates, generateLabel, batchLabelPayload, labelPrintHistory, confirmLabelPrinted } from "@/services/manufacturing/labelService";
 import { ForbiddenError, type StaffActor } from "@/services/manufacturing/actor";
 
 const RUNK = Date.now().toString(36).slice(-5);
@@ -124,5 +124,17 @@ d("Phase 10 — batch labels", () => {
   it("11. unauthorised role cannot print", async () => {
     const { v } = await makeVariant(); const b = await approvedBatch(v, 5);
     await expect(generateLabel(customer, { batchId: b, templateId: (await tmpl("retail")).id })).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it("3. generation ≠ physical print: a job starts 'generated'; confirming marks it 'printed' idempotently", async () => {
+    const { v } = await makeVariant(); const b = await approvedBatch(v, 5);
+    await generateLabel(ed, { batchId: b, templateId: (await tmpl("retail")).id, quantity: 1 });
+    const job = (await labelPrintHistory(b))[0];
+    expect(job.status).toBe("generated");                 // generated, NOT yet physically printed
+    expect((await confirmLabelPrinted(ed, job.id)).status).toBe("printed");
+    expect((await confirmLabelPrinted(ed, job.id)).ok).toBe(true); // idempotent re-confirm
+    expect((await labelPrintHistory(b))[0].status).toBe("printed");
+    // generation vs print recorded distinctly; original generation evidence preserved (same job row)
+    expect((await labelPrintHistory(b)).length).toBe(1);
   });
 });

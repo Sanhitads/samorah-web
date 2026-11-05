@@ -3174,8 +3174,11 @@ export type Database = {
           data_snapshot: Json
           id: string
           printed_by: string | null
+          printed_confirmed_at: string | null
+          printed_confirmed_by: string | null
           purpose: string
           quantity: number
+          status: string
           template_id: string
           template_key: string
           template_version: number
@@ -3188,8 +3191,11 @@ export type Database = {
           data_snapshot: Json
           id?: string
           printed_by?: string | null
+          printed_confirmed_at?: string | null
+          printed_confirmed_by?: string | null
           purpose: string
           quantity: number
+          status?: string
           template_id: string
           template_key: string
           template_version: number
@@ -3202,8 +3208,11 @@ export type Database = {
           data_snapshot?: Json
           id?: string
           printed_by?: string | null
+          printed_confirmed_at?: string | null
+          printed_confirmed_by?: string | null
           purpose?: string
           quantity?: number
+          status?: string
           template_id?: string
           template_key?: string
           template_version?: number
@@ -3220,6 +3229,13 @@ export type Database = {
           {
             foreignKeyName: "label_print_jobs_printed_by_fkey"
             columns: ["printed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "label_print_jobs_printed_confirmed_by_fkey"
+            columns: ["printed_confirmed_by"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
@@ -7687,6 +7703,7 @@ export type Database = {
         Args: { p_error?: string; p_id: string; p_status: string }
         Returns: undefined
       }
+      confirm_label_printed: { Args: { p: Json }; Returns: Json }
       confirm_pick_batch: { Args: { p: Json }; Returns: Json }
       confirm_shipment_provenance: {
         Args: { p_actor?: string; p_shipment_id: string }

@@ -39,3 +39,18 @@ Template dimensions are stored with `dimensions_status = 'unverified'` and must 
 - Provide manufacturer/packer/consumer-care details and per-SKU MRP.
 - Decide ingredient/warning declarations and any licence/certification lines.
 - Verify each format's physical label dimensions, then flip the template `dimensions_status` to `verified`.
+
+## 7. Physical dimensions verification checklist (Phase 11A — Part A.2)
+Every `label_templates` row carries `dimensions_status` (`unverified` by default). A template is **not** cleared for a real print run until an operator completes this checklist for the exact stock + printer and an authorised person flips the status to `verified`. The checklist is deliberately physical — nothing in the DB can prove a millimetre size is correct.
+
+Per template × per vessel format (190 g glass / 150 g ceramic / 100 g candle / 100 ml freshener):
+
+1. **Stock match** — label media physical size (mm) matches the template's declared `width_mm` × `height_mm`; media finish (matte/gloss) and adhesive are the production stock, not a test sheet.
+2. **Scale 1:1** — print at 100% (no "fit to page"/auto-scale); measure the printed label with a ruler — width and height within ±0.5 mm of declared.
+3. **Margins & safe area** — no text or code within the printer's non-printable margin; human-readable batch code and net-quantity fully inside the trim.
+4. **Code legibility** — the encoded value scans/reads at the intended distance; for a barcode/QR, verify with a real scanner that the decoded string **equals** the printed human-readable `batch_code` (the preview already flags a mismatch with ✗).
+5. **Small-format legibility** — on the smallest vessel, the mandatory fields (batch code, net quantity, DoM) are legible without magnification.
+6. **Bleed/placement on vessel** — a printed label applied to the actual vessel sits within the label well; no wrap-induced distortion of the code.
+7. **Sign-off** — record operator, printer model, stock SKU, and date; only a `manufacturing.operate`+ authoriser flips `dimensions_status → verified`. Re-verify if the stock or printer changes.
+
+Until step 7 is done, the admin UI shows **"(dims unverified)"** on the template and a warning banner, and the operator is told to confirm physical size/margins/scaling before any real run. Verification status does **not** gate label *generation* (you can still produce an internal proof); it is an operational gate on committing to a production print.

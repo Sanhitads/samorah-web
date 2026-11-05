@@ -35,8 +35,16 @@ export async function generateLabel(actor: StaffActor, input: GenerateLabelInput
   return { ok: !!r?.ok, batchCode: r?.batch_code, encodedValue: r?.encoded_value, purpose: r?.purpose, payload: r?.payload, quantity: r?.quantity };
 }
 
-/** Append-only print history for a batch (operator, template version, quantity, timestamp). */
+/** Append-only print history for a batch (operator, template version, quantity, status, timestamp). */
 export async function labelPrintHistory(batchId: string): Promise<any[]> {
-  const { data } = await db().from("label_print_jobs").select("id,template_key,template_version,purpose,batch_code,quantity,printed_by,created_at").eq("batch_id", batchId).order("created_at", { ascending: false });
+  const { data } = await db().from("label_print_jobs").select("id,template_key,template_version,purpose,batch_code,quantity,status,printed_by,printed_confirmed_by,printed_confirmed_at,created_at").eq("batch_id", batchId).order("created_at", { ascending: false });
   return data ?? [];
+}
+
+/** Record that a GENERATED label job was physically printed (idempotent). Generation ≠ printing. */
+export async function confirmLabelPrinted(actor: StaffActor, jobId: string): Promise<{ ok: boolean; status?: string }> {
+  assertCap(actor, "manufacturing.operate");
+  const r = await callRpc<any>("confirm_label_printed", { p: { job_id: jobId, actor_id: actor.userId } });
+  await logEvent({ entityType: "settings", entityId: jobId, event: "label.print_confirmed", actorType: "staff", actorId: actor.userId });
+  return { ok: !!r?.ok, status: r?.status ?? (r?.already_printed ? "printed" : undefined) };
 }
