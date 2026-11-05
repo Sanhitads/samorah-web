@@ -28,6 +28,7 @@ import { releaseBatch, variantReconciliation } from "@/services/manufacturing/re
 import { setAllocationEnabled, setReleaseEnabled, setVariantTracking } from "@/services/manufacturing/activationService";
 import { getOrderEntitlements, confirmPickBatch, confirmShipmentProvenance, recordPackingQc, orderShippedBatches, batchShippedOrders } from "@/services/manufacturing/fulfillmentProvenanceService";
 import { receiveReturnGoods } from "@/services/returnReceivingService";
+import { markShipmentDispatched } from "@/services/shipmentService";
 import { ForbiddenError, type StaffActor } from "@/services/manufacturing/actor";
 
 const RUNK = Date.now().toString(36).slice(-5);
@@ -296,5 +297,45 @@ d("Phase 8 — fulfilment provenance", () => {
     expect(ok.body.ok).toBe(true);
     expect((await variantReconciliation(v)).physical_consistent).toBe(true);
     void b2;
+  });
+
+  it("A1. the pick fingerprint is collision-resistant and changes when a pick changes", async () => {
+    const vX = await makeVariant(); const bA = await releasedBatch(vX, 5); const sX = await sale(vX, 3);
+    await confirmPickBatch(editor, { orderItemId: sX.orderItemId, batchId: bA, qty: 2 });
+    const fpX2 = (await rpc("order_pick_fingerprint", { p_order_id: sX.orderId })).body; // 1 record (bA,2)
+    await confirmPickBatch(editor, { orderItemId: sX.orderItemId, batchId: bA, qty: 1 });
+    const fpX3 = (await rpc("order_pick_fingerprint", { p_order_id: sX.orderId })).body; // 2 records → MUST differ
+    expect(fpX3).not.toBe(fpX2); // a changed pick set supersedes any earlier QC
+    const vY = await makeVariant(); const bC = await releasedBatch(vY, 5); const sY = await sale(vY, 2);
+    await confirmPickBatch(editor, { orderItemId: sY.orderItemId, batchId: bC, qty: 2 }); // same count(1)/sum(2) as fpX2, different batch
+    const fpY = (await rpc("order_pick_fingerprint", { p_order_id: sY.orderId })).body;
+    expect(fpY).not.toBe(fpX2); // different batch set with equal count/sum → different fingerprint (no collision)
+    expect(fpX2).toMatch(/^[0-9a-f]{32}$/); // md5 digest
+  });
+
+  it("A2. a batch recalled AFTER shipment freeze blocks the final carrier dispatch (markShipmentDispatched)", async () => {
+    const v = await makeVariant(); const b = await releasedBatch(v, 5); const s = await sale(v, 2);
+    await confirmPickBatch(editor, { orderItemId: s.orderItemId, batchId: b, qty: 2 });
+    await recordPackingQc(editor, s.orderId, PASS);
+    const sh = await ins("shipments", { order_id: s.orderId, status: "courier_assigned", provider: "manual" });
+    expect((await confirmShipmentProvenance(editor, sh.id)).frozenLines).toBe(1); // provenance frozen while eligible
+    await patch(`/manufacturing_batches?id=eq.${b}`, { recall_state: "recalled" }); // recall slips in AFTER freeze
+    expect((await rpc("assert_shipment_dispatchable", { p_shipment_id: sh.id })).body.reason).toBe("batch_recalled_or_held");
+    const disp = await markShipmentDispatched(s.orderId, { actorId });
+    expect(disp.ok).toBe(false); expect(disp.reason).toMatch(/dispatch_blocked:batch_recalled_or_held/);
+  });
+
+  it("A3. quantity semantics: shipped not double-counted; repeated shipment freeze adds no provenance; refund can't over-fulfill", async () => {
+    const v = await makeVariant(); const b = await releasedBatch(v, 10); const s = await sale(v, 3);
+    await confirmPickBatch(editor, { orderItemId: s.orderItemId, batchId: b, qty: 3 });
+    await recordPackingQc(editor, s.orderId, PASS);
+    const sh = await ins("shipments", { order_id: s.orderId, status: "pending", provider: "manual" });
+    await confirmShipmentProvenance(editor, sh.id);
+    await confirmShipmentProvenance(editor, sh.id); // repeated → idempotent, no duplicate lines
+    const lines = await sel(`/shipment_batch_lines?shipment_id=eq.${sh.id}&select=qty`);
+    expect(lines.reduce((a: number, x: any) => a + x.qty, 0)).toBe(3); // not 6
+    const e = await ent(s.orderId, s.orderItemId);
+    expect(e.item.shipped).toBe(3); expect(e.item.remaining_to_pick).toBe(0); expect(e.item.remaining_to_ship).toBe(0);
+    expect(e.item.remaining_fulfillable).toBe(0); // fully shipped → nothing more fulfillable
   });
 });

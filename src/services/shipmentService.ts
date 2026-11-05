@@ -359,6 +359,13 @@ export async function markShipmentDispatched(orderId: string, opts?: { actorId?:
   const db = adminLoose();
   const { data: shipment } = await db.from("shipments").select("id,status").eq("order_id", orderId).maybeSingle();
   if (!shipment) return { ok: false, reason: "no shipment for order" };
+  // Phase 8 (A.2) — FINAL dispatch gate re-checked at the last controllable boundary: a shipment created
+  // before a hold must not hand over to the courier if a confirmed batch is now recalled/held (or the order
+  // was cancelled / fully refunded). Inert for untracked orders with no frozen batch lines.
+  const dispatchable = await callRpc<{ ok: boolean; reason?: string }>("assert_shipment_dispatchable", { p_shipment_id: shipment.id });
+  if (dispatchable && dispatchable.ok === false) {
+    return { ok: false, reason: `dispatch_blocked:${dispatchable.reason ?? "not_dispatchable"}` };
+  }
   await addShipmentEvent(shipment.id, "picked_up", { description: "Dispatched — parcel handed to courier", source: "admin" });
   await db.from("orders").update({ status: "shipped" }).eq("id", orderId);
   await emitShipmentEvent("order.dispatched", orderId); // "your order is on its way" email
