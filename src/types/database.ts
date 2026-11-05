@@ -620,6 +620,94 @@ export type Database = {
           },
         ]
       }
+      batch_pick_confirmations: {
+        Row: {
+          allocated_batch_id: string | null
+          batch_id: string
+          component_key: string
+          confirmed_at: string
+          confirmed_by: string | null
+          id: string
+          is_substitution: boolean
+          order_id: string
+          order_item_id: string
+          qty: number
+          reason: string | null
+          variant_id: string
+        }
+        Insert: {
+          allocated_batch_id?: string | null
+          batch_id: string
+          component_key?: string
+          confirmed_at?: string
+          confirmed_by?: string | null
+          id?: string
+          is_substitution?: boolean
+          order_id: string
+          order_item_id: string
+          qty: number
+          reason?: string | null
+          variant_id: string
+        }
+        Update: {
+          allocated_batch_id?: string | null
+          batch_id?: string
+          component_key?: string
+          confirmed_at?: string
+          confirmed_by?: string | null
+          id?: string
+          is_substitution?: boolean
+          order_id?: string
+          order_item_id?: string
+          qty?: number
+          reason?: string | null
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batch_pick_confirmations_allocated_batch_id_fkey"
+            columns: ["allocated_batch_id"]
+            isOneToOne: false
+            referencedRelation: "manufacturing_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_pick_confirmations_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "manufacturing_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_pick_confirmations_confirmed_by_fkey"
+            columns: ["confirmed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_pick_confirmations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_pick_confirmations_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_pick_confirmations_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       batch_quality_checks: {
         Row: {
           approval_notes: string | null
@@ -4730,6 +4818,61 @@ export type Database = {
           },
         ]
       }
+      packing_qc_checks: {
+        Row: {
+          checklist: Json
+          created_at: string
+          id: string
+          notes: string | null
+          operator_id: string | null
+          order_id: string
+          passed: boolean
+          shipment_id: string | null
+        }
+        Insert: {
+          checklist: Json
+          created_at?: string
+          id?: string
+          notes?: string | null
+          operator_id?: string | null
+          order_id: string
+          passed: boolean
+          shipment_id?: string | null
+        }
+        Update: {
+          checklist?: Json
+          created_at?: string
+          id?: string
+          notes?: string | null
+          operator_id?: string | null
+          order_id?: string
+          passed?: boolean
+          shipment_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "packing_qc_checks_operator_id_fkey"
+            columns: ["operator_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "packing_qc_checks_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "packing_qc_checks_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_attempts: {
         Row: {
           amount: number | null
@@ -5869,6 +6012,78 @@ export type Database = {
           value?: Json | null
         }
         Relationships: []
+      }
+      shipment_batch_lines: {
+        Row: {
+          batch_id: string
+          component_key: string
+          created_at: string
+          id: string
+          order_id: string
+          order_item_id: string
+          qty: number
+          shipment_id: string
+          variant_id: string
+        }
+        Insert: {
+          batch_id: string
+          component_key?: string
+          created_at?: string
+          id?: string
+          order_id: string
+          order_item_id: string
+          qty: number
+          shipment_id: string
+          variant_id: string
+        }
+        Update: {
+          batch_id?: string
+          component_key?: string
+          created_at?: string
+          id?: string
+          order_id?: string
+          order_item_id?: string
+          qty?: number
+          shipment_id?: string
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipment_batch_lines_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "manufacturing_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipment_batch_lines_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipment_batch_lines_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipment_batch_lines_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipment_batch_lines_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "variants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       shipment_events: {
         Row: {
@@ -7058,6 +7273,11 @@ export type Database = {
         Args: { p_error?: string; p_id: string; p_status: string }
         Returns: undefined
       }
+      confirm_pick_batch: { Args: { p: Json }; Returns: Json }
+      confirm_shipment_provenance: {
+        Args: { p_actor?: string; p_shipment_id: string }
+        Returns: Json
+      }
       consume_coupon: { Args: { p_order_id: string }; Returns: Json }
       create_batch: { Args: { p: Json }; Returns: Json }
       create_pending_order: { Args: { p: Json }; Returns: Json }
@@ -7099,6 +7319,7 @@ export type Database = {
         Returns: boolean
       }
       order_fulfillment_blocked: { Args: { p_order_id: string }; Returns: Json }
+      order_item_entitlements: { Args: { p_order_id: string }; Returns: Json }
       payable_window_minutes: { Args: never; Returns: number }
       queue_fulfillment_job: {
         Args: { p_job_type: string; p_order_id: string }
@@ -7109,6 +7330,7 @@ export type Database = {
       record_design_validation: { Args: { p: Json }; Returns: Json }
       record_material_consumption: { Args: { p: Json }; Returns: Json }
       record_notification: { Args: { p: Json }; Returns: Json }
+      record_packing_qc: { Args: { p: Json }; Returns: Json }
       record_payment_attempt: { Args: { p: Json }; Returns: undefined }
       record_qc: { Args: { p: Json }; Returns: Json }
       register_material: { Args: { p: Json }; Returns: Json }

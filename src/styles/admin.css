@@ -2467,3 +2467,10 @@ a.adm-badge[data-b="incident"]:hover { background: rgba(168,68,58,0.22); }
 .an-chart__state { display: flex; align-items: center; justify-content: center; height: 200px; font-style: italic; font-size: 12px; text-align: center; }
 .an-chart__skel { border-radius: 4px; background: linear-gradient(90deg, rgba(0,0,0,0.04), rgba(0,0,0,0.08), rgba(0,0,0,0.04)); background-size: 200% 100%; animation: kpi-shimmer 1.2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .an-chart__skel { animation: none; } }
+
+/* Phase 8 — batch provenance panel */
+.pick-row__prov { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.prov-chip { font-size: 11px; padding: 1px 6px; border-radius: 10px; background: var(--admin-chip-bg, #eef2f7); color: var(--admin-chip-fg, #334155); font-variant-numeric: tabular-nums; }
+.prov-chip--sub { background: #fde68a; color: #7c5e10; }
+.prov-ship { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; padding: 0; margin: 6px 0 0; }
+.prov-ship li { font-size: 12px; padding: 2px 8px; border: 1px solid var(--admin-border, #e2e8f0); border-radius: 6px; font-variant-numeric: tabular-nums; }
