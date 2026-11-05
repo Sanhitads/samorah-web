@@ -6400,6 +6400,45 @@ export type Database = {
           },
         ]
       }
+      variant_tracking_epochs: {
+        Row: {
+          activated_by: string | null
+          created_at: string
+          epoch_at: string
+          id: string
+          variant_id: string
+        }
+        Insert: {
+          activated_by?: string | null
+          created_at?: string
+          epoch_at?: string
+          id?: string
+          variant_id: string
+        }
+        Update: {
+          activated_by?: string | null
+          created_at?: string
+          epoch_at?: string
+          id?: string
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "variant_tracking_epochs_activated_by_fkey"
+            columns: ["activated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "variant_tracking_epochs_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       variants: {
         Row: {
           barcode: string | null
@@ -6771,7 +6810,9 @@ export type Database = {
       }
     }
     Functions: {
+      activate_variant_tracking: { Args: { p: Json }; Returns: Json }
       add_shipment_event: { Args: { p: Json }; Returns: undefined }
+      adjust_batch_inventory: { Args: { p: Json }; Returns: Json }
       adjust_inventory: { Args: { p: Json }; Returns: Json }
       advance_batch_lifecycle: { Args: { p: Json }; Returns: Json }
       allocate_invoice_number: { Args: never; Returns: string }
@@ -6954,11 +6995,16 @@ export type Database = {
         Args: { p_period: string; p_scope: string }
         Returns: number
       }
+      order_allocation_blocked: {
+        Args: { p_order_id: string }
+        Returns: boolean
+      }
       payable_window_minutes: { Args: never; Returns: number }
       queue_fulfillment_job: {
         Args: { p_job_type: string; p_order_id: string }
         Returns: undefined
       }
+      reallocate_order_exception: { Args: { p: Json }; Returns: Json }
       record_audit_event: { Args: { p: Json }; Returns: undefined }
       record_design_validation: { Args: { p: Json }; Returns: Json }
       record_material_consumption: { Args: { p: Json }; Returns: Json }

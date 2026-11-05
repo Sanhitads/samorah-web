@@ -23,6 +23,7 @@ import { recordRoutineQc, recordDesignValidation } from "@/services/manufacturin
 import { releaseBatch, variantReconciliation } from "@/services/manufacturing/releaseService";
 import { setAllocationEnabled, setReleaseEnabled, setVariantTracking } from "@/services/manufacturing/activationService";
 import { getOrderExceptions, resolveException } from "@/services/manufacturing/exceptionService";
+import { advanceFulfillment } from "@/services/fulfillmentService";
 import type { StaffActor } from "@/services/manufacturing/actor";
 
 const RUNK = Date.now().toString(36).slice(-5);
@@ -62,7 +63,7 @@ async function sale(items: Array<{ variantId: string; qty: number; productId?: s
     await ins("stock_reservations", { variant_id: it.variantId, quantity: it.qty, order_id: o.id, session_id: `sess-${tag}`, expires_at: new Date(Date.now() + 3600e3).toISOString() });
   }
   const r = await rpc("finalize_order", { p_razorpay_order_id: roid, p_payment_id: `pay_${tag}`, p_signature: "sig", p_source: "test", p_amount_paise: null });
-  return { orderId: o.id, roid, result: r.body };
+  return { orderId: o.id, orderNumber: `SALE-${tag}`, roid, result: r.body };
 }
 const overlays = async (orderId: string) => sel(`/batch_stock_entries?source_id=eq.${orderId}&entry_type=eq.sale&select=batch_id,qty`);
 const allocs = async (orderId: string) => sel(`/batch_allocations?order_id=eq.${orderId}&select=order_item_id,batch_id,qty`);
@@ -169,7 +170,7 @@ d("Phase 7A — batch-aware sale allocation (inert)", () => {
     const cr = await sel(`/batch_stock_entries?source_id=eq.${orderId}&entry_type=eq.cancel_restock&select=qty`);
     expect(cr.reduce((n: number, e: any) => n + e.qty, 0)).toBe(5); // restored to the original batches
     const rec = await variantReconciliation(Vc);
-    expect(rec.reconciled).toBe(true); expect(rec.overlay_ledger_drift).toBe(0);
+    expect(rec.fully_reconciled).toBe(true); expect(rec.overlay_ledger_drift).toBe(0);
   });
 
   it("A4b. cancellation routes held/recalled-batch units to quarantine (never auto-sellable)", async () => {
@@ -190,7 +191,8 @@ d("Phase 7A — batch-aware sale allocation (inert)", () => {
     expect(result.created).toBe(true);
     const rec = await variantReconciliation(Vx);
     expect(rec.open_exception_qty).toBe(2);
-    expect(rec.reconciled).toBe(true); // the gap IS the open exception — not lost
+    expect(rec.accounting_explained).toBe(true); // the gap IS the open exception — traceable
+    expect(rec.fully_reconciled).toBe(false); // but NOT complete — must not pass as reconciled stock
     const exc = (await getOrderExceptions(orderId))[0];
     expect(exc.state).toBe("captured_unallocated");
     await resolveException(adminA, exc.id, "pending_reallocation", "ops will release more");
@@ -199,7 +201,48 @@ d("Phase 7A — batch-aware sale allocation (inert)", () => {
 
   it("A3. a direct untagged restock on a tracked variant is rejected (DB fail-closed)", async () => {
     const r = await rpc("apply_stock_movement", { p_variant_id: V, p_delta: 1, p_movement_type: "cancel_restock", p_source_type: "order", p_source_id: null, p_reference: "x", p_actor_id: null, p_reason: null, p_note: null, p_metadata: null, p_idempotency_key: `direct-${RUNK}` });
-    expect(r.status).toBeGreaterThanOrEqual(400);
+    expect(r.status).toBeGreaterThanOrEqual(400); // aborts at commit via the deferred attribution constraint
+  });
+
+  it("B3. batch-aware manual adjustment: +/- attributed; untracked/unattributed rejected", async () => {
+    const { variantId: Va } = await makeVariant(true); const ba = await releasedBatch(Va, 10);
+    const add = await rpc("adjust_batch_inventory", { p: { variant_id: Va, batch_id: ba, mode: "add", qty: 2, reason: "Found extra", actor_id: manager.userId } });
+    expect(add.status).toBe(200);
+    const rem = await rpc("adjust_batch_inventory", { p: { variant_id: Va, batch_id: ba, mode: "remove", qty: 1, reason: "Damaged on floor", actor_id: manager.userId } });
+    expect(rem.status).toBe(200);
+    expect((await variantReconciliation(Va)).fully_reconciled).toBe(true); // overlay matches movements exactly
+    // untagged adjust on a tracked variant is refused (fail closed)
+    const untagged = await rpc("adjust_inventory", { p: { variant_id: Va, mode: "add", qty: 1, reason: "Physical count correction" } });
+    expect(untagged.status).toBeGreaterThanOrEqual(400);
+  });
+
+  it("B4. a paid allocation exception reallocates after re-eligibility → resolved + fully reconciled", async () => {
+    const { variantId: Vr } = await makeVariant(true); const b = await releasedBatch(Vr, 3);
+    const dv = (await sel(`/batch_design_validations?batch_id=eq.${b}&state=eq.approved&select=id`))[0];
+    await rpc("revoke_design_validation", { p: { validation_id: dv.id, reason: "x", actor_id: manager.userId } });
+    const { orderId } = await sale([{ variantId: Vr, qty: 3 }]); // shortfall 3 (batch ineligible)
+    let exc = (await getOrderExceptions(orderId))[0];
+    expect(exc.state).toBe("captured_unallocated");
+    await recordDesignValidation(inspector, { batchId: b, result: "pass", measurements: { flame: "stable" } }); // re-validate config
+    const rr = await rpc("reallocate_order_exception", { p: { exception_id: exc.id, actor_id: adminA.userId } });
+    expect(rr.body.resolved).toBe(true);
+    exc = (await getOrderExceptions(orderId))[0];
+    expect(exc.state).toBe("resolved_allocated");
+    expect((await variantReconciliation(Vr)).fully_reconciled).toBe(true);
+  });
+
+  it("B5. fulfilment is blocked server-side while an allocation exception is open", async () => {
+    const { variantId: Vf } = await makeVariant(true); const b = await releasedBatch(Vf, 2);
+    const dv = (await sel(`/batch_design_validations?batch_id=eq.${b}&state=eq.approved&select=id`))[0];
+    await rpc("revoke_design_validation", { p: { validation_id: dv.id, reason: "x", actor_id: manager.userId } });
+    const { orderNumber } = await sale([{ variantId: Vf, qty: 2 }]); // open exception
+    await expect(advanceFulfillment(orderNumber, "picking", { actorId: manager.userId })).rejects.toThrow(/allocation_exception/);
+  });
+
+  it("A5/A6. pre-activation movements are exempt; untagged return_restock on tracked fails closed", async () => {
+    // return_restock (untagged, no batch-aware path yet) on a tracked variant → deferred constraint aborts
+    const r = await rpc("apply_stock_movement", { p_variant_id: V, p_delta: 1, p_movement_type: "return_restock", p_source_type: "return", p_source_id: null, p_reference: "x", p_actor_id: null, p_reason: null, p_note: null, p_metadata: null, p_idempotency_key: `ret-${RUNK}` });
+    expect(r.status).toBeGreaterThanOrEqual(400); // returns/RTO remain fail-closed until batch-aware (deferred)
   });
 
   it("13-16. held/revoked batches are skipped by eligibility", async () => {

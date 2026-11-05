@@ -6,6 +6,7 @@
  * stock. Every change is audited. Activation itself is governed by the reconciliation gates
  * documented for Phase 7B — this service is the enforcement point, not an auto-activator.
  */
+import { callRpc } from "@/lib/supabase/rpc";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logEvent } from "@/services/auditService";
 import { assertCap, type StaffActor } from "@/services/manufacturing/actor";
@@ -35,7 +36,8 @@ export async function setAllocationEnabled(actor: StaffActor, enabled: boolean):
  *  may only go to 'tracked' once every enabled stock-writing path supports attribution. */
 export async function setVariantTracking(actor: StaffActor, variantId: string, state: "untracked" | "transition_pending" | "tracked"): Promise<void> {
   assertCap(actor, "manufacturing.activate");
-  const { error } = await db().from("variants").update({ tracking_state: state, tracked_at: state === "tracked" ? new Date().toISOString() : null }).eq("id", variantId);
-  if (error) throw new Error(error.message);
+  // Serialised in the DB (locks the variant against in-flight stock txns) and stamps an
+  // IMMUTABLE tracking epoch on activation, so pre/post-activation movements stay classified.
+  await callRpc<unknown>("activate_variant_tracking", { p: { variant_id: variantId, state, actor_id: actor.userId } });
   await logEvent({ entityType: "variant", entityId: variantId, event: "manufacturing.tracking_state", actorType: "staff", actorId: actor.userId, newState: state });
 }

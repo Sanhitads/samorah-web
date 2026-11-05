@@ -27,6 +27,7 @@ import { shippingMilestones, type ShippingMilestones } from "@/lib/fulfillment/h
 import { clampPicked, pickProgress, type PickProgress } from "@/lib/fulfillment/pick";
 import { requiredPackingItems, packingComplete, packingProgress, type PackingChecklist } from "@/lib/fulfillment/packing";
 import { logEvent } from "@/services/auditService";
+import { callRpc } from "@/lib/supabase/rpc";
 
 const START: FulfillmentStatus = "reserved";
 const TERMINAL_ORDER = new Set(["cancelled", "delivered", "returned", "rto"]);
@@ -48,6 +49,11 @@ export async function advanceFulfillment(
     .eq("order_number", orderNumber)
     .maybeSingle();
   if (!order) throw new Error("order not found");
+  // Phase 7B-2 (B.5): block fulfilment while a tracked-stock allocation exception is unresolved.
+  // Inert for untracked / exception-free orders (predicate returns false) — no behaviour change.
+  if (await callRpc<boolean>("order_allocation_blocked", { p_order_id: order.id as string })) {
+    throw new Error("order_allocation_exception_unresolved");
+  }
   const from = (order.fulfillment_status ?? START) as FulfillmentStatus;
   assertFulfillmentTransition(from, to);
 
@@ -441,6 +447,9 @@ export async function setItemPicked(orderNumber: string, itemId: string, pickedQ
   const db = loose();
   const { data: o } = await db.from("orders").select("id,fulfillment_status").eq("order_number", orderNumber).maybeSingle();
   if (!o) return { ok: false, progress: empty, advanced: false, reason: "order not found" };
+  if (await callRpc<boolean>("order_allocation_blocked", { p_order_id: o.id as string })) {
+    return { ok: false, progress: empty, advanced: false, reason: "order_allocation_exception_unresolved" };
+  }
   const { data: item } = await db.from("order_items").select("id,quantity").eq("id", itemId).eq("order_id", o.id).maybeSingle();
   if (!item) return { ok: false, progress: empty, advanced: false, reason: "item not found" };
 
