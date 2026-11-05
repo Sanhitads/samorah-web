@@ -279,14 +279,23 @@ d("Phase 7B-2 (part 2) — batch-aware returns / RTO / refund", () => {
     expect(r.accounting_explained).toBe(true);   // the fix: refunded shortfall still explains the drift
     expect(r.fully_reconciled).toBe(false);       // but NOT complete until physically disposed
 
-    // Physical disposition (separate): write the consumed units off FROM the batch that holds them.
+    // Physical disposition (separate, A.1-corrected): MOVEMENT-LESS write-off of the refunded units FROM
+    // the batch that physically held them. Restores PHYSICAL conservation but is a SYNTHETIC disposition —
+    // it must NOT be read as verified sale→batch attribution, so fully_reconciled/activation stay false.
     const stockPre = (await sel(`/variants?id=eq.${variantId}&select=stock`))[0].stock;
     const d = await disposeExceptionShortfall(superadmin, exc[0].id, s.batchId, "units destroyed with refund");
     expect(d.ok).toBe(true); expect(d.writtenOff).toBe(3);
     expect((await sel(`/variants?id=eq.${variantId}&select=stock`))[0].stock).toBe(stockPre); // no aggregate change
     r = await recon(variantId);
-    expect(r.overlay_ledger_drift).toBe(0); expect(r.fully_reconciled).toBe(true); // drift closed via batch attribution
+    expect(r.physical_consistent).toBe(true);            // aggregate == Σ batch on-hand (conservation restored)
+    expect(r.overlay_ledger_drift).toBe(3);              // sale stays UN-attributed (drift persists — honest)
+    expect(r.written_off_qty).toBe(3); expect(r.has_synthetic_disposition).toBe(true);
+    expect(r.accounting_explained).toBe(true);           // drift explained by the written-off exception
+    expect(r.fully_reconciled).toBe(false);              // synthetic ≠ verified → NOT fully reconciled
+    expect(r.activation_eligible).toBe(false);           // cannot activate on a synthetic disposition
     expect((await getOrderExceptions(s.orderId))[0].state).toBe("resolved_written_off");
+    // the write-off created NO sale→batch attribution and NO batch_allocation (no fabricated provenance)
+    expect((await sel(`/batch_stock_entries?variant_id=eq.${variantId}&entry_type=eq.writeoff&select=movement_id,qty`)).every((e: any) => e.movement_id === null)).toBe(true);
   });
 
   it("11. refund-evidence integrity: processing→refund_initiated (still open), failed refund rejected", async () => {
