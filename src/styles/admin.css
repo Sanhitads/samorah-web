@@ -2474,3 +2474,15 @@ a.adm-badge[data-b="incident"]:hover { background: rgba(168,68,58,0.22); }
 .prov-chip--sub { background: #fde68a; color: #7c5e10; }
 .prov-ship { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; padding: 0; margin: 6px 0 0; }
 .prov-ship li { font-size: 12px; padding: 2px 8px; border: 1px solid var(--admin-border, #e2e8f0); border-radius: 6px; font-variant-numeric: tabular-nums; }
+
+/* Phase 10 — batch label preview / print */
+.label-preview { border: 1px dashed var(--admin-border, #cbd5e1); border-radius: 6px; padding: 10px 12px; max-width: 320px; font-variant-numeric: tabular-nums; }
+.label-preview__name { font-weight: 600; margin: 0 0 2px; }
+.label-preview__net, .label-preview__date { font-size: 12px; color: var(--admin-muted, #64748b); margin: 0; }
+.label-preview__code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 15px; letter-spacing: 0.5px; margin: 8px 0 0; word-break: break-all; }
+.label-preview__encoded { font-size: 11px; color: var(--admin-muted, #64748b); margin: 2px 0 0; }
+.label-preview__encoded--bad { color: #b91c1c; font-weight: 600; }
+.label-preview__warn { background: #fee2e2; color: #991b1b; font-weight: 700; font-size: 12px; padding: 2px 6px; border-radius: 4px; margin: 0 0 6px; }
+.label-preview__tag { font-size: 10px; letter-spacing: 1px; color: #7c5e10; background: #fde68a; padding: 1px 6px; border-radius: 4px; display: inline-block; margin: 0 0 6px; }
+.label-preview__missing { font-size: 11px; color: #92400e; margin: 8px 0 0; }
+@media print { .label-preview { border: 1px solid #000; page-break-inside: avoid; } .admin__nav, .admin__head { display: none; } }

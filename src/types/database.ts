@@ -3166,6 +3166,130 @@ export type Database = {
         }
         Relationships: []
       }
+      label_print_jobs: {
+        Row: {
+          batch_code: string
+          batch_id: string
+          created_at: string
+          data_snapshot: Json
+          id: string
+          printed_by: string | null
+          purpose: string
+          quantity: number
+          template_id: string
+          template_key: string
+          template_version: number
+          variant_id: string | null
+        }
+        Insert: {
+          batch_code: string
+          batch_id: string
+          created_at?: string
+          data_snapshot: Json
+          id?: string
+          printed_by?: string | null
+          purpose: string
+          quantity: number
+          template_id: string
+          template_key: string
+          template_version: number
+          variant_id?: string | null
+        }
+        Update: {
+          batch_code?: string
+          batch_id?: string
+          created_at?: string
+          data_snapshot?: Json
+          id?: string
+          printed_by?: string | null
+          purpose?: string
+          quantity?: number
+          template_id?: string
+          template_key?: string
+          template_version?: number
+          variant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "label_print_jobs_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "manufacturing_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "label_print_jobs_printed_by_fkey"
+            columns: ["printed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "label_print_jobs_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "label_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "label_print_jobs_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      label_templates: {
+        Row: {
+          active: boolean
+          created_at: string
+          created_by: string | null
+          dimensions: Json
+          dimensions_status: string
+          fields: Json
+          id: string
+          purpose: string
+          template_key: string
+          title: string
+          version: number
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          dimensions?: Json
+          dimensions_status?: string
+          fields?: Json
+          id?: string
+          purpose: string
+          template_key: string
+          title: string
+          version?: number
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          dimensions?: Json
+          dimensions_status?: string
+          fields?: Json
+          id?: string
+          purpose?: string
+          template_key?: string
+          title?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "label_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       login_history: {
         Row: {
           browser: string | null
@@ -7452,6 +7576,10 @@ export type Database = {
         Args: { p_product_type: string; p_size_label: string; p_vessel: string }
         Returns: string
       }
+      batch_label_payload: {
+        Args: { p_batch_id: string; p_purpose: string }
+        Returns: Json
+      }
       batch_material_lots: {
         Args: { p_batch_id: string }
         Returns: {
@@ -7594,6 +7722,7 @@ export type Database = {
         Args: { p_date: string; p_format: string; p_prefix: string }
         Returns: string
       }
+      generate_label: { Args: { p: Json }; Returns: Json }
       is_admin: { Args: never; Returns: boolean }
       is_editor: { Args: never; Returns: boolean }
       is_manager: { Args: never; Returns: boolean }
