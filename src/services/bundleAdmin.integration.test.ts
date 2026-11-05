@@ -151,12 +151,20 @@ d("Bundle admin service (Phase 1A)", () => {
     // (proven in bundlePage.integration.test.ts V3-D) — that defensive behavior is unchanged.
   });
 
+  // Deterministic candle universe: exclude EVERY catalogue product except the given test products, so
+  // the selectable/sellable counts depend ONLY on this test's fixtures — independent of how many other
+  // (real or disposable) candles exist in the local DB.
+  const excludeAllBut = async (keep: string[]): Promise<string[]> => {
+    const all = (await sel(`/products?select=id`)) as { id: string }[];
+    return all.map((p) => p.id).filter((id) => !keep.includes(id));
+  };
+
   it("V2-A — CONFIG-caused impossible composition → Publish ERROR; nothing mutates", async () => {
     await publishBundle(cfg("BASELINE LIVE"));
     const revs = (await listBundleRevisions()).length;
     const auditBefore = (await sel(`/audit_events?event=eq.bundle.published&select=id`)).length;
-    // exclude 2 of the 3 products → each enabled vessel left with 1 selectable (< 3)
-    const bad = await publishBundle({ ...cfg("SHOULD NOT PUBLISH"), excludedProductIds: [PRODUCT_IDS[0], PRODUCT_IDS[1]] });
+    // Leave only ONE product selectable → each enabled vessel has 1 selectable (< 3) → impossible.
+    const bad = await publishBundle({ ...cfg("SHOULD NOT PUBLISH"), excludedProductIds: await excludeAllBut([PRODUCT_IDS[2]]) });
     expect(bad.ok).toBe(false);
     expect(bad.errors && bad.errors.some((e) => /selectable candle/.test(e))).toBe(true);
     expect((await getPublishedBundleConfig()).hero.heading).toBe("BASELINE LIVE"); // byte-identical previous published
@@ -165,11 +173,13 @@ d("Bundle admin service (Phase 1A)", () => {
   });
 
   it("V2-B — INVENTORY-caused OOS (≥3 configured, <3 sellable) → WARNING; Publish allowed; no inventory persisted", async () => {
-    // Make 2 of the 3 products OOS via the CANONICAL inventory RPC → eligible 3, sellable 1 (< 3) per vessel.
+    // Scope the universe to exactly the 3 test products (eligible = 3 per vessel), then make 2 of them OOS
+    // via the CANONICAL inventory RPC → sellable 1 (< 3) per vessel. Deterministic vs any other catalogue.
+    const only3 = { ...cfg("PUBLISHED WITH WARNING"), excludedProductIds: await excludeAllBut(PRODUCT_IDS) };
     const oos = VARIANT_IDS.slice(0, 4); // product 0 + product 1 (glass+ceramic each)
     for (const vid of oos) await setStock(vid, 0);
     try {
-      const r = await publishBundle(cfg("PUBLISHED WITH WARNING"));
+      const r = await publishBundle(only3);
       expect(r.ok).toBe(true); // WARNING does not block
       expect(r.warnings && r.warnings.some((w) => /currently in stock/.test(w))).toBe(true);
       expect((await getPublishedBundleConfig()).hero.heading).toBe("PUBLISHED WITH WARNING");

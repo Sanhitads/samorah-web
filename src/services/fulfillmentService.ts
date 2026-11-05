@@ -49,10 +49,12 @@ export async function advanceFulfillment(
     .eq("order_number", orderNumber)
     .maybeSingle();
   if (!order) throw new Error("order not found");
-  // Phase 7B-2 (B.5): block fulfilment while a tracked-stock allocation exception is unresolved.
-  // Inert for untracked / exception-free orders (predicate returns false) — no behaviour change.
-  if (await callRpc<boolean>("order_allocation_blocked", { p_order_id: order.id as string })) {
-    throw new Error("order_allocation_exception_unresolved");
+  // Phase 7B-2: block fulfilment while a tracked-stock allocation exception is unresolved, OR the
+  // order is cancelled / fully refunded (a refunded or cancelled order must never become shippable).
+  // Inert for untracked / exception-free / live orders (predicate reports blocked=false).
+  const fb = await callRpc<{ blocked: boolean; reason: string | null }>("order_fulfillment_blocked", { p_order_id: order.id as string });
+  if (fb?.blocked) {
+    throw new Error(fb.reason === "allocation_exception" ? "order_allocation_exception_unresolved" : `order_not_fulfillable:${fb.reason}`);
   }
   const from = (order.fulfillment_status ?? START) as FulfillmentStatus;
   assertFulfillmentTransition(from, to);
@@ -447,8 +449,9 @@ export async function setItemPicked(orderNumber: string, itemId: string, pickedQ
   const db = loose();
   const { data: o } = await db.from("orders").select("id,fulfillment_status").eq("order_number", orderNumber).maybeSingle();
   if (!o) return { ok: false, progress: empty, advanced: false, reason: "order not found" };
-  if (await callRpc<boolean>("order_allocation_blocked", { p_order_id: o.id as string })) {
-    return { ok: false, progress: empty, advanced: false, reason: "order_allocation_exception_unresolved" };
+  const fb = await callRpc<{ blocked: boolean; reason: string | null }>("order_fulfillment_blocked", { p_order_id: o.id as string });
+  if (fb?.blocked) {
+    return { ok: false, progress: empty, advanced: false, reason: fb.reason === "allocation_exception" ? "order_allocation_exception_unresolved" : `order_not_fulfillable:${fb.reason}` };
   }
   const { data: item } = await db.from("order_items").select("id,quantity").eq("id", itemId).eq("order_id", o.id).maybeSingle();
   if (!item) return { ok: false, progress: empty, advanced: false, reason: "item not found" };

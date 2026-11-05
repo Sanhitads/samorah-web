@@ -27,7 +27,7 @@ import { toCuring, toQualityCheck, approveQc } from "@/services/manufacturing/li
 import { recordRoutineQc, recordDesignValidation } from "@/services/manufacturing/qcService";
 import { releaseBatch, variantReconciliation } from "@/services/manufacturing/releaseService";
 import { setAllocationEnabled, setReleaseEnabled, setVariantTracking } from "@/services/manufacturing/activationService";
-import { getOrderExceptions, resolveExceptionByRefund, listReceiptHolds } from "@/services/manufacturing/exceptionService";
+import { getOrderExceptions, resolveExceptionByRefund, listReceiptHolds, disposeExceptionShortfall, resolveReceiptHold } from "@/services/manufacturing/exceptionService";
 import { receiveReturnGoods } from "@/services/returnReceivingService";
 import { receiveRtoGoods } from "@/services/rtoReceivingService";
 import { advanceFulfillment } from "@/services/fulfillmentService";
@@ -43,7 +43,9 @@ async function makeVariant(tracked: boolean): Promise<{ productId: string; varia
   const t = `${RUNK}${Math.random().toString(36).slice(2, 5)}`;
   const pref = ("T" + Math.random().toString(36).slice(2, 6)).toUpperCase().slice(0, 6);
   const p = await ins("products", { name: `RRT ${t}`, slug: `rrt-${t}`, base_sku: `RRT-${t}`.toUpperCase(), category_id: cat.id, price: 100, hsn_code: "34060010", product_type: "candle", batch_prefix: pref });
-  const v = await ins("variants", { product_id: p.id, sku: `RRT-${t}-GL`.toUpperCase(), price: 100, vessel_type: "glass", size_label: "100g", tracking_state: "untracked" });
+  // is_active:false keeps disposable fixtures OUT of the bundle candle pool (getBundleCandles filters
+  // on is_active) so bundle tests stay deterministic regardless of accumulated test products.
+  const v = await ins("variants", { product_id: p.id, sku: `RRT-${t}-GL`.toUpperCase(), price: 100, vessel_type: "glass", size_label: "100g", tracking_state: "untracked", is_active: false });
   if (tracked) await setVariantTracking(superadmin, v.id, "tracked");
   return { productId: p.id, variantId: v.id };
 }
@@ -84,7 +86,8 @@ async function shortfallOrder(variantId: string, releaseQty: number, saleQty: nu
   const b = await releasedBatch(variantId, releaseQty);
   const dv = (await sel(`/batch_design_validations?batch_id=eq.${b}&state=eq.approved&select=id`))[0];
   await rpc("revoke_design_validation", { p: { validation_id: dv.id, reason: "test shortfall", actor_id: manager.userId } });
-  return sale(variantId, saleQty); // exception shortfall = saleQty (batch now ineligible)
+  const s = await sale(variantId, saleQty); // exception shortfall = saleQty (batch now ineligible)
+  return { ...s, batchId: b };
 }
 
 const recon = async (v: string) => variantReconciliation(v);
@@ -253,19 +256,37 @@ d("Phase 7B-2 (part 2) — batch-aware returns / RTO / refund", () => {
     expect((await quarFor(b)).reduce((n: number, x: any) => n + x.qty, 0)).toBe(2);
   });
 
-  it("10. refund recovery: processed refund resolves the exception WITHOUT any positive movement", async () => {
+  it("10. shortfall IS aggregate-deducted; refund is financial-only (no positive movement); drift stays EXPLAINED; physical writeoff then reconciles", async () => {
     const { variantId } = await makeVariant(true);
-    const s = await shortfallOrder(variantId, 5, 3); // shortfall of 3 → durable exception
+    const stock0 = (await sel(`/variants?id=eq.${variantId}&select=stock`))[0].stock; // 0
+    const s = await shortfallOrder(variantId, 5, 3); // release 5 (stock→5), revoke, sell 3 (stock→2); shortfall 3
+    // ROOT CAUSE: the shortfall WAS deducted from aggregate variants.stock.
+    expect((await sel(`/variants?id=eq.${variantId}&select=stock`))[0].stock).toBe(stock0 + 5 - 3);
     const exc = await getOrderExceptions(s.orderId);
     expect(exc).toHaveLength(1); expect(exc[0].shortfall_qty).toBe(3);
+    let r = await recon(variantId);
+    expect(r.overlay_ledger_drift).toBe(3); expect(r.open_exception_qty).toBe(3);
+    expect(r.accounting_explained).toBe(true); expect(r.fully_reconciled).toBe(false);
+
+    // Financial refund: NO positive inventory movement; drift persists but stays EXPLAINED (not "unexplained").
     const movesBefore = (await sel(`/inventory_movements?variant_ref=eq.${variantId}&select=id`)).length;
     const refund = await ins("refunds", { order_id: s.orderId, amount: 300, status: "processed", method: "manual" });
     const res = await resolveExceptionByRefund(superadmin, exc[0].id, refund.id, "customer refunded for OOS units");
-    expect(res.ok).toBe(true); expect(res.state).toBe("resolved_refunded");
-    const movesAfter = (await sel(`/inventory_movements?variant_ref=eq.${variantId}&select=id`)).length;
-    expect(movesAfter).toBe(movesBefore); // NO positive inventory movement issued
-    const after = await getOrderExceptions(s.orderId);
-    expect(after[0].state).toBe("resolved_refunded"); expect(after[0].refund_id).toBe(refund.id);
+    expect(res.state).toBe("resolved_refunded");
+    expect((await sel(`/inventory_movements?variant_ref=eq.${variantId}&select=id`)).length).toBe(movesBefore);
+    r = await recon(variantId);
+    expect(r.overlay_ledger_drift).toBe(3); expect(r.refunded_exception_qty).toBe(3);
+    expect(r.accounting_explained).toBe(true);   // the fix: refunded shortfall still explains the drift
+    expect(r.fully_reconciled).toBe(false);       // but NOT complete until physically disposed
+
+    // Physical disposition (separate): write the consumed units off FROM the batch that holds them.
+    const stockPre = (await sel(`/variants?id=eq.${variantId}&select=stock`))[0].stock;
+    const d = await disposeExceptionShortfall(superadmin, exc[0].id, s.batchId, "units destroyed with refund");
+    expect(d.ok).toBe(true); expect(d.writtenOff).toBe(3);
+    expect((await sel(`/variants?id=eq.${variantId}&select=stock`))[0].stock).toBe(stockPre); // no aggregate change
+    r = await recon(variantId);
+    expect(r.overlay_ledger_drift).toBe(0); expect(r.fully_reconciled).toBe(true); // drift closed via batch attribution
+    expect((await getOrderExceptions(s.orderId))[0].state).toBe("resolved_written_off");
   });
 
   it("11. refund-evidence integrity: processing→refund_initiated (still open), failed refund rejected", async () => {
@@ -286,15 +307,25 @@ d("Phase 7B-2 (part 2) — batch-aware returns / RTO / refund", () => {
     expect((await rpc("order_allocation_blocked", { p_order_id: s.orderId })).body).toBe(true);
   });
 
-  it("12. fulfilment stays blocked while an exception is open; unblocks once refund-resolved", async () => {
+  it("12. fulfilment eligibility: open exception blocks; refund unblocks the exception; fully-refunded & cancelled orders stay unshippable", async () => {
     const { variantId } = await makeVariant(true);
-    const s = await shortfallOrder(variantId, 2, 2); // shortfall 2 → open exception
+    const s = await shortfallOrder(variantId, 2, 2); // shortfall 2 → open exception; order total 200
     expect((await rpc("order_allocation_blocked", { p_order_id: s.orderId })).body).toBe(true);
+    expect((await rpc("order_fulfillment_blocked", { p_order_id: s.orderId })).body.reason).toBe("allocation_exception");
     await expect(advanceFulfillment(s.orderNumber, "picking" as any, { actorId })).rejects.toThrow(/order_allocation_exception_unresolved/);
     const exc = (await getOrderExceptions(s.orderId))[0];
     const refund = await ins("refunds", { order_id: s.orderId, amount: 200, status: "processed", method: "manual" });
     await resolveExceptionByRefund(superadmin, exc.id, refund.id);
-    expect((await rpc("order_allocation_blocked", { p_order_id: s.orderId })).body).toBe(false);
+    expect((await rpc("order_allocation_blocked", { p_order_id: s.orderId })).body).toBe(false); // exception no longer open
+    // A FULLY refunded order (payment_status='refunded', as settle_refund would set) must NOT be shippable.
+    await patch(`/orders?id=eq.${s.orderId}`, { payment_status: "refunded" });
+    expect((await rpc("order_fulfillment_blocked", { p_order_id: s.orderId })).body.reason).toBe("fully_refunded");
+    await expect(advanceFulfillment(s.orderNumber, "picking" as any, { actorId })).rejects.toThrow(/order_not_fulfillable:fully_refunded/);
+    // A cancelled order is likewise unshippable (server-side, not a UI warning).
+    const c = await makeVariant(true); const cb = await releasedBatch(c.variantId, 3); const cs = await sale(c.variantId, 1); void cb;
+    await patch(`/orders?id=eq.${cs.orderId}`, { status: "cancelled" });
+    expect((await rpc("order_fulfillment_blocked", { p_order_id: cs.orderId })).body.reason).toBe("cancelled");
+    await expect(advanceFulfillment(cs.orderNumber, "picking" as any, { actorId })).rejects.toThrow(/order_not_fulfillable:cancelled/);
   });
 
   it("13. A.1 backdate guard: a backdated unattributed tracked movement cannot dodge the epoch", async () => {
@@ -347,4 +378,86 @@ d("Phase 7B-2 (part 2) — batch-aware returns / RTO / refund", () => {
     expect(rr.fully_reconciled).toBe(true);
     void b;
   });
+
+  it("16. privileged mutation boundaries: overlay/epoch are immutable; untagged & unsupported tracked movements fail closed", async () => {
+    const { variantId } = await makeVariant(true);
+    const b = await releasedBatch(variantId, 5);
+    await sale(variantId, 2); // creates a sale overlay + release overlay
+    const ov = (await sel(`/batch_stock_entries?variant_id=eq.${variantId}&select=id&limit=1`))[0];
+    // overlay rows are append-only: no UPDATE / DELETE grant to service_role
+    expect((await fetch(rest(`/batch_stock_entries?id=eq.${ov.id}`), { method: "PATCH", headers: H, body: JSON.stringify({ qty: 999 }) })).ok).toBe(false);
+    expect((await fetch(rest(`/batch_stock_entries?id=eq.${ov.id}`), { method: "DELETE", headers: H })).ok).toBe(false);
+    // tracking epoch is append-only: no UPDATE / DELETE grant
+    const ep = (await sel(`/variant_tracking_epochs?variant_id=eq.${variantId}&select=id&limit=1`))[0];
+    expect((await fetch(rest(`/variant_tracking_epochs?id=eq.${ep.id}`), { method: "PATCH", headers: H, body: JSON.stringify({ epoch_at: "2099-01-01" }) })).ok).toBe(false);
+    expect((await fetch(rest(`/variant_tracking_epochs?id=eq.${ep.id}`), { method: "DELETE", headers: H })).ok).toBe(false);
+    // untagged restock + unsupported movement type on a tracked variant → fail closed at commit
+    const v = (await sel(`/variants?id=eq.${variantId}&select=stock,sku,variant_name,product_id`))[0];
+    const prod = (await sel(`/products?id=eq.${v.product_id}&select=name`))[0];
+    for (const mt of ["return_restock", "banana_type"]) {
+      const r = await fetch(rest("/inventory_movements"), { method: "POST", headers: H, body: JSON.stringify({
+        variant_id: variantId, variant_ref: variantId, sku_snapshot: v.sku, product_name_snapshot: prod.name, variant_name_snapshot: v.variant_name,
+        quantity_before: v.stock, quantity_delta: 1, quantity_after: v.stock + 1, movement_type: mt, source_type: "system" }) });
+      expect(r.ok).toBe(false); // no overlay attribution (or unsupported type) → constraint/CHECK rejects
+    }
+    expect(await drift_(variantId)).toBe(0);
+    void b;
+  });
+
+  it("17. activation epoch: a sale committing AFTER activation attributes (no evasion); epoch is durable", async () => {
+    const { variantId } = await makeVariant(false);           // start untracked (no epoch)
+    expect((await sel(`/variant_tracking_epochs?variant_id=eq.${variantId}&select=id`)).length).toBe(0);
+    await setVariantTracking(superadmin, variantId, "tracked"); // stamps the immutable epoch now
+    const eps = await sel(`/variant_tracking_epochs?variant_id=eq.${variantId}&select=id,epoch_at`);
+    expect(eps.length).toBe(1);                                 // durable epoch identity (not just now()/tracked_at)
+    const b = await releasedBatch(variantId, 5);               // release is allowed only once tracked
+    const s = await sale(variantId, 2);                        // post-epoch sale → MUST attribute, cannot be exempt
+    expect(s.result.created).toBe(true);
+    const r = await recon(variantId);
+    expect(r.overlay_ledger_drift).toBe(0); expect(r.open_exception_qty).toBe(0); expect(r.fully_reconciled).toBe(true);
+    // the sale overlay exists (attributed), proving the post-activation movement did not evade attribution
+    expect((await sel(`/batch_stock_entries?source_id=eq.${s.orderId}&entry_type=eq.sale&select=qty`)).reduce((n: number, e: any) => n + e.qty, 0)).toBe(-2);
+    void b;
+  });
+
+  it("18. receipt-hold disposition lifecycle (restock / quarantine / writeoff) resolves exactly once, no double count", async () => {
+    // unknown-origin hold (no provenance) × 3 separate holds, one per disposition mode.
+    async function unknownHold(qty: number) {
+      const { variantId, productId } = await makeVariant(true);
+      await releasedBatch(variantId, 10);
+      const elig = await releasedBatch(variantId, 10, "2026-12-15"); // an eligible batch to restock into
+      const tag = `${RUNK}-${saleN++}`;
+      const o = await ins("orders", { order_number: `RRT-${tag}`, email: "t@example.test", status: "shipped", payment_status: "paid", total_amount: qty * 100 });
+      await ins("order_items", { order_id: o.id, product_id: productId, variant_id: variantId, product_name: "T", sku: "T", hsn_code: "34060010", gst_rate: 5, unit_price: 100, quantity: qty, line_subtotal: qty * 100, line_total: qty * 100 });
+      const rId = await makeReturn(o.id, `RRT-${tag}`, variantId, qty);
+      await receiveReturnGoods(rId, [{ variantId, received: qty, restockable: qty, damaged: 0 }], { actorId }); // → unknown_origin hold
+      const hold = (await sel(`/batch_receipt_holds?order_id=eq.${o.id}&select=id,qty,state`))[0];
+      return { variantId, holdId: hold.id, eligBatch: elig };
+    }
+    // writeoff: no stock change, terminal
+    const w = await unknownHold(2);
+    const wStock = (await sel(`/variants?id=eq.${w.variantId}&select=stock`))[0].stock;
+    expect((await resolveReceiptHold(superadmin, w.holdId, "writeoff", { reason: "discarded" })).ok).toBe(true);
+    expect((await sel(`/variants?id=eq.${w.variantId}&select=stock`))[0].stock).toBe(wStock);
+    expect((await sel(`/batch_receipt_holds?id=eq.${w.holdId}&select=state`))[0].state).toBe("resolved_writeoff");
+    // second resolve is a no-op (no double counting)
+    expect((await resolveReceiptHold(superadmin, w.holdId, "restock", { batchId: w.eligBatch })).ok).toBe(true);
+    expect((await sel(`/variants?id=eq.${w.variantId}&select=stock`))[0].stock).toBe(wStock);
+
+    // quarantine: records batch_quarantine, no sellable change
+    const q = await unknownHold(2);
+    const qStock = (await sel(`/variants?id=eq.${q.variantId}&select=stock`))[0].stock;
+    expect((await resolveReceiptHold(superadmin, q.holdId, "quarantine", { batchId: q.eligBatch, reason: "hold to quarantine" })).ok).toBe(true);
+    expect((await sel(`/variants?id=eq.${q.variantId}&select=stock`))[0].stock).toBe(qStock);
+    expect((await quarFor(q.eligBatch)).reduce((n: number, x: any) => n + x.qty, 0)).toBe(2);
+
+    // restock: adds to sellable via an eligible batch (movement + overlay), reconciled
+    const re = await unknownHold(2);
+    const reStock = (await sel(`/variants?id=eq.${re.variantId}&select=stock`))[0].stock;
+    expect((await resolveReceiptHold(superadmin, re.holdId, "restock", { batchId: re.eligBatch })).ok).toBe(true);
+    expect((await sel(`/variants?id=eq.${re.variantId}&select=stock`))[0].stock).toBe(reStock + 2);
+    expect((await recon(re.variantId)).fully_reconciled).toBe(true);
+  });
 });
+
+const drift_ = async (v: string) => (await variantReconciliation(v)).overlay_ledger_drift;

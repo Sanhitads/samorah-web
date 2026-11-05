@@ -5868,15 +5868,7 @@ export type Database = {
           updated_by?: string | null
           value?: Json | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "settings_updated_by_fkey"
-            columns: ["updated_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       shipment_events: {
         Row: {
@@ -7074,6 +7066,7 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
       }
+      dispose_exception_shortfall: { Args: { p: Json }; Returns: Json }
       expire_stale_pending_orders: {
         Args: { p_minutes?: number }
         Returns: number
@@ -7105,6 +7098,7 @@ export type Database = {
         Args: { p_order_id: string }
         Returns: boolean
       }
+      order_fulfillment_blocked: { Args: { p_order_id: string }; Returns: Json }
       payable_window_minutes: { Args: never; Returns: number }
       queue_fulfillment_job: {
         Args: { p_job_type: string; p_order_id: string }
@@ -7148,6 +7142,7 @@ export type Database = {
       reserve_stock: { Args: { p: Json }; Returns: Json }
       resolve_exception_by_refund: { Args: { p: Json }; Returns: Json }
       resolve_order_inventory_exception: { Args: { p: Json }; Returns: Json }
+      resolve_receipt_hold: { Args: { p: Json }; Returns: Json }
       restock_return_items: { Args: { p_return_id: string }; Returns: number }
       restore_coupon: {
         Args: { p_actor_id?: string; p_order_id: string; p_reason: string }

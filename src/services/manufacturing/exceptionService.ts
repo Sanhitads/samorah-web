@@ -67,3 +67,29 @@ export async function listReceiptHolds(opts?: { variantId?: string; openOnly?: b
   const { data } = await q;
   return data ?? [];
 }
+
+/**
+ * PHYSICAL disposition of a refunded shortfall (separate from the financial refund). Attributes the
+ * units the refunded sale consumed to a named batch that physically holds them (movement-backed overlay
+ * on the existing sale movement), closing the reconciliation drift to 0. Issues NO positive movement and
+ * restores NOTHING to sellable. Requires the exception already `resolved_refunded`. Gated by recall.
+ */
+export async function disposeExceptionShortfall(actor: StaffActor, exceptionId: string, batchId: string, reason?: string): Promise<{ ok: boolean; writtenOff?: number }> {
+  assertCap(actor, "manufacturing.recall");
+  const r = await callRpc<any>("dispose_exception_shortfall", { p: { exception_id: exceptionId, batch_id: batchId, actor_id: actor.userId, reason: reason ?? "" } });
+  await logEvent({ entityType: "settings", entityId: exceptionId, event: "inventory.exception.resolved_written_off", actorType: "staff", actorId: actor.userId, notes: reason, metadata: { batch_id: batchId, written_off: r?.written_off } });
+  return { ok: !!r?.ok, writtenOff: r?.written_off };
+}
+
+/**
+ * Resolve a durable receipt hold (received-but-not-sellable units) exactly once:
+ *   restock → +return_restock movement + overlay to an ELIGIBLE batch (back to sellable);
+ *   quarantine → batch_quarantine 'held' against a named batch (no stock change);
+ *   writeoff → discard (no stock change — never was sellable). Gated by recall.
+ */
+export async function resolveReceiptHold(actor: StaffActor, holdId: string, mode: "restock" | "quarantine" | "writeoff", opts?: { batchId?: string; reason?: string }): Promise<{ ok: boolean; mode?: string; qty?: number }> {
+  assertCap(actor, "manufacturing.recall");
+  const r = await callRpc<any>("resolve_receipt_hold", { p: { hold_id: holdId, mode, batch_id: opts?.batchId ?? null, actor_id: actor.userId, reason: opts?.reason ?? "" } });
+  await logEvent({ entityType: "settings", entityId: holdId, event: `inventory.receipt_hold.${mode}`, actorType: "staff", actorId: actor.userId, notes: opts?.reason, metadata: { batch_id: opts?.batchId, qty: r?.qty } });
+  return { ok: !!r?.ok, mode: r?.mode, qty: r?.qty };
+}

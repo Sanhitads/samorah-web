@@ -31,10 +31,18 @@ d("Manufacturing Phase 3 (identity, records, materials)", () => {
   beforeAll(async () => {
     const users = await sel("/users?select=id&role=eq.admin&limit=1");
     admin = { userId: users?.[0]?.id, role: "admin" };
-    const vs = await sel("/variants?select=id,product_id&limit=2&order=sku.asc");
-    variantId = vs?.[0]?.id; productId = vs?.[0]?.product_id; variant2Id = vs?.[1]?.id ?? variantId;
+    // Create a DEDICATED product + 2 variants so this suite is fully isolated and deterministic —
+    // never reusing a shared/seed product (whose prefix is immutable once any batch exists).
+    const cat = (await sel("/categories?select=id&limit=1"))[0];
+    const ins = async (t: string, row: any) => { const r = await fetch(rest(`/${t}`), { method: "POST", headers: { ...H, Prefer: "return=representation" }, body: JSON.stringify(row) }); if (!r.ok) throw new Error(`${t}: ${await r.text()}`); return (await r.json())[0]; };
+    const tag = `${RUNK}${Math.random().toString(36).slice(2, 5)}`;
+    const p = await ins("products", { name: `P3 ${tag}`, slug: `p3-${tag}`, base_sku: `P3-${tag}`.toUpperCase(), category_id: cat.id, price: 100, hsn_code: "34060010", product_type: "candle" });
+    productId = p.id;
+    const v1 = await ins("variants", { product_id: p.id, sku: `P3-${tag}-GL`.toUpperCase(), price: 100, vessel_type: "glass", size_label: "100g", is_active: false });
+    const v2 = await ins("variants", { product_id: p.id, sku: `P3-${tag}-CE`.toUpperCase(), price: 100, vessel_type: "ceramic", size_label: "100g", is_active: false });
+    variantId = v1.id; variant2Id = v2.id;
     prefix = ("T" + String(productId).replace(/-/g, "").slice(0, 4)).toUpperCase();
-    await setProductBatchPrefix(admin, productId, prefix);
+    await setProductBatchPrefix(admin, productId, prefix); // fresh product → no batches yet → always succeeds
   });
 
   it("creates a batch with a generated code and is idempotent on retry", async () => {
