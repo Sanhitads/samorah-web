@@ -782,6 +782,87 @@ export type Database = {
           },
         ]
       }
+      batch_receipt_holds: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          order_id: string | null
+          qty: number
+          reason: string | null
+          receipt_id: string | null
+          receipt_item_id: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          state: string
+          variant_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind: string
+          order_id?: string | null
+          qty: number
+          reason?: string | null
+          receipt_id?: string | null
+          receipt_item_id?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          state?: string
+          variant_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          order_id?: string | null
+          qty?: number
+          reason?: string | null
+          receipt_id?: string | null
+          receipt_item_id?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          state?: string
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batch_receipt_holds_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_receipt_holds_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_receipt_holds_receipt_item_id_fkey"
+            columns: ["receipt_item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_receipt_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_receipt_holds_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_receipt_holds_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       batch_release_events: {
         Row: {
           batch_id: string
@@ -3914,6 +3995,7 @@ export type Database = {
           movement_id: string | null
           order_id: string
           reason: string | null
+          refund_id: string | null
           resolved_at: string | null
           resolved_by: string | null
           shortfall_qty: number
@@ -3927,6 +4009,7 @@ export type Database = {
           movement_id?: string | null
           order_id: string
           reason?: string | null
+          refund_id?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
           shortfall_qty: number
@@ -3940,6 +4023,7 @@ export type Database = {
           movement_id?: string | null
           order_id?: string
           reason?: string | null
+          refund_id?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
           shortfall_qty?: number
@@ -3960,6 +4044,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_inventory_exceptions_refund_id_fkey"
+            columns: ["refund_id"]
+            isOneToOne: false
+            referencedRelation: "refunds"
             referencedColumns: ["id"]
           },
           {
@@ -6868,6 +6959,21 @@ export type Database = {
         }
         Returns: Json
       }
+      attribute_receipt_restock: {
+        Args: {
+          p_actor: string
+          p_movement_type: string
+          p_order: string
+          p_receipt_id: string
+          p_receipt_item_id: string
+          p_reference: string
+          p_restockable: number
+          p_src_id: string
+          p_src_type: string
+          p_variant: string
+        }
+        Returns: Json
+      }
       available_stock: { Args: { p_variant_id: string }; Returns: number }
       backfill_opening_balances: { Args: never; Returns: number }
       batch_config_fingerprint: {
@@ -7040,6 +7146,7 @@ export type Database = {
         Returns: Json
       }
       reserve_stock: { Args: { p: Json }; Returns: Json }
+      resolve_exception_by_refund: { Args: { p: Json }; Returns: Json }
       resolve_order_inventory_exception: { Args: { p: Json }; Returns: Json }
       restock_return_items: { Args: { p_return_id: string }; Returns: number }
       restore_coupon: {

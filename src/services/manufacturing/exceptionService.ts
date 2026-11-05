@@ -33,3 +33,37 @@ export async function resolveException(actor: StaffActor, exceptionId: string, t
   await callRpc<any>("resolve_order_inventory_exception", { p: { exception_id: exceptionId, to_state: toState, reason: reason ?? "", actor_id: actor.userId } });
   await logEvent({ entityType: "settings", entityId: exceptionId, event: `inventory.exception.${toState}`, actorType: "staff", actorId: actor.userId, notes: reason });
 }
+
+/**
+ * STOCK recovery: repair a paid shortfall by attributing newly-eligible batch stock (FIFO) to the
+ * exception's sale movement. Resolves to `resolved_allocated` only if the full shortfall is covered;
+ * otherwise it stays open with the reduced remaining. Creates NO new stock — it is attribution repair.
+ */
+export async function reallocateException(actor: StaffActor, exceptionId: string): Promise<{ ok: boolean; resolved?: boolean; remaining?: number }> {
+  assertCap(actor, "manufacturing.recall");
+  const r = await callRpc<any>("reallocate_order_exception", { p: { exception_id: exceptionId, actor_id: actor.userId } });
+  await logEvent({ entityType: "settings", entityId: exceptionId, event: r?.resolved ? "inventory.exception.resolved_allocated" : "inventory.exception.pending_reallocation", actorType: "staff", actorId: actor.userId, metadata: { remaining: r?.remaining ?? 0 } });
+  return { ok: !!r?.ok, resolved: !!r?.resolved, remaining: r?.remaining };
+}
+
+/**
+ * REFUND recovery (Part D): resolve a shortfall against confirmed refund evidence in the refunds
+ * ledger (the financial truth — no second ledger). Issues NO positive inventory movement: a shortfall's
+ * units were never deducted. `processed` refund ⇒ resolved_refunded (fulfilment unblocks); any other
+ * non-failed status ⇒ refund_initiated (stays open/blocked); a failed refund is rejected as evidence.
+ */
+export async function resolveExceptionByRefund(actor: StaffActor, exceptionId: string, refundId: string, reason?: string): Promise<{ ok: boolean; state?: string; refundStatus?: string }> {
+  assertCap(actor, "manufacturing.recall");
+  const r = await callRpc<any>("resolve_exception_by_refund", { p: { exception_id: exceptionId, refund_id: refundId, actor_id: actor.userId, reason: reason ?? "" } });
+  await logEvent({ entityType: "settings", entityId: exceptionId, event: `inventory.exception.${r?.state ?? "refund"}`, actorType: "staff", actorId: actor.userId, notes: reason, metadata: { refund_id: refundId, refund_status: r?.refund_status } });
+  return { ok: !!r?.ok, state: r?.state, refundStatus: r?.refund_status };
+}
+
+/** Durable pending batch-attribution holds (received, resale-eligible, not yet sellable) — for operator triage. */
+export async function listReceiptHolds(opts?: { variantId?: string; openOnly?: boolean }): Promise<any[]> {
+  let q = db().from("batch_receipt_holds").select("*").order("created_at", { ascending: true });
+  if (opts?.variantId) q = q.eq("variant_id", opts.variantId);
+  if (opts?.openOnly !== false) q = q.eq("state", "held");
+  const { data } = await q;
+  return data ?? [];
+}
