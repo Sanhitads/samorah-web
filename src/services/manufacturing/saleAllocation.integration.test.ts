@@ -22,10 +22,11 @@ import { toCuring, toQualityCheck, approveQc } from "@/services/manufacturing/li
 import { recordRoutineQc, recordDesignValidation } from "@/services/manufacturing/qcService";
 import { releaseBatch, variantReconciliation } from "@/services/manufacturing/releaseService";
 import { setAllocationEnabled, setReleaseEnabled, setVariantTracking } from "@/services/manufacturing/activationService";
+import { getOrderExceptions, resolveException } from "@/services/manufacturing/exceptionService";
 import type { StaffActor } from "@/services/manufacturing/actor";
 
 const RUNK = Date.now().toString(36).slice(-5);
-let superadmin: StaffActor, manager: StaffActor, inspector: StaffActor;
+let superadmin: StaffActor, manager: StaffActor, inspector: StaffActor, adminA: StaffActor;
 let V = "", Vprod = "", V2 = "", U = "";
 let saleN = 0;
 
@@ -73,6 +74,7 @@ d("Phase 7A — batch-aware sale allocation (inert)", () => {
     superadmin = { userId: us[0].id, role: "super_admin" };
     manager = { userId: us[1]?.id ?? us[0].id, role: "manager" };
     inspector = { userId: us[0].id, role: "editor" };
+    adminA = { userId: us[0].id, role: "admin" };
     await setReleaseEnabled(superadmin, true);
     await setAllocationEnabled(superadmin, true);
     ({ productId: Vprod, variantId: V } = await makeVariant(true));
@@ -133,9 +135,10 @@ d("Phase 7A — batch-aware sale allocation (inert)", () => {
     const { orderId, result } = await sale([{ variantId: Vs, qty: 3 }]); // stock covers the sale, but the batch is now ineligible
     expect(result.created).toBe(true); // payment finalised — never blocked
     expect((await overlays(orderId)).length).toBe(0); // nothing attributed to the revoked batch
-    const shortfall = await sel(`/audit_logs?entity_id=eq.${orderId}&action=eq.inventory.allocation_shortfall&select=after_data`);
-    expect(shortfall.length).toBe(1);
-    expect(shortfall[0].after_data.shortfall).toBe(3);
+    const exc = await sel(`/order_inventory_exceptions?order_id=eq.${orderId}&select=shortfall_qty,state`);
+    expect(exc.length).toBe(1); // DURABLE exception, not a silent completion
+    expect(exc[0].shortfall_qty).toBe(3);
+    expect(exc[0].state).toBe("captured_unallocated");
   });
 
   it("11+17. cancel/adjust fail CLOSED on a tracked variant; untracked unaffected", async () => {
@@ -157,6 +160,48 @@ d("Phase 7A — batch-aware sale allocation (inert)", () => {
     expect(await drift(Vb)).toBe(0);
   });
 
+  it("A4. cancellation of a tracked order is batch-aware (restores eligible batches, reconciles)", async () => {
+    const { variantId: Vc } = await makeVariant(true); await releasedBatch(Vc, 8);
+    const { orderId } = await sale([{ variantId: Vc, qty: 5 }]);
+    const cc = await rpc("cancel_order", { p: { order_id: orderId, release_inventory: true, actor_id: manager.userId } });
+    expect(cc.body.ok).toBe(true);
+    expect((await sel(`/batch_allocations?order_id=eq.${orderId}&select=state`)).every((a: any) => a.state === "cancelled")).toBe(true);
+    const cr = await sel(`/batch_stock_entries?source_id=eq.${orderId}&entry_type=eq.cancel_restock&select=qty`);
+    expect(cr.reduce((n: number, e: any) => n + e.qty, 0)).toBe(5); // restored to the original batches
+    const rec = await variantReconciliation(Vc);
+    expect(rec.reconciled).toBe(true); expect(rec.overlay_ledger_drift).toBe(0);
+  });
+
+  it("A4b. cancellation routes held/recalled-batch units to quarantine (never auto-sellable)", async () => {
+    const { variantId: Vq } = await makeVariant(true); const hb = await releasedBatch(Vq, 5);
+    const { orderId } = await sale([{ variantId: Vq, qty: 3 }]);
+    await rpc("set_batch_hold", { p: { batch_id: hb, hold: true, reason: "recall check" } });
+    const cc = await rpc("cancel_order", { p: { order_id: orderId, release_inventory: true, actor_id: manager.userId } });
+    expect(cc.body.ok).toBe(true);
+    expect((await sel(`/batch_quarantine?batch_id=eq.${hb}&select=qty`)).reduce((n: number, e: any) => n + e.qty, 0)).toBeGreaterThanOrEqual(3);
+    expect((await sel(`/batch_stock_entries?source_id=eq.${orderId}&entry_type=eq.cancel_restock&select=qty`)).length).toBe(0); // nothing made sellable
+  });
+
+  it("A1/A2/A7. shortfall → durable exception; reconciliation stays honest; exception resolvable", async () => {
+    const { variantId: Vx } = await makeVariant(true); const b = await releasedBatch(Vx, 2);
+    const dv = (await sel(`/batch_design_validations?batch_id=eq.${b}&state=eq.approved&select=id`))[0];
+    await rpc("revoke_design_validation", { p: { validation_id: dv.id, reason: "config recall", actor_id: manager.userId } });
+    const { orderId, result } = await sale([{ variantId: Vx, qty: 2 }]);
+    expect(result.created).toBe(true);
+    const rec = await variantReconciliation(Vx);
+    expect(rec.open_exception_qty).toBe(2);
+    expect(rec.reconciled).toBe(true); // the gap IS the open exception — not lost
+    const exc = (await getOrderExceptions(orderId))[0];
+    expect(exc.state).toBe("captured_unallocated");
+    await resolveException(adminA, exc.id, "pending_reallocation", "ops will release more");
+    expect((await getOrderExceptions(orderId))[0].state).toBe("pending_reallocation");
+  });
+
+  it("A3. a direct untagged restock on a tracked variant is rejected (DB fail-closed)", async () => {
+    const r = await rpc("apply_stock_movement", { p_variant_id: V, p_delta: 1, p_movement_type: "cancel_restock", p_source_type: "order", p_source_id: null, p_reference: "x", p_actor_id: null, p_reason: null, p_note: null, p_metadata: null, p_idempotency_key: `direct-${RUNK}` });
+    expect(r.status).toBeGreaterThanOrEqual(400);
+  });
+
   it("13-16. held/revoked batches are skipped by eligibility", async () => {
     const { variantId: Ve } = await makeVariant(true);
     const held = await releasedBatch(Ve, 5);
@@ -164,7 +209,7 @@ d("Phase 7A — batch-aware sale allocation (inert)", () => {
     const { orderId, result } = await sale([{ variantId: Ve, qty: 1 }]); // only eligible batch is held → shortfall
     expect(result.created).toBe(true);
     expect((await overlays(orderId)).length).toBe(0); // nothing attributed from the held batch
-    const sf = await sel(`/audit_logs?entity_id=eq.${orderId}&action=eq.inventory.allocation_shortfall&select=id`);
+    const sf = await sel(`/order_inventory_exceptions?order_id=eq.${orderId}&select=id`);
     expect(sf.length).toBe(1);
   });
 });

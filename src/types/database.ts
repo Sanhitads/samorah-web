@@ -3907,6 +3907,77 @@ export type Database = {
           },
         ]
       }
+      order_inventory_exceptions: {
+        Row: {
+          created_at: string
+          id: string
+          movement_id: string | null
+          order_id: string
+          reason: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          shortfall_qty: number
+          state: string
+          updated_at: string
+          variant_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          movement_id?: string | null
+          order_id: string
+          reason?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          shortfall_qty: number
+          state?: string
+          updated_at?: string
+          variant_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          movement_id?: string | null
+          order_id?: string
+          reason?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          shortfall_qty?: number
+          state?: string
+          updated_at?: string
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_inventory_exceptions_movement_id_fkey"
+            columns: ["movement_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_movements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_inventory_exceptions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_inventory_exceptions_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_inventory_exceptions_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_items: {
         Row: {
           brand_name: string | null
@@ -6923,6 +6994,7 @@ export type Database = {
         Returns: Json
       }
       reserve_stock: { Args: { p: Json }; Returns: Json }
+      resolve_order_inventory_exception: { Args: { p: Json }; Returns: Json }
       restock_return_items: { Args: { p_return_id: string }; Returns: number }
       restore_coupon: {
         Args: { p_actor_id?: string; p_order_id: string; p_reason: string }
