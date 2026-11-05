@@ -46,3 +46,24 @@ Preconditions: local app running (`npm run dev`), logged in as a staff account w
 - Service/DB/API: `npm run test:integration` (local DB required; guard fails closed against hosted DBs).
 - Component render: `npm run test:unit` (includes `*.rendered` tests).
 - Browser: the steps above, by a human, on local dev. Record operator, date, and any deviation. This is the honest status — the browser path is **not** machine-verified.
+
+## Phase 11B — authenticated browser walkthrough: attempt & status
+
+**Attempted. Not executed.** This environment has **no browser-automation / authenticated-login harness** (no Playwright/Cypress in the project; `jsdom` component tests do not log in; no connected desktop/extension browser). An authenticated admin walkthrough therefore could not be run automatically, and **browser E2E is NOT claimed complete.** It remains an **open production-readiness item** to be performed by a human on an isolated staging environment with a dedicated staff **test** account (never a real customer/admin), with results recorded below.
+
+Executable checklist (record actual observed result + operator + date for each; until then each stays `NOT EXECUTED`):
+
+| # | Step | Capability | Expected | Observed |
+|---|---|---|---|---|
+| 1 | Batch create + lifecycle draft→…→qc_approved (`/admin/manufacturing/<id>`) | operate/qc/qc_approve | transition controls appear per state/role | NOT EXECUTED |
+| 2 | Record QC + approve | qc / qc_approve | approved/rejected qty update; approve shown to manager only | NOT EXECUTED |
+| 3 | Material-lot registration | operate | lot recorded; consumption traceable for recall | NOT EXECUTED |
+| 4 | Label preview + print history + Mark printed | operate | encoded==batch code; generated→printed; evidence unchanged | NOT EXECUTED |
+| 5 | Fulfilment picking + packing QC (`/admin/fulfillment`) | operate | actual batch confirmed; packing QC gates | NOT EXECUTED |
+| 6 | Batch substitution | operate | substitution via append-only pick confirmation | NOT EXECUTED |
+| 7 | Shipment readiness + dispatch blocking | operate | dispatch blocked until provenance frozen / exception cleared | NOT EXECUTED |
+| 8 | Recall case create + containment (`/admin/recalls`) | recall (admin) | recall_state set; release/label refused | NOT EXECUTED |
+| 9 | Affected-customer lookup (PII) | recall (admin) | visible only under recall capability | NOT EXECUTED |
+| 10 | Role-specific permissions + error messages | below-floor role | control hidden AND server returns 403 | NOT EXECUTED |
+
+The server-side RBAC, gating and accounting that these screens drive **are** machine-verified (integration suite); what remains unverified is the UI wiring and operator ergonomics, which only a real authenticated session can confirm.
