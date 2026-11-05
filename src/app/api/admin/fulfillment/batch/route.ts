@@ -7,6 +7,17 @@ import {
   getOrderEntitlements, confirmPickBatch, confirmShipmentProvenance, recordPackingQc,
   orderShippedBatches, batchShippedOrders, orderPickConfirmations,
 } from "@/services/manufacturing/fulfillmentProvenanceService";
+import { getOrderByNumber } from "@/services/orderService";
+
+/** Combined read for the BatchProvenancePanel: resolve an order number → entitlements + picks + shipped. */
+async function panelData(orderNumber: string) {
+  const order = await getOrderByNumber(orderNumber);
+  if (!order) return { orderId: null, entitlements: null, picks: [], shipped: [] };
+  const [entitlements, picks, shipped] = await Promise.all([
+    getOrderEntitlements(order.id), orderPickConfirmations(order.id), orderShippedBatches(order.id),
+  ]);
+  return { orderId: order.id, orderNumber, entitlements, picks, shipped };
+}
 
 /**
  * POST /api/admin/fulfillment/batch — Phase 8 physical batch provenance actions.
@@ -19,6 +30,7 @@ export const runtime = "nodejs";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Handler = (b: any, actor: StaffActor) => Promise<unknown>;
 const ACTIONS: Record<string, { cap: Capability; run: Handler }> = {
+  panel:               { cap: "manufacturing.operate", run: (b) => panelData(String(b.orderNumber)) },
   entitlements:        { cap: "manufacturing.operate", run: (b) => getOrderEntitlements(String(b.orderId)) },
   order_provenance:    { cap: "manufacturing.operate", run: (b) => orderShippedBatches(String(b.orderId)) },
   order_picks:         { cap: "manufacturing.operate", run: (b) => orderPickConfirmations(String(b.orderId)) },

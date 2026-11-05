@@ -62,6 +62,7 @@ async function sale(variantId: string, qty: number) {
   await rpc("finalize_order", { p_razorpay_order_id: roid, p_payment_id: `pay_${tag}`, p_signature: "sig", p_source: "test", p_amount_paise: null });
   return { orderId: o.id, orderItemId: oi.id, orderNumber: `P8-${tag}` };
 }
+const PASS = { product_ok: true, variant_ok: true, batch_ok: true, qty_ok: true, vessel_ok: true, label_ok: true, packaging_ok: true };
 const drift = async (v: string) => (await variantReconciliation(v)).overlay_ledger_drift;
 const ent = async (orderId: string, itemId: string) => { const e = await getOrderEntitlements(orderId); return { blocked: e.order_blocked, reason: e.block_reason, item: (e.items || []).find((i: any) => i.order_item_id === itemId) }; };
 
@@ -179,6 +180,7 @@ d("Phase 8 — fulfilment provenance", () => {
   it("13-14-15. shipment provenance freeze is idempotent; reverse traceability resolves both directions", async () => {
     const v = await makeVariant(); const b = await releasedBatch(v, 5); const s = await sale(v, 2);
     await confirmPickBatch(editor, { orderItemId: s.orderItemId, batchId: b, qty: 2 });
+    await recordPackingQc(editor, s.orderId, PASS); // dispatch gate requires a current passing QC
     const sh = await ins("shipments", { order_id: s.orderId, status: "pending", provider: "manual" });
     const f1 = await confirmShipmentProvenance(editor, sh.id); expect(f1.frozenLines).toBe(1);
     const f2 = await confirmShipmentProvenance(editor, sh.id); expect(f2.alreadyFrozen).toBe(true); // duplicate shipment action is a no-op
@@ -190,6 +192,7 @@ d("Phase 8 — fulfilment provenance", () => {
     const v = await makeVariant(); const b1 = await releasedBatch(v, 5, "2026-12-01"); const b3 = await releasedBatch(v, 5, "2026-12-28");
     const s = await sale(v, 2); // allocated b1
     await confirmPickBatch(editor, { orderItemId: s.orderItemId, batchId: b3, qty: 2, reason: "substitute" }); // actual = b3
+    await recordPackingQc(editor, s.orderId, PASS);
     const sh = await ins("shipments", { order_id: s.orderId, status: "pending", provider: "manual" });
     await confirmShipmentProvenance(editor, sh.id);
     // customer returns 2 → should restock to b3 (actual provenance), since confirm_pick_batch re-pointed the allocation
@@ -206,5 +209,92 @@ d("Phase 8 — fulfilment provenance", () => {
   it("19. authorisation: a role without manufacturing.operate cannot confirm a pick", async () => {
     const v = await makeVariant(); const b = await releasedBatch(v, 5); const s = await sale(v, 1);
     await expect(confirmPickBatch(customer, { orderItemId: s.orderItemId, batchId: b, qty: 1 })).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it("C1. the ORIGINAL payment-time allocation is never mutated by a substitution (immutable history)", async () => {
+    const v = await makeVariant(); const b1 = await releasedBatch(v, 5, "2026-12-01"); const b3 = await releasedBatch(v, 5, "2026-12-29");
+    const s = await sale(v, 2); // allocated b1
+    const allocBefore = await sel(`/batch_allocations?order_item_id=eq.${s.orderItemId}&select=batch_id,qty,state&order=batch_id`);
+    await confirmPickBatch(editor, { orderItemId: s.orderItemId, batchId: b3, qty: 2, reason: "shelf" });
+    const allocAfter = await sel(`/batch_allocations?order_item_id=eq.${s.orderItemId}&select=batch_id,qty,state&order=batch_id`);
+    expect(allocAfter).toEqual(allocBefore); // UNCHANGED — original allocation preserved
+    expect(allocBefore[0].batch_id).toBe(b1);
+    const pc = (await sel(`/batch_pick_confirmations?order_item_id=eq.${s.orderItemId}&select=batch_id,allocated_batch_id,is_substitution,reason,confirmed_by,confirmed_at`))[0];
+    expect(pc.batch_id).toBe(b3); expect(pc.allocated_batch_id).toBe(b1); expect(pc.is_substitution).toBe(true);
+    expect(pc.reason).toBe("shelf"); expect(pc.confirmed_by).toBe(actorId); expect(pc.confirmed_at).toBeTruthy();
+  });
+
+  it("C2. partial substitution of a multi-unit line: one unit from the allocated batch, one substituted", async () => {
+    const v = await makeVariant(); const b1 = await releasedBatch(v, 3, "2026-12-01"); const b3 = await releasedBatch(v, 3, "2026-12-29");
+    const s = await sale(v, 2); // both allocated to b1 (FIFO, b1 has 3)
+    await confirmPickBatch(editor, { orderItemId: s.orderItemId, batchId: b1, qty: 1 });  // not substitution
+    await confirmPickBatch(editor, { orderItemId: s.orderItemId, batchId: b3, qty: 1, reason: "ran out" }); // substitution
+    const pcs = await sel(`/batch_pick_confirmations?order_item_id=eq.${s.orderItemId}&select=batch_id,is_substitution,qty&order=confirmed_at`);
+    expect(pcs.find((p: any) => p.batch_id === b1).is_substitution).toBe(false);
+    expect(pcs.find((p: any) => p.batch_id === b3).is_substitution).toBe(true);
+    expect(await drift(v)).toBe(0);
+    // original allocation (b1) still intact
+    expect((await sel(`/batch_allocations?order_item_id=eq.${s.orderItemId}&batch_id=eq.${b1}&select=qty`))[0].qty).toBe(2);
+  });
+
+  it("C7. changing a pick after packing QC supersedes the QC → dispatch blocked until re-QC", async () => {
+    const v = await makeVariant(); const b = await releasedBatch(v, 5); const s = await sale(v, 2);
+    await confirmPickBatch(editor, { orderItemId: s.orderItemId, batchId: b, qty: 1 });
+    await recordPackingQc(editor, s.orderId, PASS);           // QC against 1 picked
+    await confirmPickBatch(editor, { orderItemId: s.orderItemId, batchId: b, qty: 1 }); // pick changes → QC stale
+    const sh = await ins("shipments", { order_id: s.orderId, status: "pending", provider: "manual" });
+    await expect(confirmShipmentProvenance(editor, sh.id)).rejects.toThrow(/packing_qc_missing_or_stale/);
+    await recordPackingQc(editor, s.orderId, PASS);           // re-QC against current picks
+    expect((await confirmShipmentProvenance(editor, sh.id)).frozenLines).toBe(1);
+  });
+
+  it("C8-C9. dispatch blocked without full confirmation and without passing QC", async () => {
+    const v = await makeVariant(); const b = await releasedBatch(v, 5); const s = await sale(v, 2);
+    const sh = await ins("shipments", { order_id: s.orderId, status: "pending", provider: "manual" });
+    await expect(confirmShipmentProvenance(editor, sh.id)).rejects.toThrow(/incomplete_pick_confirmation/); // nothing picked
+    await confirmPickBatch(editor, { orderItemId: s.orderItemId, batchId: b, qty: 2 });
+    await expect(confirmShipmentProvenance(editor, sh.id)).rejects.toThrow(/packing_qc/); // picked but no QC
+  });
+
+  it("C10. a batch recalled AFTER picking but BEFORE dispatch blocks the shipment freeze", async () => {
+    const v = await makeVariant(); const b = await releasedBatch(v, 5); const s = await sale(v, 2);
+    await confirmPickBatch(editor, { orderItemId: s.orderItemId, batchId: b, qty: 2 });
+    await recordPackingQc(editor, s.orderId, PASS);
+    await patch(`/manufacturing_batches?id=eq.${b}`, { recall_state: "recalled" }); // recall slips in
+    const sh = await ins("shipments", { order_id: s.orderId, status: "pending", provider: "manual" });
+    await expect(confirmShipmentProvenance(editor, sh.id)).rejects.toThrow(/recall/i);
+  });
+
+  it("C13. multi-component bundle preserves per-component (per order-item) batch provenance", async () => {
+    // The bundle model creates one order_item PER component; each confirms its own actual batch.
+    const v = await makeVariant(); const b = await releasedBatch(v, 10);
+    const tag = `${RUNK}-${n++}`; const roid = `rzp_p8b_${tag}`;
+    const o = await ins("orders", { order_number: `P8-${tag}`, email: "t@example.test", status: "pending", payment_status: "pending", total_amount: 200, razorpay_order_id: roid });
+    const ca = await ins("order_items", { order_id: o.id, variant_id: v, product_name: "Comp A", sku: "A", hsn_code: "34060010", gst_rate: 5, unit_price: 100, quantity: 1, line_subtotal: 100, line_total: 100, is_bundle: true, composition_id: "bundle-1" });
+    const cb = await ins("order_items", { order_id: o.id, variant_id: v, product_name: "Comp B", sku: "B", hsn_code: "34060010", gst_rate: 5, unit_price: 100, quantity: 1, line_subtotal: 100, line_total: 100, is_bundle: true, composition_id: "bundle-1" });
+    await ins("stock_reservations", { variant_id: v, quantity: 2, order_id: o.id, session_id: `s-${tag}`, expires_at: new Date(Date.now() + 3600e3).toISOString() });
+    await rpc("finalize_order", { p_razorpay_order_id: roid, p_payment_id: `pay_${tag}`, p_signature: "sig", p_source: "test", p_amount_paise: null });
+    await confirmPickBatch(editor, { orderItemId: ca.id, batchId: b, qty: 1 });
+    await confirmPickBatch(editor, { orderItemId: cb.id, batchId: b, qty: 1 });
+    expect((await sel(`/batch_pick_confirmations?order_item_id=eq.${ca.id}&select=batch_id`))[0].batch_id).toBe(b);
+    expect((await sel(`/batch_pick_confirmations?order_item_id=eq.${cb.id}&select=batch_id`))[0].batch_id).toBe(b);
+    expect(await drift(v)).toBe(0);
+  });
+
+  it("C17. physical write-off cannot consume more than the batch currently holds (conservation)", async () => {
+    const v = await makeVariant(); const b = await releasedBatch(v, 2); // b holds the 2 units; made ineligible below
+    const dv = (await sel(`/batch_design_validations?batch_id=eq.${b}&state=eq.approved&select=id`))[0];
+    await rpc("revoke_design_validation", { p: { validation_id: dv.id, reason: "x", actor_id: manager.userId } });
+    const s = await sale(v, 2); // shortfall 2 (b ineligible); b on-hand still 2 (sale unattributed)
+    const e = (await sel(`/order_inventory_exceptions?order_id=eq.${s.orderId}&select=id`))[0];
+    const refund = await ins("refunds", { order_id: s.orderId, amount: 200, status: "processed", method: "manual" });
+    await rpc("resolve_exception_by_refund", { p: { exception_id: e.id, refund_id: refund.id, actor_id: actorId } });
+    const b2 = await releasedBatch(v, 1); // on-hand 1 < shortfall 2 → disposing the shortfall to it is REJECTED
+    const bad = await rpc("dispose_exception_shortfall", { p: { exception_id: e.id, batch_id: b2, actor_id: actorId } });
+    expect(bad.status).toBeGreaterThanOrEqual(400);
+    const ok = await rpc("dispose_exception_shortfall", { p: { exception_id: e.id, batch_id: b, actor_id: actorId } }); // b holds 2 → OK
+    expect(ok.body.ok).toBe(true);
+    expect((await variantReconciliation(v)).physical_consistent).toBe(true);
+    void b2;
   });
 });

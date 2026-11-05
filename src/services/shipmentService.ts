@@ -147,6 +147,15 @@ export async function createShipmentForOrder(orderId: string, opts?: { actorId?:
   const order = (await getOrderById(orderId)) as unknown as (ShippableOrder & { fulfillment_status?: string | null }) | null;
   if (!order) return { ok: false, created: false, reason: "order not found" };
 
+  // Phase 8 — central dispatch gate: for a TRACKED order (physical batch confirmation required), the
+  // shipment can only be created once every fulfillable unit has a confirmed eligible batch and a current
+  // passing packing QC, with no open exception / cancellation / refund. Inert for untracked orders
+  // (assert_tracked_shipment_ready → ready:true). Centralised here so no route/webhook/bulk path bypasses it.
+  const ready = await callRpc<{ ready: boolean; reason?: string }>("assert_tracked_shipment_ready", { p_order_id: orderId });
+  if (ready && ready.ready === false) {
+    return { ok: false, created: false, reason: `tracked_not_ready:${ready.reason ?? "not_ready"}` };
+  }
+
   const settings = await getShippingSettings();
 
   // §14 gate — when enabled, only ship once fulfillment reaches ready_for_dispatch.

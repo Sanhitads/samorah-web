@@ -3043,13 +3043,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "inventory_movements_actor_id_fkey"
-            columns: ["actor_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "inventory_movements_variant_id_fkey"
             columns: ["variant_id"]
             isOneToOne: false
@@ -3171,22 +3164,7 @@ export type Database = {
           status?: string
           updated_at?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "inventory_receipts_committed_by_fkey"
-            columns: ["committed_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "inventory_receipts_received_by_fkey"
-            columns: ["received_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       login_history: {
         Row: {
@@ -4827,6 +4805,7 @@ export type Database = {
           operator_id: string | null
           order_id: string
           passed: boolean
+          pick_fingerprint: string | null
           shipment_id: string | null
         }
         Insert: {
@@ -4837,6 +4816,7 @@ export type Database = {
           operator_id?: string | null
           order_id: string
           passed: boolean
+          pick_fingerprint?: string | null
           shipment_id?: string | null
         }
         Update: {
@@ -4847,6 +4827,7 @@ export type Database = {
           operator_id?: string | null
           order_id?: string
           passed?: boolean
+          pick_fingerprint?: string | null
           shipment_id?: string | null
         }
         Relationships: [
@@ -7166,6 +7147,10 @@ export type Database = {
         }
         Returns: Json
       }
+      assert_tracked_shipment_ready: {
+        Args: { p_order_id: string }
+        Returns: Json
+      }
       attribute_receipt_restock: {
         Args: {
           p_actor: string
@@ -7320,6 +7305,14 @@ export type Database = {
       }
       order_fulfillment_blocked: { Args: { p_order_id: string }; Returns: Json }
       order_item_entitlements: { Args: { p_order_id: string }; Returns: Json }
+      order_pick_fingerprint: { Args: { p_order_id: string }; Returns: string }
+      order_variant_provenance: {
+        Args: { p_order: string; p_variant: string }
+        Returns: {
+          batch_id: string
+          qty: number
+        }[]
+      }
       payable_window_minutes: { Args: never; Returns: number }
       queue_fulfillment_job: {
         Args: { p_job_type: string; p_order_id: string }

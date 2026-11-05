@@ -6,6 +6,7 @@ import type { FulfillmentStatus } from "@/lib/fulfillment/state";
 import { HOLD_REASONS, composeHoldReason } from "@/lib/fulfillment/holdReasons";
 import { PickPanel } from "@/components/admin/PickPanel";
 import { PackPanel } from "@/components/admin/PackPanel";
+import { BatchProvenanceModal } from "@/components/admin/BatchProvenanceModal";
 
 const ACTION_LABEL: Record<string, string> = {
   picking: "Start Picking",
@@ -41,6 +42,7 @@ export function FulfillmentActions({
   const [holdInput, setHoldInput] = useState(false);
   const [showPick, setShowPick] = useState(false);
   const [showPack, setShowPack] = useState(false);
+  const [showProv, setShowProv] = useState(false);
   const [reasonValue, setReasonValue] = useState(HOLD_REASONS[0].value);
   const [note, setNote] = useState("");
   const disabled = busy !== null || pending;
@@ -99,6 +101,9 @@ export function FulfillmentActions({
       ) : null}
       {fulfillmentStatus === "packing" ? (
         <button type="button" className="ff-btn ff-btn--primary" disabled={disabled} onClick={() => setShowPack(true)}>Packing checklist</button>
+      ) : null}
+      {(["picking", "picked", "packing", "packed", "qc_passed", "ready_for_dispatch"] as FulfillmentStatus[]).includes(fulfillmentStatus) ? (
+        <button type="button" className="ff-btn" disabled={disabled} onClick={() => setShowProv(true)}>Batch provenance</button>
       ) : null}
       {forwardNext.map((s) => (
         <button key={s} type="button" disabled={disabled} onClick={() => advance(s)} className="ff-btn">
@@ -161,6 +166,9 @@ export function FulfillmentActions({
       ) : null}
       {showPack ? (
         <PackPanel orderNumber={orderNumber} onClose={() => setShowPack(false)} onDone={() => startTransition(() => router.refresh())} />
+      ) : null}
+      {showProv ? (
+        <BatchProvenanceModal orderNumber={orderNumber} onClose={() => { setShowProv(false); startTransition(() => router.refresh()); }} />
       ) : null}
     </div>
   );

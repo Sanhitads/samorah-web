@@ -10,9 +10,10 @@ import { useState } from "react";
  * /api/admin/fulfillment/batch. Inert for untracked orders (no tracked lines → nothing to confirm).
  */
 export interface EntitlementItem {
-  order_item_id: string; variant_id: string; is_bundle: boolean;
-  ordered: number; allocated: number; picked_qty: number; picked_confirmed: number;
+  order_item_id: string; variant_id: string; is_bundle: boolean; tracked?: boolean;
+  ordered: number; allocated: number; cancelled_qty?: number; picked_qty: number; picked_confirmed: number;
   shipped: number; refunded_identifiable: number; remaining_fulfillable: number;
+  remaining_to_pick?: number; remaining_to_ship?: number;
 }
 export interface Entitlements { order_id: string; order_blocked: boolean; block_reason: string | null; items: EntitlementItem[] }
 export interface PickRow { order_item_id: string; batch_id: string; qty: number; is_substitution: boolean; allocated_batch_id: string | null; reason: string | null }
@@ -83,7 +84,7 @@ export function BatchProvenancePanel({
                   </span>
                 ))}
               </span>
-              {!entitlements.order_blocked && it.picked_confirmed < rem ? (
+              {!entitlements.order_blocked && it.tracked !== false && it.picked_confirmed < rem ? (
                 <span className="pick-row__ctl">
                   <input className="admin__input" placeholder="actual batch id" value={dd.batchId}
                     onChange={(e) => setDraft((p) => ({ ...p, [it.order_item_id]: { ...dd, batchId: e.target.value } }))} />
