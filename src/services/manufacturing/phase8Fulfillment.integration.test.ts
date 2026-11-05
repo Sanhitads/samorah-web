@@ -310,7 +310,7 @@ d("Phase 8 — fulfilment provenance", () => {
     await confirmPickBatch(editor, { orderItemId: sY.orderItemId, batchId: bC, qty: 2 }); // same count(1)/sum(2) as fpX2, different batch
     const fpY = (await rpc("order_pick_fingerprint", { p_order_id: sY.orderId })).body;
     expect(fpY).not.toBe(fpX2); // different batch set with equal count/sum → different fingerprint (no collision)
-    expect(fpX2).toMatch(/^[0-9a-f]{32}$/); // md5 digest
+    expect(fpX2).toMatch(/^[0-9a-f]{64}$/); // SHA-256 digest
   });
 
   it("A2. a batch recalled AFTER shipment freeze blocks the final carrier dispatch (markShipmentDispatched)", async () => {

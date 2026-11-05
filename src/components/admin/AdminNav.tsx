@@ -23,6 +23,7 @@ const NAV: NavGroup[] = [
       { label: "Notif. Log", href: "/admin/notifications-log", icon: "📡" },
       { label: "Notif. Analytics", href: "/admin/notification-analytics", icon: "📊" },
       { label: "Manufacturing", href: "/admin/manufacturing", icon: "⚗" },
+      { label: "Recalls", href: "/admin/recalls", icon: "🚫" },
       { label: "Orders", href: "/admin/orders", icon: "▤" },
       { label: "Fulfillment", href: "/admin/fulfillment", icon: "▦" },
       { label: "Returns", href: "/admin/returns", icon: "↩" },

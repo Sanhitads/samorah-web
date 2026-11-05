@@ -5440,6 +5440,66 @@ export type Database = {
           },
         ]
       }
+      recall_notifications: {
+        Row: {
+          approval_status: string
+          attempts: number
+          created_at: string
+          email_snapshot: string | null
+          id: string
+          necessity: string
+          needs_followup: boolean
+          order_id: string
+          outcome: string | null
+          provenance: string
+          recall_id: string
+          updated_at: string
+        }
+        Insert: {
+          approval_status?: string
+          attempts?: number
+          created_at?: string
+          email_snapshot?: string | null
+          id?: string
+          necessity?: string
+          needs_followup?: boolean
+          order_id: string
+          outcome?: string | null
+          provenance: string
+          recall_id: string
+          updated_at?: string
+        }
+        Update: {
+          approval_status?: string
+          attempts?: number
+          created_at?: string
+          email_snapshot?: string | null
+          id?: string
+          necessity?: string
+          needs_followup?: boolean
+          order_id?: string
+          outcome?: string | null
+          provenance?: string
+          recall_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recall_notifications_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recall_notifications_recall_id_fkey"
+            columns: ["recall_id"]
+            isOneToOne: false
+            referencedRelation: "recall_cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       redirects: {
         Row: {
           code: number
@@ -7289,6 +7349,7 @@ export type Database = {
     }
     Functions: {
       activate_variant_tracking: { Args: { p: Json }; Returns: Json }
+      add_recall_batches: { Args: { p: Json }; Returns: Json }
       add_shipment_event: { Args: { p: Json }; Returns: undefined }
       adjust_batch_inventory: { Args: { p: Json }; Returns: Json }
       adjust_inventory: { Args: { p: Json }; Returns: Json }
@@ -7404,7 +7465,19 @@ export type Database = {
         }[]
       }
       batch_onhand: { Args: { p_batch_id: string }; Returns: number }
+      batch_open_recall_kind: { Args: { p_batch_id: string }; Returns: string }
       batch_recall_accounting: { Args: { p_batch_id: string }; Returns: Json }
+      batch_recall_impact: {
+        Args: { p_batch_id: string }
+        Returns: {
+          order_id: string
+          order_item_id: string
+          order_status: string
+          provenance: string
+          qty: number
+          shipment_state: string
+        }[]
+      }
       begin_refund: { Args: { p: Json }; Returns: Json }
       cancel_order: { Args: { p: Json }; Returns: Json }
       claim_due_notifications: {
@@ -7501,6 +7574,7 @@ export type Database = {
         Returns: Database["public"]["Enums"]["user_role"]
       }
       dispose_exception_shortfall: { Args: { p: Json }; Returns: Json }
+      expand_recall_batches: { Args: { p: Json }; Returns: Json }
       expire_stale_pending_orders: {
         Args: { p_minutes?: number }
         Returns: number
@@ -7564,12 +7638,14 @@ export type Database = {
         }[]
       }
       payable_window_minutes: { Args: never; Returns: number }
+      prepare_recall_notifications: { Args: { p: Json }; Returns: Json }
       queue_fulfillment_job: {
         Args: { p_job_type: string; p_order_id: string }
         Returns: undefined
       }
       reallocate_order_exception: { Args: { p: Json }; Returns: Json }
       recall_case_transition: { Args: { p: Json }; Returns: Json }
+      recall_stamp_batch: { Args: { p_batch_id: string }; Returns: undefined }
       record_audit_event: { Args: { p: Json }; Returns: undefined }
       record_design_validation: { Args: { p: Json }; Returns: Json }
       record_material_consumption: { Args: { p: Json }; Returns: Json }
@@ -7580,6 +7656,7 @@ export type Database = {
       register_material: { Args: { p: Json }; Returns: Json }
       register_material_lot: { Args: { p: Json }; Returns: Json }
       release_batch: { Args: { p: Json }; Returns: Json }
+      release_batch_containment: { Args: { p: Json }; Returns: Json }
       release_coupon: {
         Args: {
           p_actor_id?: string

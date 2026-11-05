@@ -154,9 +154,10 @@ d("Phase 9 — recalls & traceability", () => {
     const sh = await ins("shipments", { order_id: s.orderId, status: "pending", provider: "manual" });
     await confirmShipmentProvenance(editor, sh.id);
     const acc = await batchRecallAccounting(b);
-    expect(acc.produced).toBe(10); expect(acc.approved).toBe(10); expect(acc.released).toBe(10);
-    expect(acc.on_hand).toBe(7); // 10 released − 3 sold
-    expect(acc.shipped).toBe(3);
+    expect(acc.cumulative.produced).toBe(10); expect(acc.cumulative.approved).toBe(10); expect(acc.cumulative.released).toBe(10);
+    expect(acc.current.sellable_on_hand).toBe(7); // 10 released − 3 sold
+    expect(acc.current.shipped).toBe(3);
+    expect(acc.reconciled).toBe(true); expect(acc.unknown_qty).toBe(0);
   });
 
   it("6. manufacturing_hold vs recall: a hold sets on_hold (distinct from a formal recall)", async () => {

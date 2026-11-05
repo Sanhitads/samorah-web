@@ -22,14 +22,27 @@ export async function createRecallCase(actor: StaffActor, input: CreateRecallInp
   return { ok: !!r?.ok, recallId: r?.recall_id, recallNumber: r?.recall_number };
 }
 
-export async function addRecallBatches(actor: StaffActor, recallId: string, batchIds: string[]): Promise<void> {
+export async function addRecallBatches(actor: StaffActor, recallId: string, batchIds: string[]): Promise<{ added: number; stamped: boolean }> {
   assertCap(actor, "manufacturing.recall");
-  // variant_id is backfilled from the batch for affected-order convenience.
-  const { data: batches } = await db().from("manufacturing_batches").select("id,variant_id").in("id", batchIds);
-  const vmap = new Map((batches ?? []).map((b: any) => [b.id, b.variant_id]));
-  const rows = batchIds.map((batch_id) => ({ recall_id: recallId, batch_id, variant_id: vmap.get(batch_id) ?? null }));
-  const { error } = await db().from("recall_case_batches").upsert(rows, { onConflict: "recall_id,batch_id", ignoreDuplicates: true });
-  if (error) throw new Error(`addRecallBatches: ${error.message}`);
+  // RPC inserts membership AND fail-closes (stamps recall_state) immediately if the case is already active.
+  const r = await callRpc<any>("add_recall_batches", { p: { recall_id: recallId, batch_ids: batchIds } });
+  return { added: r?.added ?? 0, stamped: !!r?.stamped };
+}
+
+/** Controlled expansion: add newly-discovered lot-consuming batches to the case (fail-closed if active). */
+export async function expandRecallBatches(actor: StaffActor, recallId: string): Promise<{ added: number }> {
+  assertCap(actor, "manufacturing.recall");
+  const r = await callRpc<any>("expand_recall_batches", { p: { recall_id: recallId, actor_id: actor.userId } });
+  await logEvent({ entityType: "settings", entityId: recallId, event: "recall.expanded", actorType: "staff", actorId: actor.userId, metadata: { added: r?.added } });
+  return { added: r?.added ?? 0 };
+}
+
+/** Explicit, authorised return-to-eligibility — refused while ANY open case still covers the batch. */
+export async function releaseBatchContainment(actor: StaffActor, batchId: string, reason: string): Promise<{ ok: boolean }> {
+  assertCap(actor, "manufacturing.recall");
+  const r = await callRpc<any>("release_batch_containment", { p: { batch_id: batchId, reason, actor_id: actor.userId } });
+  await logEvent({ entityType: "batch", entityId: batchId, event: "recall.batch_released", actorType: "staff", actorId: actor.userId, notes: reason });
+  return { ok: !!r?.ok };
 }
 
 export async function addRecallLots(actor: StaffActor, recallId: string, lotIds: string[]): Promise<void> {
@@ -73,6 +86,37 @@ export async function batchAffectedOrders(actor: StaffActor, batchId: string): P
 export async function lotAffectedOrders(actor: StaffActor, lotId: string): Promise<any[]> {
   assertCap(actor, "manufacturing.recall");
   return (await callRpc<any>("lot_affected_orders", { p_lot_id: lotId })) ?? [];
+}
+
+/** Per-order shipment-state classification for a batch (logical/picked/packed/shipment_created/dispatched/in_transit/delivered/rto/returned/unknown). */
+export async function batchRecallImpact(actor: StaffActor, batchId: string): Promise<any[]> {
+  assertCap(actor, "manufacturing.recall");
+  return (await callRpc<any>("batch_recall_impact", { p_batch_id: batchId })) ?? [];
+}
+
+/** Build/refresh the reviewable affected-customer contact list from ACTUAL provenance. NEVER sends. */
+export async function prepareRecallNotifications(actor: StaffActor, recallId: string): Promise<{ ok: boolean; prepared?: number }> {
+  assertCap(actor, "manufacturing.recall");
+  const r = await callRpc<any>("prepare_recall_notifications", { p: { recall_id: recallId } });
+  await logEvent({ entityType: "settings", entityId: recallId, event: "recall.notifications_prepared", actorType: "staff", actorId: actor.userId, metadata: { prepared: r?.prepared, dispatch_enabled: false } });
+  return { ok: !!r?.ok, prepared: r?.prepared };
+}
+
+export async function listRecallNotifications(actor: StaffActor, recallId: string): Promise<any[]> {
+  assertCap(actor, "manufacturing.recall");
+  const { data } = await db().from("recall_notifications").select("*").eq("recall_id", recallId).order("created_at");
+  return data ?? [];
+}
+
+/** Record an operator decision on a prepared contact (necessity/approval). NO external dispatch here. */
+export async function reviewRecallNotification(actor: StaffActor, id: string, patch: { necessity?: string; approvalStatus?: string; needsFollowup?: boolean }): Promise<void> {
+  assertCap(actor, "manufacturing.recall");
+  const upd: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (patch.necessity) upd.necessity = patch.necessity;
+  if (patch.approvalStatus) upd.approval_status = patch.approvalStatus;
+  if (patch.needsFollowup !== undefined) upd.needs_followup = patch.needsFollowup;
+  await db().from("recall_notifications").update(upd).eq("id", id);
+  await logEvent({ entityType: "settings", entityId: id, event: "recall.notification_reviewed", actorType: "staff", actorId: actor.userId, metadata: patch });
 }
 
 /** Affected customers for a batch — PERSONAL DATA; manufacturing.recall only. Joins orders for contact. */
