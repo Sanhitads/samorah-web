@@ -155,8 +155,9 @@ d("Phase 9 — recalls & traceability", () => {
     await confirmShipmentProvenance(editor, sh.id);
     const acc = await batchRecallAccounting(b);
     expect(acc.cumulative.produced).toBe(10); expect(acc.cumulative.approved).toBe(10); expect(acc.cumulative.released).toBe(10);
-    expect(acc.current.sellable_on_hand).toBe(7); // 10 released − 3 sold
-    expect(acc.current.shipped).toBe(3);
+    expect(acc.current.physical_on_hand).toBe(7);      // 10 released − 3 sold
+    expect(acc.current.sellable_on_hand).toBe(7);      // batch not recalled → sellable == physical
+    expect(acc.eligible).toBe(true); expect(acc.current.shipped).toBe(3);
     expect(acc.reconciled).toBe(true); expect(acc.unknown_qty).toBe(0);
   });
 

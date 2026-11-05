@@ -129,9 +129,11 @@ d("Phase 9 closure — end-to-end recall simulation", () => {
     expect((await batchAffectedCustomers(sup, bAff1)).find((c: any) => c.order_id === shipped.orderId).customer.email).toMatch(/@example.test$/);
     // 17. conservation accounting
     const acc = await batchRecallAccounting(bAff1);
-    // released 10 = on_hand 6 + sold_from_batch 4 (shipped 2 + in_fulfillment 2) → reconciled, nothing unknown
+    // released 10 = physical_on_hand 6 + sold_from_batch 4 (shipped 2 + in_fulfillment 2) → reconciled.
+    // The batch is RECALLED → sellable_on_hand is 0 even though 6 units are physically present.
     expect(acc.cumulative.released).toBe(10); expect(acc.current.shipped).toBe(2);
-    expect(acc.current.sellable_on_hand).toBe(6); expect(acc.current.in_fulfillment).toBe(2);
+    expect(acc.current.physical_on_hand).toBe(6); expect(acc.current.sellable_on_hand).toBe(0);
+    expect(acc.eligible).toBe(false); expect(acc.current.in_fulfillment).toBe(2);
     expect(acc.reconciled).toBe(true); expect(acc.unknown_qty).toBe(0);
     // 18. closure CANNOT release unsafe stock: close the case, batch stays recalled
     await transitionRecall(sup, rc.recallId!, "investigating");
