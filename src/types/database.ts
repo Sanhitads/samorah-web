@@ -5241,6 +5241,205 @@ export type Database = {
         }
         Relationships: []
       }
+      recall_case_batches: {
+        Row: {
+          added_at: string
+          batch_id: string
+          recall_id: string
+          variant_id: string | null
+        }
+        Insert: {
+          added_at?: string
+          batch_id: string
+          recall_id: string
+          variant_id?: string | null
+        }
+        Update: {
+          added_at?: string
+          batch_id?: string
+          recall_id?: string
+          variant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recall_case_batches_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "manufacturing_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recall_case_batches_recall_id_fkey"
+            columns: ["recall_id"]
+            isOneToOne: false
+            referencedRelation: "recall_cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recall_case_batches_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recall_case_events: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          event: string
+          from_state: string | null
+          id: string
+          notes: string | null
+          recall_id: string
+          to_state: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          event: string
+          from_state?: string | null
+          id?: string
+          notes?: string | null
+          recall_id: string
+          to_state?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          event?: string
+          from_state?: string | null
+          id?: string
+          notes?: string | null
+          recall_id?: string
+          to_state?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recall_case_events_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recall_case_events_recall_id_fkey"
+            columns: ["recall_id"]
+            isOneToOne: false
+            referencedRelation: "recall_cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recall_case_lots: {
+        Row: {
+          added_at: string
+          material_lot_id: string
+          recall_id: string
+        }
+        Insert: {
+          added_at?: string
+          material_lot_id: string
+          recall_id: string
+        }
+        Update: {
+          added_at?: string
+          material_lot_id?: string
+          recall_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recall_case_lots_material_lot_id_fkey"
+            columns: ["material_lot_id"]
+            isOneToOne: false
+            referencedRelation: "material_lots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recall_case_lots_recall_id_fkey"
+            columns: ["recall_id"]
+            isOneToOne: false
+            referencedRelation: "recall_cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recall_cases: {
+        Row: {
+          approved_by: string | null
+          closed_at: string | null
+          closure_decision: string | null
+          containment_status: string
+          created_at: string
+          evidence: Json | null
+          id: string
+          initiated_at: string | null
+          initiated_by: string | null
+          investigation_notes: string | null
+          kind: string
+          reason: string
+          recall_number: string | null
+          required_actions: Json | null
+          severity: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          approved_by?: string | null
+          closed_at?: string | null
+          closure_decision?: string | null
+          containment_status?: string
+          created_at?: string
+          evidence?: Json | null
+          id?: string
+          initiated_at?: string | null
+          initiated_by?: string | null
+          investigation_notes?: string | null
+          kind: string
+          reason: string
+          recall_number?: string | null
+          required_actions?: Json | null
+          severity?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          approved_by?: string | null
+          closed_at?: string | null
+          closure_decision?: string | null
+          containment_status?: string
+          created_at?: string
+          evidence?: Json | null
+          id?: string
+          initiated_at?: string | null
+          initiated_by?: string | null
+          investigation_notes?: string | null
+          kind?: string
+          reason?: string
+          recall_number?: string | null
+          required_actions?: Json | null
+          severity?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recall_cases_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recall_cases_initiated_by_fkey"
+            columns: ["initiated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       redirects: {
         Row: {
           code: number
@@ -7131,6 +7330,7 @@ export type Database = {
         }[]
       }
       analytics_refresh_mvs: { Args: never; Returns: undefined }
+      apply_recall_containment: { Args: { p: Json }; Returns: Json }
       apply_stock_movement: {
         Args: {
           p_actor_id: string
@@ -7145,6 +7345,10 @@ export type Database = {
           p_source_type: string
           p_variant_id: string
         }
+        Returns: Json
+      }
+      assert_shipment_dispatchable: {
+        Args: { p_shipment_id: string }
         Returns: Json
       }
       assert_tracked_shipment_ready: {
@@ -7168,6 +7372,17 @@ export type Database = {
       }
       available_stock: { Args: { p_variant_id: string }; Returns: number }
       backfill_opening_balances: { Args: never; Returns: number }
+      batch_affected_orders: {
+        Args: { p_batch_id: string }
+        Returns: {
+          fulfillment_status: string
+          order_id: string
+          order_item_id: string
+          order_status: string
+          provenance: string
+          qty: number
+        }[]
+      }
       batch_config_fingerprint: {
         Args: { p_batch_id: string }
         Returns: string
@@ -7176,7 +7391,20 @@ export type Database = {
         Args: { p_product_type: string; p_size_label: string; p_vessel: string }
         Returns: string
       }
+      batch_material_lots: {
+        Args: { p_batch_id: string }
+        Returns: {
+          material_id: string
+          material_lot_id: string
+          qty_consumed: number
+          received_on: string
+          supplier_lot_code: string
+          supplier_name: string
+          uom: string
+        }[]
+      }
       batch_onhand: { Args: { p_batch_id: string }; Returns: number }
+      batch_recall_accounting: { Args: { p_batch_id: string }; Returns: Json }
       begin_refund: { Args: { p: Json }; Returns: Json }
       cancel_order: { Args: { p: Json }; Returns: Json }
       claim_due_notifications: {
@@ -7266,6 +7494,7 @@ export type Database = {
       consume_coupon: { Args: { p_order_id: string }; Returns: Json }
       create_batch: { Args: { p: Json }; Returns: Json }
       create_pending_order: { Args: { p: Json }; Returns: Json }
+      create_recall_case: { Args: { p: Json }; Returns: Json }
       create_shipment: { Args: { p: Json }; Returns: Json }
       current_user_role: {
         Args: never
@@ -7294,6 +7523,27 @@ export type Database = {
       is_admin: { Args: never; Returns: boolean }
       is_editor: { Args: never; Returns: boolean }
       is_manager: { Args: never; Returns: boolean }
+      lot_affected_orders: {
+        Args: { p_lot_id: string }
+        Returns: {
+          batch_id: string
+          order_id: string
+          order_item_id: string
+          provenance: string
+          qty: number
+        }[]
+      }
+      material_lot_batches: {
+        Args: { p_lot_id: string }
+        Returns: {
+          batch_code: string
+          batch_id: string
+          lifecycle_status: string
+          qty_consumed: number
+          recall_state: string
+          variant_id: string
+        }[]
+      }
       next_batch_sequence: { Args: { p_scope_key: string }; Returns: number }
       next_counter: {
         Args: { p_period: string; p_scope: string }
@@ -7319,6 +7569,7 @@ export type Database = {
         Returns: undefined
       }
       reallocate_order_exception: { Args: { p: Json }; Returns: Json }
+      recall_case_transition: { Args: { p: Json }; Returns: Json }
       record_audit_event: { Args: { p: Json }; Returns: undefined }
       record_design_validation: { Args: { p: Json }; Returns: Json }
       record_material_consumption: { Args: { p: Json }; Returns: Json }
