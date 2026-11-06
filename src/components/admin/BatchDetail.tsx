@@ -68,6 +68,25 @@ export function BatchDetail({ batch, timeline, qc, validations, designValidation
     catch (e) { setErr(e instanceof Error ? e.message : "Failed"); } finally { setBusy(false); }
   }
 
+  // Approve QC. For a small team / single operator, the person who recorded the QC may also approve via the
+  // existing AUDITED separation-of-duties override (needs a reason; admin-gated). Normal approve is tried
+  // first; only if SoD blocks it do we offer the override, so the audit trail always records it.
+  async function approveBatch() {
+    setErr(null);
+    if (!window.confirm("Approve QC for this batch?")) return;
+    setBusy(true);
+    try { await mfgAction("approve", { batchId: batch.id }); router.refresh(); }
+    catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed";
+      if (/separation of duties/i.test(msg)) {
+        const reason = window.prompt("You recorded the QC for this batch. To approve it yourself, enter a separation-of-duties override reason (recorded in the audit trail), e.g. 'single operator — owner approved':");
+        if (reason === null || !reason.trim()) { setBusy(false); return; }
+        try { await mfgAction("approve", { batchId: batch.id, overrideReason: reason.trim() }); router.refresh(); }
+        catch (e2) { setErr(e2 instanceof Error ? e2.message : "Failed"); }
+      } else { setErr(msg); }
+    } finally { setBusy(false); }
+  }
+
   const productName = batch.products?.name ?? batch.product_name ?? null;
   const variantName = batch.variants?.variant_name ?? null;
 
@@ -100,7 +119,7 @@ export function BatchDetail({ batch, timeline, qc, validations, designValidation
           {caps.operate && batch.lifecycle_status === "draft" && <button className="admin__btn" disabled={busy} onClick={() => act("start_production", { batchId: batch.id })}>Start production</button>}
           {caps.operate && batch.lifecycle_status === "in_production" && <button className="admin__btn" disabled={busy} onClick={() => act("to_curing", { batchId: batch.id }, batch.produced_qty === 0 ? { confirm: "No produced quantity has been recorded. You should record it in the Production record first. Continue to curing anyway?" } : {})}>Move to curing</button>}
           {caps.qc && batch.lifecycle_status === "curing" && <button className="admin__btn" disabled={busy} onClick={() => act("to_quality_check", { batchId: batch.id })}>Move to quality check</button>}
-          {caps.approve && batch.lifecycle_status === "quality_check" && <button className="admin__btn" disabled={busy || blockers.length > 0} onClick={() => act("approve", { batchId: batch.id }, { confirm: "Approve QC for this batch?" })}>Approve QC</button>}
+          {caps.approve && batch.lifecycle_status === "quality_check" && <button className="admin__btn" disabled={busy || blockers.length > 0} onClick={approveBatch}>Approve QC</button>}
           {caps.approve && batch.lifecycle_status === "qc_approved" && <button className="admin__btn" disabled={busy} onClick={() => act("reopen", { batchId: batch.id }, { reason: true, confirm: "Reopen? This invalidates the current approval." })}>Reopen</button>}
           {caps.approve && ["in_production", "curing", "quality_check"].includes(batch.lifecycle_status) && <button className="admin__btn" disabled={busy} onClick={() => act("reject", { batchId: batch.id }, { reason: true, confirm: "Reject this batch?" })}>Reject</button>}
           {caps.approve && batch.recall_state === "none" && <button className="admin__btn" disabled={busy} onClick={() => act("hold", { batchId: batch.id }, { reason: true })}>Hold</button>}
