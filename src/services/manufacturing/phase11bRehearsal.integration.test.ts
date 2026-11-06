@@ -49,7 +49,7 @@ async function makeUntrackedWithStock(qty: number): Promise<string> {
   return v.id;
 }
 async function releasedBatch(variantId: string, qty: number): Promise<string> {
-  const { batchId } = await createBatch(mgr, { variantId, idempotencyKey: `PBB-${RUNK}-${Math.random()}`, manufacturingDate: "2026-12-10", plannedQty: qty, earliestReleaseDate: "2026-01-01" });
+  const { batchId } = await createBatch(mgr, { variantId, idempotencyKey: `PBB-${RUNK}-${Math.random()}`, manufacturingDate: "2026-10-01", plannedQty: qty, earliestReleaseDate: "2026-10-10" });
   await updateBatch(mgr, { batchId, producedQty: qty, pendingInspectionQty: qty });
   await startProduction(mgr, batchId); await toCuring(mgr, batchId); await toQualityCheck(mgr, batchId);
   await recordRoutineQc(ed, { batchId, inspectedQty: qty, approvedDelta: qty, rejectedDelta: 0, result: "pass", measurements: { fill_weight: 100 } });

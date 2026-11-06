@@ -44,7 +44,7 @@ async function makeVariant(): Promise<string> {
   return v.id;
 }
 async function releasedBatch(variantId: string, qty: number): Promise<string> {
-  const { batchId } = await createBatch(manager, { variantId, idempotencyKey: `P9B-${RUNK}-${Math.random()}`, manufacturingDate: "2026-12-10", plannedQty: qty, earliestReleaseDate: "2026-01-01" });
+  const { batchId } = await createBatch(manager, { variantId, idempotencyKey: `P9B-${RUNK}-${Math.random()}`, manufacturingDate: "2026-10-01", plannedQty: qty, earliestReleaseDate: "2026-10-10" });
   await updateBatch(manager, { batchId, producedQty: qty, pendingInspectionQty: qty });
   await startProduction(manager, batchId); await toCuring(manager, batchId); await toQualityCheck(manager, batchId);
   await recordRoutineQc(editor, { batchId, inspectedQty: qty, approvedDelta: qty, rejectedDelta: 0, result: "pass", measurements: { fill_weight: 100 } });
@@ -114,7 +114,7 @@ d("Phase 9 — recalls & traceability", () => {
     const mat = await registerMaterial(manager, { name: `Wax ${RUNK}-${n++}`, materialType: "wax", defaultUom: "kg" });
     const lotA = await registerMaterialLot(manager, { materialId: mat, supplierName: "SupplierA", supplierLotCode: `LOTA-${RUNK}`, receivedQty: 100, uom: "kg", receivedOn: "2026-11-01" });
     const lotB = await registerMaterialLot(manager, { materialId: mat, supplierName: "SupplierB", supplierLotCode: `LOTB-${RUNK}`, receivedQty: 100, uom: "kg", receivedOn: "2026-11-02" });
-    const { batchId: b1 } = await createBatch(manager, { variantId: v, idempotencyKey: `P9C-${RUNK}-${n++}`, manufacturingDate: "2026-12-10", plannedQty: 5 });
+    const { batchId: b1 } = await createBatch(manager, { variantId: v, idempotencyKey: `P9C-${RUNK}-${n++}`, manufacturingDate: "2026-10-01", plannedQty: 5 });
     const { batchId: b2 } = await createBatch(manager, { variantId: v, idempotencyKey: `P9C-${RUNK}-${n++}`, manufacturingDate: "2026-12-11", plannedQty: 5 });
     await startProduction(manager, b1); await startProduction(manager, b2); // materials recorded during production
     await recordConsumption(manager, { batchId: b1, materialLotId: lotA, qtyConsumed: 2, uom: "kg", idempotencyKey: `con-${RUNK}-1` });
@@ -183,7 +183,7 @@ d("Phase 9 — recalls & traceability", () => {
     const mat = await registerMaterial(manager, { name: `Wick ${RUNK}-${n++}`, materialType: "wick", defaultUom: "pcs" });
     const lot = await registerMaterialLot(manager, { materialId: mat, supplierName: "WickCo", supplierLotCode: `WLOT-${RUNK}`, receivedQty: 50, uom: "pcs", receivedOn: "2026-11-03" });
     // build a released batch, recording material consumption DURING production
-    const { batchId: b } = await createBatch(manager, { variantId: v, idempotencyKey: `P9W-${RUNK}-${n++}`, manufacturingDate: "2026-12-10", plannedQty: 10, earliestReleaseDate: "2026-01-01" });
+    const { batchId: b } = await createBatch(manager, { variantId: v, idempotencyKey: `P9W-${RUNK}-${n++}`, manufacturingDate: "2026-10-01", plannedQty: 10, earliestReleaseDate: "2026-10-10" });
     await updateBatch(manager, { batchId: b, producedQty: 10, pendingInspectionQty: 10 });
     await startProduction(manager, b);
     await recordConsumption(manager, { batchId: b, materialLotId: lot, qtyConsumed: 10, uom: "pcs", idempotencyKey: `con-${RUNK}-w` });

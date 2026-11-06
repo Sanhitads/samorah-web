@@ -16,7 +16,8 @@ describe("LabelPreview", () => {
     const { container } = render(h(LabelPreview, { payload: retail(), encodedValue: "KC-G100-261210-01" }));
     expect(container.textContent).toContain("KC-G100-261210-01");           // human-readable code present
     expect(container.textContent).toContain("Missing before print");         // missing fields surfaced
-    expect(container.textContent).toContain("manufacturer_name_and_address");
+    expect(container.textContent).toContain("Manufacturer name & address");   // readable operator label, not the raw key
+    expect(container.textContent).not.toContain("manufacturer_name_and_address"); // raw key not shown
     expect(container.textContent).not.toContain("✗ MISMATCH");               // encoded == code
   });
 

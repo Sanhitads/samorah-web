@@ -51,8 +51,8 @@ async function makeVariant(tracked: boolean): Promise<{ productId: string; varia
 }
 
 /** Build + release a batch of `qty` for a variant. `date` lets a caller order FIFO across batches. */
-async function releasedBatch(variantId: string, qty: number, date = "2026-12-10"): Promise<string> {
-  const { batchId } = await createBatch(manager, { variantId, idempotencyKey: `RB-${RUNK}-${Math.random()}`, manufacturingDate: date, plannedQty: qty, earliestReleaseDate: "2026-01-01" });
+async function releasedBatch(variantId: string, qty: number, date = "2026-10-01"): Promise<string> {
+  const { batchId } = await createBatch(manager, { variantId, idempotencyKey: `RB-${RUNK}-${Math.random()}`, manufacturingDate: date, plannedQty: qty, earliestReleaseDate: "2026-10-10" });
   await updateBatch(manager, { batchId, producedQty: qty, pendingInspectionQty: qty });
   await startProduction(manager, batchId); await toCuring(manager, batchId); await toQualityCheck(manager, batchId);
   await recordRoutineQc(inspector, { batchId, inspectedQty: qty, approvedDelta: qty, rejectedDelta: 0, result: "pass", measurements: { fill_weight: 100 } });
@@ -142,8 +142,8 @@ d("Phase 7B-2 (part 2) — batch-aware returns / RTO / refund", () => {
 
   it("3. multi-batch all-eligible: restock attributed FIFO, capped per batch at shipped−returned", async () => {
     const { variantId } = await makeVariant(true);
-    const b1 = await releasedBatch(variantId, 2, "2026-12-01"); // older → FIFO first
-    const b2 = await releasedBatch(variantId, 2, "2026-12-20");
+    const b1 = await releasedBatch(variantId, 2, "2026-09-01"); // older → FIFO first
+    const b2 = await releasedBatch(variantId, 2, "2026-09-20");
     const s = await sale(variantId, 4); // consumes b1(2) + b2(2)
     const rId = await makeReturn(s.orderId, s.orderNumber, variantId, 3);
     const res = await receiveReturnGoods(rId, [{ variantId, received: 3, restockable: 3, damaged: 0 }], { actorId });
@@ -190,8 +190,8 @@ d("Phase 7B-2 (part 2) — batch-aware returns / RTO / refund", () => {
 
   it("6. multi-batch incl. a recalled one: ambiguous → HOLD all (fail-safe), nothing sellable", async () => {
     const { variantId } = await makeVariant(true);
-    const b1 = await releasedBatch(variantId, 2, "2026-12-01");
-    const b2 = await releasedBatch(variantId, 2, "2026-12-20");
+    const b1 = await releasedBatch(variantId, 2, "2026-09-01");
+    const b2 = await releasedBatch(variantId, 2, "2026-09-20");
     const s = await sale(variantId, 4);
     await patch(`/manufacturing_batches?id=eq.${b2}`, { recall_state: "on_hold" });
     const before = (await sel(`/variants?id=eq.${variantId}&select=stock`))[0].stock;
@@ -434,7 +434,7 @@ d("Phase 7B-2 (part 2) — batch-aware returns / RTO / refund", () => {
     async function unknownHold(qty: number) {
       const { variantId, productId } = await makeVariant(true);
       await releasedBatch(variantId, 10);
-      const elig = await releasedBatch(variantId, 10, "2026-12-15"); // an eligible batch to restock into
+      const elig = await releasedBatch(variantId, 10, "2026-09-15"); // an eligible batch to restock into
       const tag = `${RUNK}-${saleN++}`;
       const o = await ins("orders", { order_number: `RRT-${tag}`, email: "t@example.test", status: "shipped", payment_status: "paid", total_amount: qty * 100 });
       await ins("order_items", { order_id: o.id, product_id: productId, variant_id: variantId, product_name: "T", sku: "T", hsn_code: "34060010", gst_rate: 5, unit_price: 100, quantity: qty, line_subtotal: qty * 100, line_total: qty * 100 });

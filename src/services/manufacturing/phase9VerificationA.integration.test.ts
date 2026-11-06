@@ -40,7 +40,7 @@ async function makeVariant(): Promise<string> {
   await setVariantTracking(sup, v.id, "tracked"); return v.id;
 }
 async function releasedBatch(variantId: string, qty: number): Promise<string> {
-  const { batchId } = await createBatch(mgr, { variantId, idempotencyKey: `PVB-${RUNK}-${Math.random()}`, manufacturingDate: "2026-12-10", plannedQty: qty, earliestReleaseDate: "2026-01-01" });
+  const { batchId } = await createBatch(mgr, { variantId, idempotencyKey: `PVB-${RUNK}-${Math.random()}`, manufacturingDate: "2026-10-01", plannedQty: qty, earliestReleaseDate: "2026-10-10" });
   await updateBatch(mgr, { batchId, producedQty: qty, pendingInspectionQty: qty });
   await startProduction(mgr, batchId); await toCuring(mgr, batchId); await toQualityCheck(mgr, batchId);
   await recordRoutineQc(ed, { batchId, inspectedQty: qty, approvedDelta: qty, rejectedDelta: 0, result: "pass", measurements: { fill_weight: 100 } });
@@ -104,7 +104,7 @@ d("Phase 9 verification — conservation, concurrency, release hardening", () =>
   it("A2. recall is correctly serialised vs release / allocation / dispatch; expansion vs dispatch", async () => {
     // release vs recall: recall a qc_approved (not-yet-released) batch, then release must be blocked
     const v1 = await makeVariant();
-    const { batchId: b1 } = await createBatch(mgr, { variantId: v1, idempotencyKey: `PVC-${RUNK}-${n++}`, manufacturingDate: "2026-12-10", plannedQty: 5, earliestReleaseDate: "2026-01-01" });
+    const { batchId: b1 } = await createBatch(mgr, { variantId: v1, idempotencyKey: `PVC-${RUNK}-${n++}`, manufacturingDate: "2026-10-01", plannedQty: 5, earliestReleaseDate: "2026-10-10" });
     await updateBatch(mgr, { batchId: b1, producedQty: 5, pendingInspectionQty: 5 }); await startProduction(mgr, b1); await toCuring(mgr, b1); await toQualityCheck(mgr, b1);
     await recordRoutineQc(ed, { batchId: b1, inspectedQty: 5, approvedDelta: 5, rejectedDelta: 0, result: "pass", measurements: { fill_weight: 100 } });
     await recordDesignValidation(ed, { batchId: b1, result: "pass", measurements: { flame: "stable" } });

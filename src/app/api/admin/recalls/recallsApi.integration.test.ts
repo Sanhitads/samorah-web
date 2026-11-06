@@ -46,7 +46,7 @@ d("POST /api/admin/recalls", () => {
     const p = await ins("products", { name: `RAPI ${t}`, slug: `rapi-${t}`, base_sku: `RAPI-${t}`.toUpperCase(), category_id: cat.id, price: 100, hsn_code: "34060010", product_type: "candle", batch_prefix: ("RA" + Math.random().toString(36).slice(2, 5)).toUpperCase().slice(0, 6) });
     const v = await ins("variants", { product_id: p.id, sku: `RAPI-${t}-GL`.toUpperCase(), price: 100, vessel_type: "glass", size_label: "100g", tracking_state: "untracked", is_active: false });
     await setVariantTracking(sup, v.id, "tracked");
-    const { batchId: b } = await createBatch(mgr, { variantId: v.id, idempotencyKey: `RAB-${RUNK}`, manufacturingDate: "2026-12-10", plannedQty: 10, earliestReleaseDate: "2026-01-01" });
+    const { batchId: b } = await createBatch(mgr, { variantId: v.id, idempotencyKey: `RAB-${RUNK}`, manufacturingDate: "2026-10-01", plannedQty: 10, earliestReleaseDate: "2026-10-10" });
     batchId = b;
     await updateBatch(mgr, { batchId: b, producedQty: 10, pendingInspectionQty: 10 }); await startProduction(mgr, b); await toCuring(mgr, b); await toQualityCheck(mgr, b);
     await recordRoutineQc(ed, { batchId: b, inspectedQty: 10, approvedDelta: 10, rejectedDelta: 0, result: "pass", measurements: { fill_weight: 100 } });

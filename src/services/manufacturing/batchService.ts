@@ -122,7 +122,8 @@ export async function getBatch(batchId: string): Promise<any | null> {
   return data ?? null;
 }
 export async function getBatchWithSpec(batchId: string): Promise<any | null> {
-  const { data } = await db().from("manufacturing_batches").select("*, batch_candle_spec(*)").eq("id", batchId).maybeSingle();
+  // products(name) gives the operator-friendly product name for the detail header/summary (additive join).
+  const { data } = await db().from("manufacturing_batches").select("*, batch_candle_spec(*), products(name), variants(variant_name)").eq("id", batchId).maybeSingle();
   return data ?? null;
 }
 export async function listBatches(opts: { variantId?: string; limit?: number } = {}): Promise<any[]> {

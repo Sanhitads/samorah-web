@@ -41,7 +41,7 @@ async function makeVariant(tracked: boolean): Promise<{ productId: string; varia
   return { productId: p.id, variantId: v.id };
 }
 async function releasedBatch(variantId: string, qty: number): Promise<string> {
-  const { batchId } = await createBatch(manager, { variantId, idempotencyKey: `SB-${RUNK}-${Math.random()}`, manufacturingDate: "2026-12-10", plannedQty: qty, earliestReleaseDate: "2026-01-01" });
+  const { batchId } = await createBatch(manager, { variantId, idempotencyKey: `SB-${RUNK}-${Math.random()}`, manufacturingDate: "2026-10-01", plannedQty: qty, earliestReleaseDate: "2026-10-10" });
   await updateBatch(manager, { batchId, producedQty: qty, pendingInspectionQty: qty });
   await startProduction(manager, batchId); await toCuring(manager, batchId); await toQualityCheck(manager, batchId);
   await recordRoutineQc(inspector, { batchId, inspectedQty: qty, approvedDelta: qty, rejectedDelta: 0, result: "pass", measurements: { fill_weight: 100 } });

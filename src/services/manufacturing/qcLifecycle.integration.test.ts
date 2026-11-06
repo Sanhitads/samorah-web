@@ -27,7 +27,7 @@ const PAST = "2026-01-01", FUTURE = "2027-06-01";
 
 // Create a candle batch and drive it to quality_check with produced=pending=qty.
 async function batchAtQC(key: string, qty: number, earliest: string, candle?: Record<string, unknown>): Promise<string> {
-  const { batchId } = await createBatch(admin, { variantId, idempotencyKey: `${key}-${RUNK}`, manufacturingDate: "2026-12-08", plannedQty: qty, earliestReleaseDate: earliest, candle });
+  const { batchId } = await createBatch(admin, { variantId, idempotencyKey: `${key}-${RUNK}`, manufacturingDate: "2025-12-01", plannedQty: qty, earliestReleaseDate: earliest, candle });
   await updateBatch(admin, { batchId, producedQty: qty, pendingInspectionQty: qty });
   await toInProduction(admin, batchId);
   await toCuring(admin, batchId);
@@ -120,7 +120,7 @@ d("Manufacturing Phase 4 (QC & lifecycle)", () => {
   });
 
   it("rejects illegal transitions and un-cured approval", async () => {
-    const draftId = (await createBatch(admin, { variantId, idempotencyKey: `ILL-${RUNK}`, manufacturingDate: "2026-12-08", plannedQty: 1, earliestReleaseDate: PAST })).batchId;
+    const draftId = (await createBatch(admin, { variantId, idempotencyKey: `ILL-${RUNK}`, manufacturingDate: "2025-12-01", plannedQty: 1, earliestReleaseDate: PAST })).batchId;
     await expect(advanceLifecycle(admin, draftId, "qc_approved")).rejects.toThrow(); // draft → qc_approved illegal
     // cure not complete
     const future = await batchAtQC("CURE", 2, FUTURE);
@@ -140,12 +140,12 @@ d("Manufacturing Phase 4 (QC & lifecycle)", () => {
 
   it("keeps design burn-validation distinct and config-specific (no auto-validation of a changed config)", async () => {
     const spec = { wick_spec: "ECO-10", vessel_spec: "GL190", fill_weight_target_g: 190, fragrance_load_pct: 8 };
-    const a = await createBatch(admin, { variantId, idempotencyKey: `DV-A-${RUNK}`, manufacturingDate: "2026-12-08", plannedQty: 1, candle: spec });
+    const a = await createBatch(admin, { variantId, idempotencyKey: `DV-A-${RUNK}`, manufacturingDate: "2025-12-01", plannedQty: 1, candle: spec });
     const dv = await recordDesignValidation(inspector, { batchId: a.batchId, result: "pass", measurements: { flame: "stable", melt_pool: "full", soot: "none", mushrooming: "slight", vessel_temp_c: 48, burn_hours: 4, safe_remaining_wax_mm: 10 } });
     expect(dv.configFingerprint).toBeTruthy();
     expect((await designValidationStatus(a.batchId)).validated).toBe(true);
     // A new batch with the SAME configuration is covered by the validation (config-level).
-    const b = await createBatch(admin, { variantId, idempotencyKey: `DV-B-${RUNK}`, manufacturingDate: "2026-12-08", plannedQty: 1, candle: spec });
+    const b = await createBatch(admin, { variantId, idempotencyKey: `DV-B-${RUNK}`, manufacturingDate: "2025-12-01", plannedQty: 1, candle: spec });
     expect((await designValidationStatus(b.batchId)).validated).toBe(true);
     // Change the configuration → the prior validation no longer applies.
     await updateBatch(admin, { batchId: b.batchId, candle: { wick_spec: "ECO-12" } });
@@ -201,7 +201,7 @@ d("Manufacturing Phase 4 (QC & lifecycle)", () => {
 
   it("stops a revoked design validation from qualifying a batch", async () => {
     const spec = { wick_spec: "RV-1", vessel_spec: "GL190", fill_weight_target_g: 190 };
-    const a = await createBatch(admin, { variantId, idempotencyKey: `RV-${RUNK}`, manufacturingDate: "2026-12-08", plannedQty: 1, candle: spec });
+    const a = await createBatch(admin, { variantId, idempotencyKey: `RV-${RUNK}`, manufacturingDate: "2025-12-01", plannedQty: 1, candle: spec });
     const dv = await recordDesignValidation(inspector, { batchId: a.batchId, result: "pass", measurements: { flame: "stable" } });
     expect((await designValidationStatus(a.batchId)).validated).toBe(true);
     await revokeDesignValidation(approver, dv.validationId, "lab error in burn rig");

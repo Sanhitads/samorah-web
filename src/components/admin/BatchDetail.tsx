@@ -10,6 +10,25 @@ type Caps = { operate: boolean; qc: boolean; approve: boolean };
 const today = () => new Date().toISOString().slice(0, 10);
 const EDITABLE = ["draft", "in_production"];
 
+const STATUS_LABEL: Record<string, string> = {
+  draft: "Draft", in_production: "In production", curing: "Curing", quality_check: "Quality check",
+  qc_approved: "QC approved", rejected: "Rejected", released: "Released", closed: "Closed",
+};
+/** The single next step an operator with these caps may take now (mirrors the lifecycle buttons). */
+function nextPermittedAction(batch: any, caps: Caps): string {
+  if (batch.recall_state === "recalled") return "Contained by a recall — no lifecycle action.";
+  if (batch.recall_state === "on_hold") return caps.approve ? "Resume (lift the hold) to continue." : "On hold — a manager must resume.";
+  switch (batch.lifecycle_status) {
+    case "draft": return caps.operate ? "Start production." : "Waiting on an operator to start production.";
+    case "in_production": return caps.operate ? "Move to curing when production is complete." : "In production.";
+    case "curing": return caps.qc ? "Move to quality check when curing is complete." : "Curing.";
+    case "quality_check": return caps.approve ? "Record QC, then approve once blockers clear." : "Awaiting QC approval (manager).";
+    case "qc_approved": return "Approved — eligible for release and retail labels.";
+    case "rejected": return "Rejected — terminal.";
+    default: return STATUS_LABEL[batch.lifecycle_status] ?? batch.lifecycle_status;
+  }
+}
+
 /** Reasons qc_approved is currently blocked (mirrors the server gate; display-only). */
 function approvalBlockers(batch: any, qc: any[]): string[] {
   const out: string[] = [];
@@ -44,9 +63,29 @@ export function BatchDetail({ batch, timeline, qc, validations, designValidation
     catch (e) { setErr(e instanceof Error ? e.message : "Failed"); } finally { setBusy(false); }
   }
 
+  const productName = batch.products?.name ?? batch.product_name ?? null;
+  const variantName = batch.variants?.variant_name ?? null;
+
   return (
     <div style={{ display: "grid", gap: 24 }}>
       {err && <p className="admin__error" role="alert">{err}</p>}
+
+      {/* At-a-glance summary (Phase 12A UI): friendly name first; status, next action and blockers up top. */}
+      <section className="admin__card" aria-label="Batch summary">
+        <h2 style={{ margin: 0 }}>{productName ?? batch.batch_code}{variantName ? ` · ${variantName}` : ""}</h2>
+        <p className="admin__muted" style={{ margin: "2px 0 10px" }}>{batch.batch_code} · {batch.sku_snapshot} · {batch.product_type}</p>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <span className="ff-status" data-s={batch.lifecycle_status}>{STATUS_LABEL[batch.lifecycle_status] ?? batch.lifecycle_status}</span>
+          {batch.recall_state !== "none" && <span className="ff-status" data-s="rejected">{batch.recall_state === "recalled" ? "RECALLED" : "ON HOLD"}</span>}
+        </div>
+        <p style={{ margin: "10px 0 0" }}><strong>Next:</strong> {nextPermittedAction(batch, caps)}</p>
+        {batch.lifecycle_status === "quality_check" && blockers.length > 0 && (
+          <div className="admin__note" style={{ marginTop: 8 }}>
+            <strong>QC approval blocked by:</strong>
+            <ul style={{ margin: "4px 0 0" }}>{blockers.map((b) => <li key={b}>{b}</li>)}</ul>
+          </div>
+        )}
+      </section>
 
       {/* Lifecycle actions */}
       <section className="admin__card">

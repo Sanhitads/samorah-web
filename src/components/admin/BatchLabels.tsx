@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { LabelPreview, type LabelPayload } from "@/components/admin/LabelPreview";
+import { LabelPreview, purposeLabel, type LabelPayload } from "@/components/admin/LabelPreview";
 
 /**
  * Phase 11A — batch label workflow embedded in the batch detail screen: pick a template, preview, set a
@@ -48,11 +48,16 @@ export function BatchLabels({ batchId, batchCode, lifecycle, recallState }: { ba
   return (
     <section className="admin__card" aria-label="Batch labels">
       <h3>Labels</h3>
-      {!eligible ? <p className="admin__note">Batch is <b>{lifecycle}</b>{recallState !== "none" ? ` / ${recallState}` : ""} — only internal manufacturing labels may be generated; retail / product-batch labels are blocked server-side.</p> : null}
+      {eligible
+        ? <p className="admin__note">Batch is <b>qc_approved</b> and not held/recalled — <b>retail, product-batch and internal</b> labels are eligible.</p>
+        : <p className="admin__note">Batch is <b>{lifecycle}</b>{recallState !== "none" ? ` / ${recallState}` : ""} — only <b>internal manufacturing</b> labels are eligible. Retail / product-batch labels need a <b>qc_approved</b> batch that is not held or recalled (also enforced server-side), so they are shown disabled below.</p>}
       <div className="admin__filters">
         <select className="admin__input" value={templateId} onChange={(e) => { setTemplateId(e.target.value); setGen(null); }} aria-label="Label template">
           <option value="">Choose template…</option>
-          {(templates ?? []).map((t) => <option key={t.id} value={t.id}>{t.title} · v{t.version} · {t.purpose}{t.dimensions_status !== "verified" ? " (dims unverified)" : ""}</option>)}
+          {(templates ?? []).map((t) => {
+            const blocked = (t.purpose === "retail" || t.purpose === "product_batch_id") && !eligible;
+            return <option key={t.id} value={t.id} disabled={blocked}>{t.title} · v{t.version} · {purposeLabel(t.purpose)}{t.dimensions_status !== "verified" ? " · dims unverified" : ""}{blocked ? " — not eligible for this batch" : ""}</option>;
+          })}
         </select>
         <input className="admin__input" type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)} aria-label="Print quantity" />
         <button type="button" className="admin__btn" disabled={busy || !templateId} onClick={generate}>Generate printable</button>

@@ -31,7 +31,7 @@ const RUNK = Date.now().toString(36).slice(-5);
 let sup: StaffActor, mgr: StaffActor, ed: StaffActor, customer: StaffActor; let n = 0;
 
 async function approvedBatch(variantId: string, qty: number, release = true): Promise<string> {
-  const { batchId } = await createBatch(mgr, { variantId, idempotencyKey: `L10B-${RUNK}-${Math.random()}`, manufacturingDate: "2026-12-10", plannedQty: qty, earliestReleaseDate: "2026-01-01" });
+  const { batchId } = await createBatch(mgr, { variantId, idempotencyKey: `L10B-${RUNK}-${Math.random()}`, manufacturingDate: "2026-10-01", plannedQty: qty, earliestReleaseDate: "2026-10-10" });
   await updateBatch(mgr, { batchId, producedQty: qty, pendingInspectionQty: qty });
   await startProduction(mgr, batchId); await toCuring(mgr, batchId); await toQualityCheck(mgr, batchId);
   await recordRoutineQc(ed, { batchId, inspectedQty: qty, approvedDelta: qty, rejectedDelta: 0, result: "pass", measurements: { fill_weight: 100 } });
@@ -88,7 +88,7 @@ d("Phase 10 — batch labels", () => {
   it("12,13. retail/product labels are refused for non-approved, held and recalled batches (server-enforced)", async () => {
     const { v } = await makeVariant();
     const draft = await approvedBatch(v, 5, false); // qc_approved but NOT released is fine for product label; test a true draft instead
-    const { batchId: trueDraft } = await createBatch(mgr, { variantId: v, idempotencyKey: `L10D-${RUNK}-${n++}`, manufacturingDate: "2026-12-10", plannedQty: 5 });
+    const { batchId: trueDraft } = await createBatch(mgr, { variantId: v, idempotencyKey: `L10D-${RUNK}-${n++}`, manufacturingDate: "2026-10-01", plannedQty: 5 });
     const retailT = (await tmpl("retail")).id; const internalT = (await tmpl("internal_mfg")).id;
     await expect(generateLabel(ed, { batchId: trueDraft, templateId: retailT })).rejects.toThrow(); // draft → no retail label
     expect((await generateLabel(ed, { batchId: trueDraft, templateId: internalT })).ok).toBe(true); // internal label is fine

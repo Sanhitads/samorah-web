@@ -46,7 +46,7 @@ async function makeVariant(): Promise<string> {
 }
 /** build + release a batch; optionally record a supplier-lot consumption during production. */
 async function releasedBatch(variantId: string, qty: number, lotId?: string, uom = "kg"): Promise<string> {
-  const { batchId } = await createBatch(mgr, { variantId, idempotencyKey: `PSB-${RUNK}-${Math.random()}`, manufacturingDate: "2026-12-10", plannedQty: qty, earliestReleaseDate: "2026-01-01" });
+  const { batchId } = await createBatch(mgr, { variantId, idempotencyKey: `PSB-${RUNK}-${Math.random()}`, manufacturingDate: "2026-10-01", plannedQty: qty, earliestReleaseDate: "2026-10-10" });
   await updateBatch(mgr, { batchId, producedQty: qty, pendingInspectionQty: qty });
   await startProduction(mgr, batchId);
   if (lotId) await recordConsumption(mgr, { batchId, materialLotId: lotId, qtyConsumed: 1, uom, idempotencyKey: `con-${RUNK}-${n++}` });

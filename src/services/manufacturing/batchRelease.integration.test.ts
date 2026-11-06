@@ -39,7 +39,7 @@ async function makeProductVariant(tracked: boolean): Promise<{ productId: string
 
 /** Create a batch and drive it to qc_approved with an approved design validation. */
 async function approvedBatch(qty: number, vId = variantId): Promise<string> {
-  const { batchId } = await createBatch(manager, { variantId: vId, idempotencyKey: `B-${RUNK}-${Math.random()}`, manufacturingDate: "2026-12-10", plannedQty: qty, earliestReleaseDate: "2026-01-01" });
+  const { batchId } = await createBatch(manager, { variantId: vId, idempotencyKey: `B-${RUNK}-${Math.random()}`, manufacturingDate: "2026-10-01", plannedQty: qty, earliestReleaseDate: "2026-10-10" });
   await updateBatch(manager, { batchId, producedQty: qty, pendingInspectionQty: qty });
   await startProduction(manager, batchId);
   await toCuring(manager, batchId);

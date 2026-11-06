@@ -17,12 +17,25 @@ export interface LabelPayload {
   optional_branding?: string[];
 }
 
+// Readable operator labels for raw DB field keys (fallback: humanise the key).
+const FIELD_LABELS: Record<string, string> = {
+  manufacturer_name_and_address: "Manufacturer name & address", packer_name_and_address: "Packer name & address",
+  consumer_care_contact: "Consumer-care contact", mrp: "MRP (incl. taxes)", country_of_origin: "Country of origin",
+  net_quantity_declaration_format: "Net-quantity declaration format", date_of_manufacture_format: "Date-of-manufacture format",
+  ingredient_declaration: "Ingredient declaration", safety_warnings: "Safety warnings", licence_numbers: "Licence/registration numbers",
+};
+export function humaniseField(key: string): string {
+  return FIELD_LABELS[key] ?? key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+const PURPOSE_LABELS: Record<string, string> = { retail: "Retail", product_batch_id: "Product batch ID", internal_mfg: "Internal (manufacturing)" };
+export const purposeLabel = (p: string): string => PURPOSE_LABELS[p] ?? humaniseField(p);
+
 export function LabelPreview({ payload, encodedValue }: { payload: LabelPayload; encodedValue?: string }) {
   const v = payload.verified;
   const sellable = payload.purpose !== "internal_mfg";
   const eligible = v.recall_state === "none" && v.lifecycle_status === "qc_approved";
   const encodedOk = !encodedValue || encodedValue === v.batch_code;
-  const missing = [...(payload.missing_business ?? []), ...(payload.missing_legal ?? [])];
+  const missing = [...(payload.missing_business ?? []), ...(payload.missing_legal ?? [])].map(humaniseField);
 
   return (
     <div className={`label-preview label-preview--${payload.purpose}`} role="group" aria-label={`Label ${v.batch_code}`}>

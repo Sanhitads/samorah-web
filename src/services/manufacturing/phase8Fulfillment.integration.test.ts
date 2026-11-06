@@ -45,8 +45,8 @@ async function makeVariant(): Promise<string> {
   await setVariantTracking(superadmin, v.id, "tracked");
   return v.id;
 }
-async function releasedBatch(variantId: string, qty: number, date = "2026-12-10"): Promise<string> {
-  const { batchId } = await createBatch(manager, { variantId, idempotencyKey: `P8B-${RUNK}-${Math.random()}`, manufacturingDate: date, plannedQty: qty, earliestReleaseDate: "2026-01-01" });
+async function releasedBatch(variantId: string, qty: number, date = "2026-10-01"): Promise<string> {
+  const { batchId } = await createBatch(manager, { variantId, idempotencyKey: `P8B-${RUNK}-${Math.random()}`, manufacturingDate: date, plannedQty: qty, earliestReleaseDate: "2026-10-10" });
   await updateBatch(manager, { batchId, producedQty: qty, pendingInspectionQty: qty });
   await startProduction(manager, batchId); await toCuring(manager, batchId); await toQualityCheck(manager, batchId);
   await recordRoutineQc(editor, { batchId, inspectedQty: qty, approvedDelta: qty, rejectedDelta: 0, result: "pass", measurements: { fill_weight: 100 } });
@@ -92,7 +92,7 @@ d("Phase 8 — fulfilment provenance", () => {
   });
 
   it("2. mixed-batch pick across the allocation split", async () => {
-    const v = await makeVariant(); const b1 = await releasedBatch(v, 2, "2026-12-01"); const b2 = await releasedBatch(v, 2, "2026-12-20");
+    const v = await makeVariant(); const b1 = await releasedBatch(v, 2, "2026-09-01"); const b2 = await releasedBatch(v, 2, "2026-09-20");
     const s = await sale(v, 4); // allocate FIFO: b1(2)+b2(2)
     expect((await confirmPickBatch(editor, { orderItemId: s.orderItemId, batchId: b1, qty: 2 })).substitution).toBe(false);
     expect((await confirmPickBatch(editor, { orderItemId: s.orderItemId, batchId: b2, qty: 2 })).substitution).toBe(false);
@@ -101,7 +101,7 @@ d("Phase 8 — fulfilment provenance", () => {
   });
 
   it("3-4. substitution: picking from a different eligible batch is audited; aggregate stock unchanged; conserved", async () => {
-    const v = await makeVariant(); const b1 = await releasedBatch(v, 5, "2026-12-01"); const b3 = await releasedBatch(v, 5, "2026-12-25");
+    const v = await makeVariant(); const b1 = await releasedBatch(v, 5, "2026-09-01"); const b3 = await releasedBatch(v, 5, "2026-09-25");
     const s = await sale(v, 2); // allocated to b1 (FIFO)
     const stock0 = (await sel(`/variants?id=eq.${v}&select=stock`))[0].stock;
     const r = await confirmPickBatch(editor, { orderItemId: s.orderItemId, batchId: b3, qty: 2, reason: "b1 shelf empty" });
@@ -190,7 +190,7 @@ d("Phase 8 — fulfilment provenance", () => {
   });
 
   it("16. a return after a SUBSTITUTED pick restocks to the ACTUAL (substituted) batch, not the original allocation", async () => {
-    const v = await makeVariant(); const b1 = await releasedBatch(v, 5, "2026-12-01"); const b3 = await releasedBatch(v, 5, "2026-12-28");
+    const v = await makeVariant(); const b1 = await releasedBatch(v, 5, "2026-09-01"); const b3 = await releasedBatch(v, 5, "2026-09-28");
     const s = await sale(v, 2); // allocated b1
     await confirmPickBatch(editor, { orderItemId: s.orderItemId, batchId: b3, qty: 2, reason: "substitute" }); // actual = b3
     await recordPackingQc(editor, s.orderId, PASS);
@@ -213,7 +213,7 @@ d("Phase 8 — fulfilment provenance", () => {
   });
 
   it("C1. the ORIGINAL payment-time allocation is never mutated by a substitution (immutable history)", async () => {
-    const v = await makeVariant(); const b1 = await releasedBatch(v, 5, "2026-12-01"); const b3 = await releasedBatch(v, 5, "2026-12-29");
+    const v = await makeVariant(); const b1 = await releasedBatch(v, 5, "2026-09-01"); const b3 = await releasedBatch(v, 5, "2026-09-29");
     const s = await sale(v, 2); // allocated b1
     const allocBefore = await sel(`/batch_allocations?order_item_id=eq.${s.orderItemId}&select=batch_id,qty,state&order=batch_id`);
     await confirmPickBatch(editor, { orderItemId: s.orderItemId, batchId: b3, qty: 2, reason: "shelf" });
@@ -226,7 +226,7 @@ d("Phase 8 — fulfilment provenance", () => {
   });
 
   it("C2. partial substitution of a multi-unit line: one unit from the allocated batch, one substituted", async () => {
-    const v = await makeVariant(); const b1 = await releasedBatch(v, 3, "2026-12-01"); const b3 = await releasedBatch(v, 3, "2026-12-29");
+    const v = await makeVariant(); const b1 = await releasedBatch(v, 3, "2026-09-01"); const b3 = await releasedBatch(v, 3, "2026-09-29");
     const s = await sale(v, 2); // both allocated to b1 (FIFO, b1 has 3)
     await confirmPickBatch(editor, { orderItemId: s.orderItemId, batchId: b1, qty: 1 });  // not substitution
     await confirmPickBatch(editor, { orderItemId: s.orderItemId, batchId: b3, qty: 1, reason: "ran out" }); // substitution
