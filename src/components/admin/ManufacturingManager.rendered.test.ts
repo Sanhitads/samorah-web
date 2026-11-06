@@ -36,7 +36,7 @@ describe("ManufacturingManager", () => {
 
   it("applies filters by navigating with query params", () => {
     const { getByPlaceholderText, getByText } = render(h(ManufacturingManager, { ...base, caps: { operate: true, qc: true, approve: true } }));
-    fireEvent.change(getByPlaceholderText("Search batch code…"), { target: { value: "KC" } });
+    fireEvent.change(getByPlaceholderText("Search product name or batch code…"), { target: { value: "KC" } });
     fireEvent.click(getByText("Filter"));
     expect(push).toHaveBeenCalledWith(expect.stringContaining("q=KC"));
   });
