@@ -43,7 +43,7 @@ d("POST /api/admin/recalls", () => {
     sup = { userId: us[0].id, role: "super_admin" }; mgr = { userId: us[1]?.id ?? us[0].id, role: "manager" }; ed = { userId: us[0].id, role: "editor" };
     await setReleaseEnabled(sup, true); await setAllocationEnabled(sup, true);
     const cat = (await sel("/categories?select=id&limit=1"))[0]; const t = `${RUNK}${Math.random().toString(36).slice(2, 5)}`;
-    const p = await ins("products", { name: `RAPI ${t}`, slug: `rapi-${t}`, base_sku: `RAPI-${t}`.toUpperCase(), category_id: cat.id, price: 100, hsn_code: "34060010", product_type: "candle", batch_prefix: ("RA" + Math.random().toString(36).slice(2, 5)).toUpperCase().slice(0, 6) });
+    const p = await ins("products", { name: `RAPI ${t}`, slug: `rapi-${t}`, base_sku: `RAPI-${t}`.toUpperCase(), category_id: cat.id, price: 100, hsn_code: "34060010", product_type: "candle", batch_prefix: Math.random().toString(36).slice(2, 8).toUpperCase().slice(0, 6) });
     const v = await ins("variants", { product_id: p.id, sku: `RAPI-${t}-GL`.toUpperCase(), price: 100, vessel_type: "glass", size_label: "100g", tracking_state: "untracked", is_active: false });
     await setVariantTracking(sup, v.id, "tracked");
     const { batchId: b } = await createBatch(mgr, { variantId: v.id, idempotencyKey: `RAB-${RUNK}`, manufacturingDate: "2026-10-01", plannedQty: 10, earliestReleaseDate: "2026-10-10" });

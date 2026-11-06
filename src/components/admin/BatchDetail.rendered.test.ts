@@ -44,6 +44,6 @@ describe("BatchDetail", () => {
 
   it("shows the production record read-only outside draft/in_production", () => {
     const { container } = render(h(BatchDetail, { batch: baseBatch, ...common, caps: { operate: true, qc: true, approve: true } }));
-    expect(container.textContent).toContain("read-only in the quality_check state");
+    expect(container.textContent).toContain("read-only in the Quality check state");
   });
 });

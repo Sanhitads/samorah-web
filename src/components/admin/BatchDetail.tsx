@@ -20,7 +20,7 @@ function nextPermittedAction(batch: any, caps: Caps): string {
   if (batch.recall_state === "on_hold") return caps.approve ? "Resume (lift the hold) to continue." : "On hold — a manager must resume.";
   switch (batch.lifecycle_status) {
     case "draft": return caps.operate ? "Start production." : "Waiting on an operator to start production.";
-    case "in_production": return caps.operate ? "Move to curing when production is complete." : "In production.";
+    case "in_production": return caps.operate ? "Record the produced quantity in the Production record, then move to curing." : "In production.";
     case "curing": return caps.qc ? "Move to quality check when curing is complete." : "Curing.";
     case "quality_check": return caps.approve ? "Record QC, then approve once blockers clear." : "Awaiting QC approval (manager).";
     case "qc_approved": return "Approved — eligible for release and retail labels.";
@@ -53,6 +53,9 @@ export function BatchDetail({ batch, timeline, qc, validations, designValidation
   const goToQc = () => qcRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   const spec = batch.batch_candle_spec || null;
   const editable = EDITABLE.includes(batch.lifecycle_status);
+  // Recovery: a batch advanced to quality_check WITHOUT a recorded produced quantity can still record it
+  // (nothing has been inspected yet), so it is not trapped.
+  const canEditProduction = editable || (batch.lifecycle_status === "quality_check" && batch.produced_qty === 0);
   const blockers = approvalBlockers(batch, qc);
 
   async function act(action: string, payload: Record<string, unknown> = {}, opts: { reason?: boolean; confirm?: string } = {}) {
@@ -95,7 +98,7 @@ export function BatchDetail({ batch, timeline, qc, validations, designValidation
         <h3>Lifecycle · {batch.lifecycle_status}{batch.recall_state === "on_hold" ? " (on hold)" : ""}</h3>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {caps.operate && batch.lifecycle_status === "draft" && <button className="admin__btn" disabled={busy} onClick={() => act("start_production", { batchId: batch.id })}>Start production</button>}
-          {caps.operate && batch.lifecycle_status === "in_production" && <button className="admin__btn" disabled={busy} onClick={() => act("to_curing", { batchId: batch.id })}>Move to curing</button>}
+          {caps.operate && batch.lifecycle_status === "in_production" && <button className="admin__btn" disabled={busy} onClick={() => act("to_curing", { batchId: batch.id }, batch.produced_qty === 0 ? { confirm: "No produced quantity has been recorded. You should record it in the Production record first. Continue to curing anyway?" } : {})}>Move to curing</button>}
           {caps.qc && batch.lifecycle_status === "curing" && <button className="admin__btn" disabled={busy} onClick={() => act("to_quality_check", { batchId: batch.id })}>Move to quality check</button>}
           {caps.approve && batch.lifecycle_status === "quality_check" && <button className="admin__btn" disabled={busy || blockers.length > 0} onClick={() => act("approve", { batchId: batch.id }, { confirm: "Approve QC for this batch?" })}>Approve QC</button>}
           {caps.approve && batch.lifecycle_status === "qc_approved" && <button className="admin__btn" disabled={busy} onClick={() => act("reopen", { batchId: batch.id }, { reason: true, confirm: "Reopen? This invalidates the current approval." })}>Reopen</button>}
@@ -138,8 +141,11 @@ export function BatchDetail({ batch, timeline, qc, validations, designValidation
             </dl>
           </div>
         )}
-        {caps.operate && editable && <ProductionEdit batch={batch} spec={spec} onDone={() => router.refresh()} />}
-        {!editable && <p style={{ fontSize: 12, opacity: 0.7 }}>Production record is read-only in the {batch.lifecycle_status} state.</p>}
+        {caps.operate && canEditProduction && (<>
+          {!editable && <p className="admin__note">No produced quantity was recorded before inspection — record it here (produced must equal approved + rejected + samples + pending) to continue to QC.</p>}
+          <ProductionEdit batch={batch} spec={spec} onDone={() => router.refresh()} />
+        </>)}
+        {!canEditProduction && <p style={{ fontSize: 12, opacity: 0.7 }}>Production record is read-only in the {STATUS_LABEL[batch.lifecycle_status] ?? batch.lifecycle_status} state.</p>}
       </section>
 
       {/* Quality Inspection & Approval — where approved/rejected quantities are recorded (routine QC). */}
@@ -154,6 +160,9 @@ export function BatchDetail({ batch, timeline, qc, validations, designValidation
           </div>
           {!caps.qc && <p className="admin__note">You do not have the QC capability, so you cannot record inspection here.</p>}
           {caps.qc && !["curing", "quality_check"].includes(batch.lifecycle_status) && <p className="admin__muted">QC is recorded during the curing / quality-check stages (current: {STATUS_LABEL[batch.lifecycle_status] ?? batch.lifecycle_status}).</p>}
+          {caps.qc && batch.lifecycle_status === "quality_check" && batch.pending_inspection_qty <= 0 && (batch.approved_qty + batch.rejected_qty + batch.qc_sampled_destroyed_qty) === 0 && (
+            <p className="admin__note"><b>Nothing to inspect yet:</b> no units are pending inspection. Record the <b>produced quantity</b> in the Production record above first (it is editable here because inspection hasn&apos;t started) — then record QC.</p>
+          )}
         </section>
         {caps.qc && ["curing", "quality_check"].includes(batch.lifecycle_status) && <QcForm batch={batch} templates={templates} onDone={() => router.refresh()} />}
       <section className="admin__card">

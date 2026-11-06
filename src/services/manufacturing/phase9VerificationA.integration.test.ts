@@ -35,7 +35,7 @@ const PASS = { product_ok: true, variant_ok: true, batch_ok: true, qty_ok: true,
 
 async function makeVariant(): Promise<string> {
   const cat = (await sel("/categories?select=id&limit=1"))[0]; const t = `${RUNK}${Math.random().toString(36).slice(2, 5)}`;
-  const p = await ins("products", { name: `PVA ${t}`, slug: `pva-${t}`, base_sku: `PVA-${t}`.toUpperCase(), category_id: cat.id, price: 100, hsn_code: "34060010", product_type: "candle", batch_prefix: ("PV" + Math.random().toString(36).slice(2, 5)).toUpperCase().slice(0, 6) });
+  const p = await ins("products", { name: `PVA ${t}`, slug: `pva-${t}`, base_sku: `PVA-${t}`.toUpperCase(), category_id: cat.id, price: 100, hsn_code: "34060010", product_type: "candle", batch_prefix: Math.random().toString(36).slice(2, 8).toUpperCase().slice(0, 6) });
   const v = await ins("variants", { product_id: p.id, sku: `PVA-${t}-GL`.toUpperCase(), price: 100, vessel_type: "glass", size_label: "100g", tracking_state: "untracked", is_active: false });
   await setVariantTracking(sup, v.id, "tracked"); return v.id;
 }

@@ -52,7 +52,7 @@ d("POST /api/admin/fulfillment/batch", () => {
     await setReleaseEnabled(sup, true); await setAllocationEnabled(sup, true);
     const cat = (await sel("/categories?select=id&limit=1"))[0];
     const t = `${RUNK}${Math.random().toString(36).slice(2, 5)}`;
-    const pref = ("PA" + Math.random().toString(36).slice(2, 5)).toUpperCase().slice(0, 6);
+    const pref = Math.random().toString(36).slice(2, 8).toUpperCase().slice(0, 6);
     const p = await ins("products", { name: `PAPI ${t}`, slug: `papi-${t}`, base_sku: `PAPI-${t}`.toUpperCase(), category_id: cat.id, price: 100, hsn_code: "34060010", product_type: "candle", batch_prefix: pref });
     const v = await ins("variants", { product_id: p.id, sku: `PAPI-${t}-GL`.toUpperCase(), price: 100, vessel_type: "glass", size_label: "100g", tracking_state: "untracked", is_active: false });
     await setVariantTracking(sup, v.id, "tracked");

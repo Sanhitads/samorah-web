@@ -31,7 +31,7 @@ let variantId = "", untrackedVariantId = "", productId = "";
 async function makeProductVariant(tracked: boolean): Promise<{ productId: string; variantId: string }> {
   const cat = (await sel("/categories?select=id&limit=1"))?.[0];
   const tag = `${RUNK}${Math.random().toString(36).slice(2, 5)}`;
-  const pref = ("R" + Math.random().toString(36).slice(2, 6)).toUpperCase().slice(0, 6); // unique per product
+  const pref = Math.random().toString(36).slice(2, 8).toUpperCase().slice(0, 6); // unique per product
   const p = await ins("products", { name: `REL ${tag}`, slug: `rel-${tag}`, base_sku: `REL-${tag}`.toUpperCase(), category_id: cat.id, price: 100, hsn_code: "34060010", product_type: "candle", batch_prefix: pref });
   const v = await ins("variants", { product_id: p.id, sku: `REL-${tag}-GL`.toUpperCase(), price: 100, vessel_type: "glass", size_label: "100g", tracking_state: tracked ? "tracked" : "untracked", tracked_at: tracked ? new Date(Date.now() - 60000).toISOString() : null, is_active: false });
   return { productId: p.id, variantId: v.id };

@@ -155,7 +155,14 @@ d("Bundle admin service (Phase 1A)", () => {
   // the selectable/sellable counts depend ONLY on this test's fixtures — independent of how many other
   // (real or disposable) candles exist in the local DB.
   const excludeAllBut = async (keep: string[]): Promise<string[]> => {
-    const all = (await sel(`/products?select=id`)) as { id: string }[];
+    // Paginate — PostgREST caps a response at 1000 rows, and the local DB has accumulated >1000 disposable
+    // test products, so a single select would MISS some and leave candles selectable (false negative).
+    const all: { id: string }[] = [];
+    for (let offset = 0; ; offset += 1000) {
+      const page = (await sel(`/products?select=id&limit=1000&offset=${offset}`)) as { id: string }[];
+      all.push(...page);
+      if (page.length < 1000) break;
+    }
     return all.map((p) => p.id).filter((id) => !keep.includes(id));
   };
 

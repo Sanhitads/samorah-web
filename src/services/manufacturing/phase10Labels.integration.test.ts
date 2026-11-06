@@ -42,7 +42,7 @@ async function approvedBatch(variantId: string, qty: number, release = true): Pr
 }
 async function makeVariant(): Promise<{ v: string; product: string }> {
   const cat = (await sel("/categories?select=id&limit=1"))[0]; const t = `${RUNK}${Math.random().toString(36).slice(2, 5)}`;
-  const p = await ins("products", { name: `L10 ${t}`, slug: `l10-${t}`, base_sku: `L10-${t}`.toUpperCase(), category_id: cat.id, price: 100, hsn_code: "34060010", product_type: "candle", batch_prefix: ("L1" + Math.random().toString(36).slice(2, 5)).toUpperCase().slice(0, 6) });
+  const p = await ins("products", { name: `L10 ${t}`, slug: `l10-${t}`, base_sku: `L10-${t}`.toUpperCase(), category_id: cat.id, price: 100, hsn_code: "34060010", product_type: "candle", batch_prefix: Math.random().toString(36).slice(2, 8).toUpperCase().slice(0, 6) });
   const v = await ins("variants", { product_id: p.id, sku: `L10-${t}-GL`.toUpperCase(), price: 100, vessel_type: "glass", size_label: "100g", variant_name: "Glass 100g", tracking_state: "untracked", is_active: false });
   await setVariantTracking(sup, v.id, "tracked");
   return { v: v.id, product: p.id };

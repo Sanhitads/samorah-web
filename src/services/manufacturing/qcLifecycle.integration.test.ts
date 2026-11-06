@@ -217,6 +217,24 @@ d("Manufacturing Phase 4 (QC & lifecycle)", () => {
     expect((await approveQc(approver, batchId)).to).toBe("qc_approved");
   });
 
+  it("recovery: a batch advanced to quality_check WITHOUT a produced qty can still record it, then QC", async () => {
+    // Reproduce the trap: create → start → curing → quality_check with produced still 0 (no ProductionEdit).
+    const { batchId } = await createBatch(admin, { variantId, idempotencyKey: `REC-${RUNK}`, manufacturingDate: "2025-12-01", plannedQty: 5, earliestReleaseDate: "2026-01-01" });
+    await toInProduction(admin, batchId); await toCuring(admin, batchId); await toQualityCheck(admin, batchId);
+    let row = await getBatch(batchId);
+    expect([row.lifecycle_status, row.produced_qty, row.pending_inspection_qty]).toEqual(["quality_check", 0, 0]);
+    // Recording QC now is impossible (nothing pending). The production record is editable BECAUSE produced=0.
+    await updateBatch(admin, { batchId, producedQty: 5, pendingInspectionQty: 5 });
+    row = await getBatch(batchId);
+    expect([row.produced_qty, row.pending_inspection_qty]).toEqual([5, 5]);
+    // Now QC records and reconciles.
+    await recordRoutineQc(inspector, { batchId, inspectedQty: 5, approvedDelta: 5, rejectedDelta: 0, result: "pass", measurements: { fill_weight: 100, wick_centering: "centered", vessel_condition: "ok" } });
+    row = await getBatch(batchId);
+    expect([row.approved_qty, row.pending_inspection_qty]).toEqual([5, 0]);
+    // Once inspection has started, the production record locks again.
+    await expect(updateBatch(admin, { batchId, producedQty: 6, pendingInspectionQty: 1 })).rejects.toThrow(/no longer editable/);
+  });
+
   it("batch-code sequence: monotonic & unique, survives >99 exhaustion, and a collision is surfaced not reused", async () => {
     // Generator is PREFIX-FORMAT-YYMMDD-SEQ with a monotonic per-scope counter (batch_code_sequences).
     const gp = ("Z" + RUNK).toUpperCase().slice(0, 6), fmt = "TST", date = "2026-12-08", scope = `${gp}-${fmt}-261208`;

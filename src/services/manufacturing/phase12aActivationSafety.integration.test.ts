@@ -29,7 +29,7 @@ let superId = ""; let n = 0;
 
 async function untrackedWithStock(qty: number): Promise<string> {
   const cat = (await sel("/categories?select=id&limit=1"))[0]; const t = `${RUNK}${n++}`;
-  const p = await ins("products", { name: `P12S ${t}`, slug: `p12s-${t}`.toLowerCase(), base_sku: `P12S-${t}`.toUpperCase(), category_id: cat.id, price: 100, hsn_code: "34060010", product_type: "candle", batch_prefix: ("PS" + Math.random().toString(36).slice(2, 5)).toUpperCase().slice(0, 6) });
+  const p = await ins("products", { name: `P12S ${t}`, slug: `p12s-${t}`.toLowerCase(), base_sku: `P12S-${t}`.toUpperCase(), category_id: cat.id, price: 100, hsn_code: "34060010", product_type: "candle", batch_prefix: Math.random().toString(36).slice(2, 8).toUpperCase().slice(0, 6) });
   const v = await ins("variants", { product_id: p.id, sku: `P12S-${t}-GL`.toUpperCase(), price: 100, vessel_type: "glass", size_label: "190g", variant_name: "Glass 190g", tracking_state: "untracked", is_active: false });
   if (qty > 0) await rpc("adjust_inventory", { p: { variant_id: v.id, mode: "set", qty, reason: "Physical count correction" } });
   return v.id;

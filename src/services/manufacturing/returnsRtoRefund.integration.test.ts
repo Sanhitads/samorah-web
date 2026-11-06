@@ -41,7 +41,7 @@ let saleN = 0;
 async function makeVariant(tracked: boolean): Promise<{ productId: string; variantId: string }> {
   const cat = (await sel("/categories?select=id&limit=1"))[0];
   const t = `${RUNK}${Math.random().toString(36).slice(2, 5)}`;
-  const pref = ("T" + Math.random().toString(36).slice(2, 6)).toUpperCase().slice(0, 6);
+  const pref = Math.random().toString(36).slice(2, 8).toUpperCase().slice(0, 6); // 6 chars: collision-safe as fixtures accumulate (not cleaned)
   const p = await ins("products", { name: `RRT ${t}`, slug: `rrt-${t}`, base_sku: `RRT-${t}`.toUpperCase(), category_id: cat.id, price: 100, hsn_code: "34060010", product_type: "candle", batch_prefix: pref });
   // is_active:false keeps disposable fixtures OUT of the bundle candle pool (getBundleCandles filters
   // on is_active) so bundle tests stay deterministic regardless of accumulated test products.
