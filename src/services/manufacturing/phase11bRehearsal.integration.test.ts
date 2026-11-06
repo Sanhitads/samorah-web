@@ -41,6 +41,13 @@ async function makeVariant(): Promise<string> {
   await setVariantTracking(sup, v.id, "tracked");
   return v.id;
 }
+async function makeUntrackedWithStock(qty: number): Promise<string> {
+  const cat = (await sel("/categories?select=id&limit=1"))[0]; const t = `${RUNK}${n++}`;
+  const p = await ins("products", { name: `P11B ${t}`, slug: `p11b-${t}`.toLowerCase(), base_sku: `P11B-${t}`.toUpperCase(), category_id: cat.id, price: 100, hsn_code: "34060010", product_type: "candle", batch_prefix: ("PB" + Math.random().toString(36).slice(2, 5)).toUpperCase().slice(0, 6) });
+  const v = await ins("variants", { product_id: p.id, sku: `P11B-${t}-GL`.toUpperCase(), price: 100, vessel_type: "glass", size_label: "190g", variant_name: "Glass 190g", tracking_state: "untracked", is_active: false });
+  await rpc("adjust_inventory", { p: { variant_id: v.id, mode: "set", qty, reason: "Physical count correction" } });
+  return v.id;
+}
 async function releasedBatch(variantId: string, qty: number): Promise<string> {
   const { batchId } = await createBatch(mgr, { variantId, idempotencyKey: `PBB-${RUNK}-${Math.random()}`, manufacturingDate: "2026-12-10", plannedQty: qty, earliestReleaseDate: "2026-01-01" });
   await updateBatch(mgr, { batchId, producedQty: qty, pendingInspectionQty: qty });
@@ -149,17 +156,21 @@ d("Phase 11B — activation rehearsal (service path)", () => {
     expect(rec.activation_eligible).toBe(false);                       // cannot be considered activation-ready
   });
 
-  it("HAZARD: an unsafe tracked→untracked flip breaks conservation (why it must never be automated)", async () => {
+  it("ONE-WAY: tracked→untracked is REFUSED by the DB guard (tracking history is permanent)", async () => {
     const v = await makeVariant(); made.push(v); await releasedBatch(v, 5);
     expect((await conserve(v)).physicalConsistent).toBe(true);
-    // Flip back to untracked (the function permits it — there is no DB guard today) and sell 1 unit untracked.
-    await setVariantTracking(sup, v, "untracked");
-    const { roid, tag } = await seedPaidPending(v, 1);
-    expect((await finalize(roid, tag)).body.created).toBe(true);        // untracked sale: no attribution trigger
-    // The aggregate dropped but the batch overlay is now STALE → reconciliation no longer consistent.
-    const c = await conserve(v);
-    expect(c.aggregate).toBe(4);
-    expect(c.overlay).toBe(5);                                          // overlay unchanged → physical drift
-    expect(c.physicalConsistent).toBe(false);                          // DEMONSTRATED hazard → never auto-deactivate
+    // The Phase-12A guard blocks deactivation (which would otherwise strand the batch overlay / permit
+    // untagged consumption). Pausing is done via the release/allocation switches, never by deactivation.
+    await expect(setVariantTracking(sup, v, "untracked")).rejects.toThrow(/one-way|not permitted|tracked/i);
+    // State and conservation are unchanged — the variant is still tracked and consistent.
+    expect((await sel(`/variants?id=eq.${v}&select=tracking_state`))[0].tracking_state).toBe("tracked");
+    expect((await conserve(v)).physicalConsistent).toBe(true);
+  });
+
+  it("GUARD: a non-empty variant cannot be activated without an opening cutover + sign-off", async () => {
+    // Seed real untracked aggregate stock, then attempt activation with no batch overlay / sign-off.
+    const vu = await makeUntrackedWithStock(6);
+    await expect(setVariantTracking(sup, vu, "tracked")).rejects.toThrow(/opening|consistent|eligible|reconcil/i);
+    expect((await sel(`/variants?id=eq.${vu}&select=tracking_state`))[0].tracking_state).toBe("untracked");
   });
 });

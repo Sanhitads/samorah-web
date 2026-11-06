@@ -11,8 +11,11 @@ const H = { apikey: KEY, Authorization: `Bearer ${KEY}`, "Content-Type": "applic
 const rest = (p: string) => `${URL}/rest/v1${p}`;
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const sel = async (p: string) => (await fetch(rest(p), { headers: H })).json() as any;
+const ins = async (t: string, row: any) => { const r = await fetch(rest(`/${t}`), { method: "POST", headers: { ...H, Prefer: "return=representation" }, body: JSON.stringify(row) }); if (!r.ok) throw new Error(`${t}: ${await r.text()}`); return (await r.json())[0]; };
+const patch = (p: string, row: any) => fetch(rest(p), { method: "PATCH", headers: H, body: JSON.stringify(row) });
+const rpc = async (fn: string, body: any) => { const r = await fetch(rest(`/rpc/${fn}`), { method: "POST", headers: H, body: JSON.stringify(body) }); return { status: r.status, body: await r.json().catch(() => null) as any }; };
 
-import { createBatch, updateBatch, getBatch, getBatchTimeline, setProductBatchPrefix, type StaffActor } from "@/services/manufacturing/batchService";
+import { createBatch, updateBatch, getBatch, getBatchTimeline, type StaffActor } from "@/services/manufacturing/batchService";
 import { ForbiddenError } from "@/services/manufacturing/actor";
 import { upsertTemplate, listTemplates, recordRoutineQc, recordDesignValidation, revokeDesignValidation, designValidationStatus, listQcForBatch } from "@/services/manufacturing/qcService";
 import { toInProduction, toCuring, toQualityCheck, approveQc, rejectBatch, reopenBatch, advanceLifecycle, setHold } from "@/services/manufacturing/lifecycleService";
@@ -41,12 +44,15 @@ d("Manufacturing Phase 4 (QC & lifecycle)", () => {
     approver = { userId: ids[2] ?? ids[1] ?? ids[0], role: "manager" };
     sodApprover = { userId: inspector.userId, role: "manager" };       // same person who inspected
     adminOverride = { userId: inspector.userId, role: "admin" };        // authorised SoD override
-    const vs = await sel("/variants?select=id,product_id,products!inner(product_type)&products.product_type=eq.candle&limit=1");
-    variantId = vs?.[0]?.id; productId = vs?.[0]?.product_id;
-    prefix = ("Q" + String(productId).replace(/-/g, "").slice(0, 4)).toUpperCase();
-    // Another suite may already have set (and used) this product's prefix — immutability then
-    // blocks a re-set, which is fine: any valid prefix lets create_batch generate codes.
-    try { await setProductBatchPrefix(admin, productId, prefix); } catch { /* already set & used */ }
+    // ISOLATION (Phase 12A): create a DEDICATED disposable candle product + variant in a unique
+    // batch-code namespace. Never depends on an arbitrary existing real product, and never touches
+    // the real catalogue/stock — so batch codes are unique and deterministic within this suite's scope
+    // (the duplicate-batch_code collisions came from sharing a real product's accumulated sequence).
+    const cat = (await sel("/categories?select=id&limit=1"))[0];
+    prefix = ("Q" + RUNK).toUpperCase().slice(0, 6);           // unique per run; varchar(6)
+    const p = await ins("products", { name: `QCLC ${RUNK}`, slug: `qclc-${RUNK}`, base_sku: `QCLC-${RUNK}`.toUpperCase(), category_id: cat.id, price: 100, hsn_code: "34060010", product_type: "candle", batch_prefix: prefix });
+    const v = await ins("variants", { product_id: p.id, sku: `QCLC-${RUNK}-GL`.toUpperCase(), price: 100, vessel_type: "glass", size_label: "190g", variant_name: "Glass 190g", is_active: false });
+    productId = p.id; variantId = v.id;
   });
 
   it("versions QC templates immutably", async () => {
@@ -209,5 +215,29 @@ d("Manufacturing Phase 4 (QC & lifecycle)", () => {
     await expect(approveQc(approver, batchId)).rejects.toThrow(); // can't approve while on hold
     expect(await setHold(approver, batchId, false)).toBe("none");
     expect((await approveQc(approver, batchId)).to).toBe("qc_approved");
+  });
+
+  it("batch-code sequence: monotonic & unique, survives >99 exhaustion, and a collision is surfaced not reused", async () => {
+    // Generator is PREFIX-FORMAT-YYMMDD-SEQ with a monotonic per-scope counter (batch_code_sequences).
+    const gp = ("Z" + RUNK).toUpperCase().slice(0, 6), fmt = "TST", date = "2026-12-08", scope = `${gp}-${fmt}-261208`;
+    const gen = async () => (await rpc("generate_batch_code", { p_prefix: gp, p_format: fmt, p_date: date })).body as string;
+    const c1 = await gen(), c2 = await gen(), c3 = await gen();
+    expect([c1, c2, c3]).toEqual([`${scope}-01`, `${scope}-02`, `${scope}-03`]); // deterministic, monotonic
+    expect(new Set([c1, c2, c3]).size).toBe(3);                                   // unique
+
+    // Exhaustion past the 2-digit pad: seed the counter to 98 → next codes 99, 100 (3 digits, still unique).
+    await patch(`/batch_code_sequences?scope_key=eq.${scope}`, { last_seq: 98 });
+    const c99 = await gen(), c100 = await gen();
+    expect(c99).toBe(`${scope}-99`);
+    expect(c100).toBe(`${scope}-100`);                                            // no wraparound/truncation
+    expect(c99).not.toBe(c100);
+
+    // Collision handling: the batch_code unique constraint SURFACES a duplicate (never silently reused).
+    const dupCode = `${gp}-DUP-261208-01`;
+    await ins("manufacturing_batches", { variant_id: variantId, product_id: productId, batch_kind: "legacy", lifecycle_status: "released", batch_code: dupCode, sku_snapshot: "QCLC" });
+    const second = await fetch(rest(`/manufacturing_batches`), { method: "POST", headers: { ...H, Prefer: "return=representation" },
+      body: JSON.stringify({ variant_id: variantId, product_id: productId, batch_kind: "legacy", lifecycle_status: "released", batch_code: dupCode, sku_snapshot: "QCLC" }) });
+    expect(second.status).toBeGreaterThanOrEqual(400);                            // duplicate rejected, not reused
+    expect((await second.json().catch(() => ({})) as any)?.code).toBe("23505");   // unique_violation
   });
 });
