@@ -40,7 +40,7 @@ export function ManufacturingManager({ rows, total, page, pageSize, filters, var
   return (
     <section className="admin__section">
       <form className="admin__filters" onSubmit={applyFilters} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
-        <input className="admin__input" placeholder="Search batch code…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <input className="admin__input" placeholder="Search product name or batch code…" value={q} onChange={(e) => setQ(e.target.value)} />
         <select className="admin__input" value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="">All statuses</option>
           {LIFECYCLES.map((s) => <option key={s} value={s}>{cap(s)}</option>)}

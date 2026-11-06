@@ -157,7 +157,14 @@ export async function listBatchesAdmin(opts: BatchListOpts = {}): Promise<{ rows
     .select("id,batch_code,product_type,lifecycle_status,recall_state,manufacturing_date,planned_qty,produced_qty,pending_inspection_qty,approved_qty,rejected_qty,qc_sampled_destroyed_qty,earliest_release_date,created_at,products(name),variants(sku,vessel_type,size_label)", { count: "exact" })
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
-  if (opts.q) q = q.ilike("batch_code", `%${opts.q}%`);
+  if (opts.q) {
+    // Search by batch code OR product name (operators look for "Kashmiri Chai", not the code). Resolve the
+    // matching product ids first, then OR them with a batch_code match.
+    const { data: prods } = await db().from("products").select("id").ilike("name", `%${opts.q}%`);
+    const pids = ((prods ?? []) as { id: string }[]).map((p) => p.id);
+    const codeMatch = `batch_code.ilike.%${opts.q}%`;
+    q = q.or(pids.length ? `${codeMatch},product_id.in.(${pids.join(",")})` : codeMatch);
+  }
   if (opts.status) q = q.eq("lifecycle_status", opts.status);
   if (opts.hold === true) q = q.eq("recall_state", "on_hold");
   const { data, count } = await q;
