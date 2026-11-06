@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { canTransitionReturn, assertReturnTransition, isTerminalReturn } from "@/lib/returns/state";
+import { canTransitionReturn, assertReturnTransition, isTerminalReturn, nextReturnStates } from "@/lib/returns/state";
 import { canTransitionException, assertExceptionTransition, isTerminalException, isValidExceptionType } from "@/lib/exceptions/state";
 import { requiresPhysicalReturn, isReceivingInconsistent, resolutionWaivesReturn, RESOLUTIONS } from "@/lib/returns/resolution";
 
@@ -31,6 +31,14 @@ describe("returns state machine (§8 — Resolution Center)", () => {
     expect(() => assertReturnTransition("requested", "closed")).toThrow(/Illegal return transition/);
     expect(isTerminalReturn("closed")).toBe(true);
     expect(isTerminalReturn("rejected")).toBe(true);
+  });
+
+  it("degrades gracefully on an unknown/stray status (never throws — one bad row must not crash the screen)", () => {
+    // A status outside the state machine (legacy/stray data) must yield no transitions, not `[...undefined]`.
+    expect(nextReturnStates("refund" as any)).toEqual([]); // eslint-disable-line @typescript-eslint/no-explicit-any
+    expect(nextReturnStates("" as any)).toEqual([]);       // eslint-disable-line @typescript-eslint/no-explicit-any
+    expect(isTerminalReturn("refund" as any)).toBe(true);  // eslint-disable-line @typescript-eslint/no-explicit-any
+    expect(nextReturnStates("received")).toEqual(["inspection"]); // known status still correct
   });
 });
 

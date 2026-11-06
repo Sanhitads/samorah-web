@@ -147,7 +147,7 @@ d("Phase 8 — fulfilment provenance", () => {
     const v = await makeVariant(); const b = await releasedBatch(v, 10);
     const s = await sale(v, 3);
     // a line-identified return/refund of 1 unit → remaining fulfillable drops to 2
-    const rr = await ins("returns", { order_id: s.orderId, order_number: s.orderNumber, rma_number: `RMA-P8-${RUNK}-${n++}`, status: "refund", resolution: "refund_only" });
+    const rr = await ins("returns", { order_id: s.orderId, order_number: s.orderNumber, rma_number: `RMA-P8-${RUNK}-${n++}`, status: "refund_processing", resolution: "refund_only" });
     await ins("return_items", { return_id: rr.id, order_item_id: s.orderItemId, variant_id: v, sku: "T", product_name: "T", quantity: 1, line_amount: 100, restock: false });
     expect((await ent(s.orderId, s.orderItemId)).item.remaining_fulfillable).toBe(2);
     await confirmPickBatch(editor, { orderItemId: s.orderItemId, batchId: b, qty: 2 });

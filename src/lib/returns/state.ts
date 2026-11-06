@@ -48,7 +48,7 @@ export function assertReturnTransition(from: ReturnStatus, to: ReturnStatus): vo
   if (!canTransitionReturn(from, to)) throw new Error(`Illegal return transition: ${from} → ${to}`);
 }
 export function isTerminalReturn(s: ReturnStatus): boolean {
-  return TRANSITIONS[s].length === 0;
+  return (TRANSITIONS[s] ?? []).length === 0;
 }
 
 // Once money/goods have moved or the ticket is settled, the RESOLUTION (and refund method) must not
@@ -59,5 +59,8 @@ export function isResolutionLocked(s: ReturnStatus): boolean {
   return RESOLUTION_LOCKED.includes(s);
 }
 export function nextReturnStates(from: ReturnStatus): ReturnStatus[] {
-  return [...TRANSITIONS[from]];
+  // Defensive: an unknown/legacy status (e.g. stray data, a future state) must NOT be iterated as
+  // `[...undefined]` — that TypeError would crash the whole Returns admin page for one bad row. Degrade
+  // to "no transitions" so the row simply shows no actions.
+  return [...(TRANSITIONS[from] ?? [])];
 }

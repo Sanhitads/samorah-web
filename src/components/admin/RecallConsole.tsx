@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * Phase 9 — Recall Admin Console (overview + case detail + authorised operations). All work posts to
@@ -31,6 +31,11 @@ export function RecallConsole({ initialRecalls }: { initialRecalls?: RecallRow[]
   const [q, setQ] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const detailRef = useRef<HTMLDivElement | null>(null);
+
+  // Clicking "Open" renders the detail below a (possibly long) table — bring it into view so the action
+  // is visibly reflected regardless of how many cases are listed.
+  useEffect(() => { if (sel) detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, [sel]);
 
   const load = useCallback(async () => {
     try { setRecalls(await call("list")); } catch (e) { setErr(e instanceof Error ? e.message : "load failed"); }
@@ -61,7 +66,7 @@ export function RecallConsole({ initialRecalls }: { initialRecalls?: RecallRow[]
 
       <div className="admin__filters">
         <input className="admin__input" placeholder="Search number / reason / status" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search recalls" />
-        <button type="button" className="ff-btn" disabled={busy} onClick={() => op(() => call("create", { kind: "recall", reason: window.prompt("Recall reason?") || "unspecified", severity: "high" }))}>New recall</button>
+        <button type="button" className="ff-btn" disabled={busy} onClick={() => { const reason = window.prompt("Recall reason?"); if (reason === null || reason.trim() === "") return; void op(() => call("create", { kind: "recall", reason: reason.trim(), severity: "high" })); }}>New recall</button>
       </div>
 
       {err ? <p className="ff-err" role="alert">{err}</p> : null}
@@ -83,7 +88,7 @@ export function RecallConsole({ initialRecalls }: { initialRecalls?: RecallRow[]
       </table>
 
       {current ? (
-        <div className="admin__card" aria-label={`Recall ${current.recall_number}`}>
+        <div className="admin__card" aria-label={`Recall ${current.recall_number}`} ref={detailRef}>
           <h3 className="admin__section">{current.recall_number} · {current.kind} · {current.severity}</h3>
           <p className="admin__note">Status: <b>{current.status}</b> · containment: {current.containment_status}</p>
           <div className="admin__filters">
