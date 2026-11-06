@@ -87,4 +87,16 @@ d("POST /api/admin/recalls", () => {
     const custs = await post({ action: "affected_customers", batchId });
     expect(custs.status).toBe(200);
   });
+
+  it("add_batches_by_code resolves batch codes (reports unknowns) and case_batches lists them", async () => {
+    staff.role = "admin";
+    const code = (await sel(`/manufacturing_batches?id=eq.${batchId}&select=batch_code`))[0].batch_code;
+    const created = await post({ action: "create", kind: "recall", reason: "by-code test" });
+    const recallId = created.json.result.recallId;
+    const added = await post({ action: "add_batches_by_code", recallId, codes: [code, "NOPE-DOES-NOT-EXIST"] });
+    expect(added.json.result.added).toBe(1);
+    expect(added.json.result.notFound).toEqual(["NOPE-DOES-NOT-EXIST"]);
+    const list = await post({ action: "case_batches", recallId });
+    expect(list.json.result.some((cb: any) => cb.manufacturing_batches?.batch_code === code)).toBe(true);
+  });
 });

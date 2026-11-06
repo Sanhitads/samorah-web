@@ -39,7 +39,7 @@ let n = 0;
 async function makeVariant(): Promise<string> {
   const cat = (await sel("/categories?select=id&limit=1"))[0];
   const t = `${RUNK}${Math.random().toString(36).slice(2, 5)}`;
-  const pref = ("P8" + Math.random().toString(36).slice(2, 5)).toUpperCase().slice(0, 6);
+  const pref = Math.random().toString(36).slice(2, 8).toUpperCase().slice(0, 6); // 6 chars: collision-safe as fixtures accumulate (not cleaned)
   const p = await ins("products", { name: `P8 ${t}`, slug: `p8-${t}`, base_sku: `P8-${t}`.toUpperCase(), category_id: cat.id, price: 100, hsn_code: "34060010", product_type: "candle", batch_prefix: pref });
   const v = await ins("variants", { product_id: p.id, sku: `P8-${t}-GL`.toUpperCase(), price: 100, vessel_type: "glass", size_label: "100g", tracking_state: "untracked", is_active: false });
   await setVariantTracking(superadmin, v.id, "tracked");

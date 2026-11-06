@@ -4,6 +4,16 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { ReturnStatus } from "@/lib/returns/state";
 
+// Translate server error codes into operator guidance (fallback: humanise the code).
+const ERR_LABELS: Record<string, string> = {
+  receiving_open: "Goods receiving isn't finished. Open this return and record the received items (close receiving) before processing the refund.",
+  resolution_locked: "This return has settled — its resolution can no longer be changed.",
+  return_not_found: "Return not found — refresh the page.",
+  order_fulfillment_blocked: "Blocked by the order's fulfilment state.",
+  not_receivable: "This return can't be received in its current state.",
+};
+const errLabel = (code: string) => ERR_LABELS[code] ?? code.replace(/_/g, " ");
+
 const LABEL: Record<string, string> = {
   under_review: "Start Review",
   approved: "Approve",
@@ -36,7 +46,7 @@ export function ReturnActions({ returnId, nextStates }: { returnId: string; next
       });
       const d = await res.json();
       if (!res.ok) {
-        setErr(d.error ?? "Failed");
+        setErr(errLabel(d.error ?? d.reason ?? "Failed"));
         setBusy(null);
         return;
       }

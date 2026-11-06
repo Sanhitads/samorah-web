@@ -45,10 +45,21 @@ export function RecallConsole({ initialRecalls }: { initialRecalls?: RecallRow[]
   const openDetail = useCallback(async (id: string) => {
     setSel(id); setErr(""); setDetail(null);
     try {
-      const [notifications] = await Promise.all([call("list_notifications", { recallId: id })]);
-      setDetail({ notifications });
+      const [notifications, batches] = await Promise.all([call("list_notifications", { recallId: id }), call("case_batches", { recallId: id })]);
+      setDetail({ notifications, batches });
     } catch (e) { setErr(e instanceof Error ? e.message : "detail failed"); }
   }, []);
+
+  const addBatches = async (id: string) => {
+    const codes = window.prompt("Affected batch code(s) — comma-separated:");
+    if (codes === null || !codes.trim()) return;
+    setBusy(true); setErr("");
+    try {
+      const r: any = await call("add_batches_by_code", { recallId: id, codes }); // eslint-disable-line @typescript-eslint/no-explicit-any
+      if (r?.notFound?.length) setErr(`Added ${r.added}. Not found: ${r.notFound.join(", ")}`);
+      await load(); await openDetail(id);
+    } catch (e) { setErr(e instanceof Error ? e.message : "add failed"); } finally { setBusy(false); }
+  };
 
   const op = async (fn: () => Promise<unknown>) => {
     setBusy(true); setErr("");
@@ -66,7 +77,12 @@ export function RecallConsole({ initialRecalls }: { initialRecalls?: RecallRow[]
 
       <div className="admin__filters">
         <input className="admin__input" placeholder="Search number / reason / status" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search recalls" />
-        <button type="button" className="ff-btn" disabled={busy} onClick={() => { const reason = window.prompt("Recall reason?"); if (reason === null || reason.trim() === "") return; void op(() => call("create", { kind: "recall", reason: reason.trim(), severity: "high" })); }}>New recall</button>
+        <button type="button" className="ff-btn" disabled={busy} onClick={() => {
+          const reason = window.prompt("Recall reason?"); if (reason === null || reason.trim() === "") return;
+          const sevIn = (window.prompt("Severity — low / medium / high / critical:", "high") || "high").trim().toLowerCase();
+          const severity = ["low", "medium", "high", "critical"].includes(sevIn) ? sevIn : "high";
+          void op(() => call("create", { kind: "recall", reason: reason.trim(), severity }));
+        }}>New recall</button>
       </div>
 
       {err ? <p className="ff-err" role="alert">{err}</p> : null}
@@ -89,8 +105,22 @@ export function RecallConsole({ initialRecalls }: { initialRecalls?: RecallRow[]
 
       {current ? (
         <div className="admin__card" aria-label={`Recall ${current.recall_number}`} ref={detailRef}>
-          <h3 className="admin__section">{current.recall_number} · {current.kind} · {current.severity}</h3>
+          <h3 className="admin__section">{current.recall_number} · {current.kind} · severity: {current.severity}</h3>
           <p className="admin__note">Status: <b>{current.status}</b> · containment: {current.containment_status}</p>
+          <p className="admin__note">How it works: <b>1.</b> add the affected batch(es) below. <b>2.</b> move the case to <i>initiated</i>. <b>3.</b> <i>Apply containment</i> blocks their release / allocation / picking / dispatch (returned units route to quarantine). <b>4.</b> <i>Prepare contact list</i> builds the affected-customer list (no external send). Severity is set when the case is created.</p>
+
+          {/* Affected batches — what the case acts on. Containment/notifications do nothing until batches are added. */}
+          <div className="admin__section">
+            <h4>Affected batches {detail?.batches ? `(${detail.batches.length})` : ""}</h4>
+            <ul className="prov-ship">
+              {(detail?.batches ?? []).map((cb: any) => ( // eslint-disable-line @typescript-eslint/no-explicit-any
+                <li key={cb.batch_id}>{cb.manufacturing_batches?.batch_code ?? cb.batch_id} · {cb.manufacturing_batches?.lifecycle_status} · {cb.manufacturing_batches?.recall_state}</li>
+              ))}
+              {detail?.batches && detail.batches.length === 0 ? <li className="admin__muted">None yet — add the affected batch code(s) to contain them.</li> : null}
+            </ul>
+            <button type="button" className="ff-btn" disabled={busy} onClick={() => addBatches(current.id)}>Add affected batch(es)</button>
+          </div>
+
           <div className="admin__filters">
             {(NEXT[current.status] ?? []).map((to) => (
               <button key={to} type="button" className="ff-btn" disabled={busy}

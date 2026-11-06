@@ -4,7 +4,7 @@ import type { Capability } from "@/lib/auth/capabilities";
 import type { StaffActor } from "@/services/manufacturing/actor";
 import { ForbiddenError } from "@/services/manufacturing/actor";
 import {
-  createRecallCase, addRecallBatches, addRecallLots, expandRecallBatches, transitionRecall,
+  createRecallCase, addRecallBatches, addRecallBatchesByCode, listRecallCaseBatches, addRecallLots, expandRecallBatches, transitionRecall,
   applyContainment, releaseBatchContainment, listRecalls, batchMaterialLots, materialLotBatches,
   batchRecallAccounting, batchRecallImpact, batchAffectedOrders, lotAffectedOrders, batchAffectedCustomers,
   prepareRecallNotifications, listRecallNotifications, reviewRecallNotification,
@@ -25,6 +25,8 @@ const ACTIONS: Record<string, Handler> = {
   list:                 (b) => listRecalls({ openOnly: !!b.openOnly }),
   create:               (b, a) => createRecallCase(a, { kind: b.kind, reason: b.reason, severity: b.severity, evidence: b.evidence, requiredActions: b.requiredActions }),
   add_batches:          (b, a) => addRecallBatches(a, String(b.recallId), b.batchIds ?? []),
+  add_batches_by_code:  (b, a) => addRecallBatchesByCode(a, String(b.recallId), Array.isArray(b.codes) ? b.codes : String(b.codes ?? "").split(",")),
+  case_batches:         (b) => listRecallCaseBatches(String(b.recallId)),
   add_lots:             (b, a) => addRecallLots(a, String(b.recallId), b.lotIds ?? []),
   expand:               (b, a) => expandRecallBatches(a, String(b.recallId)),
   transition:           (b, a) => transitionRecall(a, String(b.recallId), String(b.toState), { closureDecision: b.closureDecision, investigationNotes: b.investigationNotes, notes: b.notes }),

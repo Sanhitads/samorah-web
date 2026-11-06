@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { mfgAction } from "@/lib/admin/mfgClient";
 import { BatchLabels } from "@/components/admin/BatchLabels";
@@ -49,6 +49,8 @@ export function BatchDetail({ batch, timeline, qc, validations, designValidation
   const router = useRouter();
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const qcRef = useRef<HTMLDivElement | null>(null);
+  const goToQc = () => qcRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   const spec = batch.batch_candle_spec || null;
   const editable = EDITABLE.includes(batch.lifecycle_status);
   const blockers = approvalBlockers(batch, qc);
@@ -81,8 +83,9 @@ export function BatchDetail({ batch, timeline, qc, validations, designValidation
         <p style={{ margin: "10px 0 0" }}><strong>Next:</strong> {nextPermittedAction(batch, caps)}</p>
         {batch.lifecycle_status === "quality_check" && blockers.length > 0 && (
           <div className="admin__note" style={{ marginTop: 8 }}>
-            <strong>QC approval blocked by:</strong>
+            <strong>QC approval unavailable — resolve these first:</strong>
             <ul style={{ margin: "4px 0 0" }}>{blockers.map((b) => <li key={b}>{b}</li>)}</ul>
+            {caps.qc && <button type="button" className="admin__btn" style={{ marginTop: 8 }} onClick={goToQc}>Go to Quality Inspection ↓</button>}
           </div>
         )}
       </section>
@@ -100,11 +103,8 @@ export function BatchDetail({ batch, timeline, qc, validations, designValidation
           {caps.approve && batch.recall_state === "none" && <button className="admin__btn" disabled={busy} onClick={() => act("hold", { batchId: batch.id }, { reason: true })}>Hold</button>}
           {caps.approve && batch.recall_state === "on_hold" && <button className="admin__btn" disabled={busy} onClick={() => act("resume", { batchId: batch.id })}>Resume</button>}
         </div>
-        {batch.lifecycle_status === "quality_check" && blockers.length > 0 && (
-          <div className="admin__note" style={{ marginTop: 10 }}>
-            <strong>QC approval blocked:</strong>
-            <ul>{blockers.map((b) => <li key={b}>{b}</li>)}</ul>
-          </div>
+        {batch.lifecycle_status === "quality_check" && blockers.length > 0 && caps.approve && (
+          <p className="admin__note" style={{ marginTop: 8 }}>Approve QC is disabled — see the blockers in the summary above, then record inspection in <button type="button" className="admin__btn admin__btn--link" onClick={goToQc} style={{ padding: 0, border: 0, background: "none", textDecoration: "underline", cursor: "pointer" }}>Quality Inspection</button>.</p>
         )}
       </section>
 
@@ -142,8 +142,20 @@ export function BatchDetail({ batch, timeline, qc, validations, designValidation
         {!editable && <p style={{ fontSize: 12, opacity: 0.7 }}>Production record is read-only in the {batch.lifecycle_status} state.</p>}
       </section>
 
-      {/* QC */}
-      {caps.qc && ["curing", "quality_check"].includes(batch.lifecycle_status) && <QcForm batch={batch} templates={templates} onDone={() => router.refresh()} />}
+      {/* Quality Inspection & Approval — where approved/rejected quantities are recorded (routine QC). */}
+      <div ref={qcRef} id="quality-inspection" style={{ display: "grid", gap: 24 }}>
+        <section className="admin__card">
+          <h3>Quality Inspection &amp; Approval</h3>
+          <p className="admin__muted" style={{ marginTop: 0 }}>Approved and rejected quantities are set here by recording routine QC. Conservation: Produced = Approved + Rejected + Destructive samples + Pending inspection.</p>
+          <div style={{ display: "flex", gap: 20, flexWrap: "wrap", margin: "6px 0 2px" }}>
+            {([["Produced", batch.produced_qty], ["Approved", batch.approved_qty], ["Rejected", batch.rejected_qty], ["Destructive samples", batch.qc_sampled_destroyed_qty], ["Pending inspection", batch.pending_inspection_qty]] as [string, number][]).map(([l, v]) => (
+              <span key={l} style={{ display: "inline-flex", flexDirection: "column" }}><b style={{ fontSize: 20 }}>{v}</b><span className="admin__muted" style={{ fontSize: 12 }}>{l}</span></span>
+            ))}
+          </div>
+          {!caps.qc && <p className="admin__note">You do not have the QC capability, so you cannot record inspection here.</p>}
+          {caps.qc && !["curing", "quality_check"].includes(batch.lifecycle_status) && <p className="admin__muted">QC is recorded during the curing / quality-check stages (current: {STATUS_LABEL[batch.lifecycle_status] ?? batch.lifecycle_status}).</p>}
+        </section>
+        {caps.qc && ["curing", "quality_check"].includes(batch.lifecycle_status) && <QcForm batch={batch} templates={templates} onDone={() => router.refresh()} />}
       <section className="admin__card">
         <h3>QC history</h3>
         {qc.length === 0 ? <p className="admin__empty">No QC records.</p> : (
@@ -152,6 +164,7 @@ export function BatchDetail({ batch, timeline, qc, validations, designValidation
           </table>
         )}
       </section>
+      </div>
 
       {/* Burn validation */}
       <section className="admin__card">
@@ -300,20 +313,38 @@ function QcForm({ batch, templates, onDone }: { batch: any; templates: any[]; on
   );
 }
 
+// Structured burn-test entry (Phase 12A UX) — ordinary inputs that build the same measurements payload the
+// backend already stores. Only fields the validation payload supports; nothing is fabricated or auto-passed.
+const SELECT = { flame: ["stable", "flickering", "high", "self-extinguished"], soot: ["none", "light", "heavy"],
+  mushrooming: ["none", "slight", "significant"], melt_pool: ["full", "partial", "tunnelling"] } as const;
 function DesignValidationForm({ batchId, onDone }: { batchId: string; onDone: () => void }) {
-  const [result, setResult] = useState("pass"); const [measurements, setMeasurements] = useState('{"flame":"stable","melt_pool":"full","soot":"none","vessel_temp_c":48,"burn_hours":4}');
+  const [result, setResult] = useState("pass");
+  const [m, setM] = useState<Record<string, string>>({ flame: "stable", melt_pool: "full", soot: "none", mushrooming: "none", vessel_temp_c: "", burn_hours: "", notes: "" });
   const [busy, setBusy] = useState(false); const [err, setErr] = useState<string | null>(null);
+  const set = (k: string, v: string) => setM((s) => ({ ...s, [k]: v }));
   async function submit(e: FormEvent) {
     e.preventDefault(); setBusy(true); setErr(null);
-    let m: Record<string, unknown>;
-    try { m = JSON.parse(measurements || "{}"); } catch { setErr("Measurements must be valid JSON."); setBusy(false); return; }
-    try { await mfgAction("record_design_validation", { input: { batchId, result, measurements: m, idempotencyKey: crypto.randomUUID() } }); onDone(); }
+    const payload: Record<string, unknown> = {};               // drop blanks; coerce numbers
+    for (const [k, v] of Object.entries(m)) { const t = (v ?? "").trim(); if (!t) continue; payload[k] = (k === "vessel_temp_c" || k === "burn_hours") ? Number(t) : t; }
+    try { await mfgAction("record_design_validation", { input: { batchId, result, measurements: payload, idempotencyKey: crypto.randomUUID() } }); onDone(); }
     catch (e2) { setErr(e2 instanceof Error ? e2.message : "Failed"); } finally { setBusy(false); }
   }
+  const Sel = ({ k, label }: { k: keyof typeof SELECT; label: string }) => (
+    <label>{label}<select className="admin__input" value={m[k] ?? ""} onChange={(e) => set(k, e.target.value)}><option value="">—</option>{SELECT[k].map((o) => <option key={o} value={o}>{o}</option>)}</select></label>
+  );
   return (
     <form onSubmit={submit} style={{ display: "grid", gap: 8, maxWidth: 480, marginBottom: 12 }}>
-      <label>Result<select className="admin__input" value={result} onChange={(e) => setResult(e.target.value)}><option value="pass">pass</option><option value="conditional">conditional</option><option value="fail">fail</option></select></label>
-      <label>Burn observations (JSON)<textarea className="admin__input" rows={3} value={measurements} onChange={(e) => setMeasurements(e.target.value)} /></label>
+      <p className="admin__muted" style={{ margin: 0 }}>Record the burn test. The operator sets the outcome — it is never auto-passed.</p>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        <Sel k="flame" label="Flame stability" />
+        <Sel k="melt_pool" label="Melt pool" />
+        <Sel k="soot" label="Soot" />
+        <Sel k="mushrooming" label="Mushrooming" />
+        <label>Burn duration (hours)<input className="admin__input" type="number" step="any" min={0} value={m.burn_hours} onChange={(e) => set("burn_hours", e.target.value)} /></label>
+        <label>Vessel temperature (°C)<input className="admin__input" type="number" step="any" value={m.vessel_temp_c} onChange={(e) => set("vessel_temp_c", e.target.value)} /></label>
+      </div>
+      <label>Notes / remarks<input className="admin__input" value={m.notes} onChange={(e) => set("notes", e.target.value)} /></label>
+      <label>Outcome<select className="admin__input" value={result} onChange={(e) => setResult(e.target.value)}><option value="pass">pass</option><option value="conditional">conditional</option><option value="fail">fail</option></select></label>
       {err && <p className="admin__error">{err}</p>}
       <button className="admin__btn" disabled={busy}>Record burn validation</button>
     </form>

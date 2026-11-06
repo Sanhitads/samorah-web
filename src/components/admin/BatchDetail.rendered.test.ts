@@ -25,7 +25,7 @@ afterEach(() => cleanup());
 describe("BatchDetail", () => {
   it("lists why QC approval is blocked", () => {
     const { container } = render(h(BatchDetail, { batch: baseBatch, ...common, caps: { operate: true, qc: true, approve: true } }));
-    expect(container.textContent).toContain("QC approval blocked");
+    expect(container.textContent).toContain("QC approval unavailable");
     expect(container.textContent).toContain("3 units still pending inspection");
     expect(container.textContent).toContain("no approved quantity");
     expect(container.textContent).toContain("no passing routine QC");

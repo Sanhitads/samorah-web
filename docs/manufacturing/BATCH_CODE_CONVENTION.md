@@ -27,8 +27,26 @@ The generator is **correct**; the defect is **data** (`products.batch_prefix`):
 3. **Variant format identifiers** — `G190/C150/R100ML/…`, derived by `batch_format_code`; correct.
 4. **Existing immutable batch codes** — never change (DB trigger enforces immutability); this correction affects **future** batches only.
 
-## Proposed mapping (CANDLE fragrances) — **codes need your confirmation**
-Only `KC` is confirmed by you; the rest are proposed initials:
+## Approved mapping — **codes APPROVED by the user; applied only in an isolated DB so far**
+Uniqueness verified (none of the 10 codes is used by any product). The correction is scripted and **tested in
+an isolated database** ([batch_prefix_correction.sql](./batch_prefix_correction.sql) — deliberately NOT in
+`supabase/migrations`, so it cannot auto-apply). **Applying it to the production catalogue needs a separate
+data-migration approval.** Future batches only; existing immutable batch codes/history are untouched.
+
+| base_sku | product | before → after |
+|---|---|---|
+| SAM-CAN-001 | Kashmiri Chai | `T6A33` → **KC** |
+| SAM-CAN-002 | Exotic | `null` → **EX** |
+| SAM-CAN-004 | Wild Majestic | `null` → **WM** |
+| SAM-CAN-007 | Whispered Flame | `null` → **WF** |
+| SAM-CAN-008 | Bout Of Rain | `null` → **BR** |
+| SAM-CAN-009 | Rainforest Bloom | `QED19` → **RB** |
+| SAM-LNN-001 | Fresh Fold | `null` → **FF** |
+| SAM-LNN-002 | After Lights | `null` → **AL** |
+| SAM-ROOM-001 | Open Window | `null` → **OW** |
+| SAM-ROOM-002 | Slow Evening | `null` → **SE** |
+
+### Original proposal (candle formats, for reference)
 
 | Fragrance | Proposed prefix | Supported formats (from real variants) |
 |---|---|---|

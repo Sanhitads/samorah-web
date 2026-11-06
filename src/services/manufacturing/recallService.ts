@@ -29,6 +29,25 @@ export async function addRecallBatches(actor: StaffActor, recallId: string, batc
   return { added: r?.added ?? 0, stamped: !!r?.stamped };
 }
 
+/** Add affected batches to a case by BATCH CODE (operator-friendly). Resolves codes → ids, reports unknowns. */
+export async function addRecallBatchesByCode(actor: StaffActor, recallId: string, codes: string[]): Promise<{ added: number; notFound: string[] }> {
+  assertCap(actor, "manufacturing.recall");
+  const clean = Array.from(new Set(codes.map((c) => c.trim().toUpperCase()).filter(Boolean)));
+  if (!clean.length) return { added: 0, notFound: [] };
+  const { data } = await db().from("manufacturing_batches").select("id,batch_code").in("batch_code", clean);
+  const found = (data ?? []) as { id: string; batch_code: string }[];
+  const notFound = clean.filter((c) => !found.some((b) => b.batch_code === c));
+  if (found.length) await addRecallBatches(actor, recallId, found.map((b) => b.id));
+  return { added: found.length, notFound };
+}
+
+/** The batches currently attached to a case (code + status) — so the operator can see what it acts on. */
+export async function listRecallCaseBatches(recallId: string): Promise<any[]> {
+  const { data } = await db().from("recall_case_batches")
+    .select("batch_id, manufacturing_batches(batch_code, lifecycle_status, recall_state)").eq("recall_id", recallId);
+  return data ?? [];
+}
+
 /** Controlled expansion: add newly-discovered lot-consuming batches to the case (fail-closed if active). */
 export async function expandRecallBatches(actor: StaffActor, recallId: string): Promise<{ added: number }> {
   assertCap(actor, "manufacturing.recall");
