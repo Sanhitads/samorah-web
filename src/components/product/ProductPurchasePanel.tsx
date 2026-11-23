@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useCartStore } from "@/store/useCartStore";
 import { useUIStore } from "@/store/useUIStore";
 import { AddToComposition } from "@/components/product/AddToComposition";
+import { usePdpVariant } from "@/components/product/PdpVariantContext";
 import { trackSelectVariant } from "@/lib/analytics/events";
 import type { ProductVariantView } from "@/lib/productPage";
 
@@ -43,6 +44,10 @@ export function ProductPurchasePanel({ product }: { product: PurchaseProduct }) 
     () => product.variants.find((v) => v.vessel === vessel && v.size === size) ?? null,
     [product.variants, vessel, size],
   );
+
+  // Publish the chosen variant so the gallery (a sibling client island) can swap to its photos.
+  const { setSelectedVariantId } = usePdpVariant();
+  useEffect(() => { setSelectedVariantId(current?.id ?? null); }, [current?.id, setSelectedVariantId]);
 
   /** Sizes OFFERED for the currently-selected vessel only. A vessel+size with no variant must not appear
    *  (e.g. Ceramic = 100g/150g, Glass = 100g/190g — 190g must not show under Ceramic, nor 150g under Glass).

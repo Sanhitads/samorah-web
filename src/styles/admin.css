@@ -1039,6 +1039,12 @@ tr[data-inactive="1"] { opacity: 0.55; }
 .pe-img__actions { display: flex; flex-wrap: wrap; gap: 3px; }
 .pe-imgadd { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .pe-imgadd input { flex: 1 1 200px; padding: 6px 8px; font-family: var(--font-sans); font-size: 13px; border: 1px solid var(--ad-hair); border-radius: 4px; }
+/* One gallery block — the shared set, then one per variant (vessel+size). */
+.pe-vargal { padding: 12px 0; border-top: 1px solid var(--ad-hair); }
+.pe-vargal:first-of-type { border-top: 0; padding-top: 2px; }
+.pe-vargal__head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+.pe-vargal__head strong { font-size: 13px; letter-spacing: 0.01em; }
+.pe-vargal .pe-imgadd { margin-top: 6px; }
 /* One image field: thumbnail + URL input + upload, so each field's image is clearly its own. */
 .pe-imgfield { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
 .pe-imgfield input { flex: 1 1 180px; min-width: 0; padding: 6px 8px; font-family: var(--font-sans); font-size: 13px; border: 1px solid var(--ad-hair); border-radius: 4px; }

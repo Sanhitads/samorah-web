@@ -7,7 +7,8 @@ import { TrackEvent } from "@/components/analytics/TrackEvent";
 import { productBreadcrumb } from "@/lib/seo/breadcrumbLd";
 import { ProductPurchasePanel } from "@/components/product/ProductPurchasePanel";
 import { RetiredNotice } from "@/components/product/RetiredNotice";
-import { ProductGallery } from "@/components/product/ProductGallery";
+import { PdpGalleryIsland } from "@/components/product/PdpGalleryIsland";
+import { PdpVariantProvider } from "@/components/product/PdpVariantContext";
 import { SectionRenderer } from "@/components/sections/SectionRenderer";
 import { bootstrapPlatform } from "@/components/page/bootstrap";
 
@@ -89,8 +90,9 @@ export function CandleProductDetail({
           ))}
         </nav>
 
+        <PdpVariantProvider defaultVariantId={p.defaultVariantId}>
         <div className="pdp__layout">
-          <ProductGallery images={p.gallery} name={p.name} itemId={p.slug} />
+          <PdpGalleryIsland gallery={p.gallery} galleriesByVariant={p.galleriesByVariant} name={p.name} itemId={p.slug} />
 
           <div className="pdp__info">
             {p.chapterName ? (
@@ -133,6 +135,7 @@ export function CandleProductDetail({
             )}
           </div>
         </div>
+        </PdpVariantProvider>
       </div>
 
       <div className="pdp__editorial" style={editorialVars}>

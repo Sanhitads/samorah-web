@@ -47,6 +47,16 @@ export interface ProductGalleryImage {
   alt: string;
   focal?: string; // CSS object-position for the crop (e.g. "50% 30%"); undefined = centre
 }
+
+/** The gallery to show for the selected variant: its own photos if it has any, else the shared default. */
+export function galleryForVariant(
+  selectedVariantId: string | null,
+  galleriesByVariant: Record<string, ProductGalleryImage[]>,
+  defaultGallery: ProductGalleryImage[],
+): ProductGalleryImage[] {
+  const own = selectedVariantId ? galleriesByVariant[selectedVariantId] : undefined;
+  return own && own.length ? own : defaultGallery;
+}
 export interface ProductVariantView {
   id: string;
   vessel: string;
@@ -90,7 +100,9 @@ export interface ProductPageView {
   edition: string; // "VOL. III.1" — set by the route from the collection position
   scentGroup: string | null;
   fragranceFamily: string | null;
-  gallery: ProductGalleryImage[];
+  gallery: ProductGalleryImage[]; // shared/default gallery (variant_id-null images) — also the SEO/card source
+  /** Per-variant galleries keyed by variant id. A variant absent here (no own photos) falls back to `gallery`. */
+  galleriesByVariant: Record<string, ProductGalleryImage[]>;
   vessels: string[];
   sizes: string[];
   variants: ProductVariantView[];
@@ -117,12 +129,41 @@ const BURN_BY_SIZE: Record<string, string> = {
   "350g": "~80 hours",
 };
 
-function toGallery(p: ProductInput): ProductGalleryImage[] {
-  const imgs = (p.product_images ?? []).filter((i) => i.url);
-  if (imgs.length === 0) return [{ src: GRADIENT, alt: p.name }];
-  return [...imgs]
+/** Sort a set of images by sort_order and map to the gallery view type. */
+function toGalleryImages(imgs: ImageLike[], name: string): ProductGalleryImage[] {
+  return [...imgs.filter((i) => i.url)]
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-    .map((i) => ({ src: i.url, alt: i.alt_text ?? p.name, focal: i.focal ?? undefined }));
+    .map((i) => ({ src: i.url, alt: i.alt_text ?? name, focal: i.focal ?? undefined }));
+}
+
+/** Shared/default gallery = images with no variant (variant_id null). This is what every pre-existing
+ *  product has, so the default view is byte-identical to before. If a product has ONLY per-variant
+ *  images (no shared ones), fall back to any image so the default view is never blank, else the gradient
+ *  placeholder (the unchanged no-image behaviour). */
+function toGallery(p: ProductInput): ProductGalleryImage[] {
+  const all = p.product_images ?? [];
+  const shared = toGalleryImages(all.filter((i) => i.variant_id == null), p.name);
+  if (shared.length) return shared;
+  const any = toGalleryImages(all, p.name);
+  return any.length ? any : [{ src: GRADIENT, alt: p.name }];
+}
+
+/** Per-variant galleries keyed by variant id, from images tagged with a variant_id. A variant with no
+ *  own images is simply absent from the map; the gallery then falls back to the shared default. */
+function toGalleriesByVariant(p: ProductInput): Record<string, ProductGalleryImage[]> {
+  const groups = new Map<string, ImageLike[]>();
+  for (const img of p.product_images ?? []) {
+    if (!img.url || img.variant_id == null) continue;
+    const g = groups.get(img.variant_id) ?? [];
+    g.push(img);
+    groups.set(img.variant_id, g);
+  }
+  const out: Record<string, ProductGalleryImage[]> = {};
+  for (const [vid, imgs] of groups) {
+    const gallery = toGalleryImages(imgs, p.name);
+    if (gallery.length) out[vid] = gallery;
+  }
+  return out;
 }
 
 function toVariantViews(variants: ProductVariantInput[]): ProductVariantView[] {
@@ -206,6 +247,7 @@ export function buildProductPage(p: ProductInput): ProductPageView {
     scentGroup: p.scent_group,
     fragranceFamily: p.fragrance_family,
     gallery: toGallery(p),
+    galleriesByVariant: toGalleriesByVariant(p),
     vessels,
     sizes,
     variants: variantViews,

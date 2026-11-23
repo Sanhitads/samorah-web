@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type FocusEvent, type TextareaHTM
 import type { VariantRow, NoteRow, ImageRow, VesselType, ProductStatus } from "@/services/productAdminService";
 import { LivePreviewPanel } from "@/components/admin/LivePreviewPanel";
 import { FocalPicker } from "@/components/admin/FocalPicker";
+import { MediaPicker } from "@/components/admin/MediaPicker";
 import { buildVariantSavePayload } from "@/lib/inventory/variantSavePayload";
 import { AIR_ACCORDION_DEFAULTS, AIR_SECTION_POSITIONS, type CustomSection } from "@/config/theHours";
 import { CANDLE_SECTION_POSITIONS } from "@/lib/productEditorial";
@@ -41,6 +42,53 @@ function ImgField({ value, onChange, onUpload, placeholder, disabled, uploading,
         <input type="file" accept="image/*" style={{ display: "none" }} disabled={disabled || uploading} onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(f); e.target.value = ""; }} />
       </label>
       {value && onClear ? <button type="button" className="ff-btn ff-btn--mini" onClick={onClear}>Clear</button> : null}
+    </div>
+  );
+}
+
+/** One gallery block in the product editor: the image cards (reorder / delete / alt / focal, plus an
+ *  optional "Set hero" for the shared gallery) and its own Upload + Add-by-URL controls. Rendered once for
+ *  the shared/default gallery and once per variant (vessel+size), so each vessel+size can carry its own
+ *  photos. Each block keeps its own url/alt input state so the sections don't cross-contaminate. */
+function VariantGallery({ label, hint, images, canSetPrimary, onAddImage, onAddUrl, onDelete, onMove, onSaveAlt, onSaveFocal, onSetPrimary }: {
+  label: string; hint?: string; images: ImageRow[]; canSetPrimary?: boolean;
+  onAddImage: () => void; onAddUrl: (url: string, alt: string) => void;
+  onDelete: (id: string) => void; onMove: (id: string, dir: number) => void;
+  onSaveAlt: (id: string, alt: string) => void; onSaveFocal: (id: string, focal: string) => void;
+  onSetPrimary?: (id: string) => void;
+}) {
+  const [url, setUrl] = useState("");
+  const sorted = [...images].sort((a, b) => a.sortOrder - b.sortOrder);
+  const few = sorted.length < 3;
+  return (
+    <div className="pe-vargal">
+      <div className="pe-vargal__head">
+        <strong>{label}</strong>
+        <span className="om-field__hint">{sorted.length} photo{sorted.length === 1 ? "" : "s"}{few ? " · aim for at least 3" : ""}</span>
+      </div>
+      {hint ? <p className="om-field__hint" style={{ margin: "0 0 6px" }}>{hint}</p> : null}
+      <div className="pe-imgs">
+        {sorted.map((im) => (
+          <div key={im.id} className="pe-img">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={im.url} alt={im.altText ?? ""} />
+            {canSetPrimary && im.isPrimary ? <span className="pe-img__hero">Hero</span> : null}
+            <input className="pe-img__alt" defaultValue={im.altText ?? ""} placeholder="alt text" onBlur={(e) => onSaveAlt(im.id, e.target.value)} />
+            <div className="pe-img__actions">
+              {canSetPrimary && onSetPrimary && !im.isPrimary ? <button type="button" className="ff-btn ff-btn--mini" onClick={() => onSetPrimary(im.id)}>Set hero</button> : null}
+              <button type="button" className="ff-btn ff-btn--mini" onClick={() => onMove(im.id, -1)}>↑</button>
+              <button type="button" className="ff-btn ff-btn--mini" onClick={() => onMove(im.id, 1)}>↓</button>
+              <button type="button" className="ff-btn ff-btn--mini ff-btn--danger" onClick={() => onDelete(im.id)}>×</button>
+            </div>
+            <FocalPicker url={im.url} value={im.focal} onChange={(pos) => onSaveFocal(im.id, pos)} />
+          </div>
+        ))}
+      </div>
+      <div className="pe-imgadd">
+        <button type="button" className="ff-btn ff-btn--primary" onClick={onAddImage}>＋ Add image — Media Library / upload</button>
+        <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="…or paste an image URL" />
+        <button type="button" className="ff-btn" disabled={!url.trim()} onClick={() => { onAddUrl(url, ""); setUrl(""); }}>Add URL</button>
+      </div>
     </div>
   );
 }
@@ -314,11 +362,11 @@ export function ProductEditor({ productId, collections, categories, allProducts 
   const [variants, setVariants] = useState<VariantRow[]>([]);
   const [notes, setNotes] = useState<NoteRow[]>([]);
   const [images, setImages] = useState<ImageRow[]>([]);
+  const [galPicker, setGalPicker] = useState<{ variantId: string | null } | null>(null); // Media Library open for a gallery
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false); // section/artist image uploads — kept off the Save button's busy flag
   const [err, setErr] = useState("");
   const [msg, setMsg] = useState("");
-  const [imgUrl, setImgUrl] = useState(""); const [imgAlt, setImgAlt] = useState("");
   const [timeline, setTimeline] = useState<Timeline | null>(null);
   const [rels, setRels] = useState<Relationship[]>([]);
   const [relPick, setRelPick] = useState(""); const [relType, setRelType] = useState("related");
@@ -483,7 +531,7 @@ export function ProductEditor({ productId, collections, categories, allProducts 
       id: productId, name: core.name, slug: core.slug, tagline: core.tagline,
       price: core.price, product_type: core.productType, chapter_position: core.chapterPosition,
       air_content: assembleAirContent(core),
-      product_images: [...images].sort((a, b) => a.sortOrder - b.sortOrder).map((im) => ({ url: im.url, is_primary: im.isPrimary, sort_order: im.sortOrder, focal: im.focal })),
+      product_images: [...images].sort((a, b) => a.sortOrder - b.sortOrder).map((im) => ({ url: im.url, is_primary: im.isPrimary, sort_order: im.sortOrder, focal: im.focal, variant_id: im.variantId })),
       collection: col ? { id: col.id, name: col.name, slug: col.slug ?? "", volume: col.volume, tagline: "", cover_image_url: "", is_coming_soon: false } : {},
       __siblings: siblings,
     };
@@ -510,7 +558,7 @@ export function ProductEditor({ productId, collections, categories, allProducts 
         price: v.price, sale_price: v.salePrice, stock: v.stock, low_stock_threshold: v.lowStockThreshold ?? 0,
         is_active: v.isActive, sort_order: v.sortOrder,
       })),
-      product_images: [...images].sort((a, b) => a.sortOrder - b.sortOrder).map((im) => ({ url: im.url, alt_text: im.altText, is_primary: im.isPrimary, sort_order: im.sortOrder, focal: im.focal })),
+      product_images: [...images].sort((a, b) => a.sortOrder - b.sortOrder).map((im) => ({ url: im.url, alt_text: im.altText, is_primary: im.isPrimary, sort_order: im.sortOrder, focal: im.focal, variant_id: im.variantId })),
       fragrance_notes: notes.map((n) => ({ layer: n.layer, note: n.note, sort_order: n.sortOrder })),
       pdp_content: assembleCandleContent(core),
       __edition: core.cEdition.trim() || editionOf(col?.volume, Number(core.chapterPosition) || 1),
@@ -691,20 +739,10 @@ export function ProductEditor({ productId, collections, categories, allProducts 
     if (await post({ action: "notes.set", productId, notes: payload })) { setMsg("Notes saved"); setTimeout(() => setMsg(""), 1500); }
   };
 
-  // Images
-  const addImage = async () => { if (imgUrl.trim() && await post({ action: "image.add", productId, url: imgUrl, altText: imgAlt })) { setImgUrl(""); setImgAlt(""); await load(); onSaved(); } };
-  const uploadImage = async (file: File) => {
-    setBusy(true); setErr("");
-    try {
-      const fd = new FormData();
-      const alt = imgAlt.trim() || core?.name || "";
-      fd.append("file", file); fd.append("folder", "products"); if (alt) fd.append("alt", alt);
-      const res = await fetch("/api/admin/media", { method: "POST", body: fd });
-      const d = await res.json(); setBusy(false);
-      if (!res.ok || !d.url) { setErr(d.error ?? d.reason ?? "Upload failed"); return; }
-      if (d.warning) setErr(d.warning); // uploaded, but flag a too-small image
-      if (await post({ action: "image.add", productId, url: d.url, altText: alt })) { setImgAlt(""); await load(); onSaved(); }
-    } catch (e) { setBusy(false); setErr(e instanceof Error ? e.message : "Upload failed"); }
+  // Images — one gallery is the shared/default (variantId null); each variant (vessel+size) can also have
+  // its own. All go through the same image.add action with an optional variantId.
+  const addImageTo = async (variantId: string | null, url: string, altText: string) => {
+    if (url.trim() && await post({ action: "image.add", productId, url: url.trim(), altText: altText.trim(), variantId })) { await load(); onSaved(); }
   };
 
   // Upload a single image and hand the URL to a setter — for the candle PDP's section-specific images
@@ -729,12 +767,12 @@ export function ProductEditor({ productId, collections, categories, allProducts 
     setImages((prev) => prev.map((im) => (im.id === id ? { ...im, focal: focal || null } : im)));
     await post({ action: "image.update", id, patch: { focal } });
   };
-  const moveImage = async (id: string, dir: number) => {
-    const sorted = [...images].sort((a, b) => a.sortOrder - b.sortOrder);
-    const i = sorted.findIndex((x) => x.id === id); const j = i + dir;
-    if (j < 0 || j >= sorted.length) return;
-    await post({ action: "image.update", id: sorted[i].id, patch: { sortOrder: sorted[j].sortOrder } });
-    await post({ action: "image.update", id: sorted[j].id, patch: { sortOrder: sorted[i].sortOrder } });
+  const moveImage = async (id: string, dir: number, variantId: string | null) => {
+    const scope = images.filter((im) => (im.variantId ?? null) === variantId).sort((a, b) => a.sortOrder - b.sortOrder);
+    const i = scope.findIndex((x) => x.id === id); const j = i + dir;
+    if (i < 0 || j < 0 || j >= scope.length) return;
+    await post({ action: "image.update", id: scope[i].id, patch: { sortOrder: scope[j].sortOrder } });
+    await post({ action: "image.update", id: scope[j].id, patch: { sortOrder: scope[i].sortOrder } });
     await load();
   };
 
@@ -1408,34 +1446,35 @@ export function ProductEditor({ productId, collections, categories, allProducts 
 
         <details className="pe-sec">
           <summary>Images ({images.length})</summary>
-          <div className="pe-imgs">
-            {[...images].sort((a, b) => a.sortOrder - b.sortOrder).map((im) => (
-              <div key={im.id} className="pe-img">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={im.url} alt={im.altText ?? ""} />
-                {im.isPrimary ? <span className="pe-img__hero">Hero</span> : null}
-                <input className="pe-img__alt" defaultValue={im.altText ?? ""} placeholder="alt text" onBlur={(e) => saveAlt(im.id, e.target.value)} />
-                <div className="pe-img__actions">
-                  {!im.isPrimary ? <button type="button" className="ff-btn ff-btn--mini" onClick={() => primaryImage(im.id)}>Set hero</button> : null}
-                  <button type="button" className="ff-btn ff-btn--mini" onClick={() => moveImage(im.id, -1)}>↑</button>
-                  <button type="button" className="ff-btn ff-btn--mini" onClick={() => moveImage(im.id, 1)}>↓</button>
-                  <button type="button" className="ff-btn ff-btn--mini ff-btn--danger" onClick={() => delImage(im.id)}>×</button>
-                </div>
-                <FocalPicker url={im.url} value={im.focal} onChange={(pos) => saveFocal(im.id, pos)} />
-              </div>
-            ))}
-          </div>
-          <div className="pe-imgadd">
-            <input value={imgAlt} onChange={(e) => setImgAlt(e.target.value)} placeholder="Alt text (applies to the next image)" />
-            <label className={`ff-btn ff-btn--primary${busy ? " is-disabled" : ""}`} style={{ cursor: busy ? "default" : "pointer" }}>
-              {busy ? "Uploading…" : "⬆ Upload image"}
-              <input type="file" accept="image/*" style={{ display: "none" }} disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadImage(f); e.target.value = ""; }} />
-            </label>
-          </div>
-          <div className="pe-imgadd">
-            <input value={imgUrl} onChange={(e) => setImgUrl(e.target.value)} placeholder="…or paste an image URL" />
-            <button type="button" className="ff-btn" disabled={busy || !imgUrl.trim()} onClick={addImage}>Add by URL</button>
-          </div>
+          <p className="om-field__hint" style={{ margin: "0 0 10px" }}>
+            The <b>Shared</b> gallery shows for any selection. Add photos under a specific <b>vessel · size</b> to show those when the customer picks that variant on the product page; a variant with no photos of its own falls back to the Shared gallery. Aim for at least 3 photos each. <b>Save a new variant first</b> before adding its photos.
+          </p>
+          <VariantGallery
+            label="Shared / all variants"
+            hint="The default gallery, and the fallback for any variant without its own photos. The hero here is the product's card thumbnail."
+            images={images.filter((im) => im.variantId == null)}
+            canSetPrimary
+            onAddImage={() => setGalPicker({ variantId: null })}
+            onAddUrl={(url, alt) => void addImageTo(null, url, alt)}
+            onDelete={delImage}
+            onMove={(id, dir) => moveImage(id, dir, null)}
+            onSaveAlt={saveAlt}
+            onSaveFocal={saveFocal}
+            onSetPrimary={primaryImage}
+          />
+          {variants.filter((v) => v.id && (v.vesselType || v.sizeLabel)).map((v) => (
+            <VariantGallery
+              key={v.id}
+              label={[v.vesselType ? v.vesselType[0].toUpperCase() + v.vesselType.slice(1) : null, v.sizeLabel].filter(Boolean).join(" · ") || v.sku}
+              images={images.filter((im) => im.variantId === v.id)}
+              onAddImage={() => setGalPicker({ variantId: v.id })}
+              onAddUrl={(url, alt) => void addImageTo(v.id, url, alt)}
+              onDelete={delImage}
+              onMove={(id, dir) => moveImage(id, dir, v.id)}
+              onSaveAlt={saveAlt}
+              onSaveFocal={saveFocal}
+            />
+          ))}
         </details>
 
         <details className="pe-sec">
@@ -1500,6 +1539,12 @@ export function ProductEditor({ productId, collections, categories, allProducts 
           {msg ? <span className="ff-done">{msg}</span> : null}
           <button type="button" className="ff-btn ff-btn--primary" disabled={busy} onClick={saveCore}>{busy ? "Saving…" : "Save product"}</button>
         </div>
+        <MediaPicker
+          open={!!galPicker}
+          kind="image"
+          onSelect={(mediaUrl) => { if (galPicker) void addImageTo(galPicker.variantId, mediaUrl, ""); setGalPicker(null); }}
+          onClose={() => setGalPicker(null)}
+        />
     </div>
   );
 

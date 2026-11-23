@@ -106,6 +106,7 @@ export interface ImageLike {
   is_primary?: boolean | null;
   sort_order?: number | null;
   focal?: string | null; // CSS object-position ("50% 30%") for the gallery crop; null = centre
+  variant_id?: string | null; // owning variant (vessel+size); null = shared/default image
 }
 
 /** Primary image: the flagged one, else lowest sort_order, else first. */

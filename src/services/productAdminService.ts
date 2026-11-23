@@ -88,7 +88,7 @@ export interface VariantRow {
 }
 
 export interface NoteRow { id: string; layer: string; note: string; sortOrder: number; }
-export interface ImageRow { id: string; url: string; altText: string | null; isPrimary: boolean; sortOrder: number; focal: string | null; }
+export interface ImageRow { id: string; url: string; altText: string | null; isPrimary: boolean; sortOrder: number; focal: string | null; variantId: string | null; }
 
 export async function getProductForEdit(id: string): Promise<{ product: any; variants: VariantRow[]; notes: NoteRow[]; images: ImageRow[] } | null> {
   const db = loose();
@@ -109,7 +109,7 @@ export async function getProductForEdit(id: string): Promise<{ product: any; var
     supplierSku: v.supplier_sku ?? null,
   }));
   const notes: NoteRow[] = (ns ?? []).map((n: any) => ({ id: n.id, layer: n.layer, note: n.note, sortOrder: Number(n.sort_order ?? 0) }));
-  const images: ImageRow[] = (imgs ?? []).map((im: any) => ({ id: im.id, url: im.url, altText: im.alt_text ?? null, isPrimary: Boolean(im.is_primary), sortOrder: Number(im.sort_order ?? 0), focal: im.focal ?? null }));
+  const images: ImageRow[] = (imgs ?? []).map((im: any) => ({ id: im.id, url: im.url, altText: im.alt_text ?? null, isPrimary: Boolean(im.is_primary), sortOrder: Number(im.sort_order ?? 0), focal: im.focal ?? null, variantId: im.variant_id ?? null }));
   return { product, variants, notes, images };
 }
 
@@ -136,13 +136,23 @@ export async function setFragranceNotes(productId: string, notes: { layer: strin
 }
 
 // ── Product images ───────────────────────────────────────────────────────────────────────────────
-export async function addProductImage(productId: string, url: string, altText: string, actorId?: string) {
+export async function addProductImage(productId: string, url: string, altText: string, actorId?: string, variantId?: string | null) {
   if (!url.trim()) return { ok: false, reason: "url required" };
   const db = loose();
-  const { data: existing } = await db.from("product_images").select("id,sort_order").eq("product_id", productId);
+  const vid = variantId ?? null;
+  // Scope ordering + the "first image becomes primary" rule to THIS gallery (the shared/default set, or a
+  // specific variant), so a variant's photos number from their own 1 and never disturb the shared set.
+  let existingQ = db.from("product_images").select("id,sort_order").eq("product_id", productId);
+  existingQ = vid === null ? existingQ.is("variant_id", null) : existingQ.eq("variant_id", vid);
+  const { data: existing } = await existingQ;
   const maxSort = (existing ?? []).reduce((m: number, i: any) => Math.max(m, Number(i.sort_order ?? 0)), -1);
   const isFirst = !(existing ?? []).length;
-  const { error } = await db.from("product_images").insert({ product_id: productId, url: url.trim(), alt_text: altText.trim(), is_primary: isFirst, sort_order: maxSort + 1 });
+  // Only the shared/default gallery carries the single is_primary (card thumbnail / default lead image);
+  // per-variant images are never primary, which keeps the one-primary-per-product index valid.
+  const { error } = await db.from("product_images").insert({
+    product_id: productId, variant_id: vid, url: url.trim(), alt_text: altText.trim(),
+    is_primary: vid === null ? isFirst : false, sort_order: maxSort + 1,
+  });
   if (error) return { ok: false, reason: error.message };
   await logEvent({ entityType: "product", entityId: productId, event: "product.image_added", actorType: actorId ? "staff" : "system", actorId });
   return { ok: true };

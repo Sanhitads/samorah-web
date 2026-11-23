@@ -46,7 +46,7 @@ export async function POST(request: Request) {
       case "notes.set":
         return NextResponse.json(await setFragranceNotes(body.productId, body.notes ?? [], a));
       case "image.add":
-        return NextResponse.json(await addProductImage(body.productId, body.url, body.altText ?? "", a));
+        return NextResponse.json(await addProductImage(body.productId, body.url, body.altText ?? "", a, body.variantId ?? null));
       case "image.update":
         return NextResponse.json(await updateProductImage(body.id, body.patch ?? {}, a));
       case "image.primary":

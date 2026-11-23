@@ -13,11 +13,16 @@ import type { ProductGalleryImage } from "@/lib/productPage";
  * images; Escape closes the lightbox; body scroll locks while open. A single
  * image renders without thumbnails; thumbnails appear once a product has 2+.
  */
-export function ProductGallery({ images, name, itemId }: { images: ProductGalleryImage[]; name: string; itemId?: string }) {
+export function ProductGallery({ images, name, itemId, galleryKey }: { images: ProductGalleryImage[]; name: string; itemId?: string; galleryKey?: string }) {
   const imgs = images.length ? images : [];
   const count = imgs.length;
   const [active, setActive] = useState(0);
   const [open, setOpen] = useState(false);
+
+  // When the gallery set swaps (e.g. a different vessel/size is chosen), show its first image again.
+  useEffect(() => { setActive(0); }, [galleryKey]);
+  // Guard the displayed index against a set that just got shorter (one render before the reset lands).
+  const activeIdx = active < count ? active : 0;
 
   // Gallery engagement (review point 5) — luxury buyers look carefully. Fire image_change
   // (skip the initial render) and fullscreen. Zoom is a CSS hover; fullscreen is the signal.
@@ -57,7 +62,7 @@ export function ProductGallery({ images, name, itemId }: { images: ProductGaller
     };
   }, [open, count]);
 
-  const current = imgs[active];
+  const current = imgs[activeIdx];
 
   return (
     <div className="pdp__gallery" data-count={count} onKeyDown={onKey}>
@@ -68,9 +73,9 @@ export function ProductGallery({ images, name, itemId }: { images: ProductGaller
               key={i}
               type="button"
               className="pdp__thumb"
-              data-active={i === active}
+              data-active={i === activeIdx}
               role="tab"
-              aria-selected={i === active}
+              aria-selected={i === activeIdx}
               aria-label={`View image ${i + 1}`}
               onClick={() => setActive(i)}
             >
@@ -82,8 +87,8 @@ export function ProductGallery({ images, name, itemId }: { images: ProductGaller
 
       <div className="pdp__image" tabIndex={count > 1 ? 0 : -1} aria-roledescription="carousel">
         {imgs.map((g, i) => (
-          <div key={i} className="pdp__image-layer" data-active={i === active} aria-hidden={i !== active}>
-            <AssetImage asset={g.src} alt={i === active ? g.alt : ""} role="detail" priority={i === 0} sizes="(max-width: 900px) 100vw, 46vw" className="pdp__image-fill" objectPosition={g.focal} />
+          <div key={i} className="pdp__image-layer" data-active={i === activeIdx} aria-hidden={i !== activeIdx}>
+            <AssetImage asset={g.src} alt={i === activeIdx ? g.alt : ""} role="detail" priority={i === 0} sizes="(max-width: 900px) 100vw, 46vw" className="pdp__image-fill" objectPosition={g.focal} />
           </div>
         ))}
         <button type="button" className="pdp__zoom" onClick={() => setOpen(true)} aria-label="View full screen">
