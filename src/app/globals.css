@@ -43,6 +43,25 @@
   --header-height: 72px;
 }
 
+/* ─── Monetary numerals ───
+   Cormorant Garamond (our editorial serif) defaults to OLD-STYLE figures — lovely in running text, but
+   the descending 3/4/5/7/9 make prices look uneven and dip below the baseline. The loaded font DOES carry
+   lining figures (lnum, verified in the served woff2), so every customer-facing MONETARY amount uses
+   lining numerals — all digits sit on the same baseline. Scoped to price classes ONLY: chapter numbers,
+   editions, burn times, sizes and editorial text keep their old-style figures. (Amounts in sans classes
+   already use lining figures; they are listed here so this stays the single source of truth for prices.) */
+.purchase__price,
+.product-card__price,
+.composition__row,
+.cart-item__price, .cart-comp__total, .cart-drawer__line, .cart-drawer__subtotal span:last-child,
+.comp-card__total, .cart-line__total, .cart-summary__row, .cart-summary__row--total,
+.checkout__item-price, .checkout__comp-total, .checkout__row, .checkout__delivery-value,
+.oc-item__price, .oc-comp__total, .order-conf__payment-amount, .order-conf__row,
+.acc__order-total, .acc__total, .acc__item-price, .wl-card__price,
+.acc__loyalty-v {  /* reward points / member-since date — numeric account stats, same clean figures */
+  font-variant-numeric: lining-nums;
+}
+
 /* ─── Reset & Base ─── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 

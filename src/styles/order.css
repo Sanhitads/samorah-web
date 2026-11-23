@@ -181,7 +181,7 @@
   line-height: 1.6;
   margin-bottom: 12px;
 }
-.order-conf__row > span:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.order-conf__row > span:last-child { text-align: right; font-variant-numeric: tabular-nums lining-nums; }
 .order-conf__row--discount { color: var(--oc-gold); }
 .order-conf__row--muted { font-size: 0.85rem; color: var(--smoke, #6b6259); margin-bottom: 8px; }
 .order-conf__row--total {

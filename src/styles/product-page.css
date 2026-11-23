@@ -6,9 +6,9 @@
 .pdp { width: 100%; }
 .pdp__head {
   width: 100%;
-  max-width: var(--container-wide, 1440px);
+  max-width: 1560px;
   margin-inline: auto;
-  padding: clamp(20px, 3vw, 36px) clamp(24px, 5vw, 80px) 0;
+  padding: clamp(20px, 3vw, 36px) clamp(24px, 4vw, 56px) 0;
 }
 
 .pdp__breadcrumb {
@@ -28,45 +28,65 @@
 /* ── Layout ── */
 .pdp__layout {
   display: grid;
-  grid-template-columns: 1.05fr 0.95fr;
-  gap: clamp(40px, 6vw, 96px);
+  grid-template-columns: 1.32fr 0.8fr;
+  gap: clamp(28px, 4vw, 64px);
   align-items: start;
 }
 
-/* ── Gallery — vertical thumbnails + a cross-fading main image ── */
-.pdp__gallery { display: flex; gap: 12px; align-items: flex-start; }
-.pdp__gallery[data-count="1"] { display: block; }
-.pdp__thumbs {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  flex: none;
-  width: clamp(56px, 7vw, 78px);
+/* ── Gallery — a large hero photo that fills the column and the viewport height, with a floating
+   thumbnail rail overlaid inside its bottom edge (à la Boy Smells). The photo keeps its full size no
+   matter how many images there are; the whole column is pinned so the photo stays in view while the
+   info scrolls, then releases into the editorial sections below. ── */
+.pdp__gallery {
+  position: sticky;
+  top: 80px;
+  align-self: start;
 }
-.pdp__thumb {
-  position: relative;
-  aspect-ratio: 3 / 4;
-  border: none;
-  padding: 0;
-  border-radius: 2px;
-  overflow: hidden;
-  background: var(--surface-alt, var(--soft-beige));
-  opacity: 0.5;
-  transition: opacity 0.4s var(--motion-ease);
-  cursor: pointer;
-}
-.pdp__thumb[data-active="true"],
-.pdp__thumb:hover { opacity: 1; }
-.pdp__thumb-fill { width: 100%; height: 100%; }
-
 .pdp__image {
   position: relative;
-  flex: 1;
-  aspect-ratio: 3 / 4;
+  width: 100%;
+  height: calc(100vh - 128px); /* fill the viewport — the photo is the hero */
+  max-height: 900px;
+  min-height: 460px;
   border-radius: 3px;
   overflow: hidden;
   background: var(--surface-alt, var(--soft-beige));
 }
+/* Floating thumbnail pill inside the bottom of the photo. Unselected photos sit back, softly blurred;
+   only the active one is sharp (with a ring). */
+.pdp__thumbs {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: row;
+  gap: 7px;
+  max-width: calc(100% - 28px);
+  overflow-x: auto;
+  scrollbar-width: none;
+  z-index: 2;
+}
+.pdp__thumbs::-webkit-scrollbar { display: none; }
+.pdp__thumb {
+  position: relative;
+  flex: none;
+  width: clamp(36px, 2.8vw, 48px); /* small, natural */
+  aspect-ratio: 3 / 4;
+  border: none;
+  padding: 0;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--surface-alt, var(--soft-beige));
+  opacity: 0.7;
+  filter: blur(1.3px); /* unselected sit back, softly blurred; the active one is sharp */
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.16); /* soft natural lift — no pill, no ring */
+  transition: opacity 0.4s var(--motion-ease), filter 0.4s var(--motion-ease);
+  cursor: pointer;
+}
+.pdp__thumb[data-active="true"] { opacity: 1; filter: none; }
+.pdp__thumb:hover { opacity: 0.9; filter: blur(0.3px); }
+.pdp__thumb-fill { width: 100%; height: 100%; }
 .pdp__image-layer {
   position: absolute;
   inset: 0;
@@ -153,13 +173,15 @@
 .pdp__lightbox-nav--next { right: clamp(8px, 2vw, 28px); }
 
 @media (max-width: 860px) {
-  .pdp__gallery { flex-direction: column-reverse; }
-  .pdp__thumbs { flex-direction: row; width: 100%; }
-  .pdp__thumb { flex: 1; }
+  /* Single column on phones — the photo flows normally (no sticky) at a natural portrait height. */
+  .pdp__gallery { position: static; }
+  .pdp__image { height: auto; aspect-ratio: 4 / 5; max-height: none; min-height: 0; }
 }
 
 /* ── Info ── */
-.pdp__info { position: sticky; top: 96px; }
+/* The gallery is the pinned column now, so the info scrolls past the photo (the photo stays "intact"
+   while you read); it reverts to normal flow once the editorial sections begin below. */
+.pdp__info { position: static; }
 /* Chapter (muted) sits above the number, which sits above the name. */
 .pdp__chapter {
   display: inline-block;
@@ -258,7 +280,8 @@
 }
 .purchase__price {
   font-family: var(--font-serif);
-  font-size: clamp(1.6rem, 3vw, 2.1rem);
+  /* ~27px on mobile → ~31px on desktop (lining numerals set globally for monetary amounts). */
+  font-size: clamp(1.7rem, 1.1rem + 1.5vw, 1.95rem);
   color: var(--ink);
   margin-bottom: 10px;
 }

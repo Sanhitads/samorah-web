@@ -62,7 +62,11 @@ export default async function AccountPage() {
       <nav className="acc__nav" aria-label="Account">
         <Link href="/account/orders" className="acc__card"><span className="acc__card-title">Orders</span><span className="acc__card-sub">Track & review past orders</span></Link>
         <Link href="/account/addresses" className="acc__card"><span className="acc__card-title">Addresses</span><span className="acc__card-sub">Manage delivery details</span></Link>
-        <Link href="/wishlist" className="acc__card"><span className="acc__card-title">Wishlist</span><span className="acc__card-sub">Saved fragrances</span></Link>
+        {/* Wishlist is HIDDEN until the "add to wishlist" UI ships. The store (useWishlistStore), the
+            /wishlist page and cross-device sync all exist, but nothing in the storefront can ADD an item
+            yet (no save control on the PDP or product cards — addToWishlist is never called), so the list
+            is always empty. To re-enable once that lands, restore:
+            <Link href="/wishlist" className="acc__card"><span className="acc__card-title">Wishlist</span><span className="acc__card-sub">Saved fragrances</span></Link> */}
       </nav>
 
       {/* Recent orders */}
